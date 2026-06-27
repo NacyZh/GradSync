@@ -1,0 +1,155 @@
+services:
+  migrate:
+    image: ${BACKEND_IMAGE:-gradsync-backend:local}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    env_file:
+      - path: .env.production.example
+      - path: .env.production
+        required: false
+    command: python manage.py migrate --noinput
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - data
+
+  backend:
+    image: ${BACKEND_IMAGE:-gradsync-backend:local}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    env_file:
+      - path: .env.production.example
+      - path: .env.production
+        required: false
+    environment:
+      GRADSYNC_COLLECT_STATIC: "true"
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=2)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - app
+      - data
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-gradsync-frontend:local}
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app
+
+  worker:
+    image: ${BACKEND_IMAGE:-gradsync-backend:local}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    env_file:
+      - path: .env.production.example
+      - path: .env.production
+        required: false
+    command: celery -A gradsync worker -l info -Q default,notifications
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A gradsync inspect ping -d celery@$${HOSTNAME} >/dev/null"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    networks:
+      - data
+
+  scheduler:
+    image: ${BACKEND_IMAGE:-gradsync-backend:local}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    env_file:
+      - path: .env.production.example
+      - path: .env.production
+        required: false
+    command: celery -A gradsync beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - data
+
+  db:
+    image: postgres:16
+    env_file:
+      - path: .env.production.example
+      - path: .env.production
+        required: false
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backups:/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - data
+
+  redis:
+    image: redis:7
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - data
+
+volumes:
+  postgres_data:
+  postgres_backups:
+  redis_data:
+
+networks:
+  app:
+  data:
+    internal: true

@@ -1,0 +1,170 @@
+name: Release Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: gradsync
+          POSTGRES_USER: gradsync
+          POSTGRES_PASSWORD: gradsync
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gradsync -d gradsync"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e ".[dev]"
+      - name: Lint backend
+        working-directory: backend
+        run: ruff check .
+      - name: Check migrations
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: gradsync.settings.test
+        run: python manage.py makemigrations --check --dry-run
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          POSTGRES_HOST: localhost
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  containers:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    outputs:
+      backend-image: ${{ steps.meta.outputs.backend-image }}
+      frontend-image: ${{ steps.meta.outputs.frontend-image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release credentials
+        if: github.event_name != 'pull_request'
+        run: |
+          test -n "${{ secrets.GRADSYNC_REGISTRY_TOKEN }}" || { echo "GRADSYNC_REGISTRY_TOKEN is required"; exit 1; }
+          test -n "${{ vars.GRADSYNC_PRODUCTION_HOST }}" || { echo "GRADSYNC_PRODUCTION_HOST variable is required"; exit 1; }
+      - name: Log in to registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GRADSYNC_REGISTRY_TOKEN }}
+      - name: Build backend image
+        run: docker build -f docker/backend.Dockerfile -t "${BACKEND_IMAGE}:${{ github.sha }}" -t "${BACKEND_IMAGE}:main" .
+      - name: Build frontend image
+        run: docker build -f docker/frontend.Dockerfile -t "${FRONTEND_IMAGE}:${{ github.sha }}" -t "${FRONTEND_IMAGE}:main" .
+      - name: Audit Python dependencies
+        working-directory: backend
+        run: python -m pip install pip-audit && pip-audit
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+      - name: Push backend image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push "${BACKEND_IMAGE}:${{ github.sha }}"
+          docker push "${BACKEND_IMAGE}:main"
+      - name: Push frontend image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push "${FRONTEND_IMAGE}:${{ github.sha }}"
+          docker push "${FRONTEND_IMAGE}:main"
+      - name: Record image metadata
+        id: meta
+        run: |
+          echo "backend-image=${BACKEND_IMAGE}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "frontend-image=${FRONTEND_IMAGE}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [containers]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://gradsync.example.edu
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment credentials
+        run: |
+          test -n "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" || { echo "PRODUCTION_DEPLOY_SSH_KEY is required"; exit 1; }
+          test -n "${{ secrets.PRODUCTION_ENV_FILE }}" || { echo "PRODUCTION_ENV_FILE is required"; exit 1; }
+          test -n "${{ vars.GRADSYNC_PRODUCTION_HOST }}" || { echo "GRADSYNC_PRODUCTION_HOST variable is required"; exit 1; }
+      - name: Deploy approved images
+        env:
+          BACKEND_IMAGE: ${{ needs.containers.outputs.backend-image }}
+          FRONTEND_IMAGE: ${{ needs.containers.outputs.frontend-image }}
+          DEPLOY_HOST: ${{ vars.GRADSYNC_PRODUCTION_HOST }}
+          DEPLOY_USER: ${{ vars.GRADSYNC_PRODUCTION_USER }}
+        run: |
+          echo "Deploy ${BACKEND_IMAGE} and ${FRONTEND_IMAGE} to ${DEPLOY_USER:-deploy}@${DEPLOY_HOST}"
+          echo "Production environment protection must approve this job before host credentials are used."

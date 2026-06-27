@@ -1,0 +1,721 @@
+openapi: 3.0.3
+info:
+  title: GradSync Research Group Operations API
+  version: 0.1.0
+  description: >
+    Project-scoped API contract for research projects, hierarchical tasks,
+    versioned drafts, weekly reports, inline advisor comments, lab resource
+    bookings, and email notification records.
+servers:
+  - url: /api
+security:
+  - sessionAuth: []
+paths:
+  /projects:
+    get:
+      summary: List projects visible to the current user
+      operationId: listProjects
+      tags: [Projects]
+      responses:
+        "200":
+          description: Visible projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      summary: Create a research project
+      operationId: createProject
+      tags: [Projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{projectId}:
+    get:
+      summary: Get a project dashboard
+      operationId: getProjectDashboard
+      tags: [Projects]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDashboard"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /projects/{projectId}/members:
+    post:
+      summary: Add a member to a project
+      operationId: addProjectMember
+      tags: [Projects]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MembershipCreate"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMembership"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /projects/{projectId}/tasks:
+    get:
+      summary: List project tasks
+      operationId: listProjectTasks
+      tags: [Tasks]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project task tree
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      summary: Create a project task
+      operationId: createProjectTask
+      tags: [Tasks]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskCreate"
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /projects/{projectId}/tasks/{taskId}:
+    patch:
+      summary: Update task fields or status
+      operationId: updateProjectTask
+      tags: [Tasks]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /projects/{projectId}/drafts:
+    get:
+      summary: List project drafts
+      operationId: listProjectDrafts
+      tags: [Drafts]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Draft families visible in the project
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Draft"
+    post:
+      summary: Create a draft family
+      operationId: createDraft
+      tags: [Drafts]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftCreate"
+      responses:
+        "201":
+          description: Draft created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+  /projects/{projectId}/drafts/{draftId}/versions:
+    post:
+      summary: Submit a new draft version
+      operationId: submitDraftVersion
+      tags: [Drafts]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: draftId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftVersionCreate"
+      responses:
+        "201":
+          description: Draft version submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftVersion"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /projects/{projectId}/reports:
+    get:
+      summary: List weekly progress reports
+      operationId: listWeeklyReports
+      tags: [Reports]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project weekly reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WeeklyReport"
+    post:
+      summary: Submit a weekly progress report
+      operationId: submitWeeklyReport
+      tags: [Reports]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WeeklyReportCreate"
+      responses:
+        "201":
+          description: Weekly report submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeeklyReport"
+        "409":
+          description: Report already exists for this student and week
+  /projects/{projectId}/comments:
+    post:
+      summary: Add an inline comment to a draft version or weekly report
+      operationId: createInlineComment
+      tags: [Comments]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InlineCommentCreate"
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InlineComment"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /resources:
+    get:
+      summary: List lab resources
+      operationId: listLabResources
+      tags: [Resources]
+      responses:
+        "200":
+          description: Available and unavailable resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LabResource"
+  /projects/{projectId}/bookings:
+    get:
+      summary: List project bookings
+      operationId: listProjectBookings
+      tags: [Bookings]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+    post:
+      summary: Reserve lab equipment or a seat
+      operationId: createBooking
+      tags: [Bookings]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingCreate"
+      responses:
+        "201":
+          description: Booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "409":
+          description: Booking conflicts with an existing reservation
+  /projects/{projectId}/notifications:
+    get:
+      summary: List notification delivery records for a project
+      operationId: listProjectNotifications
+      tags: [Notifications]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Notification records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Forbidden:
+      description: Current user is not authorized for this project or action
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    Project:
+      type: object
+      required: [id, title, advisorId, status]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        advisorId:
+          type: string
+        status:
+          type: string
+          enum: [active, archived]
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: string
+          format: date
+    ProjectCreate:
+      type: object
+      required: [title, advisorId]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        advisorId:
+          type: string
+        studentIds:
+          type: array
+          items:
+            type: string
+    ProjectDashboard:
+      type: object
+      required: [project, currentTasks, pendingReviews, upcomingBookings]
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+        currentTasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        pendingReviews:
+          type: array
+          items:
+            type: object
+            properties:
+              targetType:
+                type: string
+              targetId:
+                type: string
+              submittedAt:
+                type: string
+                format: date-time
+        upcomingBookings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+    MembershipCreate:
+      type: object
+      required: [userId, role]
+      properties:
+        userId:
+          type: string
+        role:
+          type: string
+          enum: [advisor, student, reviewer, observer]
+    ProjectMembership:
+      type: object
+      required: [id, projectId, userId, role, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        userId:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+          enum: [active, removed]
+    Task:
+      type: object
+      required: [id, projectId, title, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        parentTaskId:
+          type: string
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+        assigneeId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [not_started, in_progress, blocked, submitted, completed, cancelled]
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        deadlineAt:
+          type: string
+          format: date-time
+    TaskCreate:
+      type: object
+      required: [title]
+      properties:
+        parentTaskId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        assigneeId:
+          type: string
+        priority:
+          type: string
+        deadlineAt:
+          type: string
+          format: date-time
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        assigneeId:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        deadlineAt:
+          type: string
+          format: date-time
+    Draft:
+      type: object
+      required: [id, projectId, title, studentId, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        title:
+          type: string
+        studentId:
+          type: string
+        status:
+          type: string
+          enum: [active, closed]
+    DraftCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+    DraftVersion:
+      type: object
+      required: [id, draftId, projectId, versionNumber, submittedById, reviewStatus]
+      properties:
+        id:
+          type: string
+        draftId:
+          type: string
+        projectId:
+          type: string
+        versionNumber:
+          type: integer
+        submittedById:
+          type: string
+        contentReference:
+          type: string
+        summary:
+          type: string
+        reviewStatus:
+          type: string
+          enum: [pending_review, reviewed, needs_revision, closed]
+        submittedAt:
+          type: string
+          format: date-time
+    DraftVersionCreate:
+      type: object
+      required: [contentReference]
+      properties:
+        contentReference:
+          type: string
+        summary:
+          type: string
+    WeeklyReport:
+      type: object
+      required: [id, projectId, studentId, reportWeekStart, reviewStatus]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        studentId:
+          type: string
+        reportWeekStart:
+          type: string
+          format: date
+        completedWork:
+          type: string
+        blockers:
+          type: string
+        nextSteps:
+          type: string
+        reviewStatus:
+          type: string
+          enum: [pending_review, reviewed, needs_revision, closed]
+    WeeklyReportCreate:
+      type: object
+      required: [reportWeekStart, completedWork, nextSteps]
+      properties:
+        reportWeekStart:
+          type: string
+          format: date
+        completedWork:
+          type: string
+        blockers:
+          type: string
+        nextSteps:
+          type: string
+        attachmentReference:
+          type: string
+    InlineComment:
+      type: object
+      required: [id, projectId, targetType, targetId, authorId, anchor, body, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        targetType:
+          type: string
+          enum: [draft_version, progress_report]
+        targetId:
+          type: string
+        authorId:
+          type: string
+        anchor:
+          type: string
+        body:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved]
+    InlineCommentCreate:
+      type: object
+      required: [targetType, targetId, anchor, body]
+      properties:
+        targetType:
+          type: string
+          enum: [draft_version, progress_report]
+        targetId:
+          type: string
+        anchor:
+          type: string
+        body:
+          type: string
+    LabResource:
+      type: object
+      required: [id, name, resourceType, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        resourceType:
+          type: string
+          enum: [equipment, seat]
+        location:
+          type: string
+        status:
+          type: string
+          enum: [available, unavailable, retired]
+    Booking:
+      type: object
+      required: [id, projectId, resourceId, requestedById, startsAt, endsAt, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        resourceId:
+          type: string
+        requestedById:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [reserved, cancelled, completed]
+        purpose:
+          type: string
+    BookingCreate:
+      type: object
+      required: [resourceId, startsAt, endsAt]
+      properties:
+        resourceId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        purpose:
+          type: string
+    Notification:
+      type: object
+      required: [id, projectId, recipientId, eventType, targetType, targetId, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        recipientId:
+          type: string
+        eventType:
+          type: string
+          enum: [new_submission, pending_review, approaching_deadline, booking_changed]
+        targetType:
+          type: string
+        targetId:
+          type: string
+        status:
+          type: string
+          enum: [pending, queued, sent, failed, skipped]
+        eligibleAt:
+          type: string
+          format: date-time
