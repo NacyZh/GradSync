@@ -23,6 +23,49 @@
 6. Watch backend logs, worker logs, queue depth, notification failures, and
    request latency for at least one reminder cycle.
 
+## Host Nginx
+
+The host reverse proxy terminates TLS and forwards all application traffic to
+the frontend container on port `8080`. Do not proxy browser traffic directly to
+backend port `8000`; that bypasses the React static frontend and makes `/`
+return Django's 404.
+
+```nginx
+server {
+    listen 80;
+    server_name 120021123.xyz www.120021123.xyz;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+
+    server_name 120021123.xyz www.120021123.xyz;
+
+    ssl_certificate /etc/letsencrypt/live/120021123.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/120021123.xyz/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Request-ID $request_id;
+    }
+}
+```
+
+Validate the deployed routing with trailing slashes on backend health endpoints:
+
+```bash
+curl -I https://120021123.xyz/
+curl -I https://120021123.xyz/healthz/
+curl -I https://120021123.xyz/readyz/
+curl -I https://120021123.xyz/api/schema/
+```
+
 ## Rollback
 
 1. Keep the previous image tags and `.env.production` available.

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 
-import { HomePage } from '../app/App';
+import { HomePage } from '../app/HomePage';
 import { Layout } from '../app/Layout';
 import { ProjectCreatePage } from '../features/projects/ProjectCreatePage';
 import { ProjectDashboardPage } from '../features/projects/ProjectDashboardPage';

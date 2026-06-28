@@ -40,6 +40,12 @@ def test_frontend_nginx_serves_static_assets_and_proxies_api():
     nginx_conf = (REPO_ROOT / "docker/nginx.conf").read_text()
 
     assert "proxy_pass http://gradsync_backend" in nginx_conf
+    assert "proxy_pass http://gradsync_backend/;" not in nginx_conf
+    assert "location = /healthz/" in nginx_conf
+    assert "location = /readyz/" in nginx_conf
+    assert "location = /metrics/" in nginx_conf
+    assert "proxy_set_header Host $host;" in nginx_conf
+    assert "proxy_set_header X-Forwarded-Proto https;" in nginx_conf
     assert 'Cache-Control "public, max-age=31536000, immutable"' in nginx_conf
     assert "try_files $uri /index.html" in nginx_conf
 
@@ -53,6 +59,8 @@ def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
     assert "./frontend:" not in compose
     assert "${BACKEND_IMAGE" in compose
     assert "${FRONTEND_IMAGE" in compose
+    assert "X-Forwarded-Proto':'https'" in compose
+    assert "http://127.0.0.1:8080/healthz/" in compose
 
 
 def test_production_operational_docs_are_present_and_actionable():

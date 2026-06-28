@@ -15,6 +15,9 @@ approved replacement domain.
 
 - Terminate HTTPS at the production ingress or reverse proxy in front of
   `frontend:8080`.
+- The host reverse proxy must use `proxy_pass http://127.0.0.1:8080;`. Port
+  `8000` is the backend Gunicorn HTTP port and must not be used for browser
+  traffic.
 - Forward `X-Forwarded-Proto: https` and `X-Request-ID` to nginx and Django.
 - Redirect HTTP to HTTPS before traffic reaches Django.
 - Use a certificate with automatic renewal and alert on renewal failure.
@@ -28,8 +31,9 @@ Run these checks before release approval:
 
 ```bash
 curl -I http://gradsync.example.edu
-curl -I https://gradsync.example.edu/healthz
-curl -I https://gradsync.example.edu/api/readyz/
+curl -I https://gradsync.example.edu/healthz/
+curl -I https://gradsync.example.edu/readyz/
+curl -I https://gradsync.example.edu/api/schema/
 ```
 
 Expected results:
@@ -37,5 +41,5 @@ Expected results:
 - HTTP returns a redirect to HTTPS.
 - HTTPS presents a valid, unexpired certificate for the production domain.
 - HSTS is present on HTTPS responses.
-- `/healthz` returns 200 and `/api/readyz/` returns 200 only when database and
+- `/healthz/` returns 200 and `/readyz/` returns 200 only when database and
   Redis are reachable.
