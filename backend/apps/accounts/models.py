@@ -11,6 +11,7 @@ class User(AbstractUser):
         ADMIN = "admin", "Administrator"
 
     class Status(models.TextChoices):
+        INVITED = "invited", "Invited"
         ACTIVE = "active", "Active"
         SUSPENDED = "suspended", "Suspended"
         ARCHIVED = "archived", "Archived"
@@ -34,3 +35,7 @@ class User(AbstractUser):
     @property
     def is_advisor(self) -> bool:
         return self.global_role in {self.GlobalRole.ADVISOR, self.GlobalRole.ADMIN}
+
+    @property
+    def is_administrator(self) -> bool:
+        return self.global_role == self.GlobalRole.ADMIN

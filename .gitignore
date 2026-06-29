@@ -39,9 +39,11 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+CLAUDE.md
 
 # Local data
 postgres-data/
 redis-data/
 media/
 staticfiles/
+specs
