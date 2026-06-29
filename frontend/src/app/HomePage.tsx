@@ -35,14 +35,7 @@ export function HomePage() {
 
       {isLoadingUser ? <AsyncState state="loading" message="Loading account" /> : null}
 
-      {!isLoadingUser && !user ? (
-        <section className="panel">
-          <h2>Sign in required</h2>
-          <p>Use an advisor or student account to open project dashboards and research workflows.</p>
-        </section>
-      ) : null}
-
-      {user ? (
+      {user && (
         <section className="dashboard-grid" aria-label="Application overview">
           <article className="panel">
             <h2>Your projects</h2>
@@ -94,7 +87,7 @@ export function HomePage() {
             </dl>
           </article>
         </section>
-      ) : null}
+      )}
     </Layout>
   );
 }
