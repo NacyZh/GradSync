@@ -17,7 +17,6 @@ describe('project work UI', () => {
 
     expect(screen.getByRole('heading', { name: 'GradSync' })).toBeInTheDocument();
     expect(screen.getByText(/Research group operations/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'New project' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Resources' })).toBeInTheDocument();
   });
 

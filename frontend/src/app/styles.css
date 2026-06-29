@@ -31,9 +31,32 @@ a:hover {
   background: #18202c;
   color: #fff;
   display: flex;
+  gap: 16px;
   height: 56px;
   justify-content: space-between;
   padding: 0 24px;
+}
+
+.topbar-brand {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.topbar-nav {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+}
+
+.topbar-nav a {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.topbar-nav a:hover {
+  color: #fff;
 }
 
 .topbar-right {
@@ -44,6 +67,14 @@ a:hover {
 
 .topbar-user {
   font-size: 14px;
+}
+
+.topbar-role {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 2px 8px;
+  text-transform: uppercase;
 }
 
 .topbar-signout {
@@ -224,6 +255,49 @@ main {
 .login-button {
   justify-content: center;
   margin-top: 4px;
+}
+
+.account-table {
+  border-collapse: collapse;
+  font-size: 14px;
+  width: 100%;
+}
+
+.account-table th,
+.account-table td {
+  border-bottom: 1px solid #e4e7eb;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.account-table th {
+  color: #627d98;
+  font-weight: 600;
+}
+
+.action-cell {
+  display: flex;
+  gap: 8px;
+}
+
+.pagination {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pagination span {
+  color: #627d98;
+  font-size: 14px;
+}
+
+.login-form select {
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+  font-size: 15px;
+  min-height: 40px;
+  padding: 0 12px;
 }
 
 @media (max-width: 720px) {

@@ -29,3 +29,27 @@ class LoginSerializer(serializers.Serializer):
             self.fail("inactive_account")
         attrs["user"] = user
         return attrs
+
+
+# ── Admin account management ──
+
+
+class AccountCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    name = serializers.CharField(max_length=255)
+    global_role = serializers.ChoiceField(choices=["advisor", "student"])
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return value
+
+
+class AccountUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255, required=False)
+    global_role = serializers.ChoiceField(choices=["admin", "advisor", "student"], required=False)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("At least one field must be provided.")
+        return attrs

@@ -1,6 +1,18 @@
 from rest_framework.permissions import BasePermission
 
 
+class IsAdministrator(BasePermission):
+    """Only users with global_role='admin' and status='active' may pass."""
+
+    def has_permission(self, request, view) -> bool:
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.is_administrator
+            and request.user.status == request.user.Status.ACTIVE
+        )
+
+
 class IsProjectMember(BasePermission):
     def has_permission(self, request, view) -> bool:
         project_id = (

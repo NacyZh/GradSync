@@ -15,6 +15,7 @@ export function HomePage() {
   });
 
   const projects = projectsQuery.data?.results ?? [];
+  const role = user?.global_role;
 
   return (
     <Layout>
@@ -24,9 +25,16 @@ export function HomePage() {
           <p>Research group operations for projects, reviews, reports, bookings, and reminders.</p>
         </div>
         <nav aria-label="Primary actions" className="action-row">
-          <Link className="button primary" to="/projects/new">
-            New project
-          </Link>
+          {(role === 'admin' || role === 'advisor') ? (
+            <Link className="button primary" to="/projects/new">
+              New project
+            </Link>
+          ) : null}
+          {role === 'admin' ? (
+            <Link className="button" to="/admin/accounts">
+              Manage accounts
+            </Link>
+          ) : null}
           <Link className="button" to="/resources">
             Resources
           </Link>
@@ -60,14 +68,25 @@ export function HomePage() {
             ) : null}
           </article>
 
-          <article className="panel">
-            <h2>Workflow</h2>
-            <div className="workflow-list">
-              <Link to="/projects/new">Create project and memberships</Link>
-              <Link to="/resources">Reserve lab equipment or seats</Link>
-              {projects[0] ? <Link to={`/projects/${projects[0].id}/reviews`}>Open review queue</Link> : null}
-            </div>
-          </article>
+          {role === 'student' ? (
+            <article className="panel">
+              <h2>Your work</h2>
+              <div className="workflow-list">
+                {projects[0] ? <Link to={`/projects/${projects[0].id}/drafts`}>Submit a draft</Link> : null}
+                {projects[0] ? <Link to={`/projects/${projects[0].id}/reports`}>Weekly reports</Link> : null}
+                <Link to="/resources">Book a resource</Link>
+              </div>
+            </article>
+          ) : (
+            <article className="panel">
+              <h2>Workflow</h2>
+              <div className="workflow-list">
+                <Link to="/projects/new">Create project and memberships</Link>
+                <Link to="/resources">Reserve lab equipment or seats</Link>
+                {projects[0] ? <Link to={`/projects/${projects[0].id}/reviews`}>Open review queue</Link> : null}
+              </div>
+            </article>
+          )}
 
           <article className="panel">
             <h2>System status</h2>

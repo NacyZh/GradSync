@@ -8,24 +8,39 @@ from apps.resources.models import Booking, LabResource
 from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
 
+DEMO_ACCOUNTS = [
+    {"email": "admin@gradsync.local", "name": "Admin Demo", "global_role": "admin", "password": "admin123"},
+    {"email": "advisor@example.com", "name": "Advisor Demo", "global_role": "advisor", "password": "advisor123"},
+    {"email": "student@example.com", "name": "Student Demo", "global_role": "student", "password": "student123"},
+    {"email": "reviewer@example.com", "name": "Reviewer Demo", "global_role": "advisor", "password": "reviewer123"},
+]
+
 
 class Command(BaseCommand):
     help = "Seed demo advisor and student accounts for research operations validation."
 
     def handle(self, *args, **options):
         user_model = get_user_model()
-        advisor, _ = user_model.objects.get_or_create(
-            email="advisor@example.com",
-            defaults={"name": "Advisor Demo", "global_role": "advisor"},
-        )
-        student, _ = user_model.objects.get_or_create(
-            email="student@example.com",
-            defaults={"name": "Student Demo", "global_role": "student"},
-        )
-        reviewer, _ = user_model.objects.get_or_create(
-            email="reviewer@example.com",
-            defaults={"name": "Reviewer Demo", "global_role": "advisor"},
-        )
+
+        created_users = {}
+        for acct in DEMO_ACCOUNTS:
+            user, created = user_model.objects.get_or_create(
+                email=acct["email"],
+                defaults={
+                    "name": acct["name"],
+                    "global_role": acct["global_role"],
+                    "status": user_model.Status.ACTIVE,
+                },
+            )
+            user.set_password(acct["password"])
+            user.save(update_fields=["password"])
+            created_users[acct["email"]] = user
+            verb = "Created" if created else "Updated"
+            self.stdout.write(f"  {verb} {acct['global_role']}: {acct['email']} / {acct['password']}")
+
+        advisor = created_users["advisor@example.com"]
+        student = created_users["student@example.com"]
+        reviewer = created_users["reviewer@example.com"]
         project, _ = ResearchProject.objects.get_or_create(
             title="Demo Research Project",
             defaults={
@@ -107,8 +122,8 @@ class Command(BaseCommand):
                 "eligible_at": timezone.now(),
             },
         )
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Seeded quickstart project {project.id} with {advisor.email} and {student.email}"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"Seeded quickstart project {project.id}"))
+        self.stdout.write("")
+        self.stdout.write(self.style.SUCCESS("Demo login credentials:"))
+        for acct in DEMO_ACCOUNTS:
+            self.stdout.write(f"  {acct['global_role']:10s} {acct['email']:30s} / {acct['password']}")
