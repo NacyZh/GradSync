@@ -23,9 +23,35 @@ export const selectedProject = {
   ],
 };
 
+export async function mockUnauthenticated(page: Page) {
+  await page.route('**/api/accounts/me/', async (route) => {
+    await route.fulfill({ status: 401, json: { message: 'Authentication required' } });
+  });
+}
+
+export async function mockLogin(page: Page, user = currentUser) {
+  await page.route('**/api/accounts/login/', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ json: user });
+      return;
+    }
+    await route.fulfill({ status: 405 });
+  });
+  await page.route('**/api/accounts/logout/', async (route) => {
+    await route.fulfill({ status: 204 });
+  });
+  // After login, /api/accounts/me/ returns the authenticated user.
+  await page.route('**/api/accounts/me/', async (route) => {
+    await route.fulfill({ json: user });
+  });
+}
+
 export async function mockAuthenticatedApi(page: Page) {
   await page.route('**/api/accounts/me/', async (route) => {
     await route.fulfill({ json: currentUser });
+  });
+  await page.route('**/api/accounts/logout/', async (route) => {
+    await route.fulfill({ status: 204 });
   });
   await page.route('**/api/projects/1/', async (route) => {
     if (route.request().method() === 'GET') {

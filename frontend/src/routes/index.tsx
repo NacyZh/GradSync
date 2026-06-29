@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom';
 
 import { HomePage } from '../app/HomePage';
 import { Layout } from '../app/Layout';
+import { LoginPage } from '../features/auth/LoginPage';
 import { ProjectCreatePage } from '../features/projects/ProjectCreatePage';
 import { ProjectDashboardPage } from '../features/projects/ProjectDashboardPage';
 import { DraftSubmissionPage } from '../features/submissions/DraftSubmissionPage';
@@ -23,6 +24,10 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <HomePage />,
+  },
+  {
+    path: '/login',
+    element: <LoginPage />,
   },
   {
     path: '/projects/new',

@@ -1,7 +1,7 @@
-import { createContext, useContext } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { createContext, useContext, useCallback, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { apiRequest } from '../../shared/api/client';
+import { login as loginApi, logout as logoutApi, fetchCurrentUser } from './api';
 
 export type CurrentUser = {
   id: number;
@@ -14,18 +14,84 @@ export type CurrentUser = {
 type AuthContextValue = {
   user: CurrentUser | null;
   isLoading: boolean;
+  login: (email: string, password: string) => Promise<CurrentUser>;
+  logout: () => Promise<void>;
+  isLoggingIn: boolean;
+  isLoggingOut: boolean;
+  loginError: string | null;
 };
 
-const AuthContext = createContext<AuthContextValue>({ user: null, isLoading: true });
+const AuthContext = createContext<AuthContextValue>({
+  user: null,
+  isLoading: true,
+  login: async () => {
+    throw new Error('AuthProvider not mounted');
+  },
+  logout: async () => {},
+  isLoggingIn: false,
+  isLoggingOut: false,
+  loginError: null,
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+
   const { data, isLoading } = useQuery({
     queryKey: ['current-user'],
-    queryFn: () => apiRequest<CurrentUser>('/api/accounts/me/'),
+    queryFn: fetchCurrentUser,
     retry: false,
   });
 
-  return <AuthContext.Provider value={{ user: data ?? null, isLoading }}>{children}</AuthContext.Provider>;
+  const loginMutation = useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) =>
+      loginApi({ email, password }),
+    onSuccess: (user) => {
+      queryClient.setQueryData(['current-user'], user);
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: logoutApi,
+    onSuccess: () => {
+      queryClient.setQueryData(['current-user'], null);
+      queryClient.clear();
+    },
+  });
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      return loginMutation.mutateAsync({ email, password });
+    },
+    [loginMutation],
+  );
+
+  const logout = useCallback(async () => {
+    await logoutMutation.mutateAsync();
+  }, [logoutMutation]);
+
+  useEffect(() => {
+    function handleAuthRequired() {
+      queryClient.setQueryData(['current-user'], null);
+    }
+    window.addEventListener('gradsync:auth-required', handleAuthRequired);
+    return () => window.removeEventListener('gradsync:auth-required', handleAuthRequired);
+  }, [queryClient]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user: data ?? null,
+        isLoading,
+        login,
+        logout,
+        isLoggingIn: loginMutation.isPending,
+        isLoggingOut: logoutMutation.isPending,
+        loginError: loginMutation.error?.message ?? null,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

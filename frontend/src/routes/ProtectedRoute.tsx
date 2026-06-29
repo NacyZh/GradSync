@@ -1,4 +1,5 @@
 import type { PropsWithChildren } from 'react';
+import { Navigate } from 'react-router-dom';
 
 import { useAuth } from '../features/auth/AuthProvider';
 import { AsyncState } from '../shared/ui/AsyncState';
@@ -11,7 +12,7 @@ export function ProtectedRoute({ children }: PropsWithChildren) {
   }
 
   if (!user) {
-    return <AsyncState state="empty" message="Sign in to continue" />;
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
