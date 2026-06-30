@@ -98,17 +98,30 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
+### Security & Privacy Requirements *(include when data, accounts, roles, or integrations are involved)*
+
+- **SEC-001**: System MUST enforce [authorization/isolation rule] for [resource/action]
+- **SEC-002**: System MUST protect [secret/token/personal data] by [storage, transport, masking, retention, or audit rule]
+- **SEC-003**: System MUST record auditable events for [privileged/security-sensitive action]
+
 ### User Experience Requirements *(include for user-facing work)*
 
 - **UX-001**: Experience MUST follow [existing pattern/component/flow] for [interaction]
 - **UX-002**: Experience MUST provide clear loading, empty, success, and error states for [journey]
 - **UX-003**: Experience MUST be usable with keyboard navigation and assistive labels for [controls/content]
+- **UX-004**: Experience MUST provide recoverable feedback when [persistence, permission, network, or background operation] fails
 
 ### Performance Requirements *(mandatory when user journeys can be measured)*
 
 - **PERF-001**: [Journey/action] MUST complete within [measurable target, e.g., p95 latency, render time, bundle budget]
 - **PERF-002**: System MUST handle [scale condition] without [degradation threshold]
 - **PERF-003**: Measurement MUST be captured by [test, benchmark, telemetry, or manual validation method]
+
+### Operational Requirements *(mandatory for production-impacting work)*
+
+- **OPS-001**: System MUST expose or preserve [health/readiness/metric/log/audit signal] for [operation]
+- **OPS-002**: Deployment MUST support [migration/rollback/backup/restore/retry behavior] for [change]
+- **OPS-003**: Release validation MUST include [smoke/readiness/security/performance check] before production use
 
 ### Key Entities *(include if feature involves data)*
 

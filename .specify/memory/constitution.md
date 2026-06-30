@@ -1,25 +1,28 @@
 <!--
 Sync Impact Report
-Version change: template -> 1.0.0
+Version change: 1.0.0 -> 1.1.0
 Modified principles:
-- Template principle 1 -> I. Code Quality by Default
-- Template principle 2 -> II. Testing is a Release Gate
-- Template principle 3 -> III. User Experience Consistency
-- Template principle 4 -> IV. Measured Performance
-- Template principle 5 -> V. Simple, Maintainable Architecture
+- I. Code Quality by Default -> I. Production-Grade Code Quality
+- II. Testing is a Release Gate -> II. Tests Prove Releasability
+- III. User Experience Consistency -> III. Operable User Experience
+- IV. Measured Performance -> IV. Measured Performance and Reliability
+- V. Simple, Maintainable Architecture -> V. Secure, Observable, Maintainable Architecture
 Added sections:
-- Quality Gates
-- Development Workflow
+- Production Readiness Gates
 Removed sections:
-- None
+- Quality Gates
 Templates requiring updates:
-- ✅ .specify/templates/constitution-template.md
 - ✅ .specify/templates/plan-template.md
 - ✅ .specify/templates/spec-template.md
 - ✅ .specify/templates/tasks-template.md
 - ✅ .specify/templates/commands/*.md (directory not present)
 Runtime guidance reviewed:
-- ✅ AGENTS.md (no principle references to update)
+- ✅ README.md
+- ✅ AGENTS.md
+- ✅ docs/production.md
+- ✅ docs/ops/infrastructure.md
+- ✅ docs/ops/backup-restore-drill.md
+- ✅ docs/ops/monitoring-alerts.md
 Follow-up TODOs:
 - None
 -->
@@ -27,94 +30,117 @@ Follow-up TODOs:
 
 ## Core Principles
 
-### I. Code Quality by Default
-Production code MUST be readable, cohesive, and aligned with the existing project
-structure. New abstractions MUST solve demonstrated duplication, complexity, or
-contract boundaries. Every change MUST preserve formatting, linting, static
-analysis, and type expectations used by the affected area. Public behavior,
-interfaces, and non-obvious implementation choices MUST be documented where a
-maintainer would otherwise need to infer intent.
+### I. Production-Grade Code Quality
+Production code MUST be readable, cohesive, and aligned with the existing Django,
+React, PostgreSQL, Redis, and Docker Compose structure. New abstractions MUST
+solve demonstrated duplication, complexity, deployment isolation, or contract
+boundaries. Every change MUST preserve formatting, linting, static analysis,
+type expectations, migrations, and configuration validation used by the affected
+area. Public behavior, interfaces, operational assumptions, and non-obvious
+implementation choices MUST be documented where a maintainer or operator would
+otherwise need to infer intent.
 
-Rationale: quality is cheaper when it is enforced at the point of change, and
-GradSync must remain maintainable as features accumulate.
+Rationale: GradSync handles academic work records, reviews, bookings, and
+notifications that must remain maintainable and deployable after development
+ends.
 
-### II. Testing is a Release Gate
+### II. Tests Prove Releasability
 Every feature, bug fix, and behavioral change MUST include automated tests that
-prove the affected user journey, service contract, or edge case. Tests MUST be
-written at the lowest useful level and include integration or end-to-end coverage
-when behavior crosses modules, persistence, network boundaries, or UI workflows.
-Known test gaps MUST be documented in the plan with a concrete reason and owner
-before implementation can proceed.
+prove the affected user journey, service contract, security boundary, data
+migration, or operational check. Tests MUST be written at the lowest useful level
+and include integration or end-to-end coverage when behavior crosses modules,
+persistence, network boundaries, background jobs, authorization, or UI workflows.
+Known test gaps MUST be documented in the plan with a concrete reason, owner,
+expiry date, and release risk before implementation can proceed.
 
 Rationale: untested behavior is not releasable behavior, and regressions in core
-academic workflows are costly for users to diagnose after deployment.
+academic workflows, access control, or deployment readiness are costly after
+production launch.
 
-### III. User Experience Consistency
-User-facing changes MUST follow the established interaction patterns, language,
+### III. Operable User Experience
+User-facing changes MUST follow established interaction patterns, language,
 accessibility expectations, and visual system of the product. Screens and flows
-MUST be usable on supported viewport sizes, expose clear error and empty states,
-and avoid introducing one-off controls, copy styles, or layout conventions unless
-the plan records why the existing pattern is insufficient. Accessibility checks
-MUST cover keyboard use, focus order, labels, contrast, and assistive text for
-new or changed UI.
+MUST be usable on supported viewport sizes, expose clear loading, empty, success,
+and error states, and avoid one-off controls, copy styles, or layout conventions
+unless the plan records why the existing pattern is insufficient. Accessibility
+checks MUST cover keyboard use, focus order, labels, contrast, and assistive text
+for new or changed UI. User workflows that trigger persistence, notifications,
+or privileged actions MUST provide recoverable feedback and must not hide
+operational failure.
 
-Rationale: consistent experience reduces training cost, prevents fragmented
-workflows, and protects users from avoidable confusion.
+Rationale: production users need consistent workflows that remain diagnosable
+when validation, permissions, network calls, or background processing fail.
 
-### IV. Measured Performance
-Each feature plan MUST define measurable performance expectations for the user
-journeys it affects, including latency, throughput, memory, bundle size, or
-rendering targets where relevant. Implementations MUST avoid unbounded work on
-the critical path, repeated network or storage calls, unnecessary client payloads,
-and avoidable layout instability. Performance-sensitive changes MUST include a
+### IV. Measured Performance and Reliability
+Each feature plan MUST define measurable performance and reliability expectations
+for the user journeys it affects, including latency, throughput, memory, bundle
+size, rendering targets, queue timing, recovery objectives, or availability
+signals where relevant. Implementations MUST avoid unbounded work on critical
+paths, repeated network or storage calls, unnecessary client payloads, avoidable
+layout instability, and background jobs without retry or failure visibility.
+Performance-sensitive or reliability-sensitive changes MUST include a
 measurement method and pass the target before release.
 
-Rationale: performance requirements must be explicit so user experience does not
-degrade silently as the system grows.
+Rationale: performance and reliability requirements must be explicit so user
+experience and operations do not degrade silently as the system grows.
 
-### V. Simple, Maintainable Architecture
-The system MUST favor direct, well-scoped designs over speculative layers.
-Feature work MUST integrate with existing modules and contracts before adding new
-services, frameworks, state stores, or persistence patterns. Cross-cutting
-concerns such as validation, authorization, logging, error handling, and
-configuration MUST use the shared project approach where one exists. Any
-intentional deviation MUST be recorded in the plan with the simpler alternative
-that was rejected.
+### V. Secure, Observable, Maintainable Architecture
+The system MUST favor direct, well-scoped designs over speculative layers while
+meeting real deployment requirements. Feature work MUST integrate with existing
+modules and contracts before adding new services, frameworks, state stores, or
+persistence patterns. Cross-cutting concerns such as validation, authorization,
+project isolation, logging, error handling, configuration, secret management,
+health checks, metrics, backups, migrations, and rollback MUST use the shared
+project approach where one exists. Any intentional deviation MUST be recorded in
+the plan with the simpler alternative that was rejected and the operational
+impact accepted.
 
-Rationale: simplicity keeps the codebase easier to test, review, operate, and
-adapt when product requirements change.
+Rationale: production architecture must be simple enough to review and operate,
+but complete enough to secure, observe, recover, and evolve safely.
 
-## Quality Gates
+## Production Readiness Gates
 
 Plans MUST pass a Constitution Check before Phase 0 research and again after
 Phase 1 design. The check MUST confirm:
 
-- Code quality expectations, ownership boundaries, and documentation needs are
-  explicit.
-- Required automated tests are identified by level and mapped to user stories or
-  contracts.
-- User experience consistency and accessibility requirements are captured for
-  user-facing work.
-- Performance targets and measurement methods are defined for affected journeys.
-- Architectural complexity is justified when the direct approach is not used.
+- Code quality expectations, ownership boundaries, migration needs,
+  configuration validation, and documentation needs are explicit.
+- Required automated tests are identified by level and mapped to user stories,
+  contracts, security boundaries, data changes, and operational readiness checks.
+- User experience consistency, accessibility, and recoverable error feedback are
+  captured for user-facing work.
+- Performance and reliability targets, scale assumptions, and measurement
+  methods are defined for affected journeys.
+- Security controls cover authentication, authorization, project isolation,
+  secret handling, CSRF/CORS, transport security, and auditability where
+  applicable.
+- Observability and operations cover structured logs, request IDs, health and
+  readiness probes, metrics, alert signals, background job visibility, backup
+  and restore impact, migration safety, rollback approach, and release checks.
+- Architectural complexity is justified when the direct project approach is not
+  used.
 
 Implementation tasks MUST include the work needed to satisfy these gates. A gate
-violation can proceed only when the plan records the risk, the reason it is
-necessary, the simpler alternative considered, and the follow-up owner.
+violation can proceed only when the plan records the risk, why it is necessary,
+the simpler alternative considered, mitigation, follow-up owner, and expiry date.
 
 ## Development Workflow
 
 Feature specifications MUST describe independently testable user journeys,
-measurable success criteria, important edge cases, UX expectations, and
-performance outcomes. Implementation plans MUST translate those requirements
-into concrete technical decisions, test strategy, and performance constraints.
-Task lists MUST keep tests and quality checks visible in the story where they
-apply, and each completed story MUST be independently demonstrable before later
-stories are layered on top.
+measurable success criteria, important edge cases, UX expectations, security and
+privacy boundaries, operational outcomes, and performance or reliability
+expectations. Implementation plans MUST translate those requirements into
+concrete technical decisions, test strategy, deployment impact, observability,
+migration and rollback handling, and release validation. Task lists MUST keep
+tests, security checks, operability work, and quality checks visible in the story
+where they apply. Each completed story MUST be independently demonstrable and
+production-deployable before later stories are layered on top.
 
 Reviews MUST verify constitution compliance before merge. Reviewers MUST block
 changes that lack required tests, introduce unjustified architectural complexity,
-break established UX patterns, or leave performance requirements unmeasured.
+break established UX patterns, weaken security or project isolation, omit
+operational visibility, skip migration or rollback planning, or leave performance
+and reliability requirements unmeasured.
 
 ## Governance
 
@@ -129,7 +155,7 @@ Versioning follows semantic versioning:
 - PATCH for clarifications, wording fixes, or non-semantic refinements.
 
 Every generated plan, specification, and task list MUST be checked against the
-current constitution. Compliance exceptions MUST be explicit, time-bounded, and
-owned.
+current constitution. Compliance exceptions MUST be explicit, time-bounded,
+owned, and reviewed before release.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-25 | **Last Amended**: 2026-06-25
+**Version**: 1.1.0 | **Ratified**: 2026-06-25 | **Last Amended**: 2026-06-30

@@ -1,14 +1,15 @@
 type FormStatusProps = {
   error?: string;
   success?: string;
+  className?: string;
 };
 
-export function FormStatus({ error, success }: FormStatusProps) {
+export function FormStatus({ error, success, className = '' }: FormStatusProps) {
   if (error) {
-    return <p role="alert">{error}</p>;
+    return <p className={`form-status error ${className}`} role="alert">{error}</p>;
   }
   if (success) {
-    return <p role="status">{success}</p>;
+    return <p className={`form-status success ${className}`} role="status">{success}</p>;
   }
   return null;
 }

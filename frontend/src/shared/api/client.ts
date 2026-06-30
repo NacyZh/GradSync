@@ -61,7 +61,15 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as Partial<ApiError>;
-    throw { message: payload.message ?? `Request failed with ${response.status}`, fields: payload.fields };
+    const fieldMessages = payload.fields
+      ? Object.entries(payload.fields)
+          .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
+          .join('; ')
+      : '';
+    throw {
+      message: payload.message ?? (fieldMessages || `Request failed with ${response.status}`),
+      fields: payload.fields,
+    };
   }
 
   if (response.status === 204) {

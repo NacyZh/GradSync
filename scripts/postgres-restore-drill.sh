@@ -22,6 +22,7 @@ cat > "$EVIDENCE_PATH" <<EOF
 | Field | Value |
 |-------|-------|
 | Backup artifact | $BACKUP_PATH |
+| Off-host storage URI | ${POSTGRES_BACKUP_OFFSITE_URI:-operator-recorded-off-host-copy} |
 | Restore target | ${RESTORE_TARGET:-production-like isolated target} |
 | Started at | $STARTED_AT |
 | Completed at | $COMPLETED_AT |

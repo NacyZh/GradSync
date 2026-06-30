@@ -26,21 +26,29 @@ export function BookingCalendar() {
   });
 
   return (
-    <section aria-label="Booking calendar">
+    <section className="panel" aria-label="Booking calendar">
       <h2>Availability</h2>
-      <label>
-        Availability start
-        <input name="availabilityStartsAt" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} />
-      </label>
-      <label>
-        Availability end
-        <input name="availabilityEndsAt" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} />
-      </label>
-      <ul>
+      <div className="filter-row">
+        <label>
+          Availability start
+          <input name="availabilityStartsAt" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} />
+        </label>
+        <label>
+          Availability end
+          <input name="availabilityEndsAt" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} />
+        </label>
+      </div>
+      <ul className="resource-list">
         {availabilityQuery.data?.map((resource) => (
           <li key={resource.id}>
-            {resource.name}: {resource.available ? 'Available' : 'Unavailable'}
-            {resource.conflicting_booking_count ? ` (${resource.conflicting_booking_count} conflict)` : ''}
+            <div>
+              <strong>{resource.name}</strong>
+              <p>{resource.resource_type} · {resource.location ?? 'No location'}</p>
+            </div>
+            <span className={`status-pill ${resource.available ? 'available' : 'blocked'}`}>
+              {resource.available ? 'Available' : 'Unavailable'}
+              {resource.conflicting_booking_count ? ` · ${resource.conflicting_booking_count} conflict` : ''}
+            </span>
           </li>
         ))}
       </ul>

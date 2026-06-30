@@ -23,7 +23,7 @@ environment.
 ## Gate Rules
 
 - Pull requests run tests and builds but do not deploy.
-- Pushes to `main` deploy by SSH after backend and frontend checks pass.
+- Pushes to `master` deploy by SSH after backend and frontend checks pass.
 - The `deploy-production` job requires GitHub environment approval before
   deployment credentials are usable.
 - Deploy credentials must be least privilege and rotated after staff changes or

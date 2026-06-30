@@ -19,9 +19,9 @@ export function HomePage() {
 
   return (
     <Layout>
-      <section className="page-heading">
+      <section className="page-heading dashboard-hero">
         <div>
-          <h1>GradSync</h1>
+          <h1>{role === 'student' ? 'Student workspace' : role === 'advisor' ? 'Advisor workspace' : 'GradSync dashboard'}</h1>
           <p>Research group operations for projects, reviews, reports, bookings, and reminders.</p>
         </div>
         <nav aria-label="Primary actions" className="action-row">
@@ -45,6 +45,21 @@ export function HomePage() {
 
       {user && (
         <section className="dashboard-grid" aria-label="Application overview">
+          <article className="metric-card">
+            <span>Projects</span>
+            <strong>{projects.length}</strong>
+            <small>visible workspaces</small>
+          </article>
+          <article className="metric-card">
+            <span>Pending reviews</span>
+            <strong>{role === 'student' ? 'Track' : 'Review'}</strong>
+            <small>{role === 'student' ? 'drafts and reports' : 'student submissions'}</small>
+          </article>
+          <article className="metric-card" id="notifications">
+            <span>Notifications</span>
+            <strong>Live</strong>
+            <small>delivery status and reminders</small>
+          </article>
           <article className="panel">
             <h2>Your projects</h2>
             {projectsQuery.isLoading ? <AsyncState state="loading" message="Loading projects" /> : null}
@@ -70,7 +85,7 @@ export function HomePage() {
 
           {role === 'student' ? (
             <article className="panel">
-              <h2>Your work</h2>
+              <h2>Next actions</h2>
               <div className="workflow-list">
                 {projects[0] ? <Link to={`/projects/${projects[0].id}/drafts`}>Submit a draft</Link> : null}
                 {projects[0] ? <Link to={`/projects/${projects[0].id}/reports`}>Weekly reports</Link> : null}
@@ -79,7 +94,7 @@ export function HomePage() {
             </article>
           ) : (
             <article className="panel">
-              <h2>Workflow</h2>
+              <h2>Review workflow</h2>
               <div className="workflow-list">
                 <Link to="/projects/new">Create project and memberships</Link>
                 <Link to="/resources">Reserve lab equipment or seats</Link>

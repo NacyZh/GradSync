@@ -6,12 +6,14 @@ type Version = {
   review_status?: string;
 };
 
-export function DraftVersionHistory({ versions }: { versions: Version[] }) {
+export function DraftVersionHistory({ versions, onSelect }: { versions: Version[]; onSelect?: (version: Version) => void }) {
   return (
-    <ol>
+    <ol className="timeline" aria-label="Draft version history">
       {versions.map((version) => (
         <li key={version.id}>
-          Version {version.versionNumber ?? version.version_number}: {version.reviewStatus ?? version.review_status}
+          <button type="button" className="link-button" onClick={() => onSelect?.(version)}>
+            Version {version.versionNumber ?? version.version_number}: {version.reviewStatus ?? version.review_status}
+          </button>
         </li>
       ))}
     </ol>

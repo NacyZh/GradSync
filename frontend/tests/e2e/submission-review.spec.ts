@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, mockAuthenticatedApi } from './api-mocks';
+import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
 test.beforeEach(async ({ page }) => {
   await mockAuthenticatedApi(page);
+  if (fullStackE2E) {
+    return;
+  }
   await page.route('**/api/projects/1/drafts/', async (route) => {
     if (route.request().method() === 'POST') {
       await fulfillJson(route, { id: 51, title: 'Paper A', status: 'active' }, 201);
@@ -29,26 +32,37 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('student submits draft/report and advisor updates review status', async ({ page }) => {
+  if (fullStackE2E) {
+    await loginAs(page, 'student@example.edu');
+  }
   await page.goto('/projects/1/drafts');
   await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText('Graphene Lab');
   await expect(page.getByRole('heading', { name: 'Submit draft' })).toBeVisible();
   await page.getByLabel('Draft title').fill('Paper A');
   await page.getByRole('button', { name: 'Create draft' }).click();
-  await expect(page.getByText('Draft created')).toBeVisible();
+  await expect(page.getByLabel('Create draft').getByRole('status')).toContainText('Draft created');
   await page.getByLabel('Content reference').fill('paper-v1.pdf');
   await page.getByLabel('Summary').fill('Initial submission');
-  await page.getByRole('button', { name: 'Submit draft' }).click();
-  await expect(page.getByText('Draft version submitted')).toBeVisible();
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByLabel('Submit draft').getByRole('status')).toContainText('Draft version submitted');
 
   await page.goto('/projects/1/reports');
   await page.getByLabel('Week start').fill('2026-06-22');
   await page.getByLabel('Completed work').fill('Completed experiments');
   await page.getByLabel('Next steps').fill('Write results');
   await page.getByRole('button', { name: 'Submit report' }).click();
-  await expect(page.getByText('Weekly report submitted')).toBeVisible();
+  await expect(page.getByLabel('Weekly progress report').getByRole('status')).toContainText('Weekly report submitted');
 
   await page.goto('/projects/1/reviews');
+  if (fullStackE2E) {
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await loginAs(page);
+    await page.goto('/projects/1/reviews');
+  }
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
-  await page.getByLabel('Review status').selectOption('reviewed');
-  await expect(page.getByText('Review status updated')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Submission review' })).toContainText('Week 2026-06-22');
+  await page.getByRole('listitem').filter({ hasText: 'Week 2026-06-22' }).getByLabel('Review status').selectOption('reviewed');
+  await expect(page.getByLabel('Report reviews').getByRole('status')).toContainText('Review status updated');
 });

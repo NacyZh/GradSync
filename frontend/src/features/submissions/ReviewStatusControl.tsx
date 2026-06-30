@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import type { DraftVersion, WeeklyReport } from './api';
 import { reviewDraftVersion, reviewWeeklyReport } from './api';
 
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function ReviewStatusControl({ status, projectId, draftId, versionId, reportId, targetType = 'report' }: Props) {
+  const { notify } = useAppFeedback();
   const mutation = useMutation<DraftVersion | WeeklyReport | null, Error, string>({
     mutationFn: (reviewStatus: string) => {
       if (!projectId) return Promise.resolve(null);
@@ -24,6 +26,8 @@ export function ReviewStatusControl({ status, projectId, draftId, versionId, rep
       }
       return Promise.resolve(null);
     },
+    onSuccess: () => notify('Review status updated', 'success'),
+    onError: (error) => notify(error.message, 'error'),
   });
 
   return (

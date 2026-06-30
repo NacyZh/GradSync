@@ -5,6 +5,8 @@ export type Project = {
   title: string;
   description: string;
   status: 'active' | 'archived';
+  starts_on?: string | null;
+  ends_on?: string | null;
   memberships?: ProjectMembership[];
   current_tasks?: unknown[];
   pending_reviews?: unknown[];
@@ -24,7 +26,7 @@ export function listProjects() {
   return apiRequest<{ results: Project[] }>('/api/projects/');
 }
 
-export function createProject(payload: { title: string; description?: string; student_ids?: number[] }) {
+export function createProject(payload: { title: string; description?: string; starts_on?: string | null; ends_on?: string | null; student_ids?: number[] }) {
   return apiRequest<Project>('/api/projects/', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -35,7 +37,7 @@ export function getProject(projectId: number) {
   return apiRequest<Project>(`/api/projects/${projectId}/`);
 }
 
-export function updateProject(projectId: number, payload: Partial<Pick<Project, 'title' | 'description'>>) {
+export function updateProject(projectId: number, payload: Partial<Pick<Project, 'title' | 'description' | 'starts_on' | 'ends_on'>>) {
   return apiRequest<Project>(`/api/projects/${projectId}/`, {
     method: 'PATCH',
     body: JSON.stringify(payload),

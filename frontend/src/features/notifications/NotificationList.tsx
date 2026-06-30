@@ -10,13 +10,19 @@ export function NotificationList({ projectId }: { projectId?: number }) {
   });
 
   return (
-    <section aria-labelledby="notifications-heading">
+    <section className="panel notification-center" aria-labelledby="notifications-heading">
       <h2 id="notifications-heading">Notifications</h2>
+      {notificationsQuery.isLoading ? <p className="muted">Loading delivery status...</p> : null}
       {notificationsQuery.data?.results.length ? null : <p>No notifications loaded.</p>}
-      <ul>
+      <ul className="notification-list">
         {notificationsQuery.data?.results.map((notification) => (
           <li key={notification.id}>
-            {notification.subject} ({notification.status})
+            <span className={`status-dot ${notification.status}`} aria-hidden="true" />
+            <div>
+              <strong>{notification.subject}</strong>
+              <p>{notification.event_type ?? notification.target_type} · {notification.status}</p>
+              {notification.action_path ? <a href={notification.action_path}>Open record</a> : null}
+            </div>
           </li>
         ))}
       </ul>

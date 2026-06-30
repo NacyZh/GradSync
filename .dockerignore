@@ -8,6 +8,7 @@ frontend/build/
 frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+backend/e2e.sqlite3
 backend/.venv/
 .venv/
 venv/

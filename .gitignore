@@ -42,6 +42,7 @@ Thumbs.db
 CLAUDE.md
 
 # Local data
+backend/e2e.sqlite3
 postgres-data/
 redis-data/
 media/

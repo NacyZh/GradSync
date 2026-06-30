@@ -24,9 +24,10 @@ test.describe('role workspaces', () => {
 
     await page.goto('/');
     await expect(page.getByText('Admin User')).toBeVisible();
-    await expect(page.getByText('admin')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Accounts' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'New Project' })).toBeVisible();
+    await expect(page.getByRole('banner').getByText('admin', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Team' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Projects' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open notifications' })).toBeVisible();
 
     await page.getByRole('link', { name: 'Manage accounts' }).click();
     await expect(page).toHaveURL('/admin/accounts');
@@ -53,8 +54,8 @@ test.describe('role workspaces', () => {
 
     await page.goto('/');
     await expect(page.getByText('Advisor User')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'New Project' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Accounts' })).not.toBeVisible();
+    await expect(page.getByRole('link', { name: 'Projects' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Team' })).not.toBeVisible();
 
     // Advisor cannot access admin routes.
     await page.goto('/admin/accounts');
@@ -82,9 +83,9 @@ test.describe('role workspaces', () => {
 
     await page.goto('/');
     await expect(page.getByText('Student User')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Resources' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'New Project' })).not.toBeVisible();
-    await expect(page.getByRole('link', { name: 'Accounts' })).not.toBeVisible();
+    await expect(page.getByLabel('Primary workspace').getByRole('link', { name: 'Resources' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Projects' })).not.toBeVisible();
+    await expect(page.getByRole('link', { name: 'Team' })).not.toBeVisible();
 
     // Student cannot access project creation.
     await page.goto('/projects/new');

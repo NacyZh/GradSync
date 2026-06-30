@@ -27,14 +27,36 @@ def test_advisor_can_create_project_with_students(api_client):
 
     response = authenticate(api_client, advisor).post(
         "/api/projects/",
-        {"title": "Project A", "description": "Demo", "student_ids": [student.id]},
+        {
+            "title": "Project A",
+            "description": "Demo",
+            "starts_on": "2026-06-25",
+            "ends_on": "2026-07-25",
+            "student_ids": [student.id],
+        },
         format="json",
     )
 
     assert response.status_code == 201
     project = ResearchProject.objects.get(title="Project A")
+    assert str(project.starts_on) == "2026-06-25"
+    assert str(project.ends_on) == "2026-07-25"
     assert project.memberships.filter(user=advisor, role="advisor", status="active").exists()
     assert project.memberships.filter(user=student, role="student", status="active").exists()
+
+
+@pytest.mark.django_db
+def test_project_create_rejects_invalid_date_range(api_client):
+    advisor = UserFactory(global_role="advisor")
+
+    response = authenticate(api_client, advisor).post(
+        "/api/projects/",
+        {"title": "Project A", "starts_on": "2026-07-25", "ends_on": "2026-06-25"},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "end date" in response.json()["message"]
 
 
 @pytest.mark.django_db

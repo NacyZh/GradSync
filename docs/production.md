@@ -15,7 +15,7 @@
 
 ## Deployment
 
-Pushes to `main` run the GitHub Actions CI/CD workflow. After backend and
+Pushes to `master` run the GitHub Actions CI/CD workflow. After backend and
 frontend checks pass, the `deploy-production` job connects to the production
 host over SSH and runs `scripts/deploy-production.sh`.
 
@@ -24,7 +24,8 @@ The production host must already have:
 - The repository cloned at `GRADSYNC_DEPLOY_PATH` (default
   `/home/GradSync/GradSync`).
 - A clean working tree that can accept `git pull --ff-only`.
-- Docker Engine and the Docker Compose plugin installed.
+- Debian 13 with `git`, `curl`, Docker Engine, and the Docker Compose plugin
+  installed.
 - A valid `.env.production` file, either maintained on the host or synced from
   the `PRODUCTION_ENV_FILE` GitHub secret.
 - Git credentials or a deploy key that allow the host to fetch the GitHub

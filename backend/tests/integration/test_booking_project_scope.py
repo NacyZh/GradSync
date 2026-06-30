@@ -1,4 +1,5 @@
 import pytest
+from django.utils import timezone
 
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.resources.models import Booking, LabResource
@@ -35,3 +36,26 @@ def test_booking_list_is_project_scoped(api_client):
 
     assert response.status_code == 200
     assert len(response.json()["results"]) == 1
+
+
+@pytest.mark.django_db
+def test_started_booking_cancel_returns_validation_error(api_client):
+    student = UserFactory(global_role="student")
+    advisor = UserFactory(global_role="advisor")
+    project = ResearchProject.objects.create(title="Project", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    resource = LabResource.objects.create(name="Seat", resource_type="seat")
+    booking = Booking.objects.create(
+        project=project,
+        resource=resource,
+        requested_by=student,
+        starts_at=timezone.now() - timezone.timedelta(minutes=5),
+        ends_at=timezone.now() + timezone.timedelta(minutes=55),
+    )
+
+    response = authenticate(api_client, student).post(
+        f"/api/projects/{project.id}/bookings/{booking.id}/cancel/"
+    )
+
+    assert response.status_code == 400
+    assert "before the reservation starts" in str(response.json())

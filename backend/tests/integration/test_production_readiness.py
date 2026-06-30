@@ -130,6 +130,31 @@ def test_restore_drill_script_records_evidence_path():
     assert "check_production_readiness" in script
 
 
+def test_production_readiness_rejects_placeholder_restore_drill(tmp_path):
+    evidence = tmp_path / "latest.md"
+    evidence.write_text(
+        "# Latest Restore Drill Evidence\n\n"
+        "Status: pending first production drill\n\n"
+        "| Field | Value |\n"
+        "|-------|-------|\n"
+        "| Backup artifact | Pending |\n"
+        "| Off-host storage URI | Pending |\n"
+        "| Restore target | Pending |\n"
+        "| Started at | Pending |\n"
+        "| Completed at | Pending |\n"
+        "| Operator | Pending |\n"
+        "| RPO result | Pending |\n"
+        "| RTO result | Pending |\n"
+        "| Validation commands | Pending |\n"
+        "| Outcome | Pending |\n"
+    )
+    settings = production_ready_settings_stub(BACKUP_RESTORE_DRILL_EVIDENCE="latest.md")
+
+    issues = collect_production_readiness_issues(settings, tmp_path)
+
+    assert any("completed restore drill evidence" in issue for issue in issues)
+
+
 def test_notification_delivery_uses_dedicated_queue():
     from apps.notifications.tasks import deliver_due_notifications_task
 
@@ -146,7 +171,7 @@ def test_production_readiness_flags_configured_sentry_when_not_initialized():
     assert "SENTRY_DSN is configured but error reporting did not initialize" in issues
 
 
-def test_production_readiness_smtp_probe_uses_delivery_path(settings):
+def test_production_readiness_smtp_probe_uses_delivery_path(settings, tmp_path):
     settings.DEBUG = False
     settings.SECRET_KEY = "x" * 64
     settings.ALLOWED_HOSTS = ["gradsync.example.edu"]
@@ -154,7 +179,9 @@ def test_production_readiness_smtp_probe_uses_delivery_path(settings):
     settings.SESSION_COOKIE_SECURE = True
     settings.CSRF_COOKIE_SECURE = True
     settings.SECURE_HSTS_SECONDS = 31536000
-    settings.STATIC_ROOT = str(REPO_ROOT / "frontend" / "dist")
+    static_root = tmp_path / "staticfiles"
+    static_root.mkdir()
+    settings.STATIC_ROOT = str(static_root)
     settings.EMAIL_HOST = "localhost"
     settings.DEFAULT_FROM_EMAIL = "no-reply@example.edu"
     settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"

@@ -6,17 +6,31 @@ import { createProject } from './api';
 
 export function ProjectCreatePage() {
   const [success, setSuccess] = useState('');
+  const [clientError, setClientError] = useState('');
   const mutation = useMutation({
     mutationFn: createProject,
-    onSuccess: (project) => setSuccess(`Created project ${project.title}`),
+    onSuccess: (project) => {
+      setClientError('');
+      setSuccess(`Created project ${project.title}`);
+    },
   });
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const startsOn = String(form.get('startsOn') ?? '');
+    const endsOn = String(form.get('endsOn') ?? '');
+    setSuccess('');
+    if (startsOn && endsOn && endsOn < startsOn) {
+      setClientError('Project end date cannot be before start date');
+      return;
+    }
+    setClientError('');
     mutation.mutate({
       title: String(form.get('title') ?? ''),
       description: String(form.get('description') ?? ''),
+      starts_on: startsOn || null,
+      ends_on: endsOn || null,
       student_ids: String(form.get('studentIds') ?? '')
         .split(',')
         .map((value) => Number(value.trim()))
@@ -37,6 +51,14 @@ export function ProjectCreatePage() {
           <textarea name="description" />
         </label>
         <label>
+          Start date
+          <input name="startsOn" type="date" />
+        </label>
+        <label>
+          End date
+          <input name="endsOn" type="date" />
+        </label>
+        <label>
           Student IDs
           <input name="studentIds" aria-describedby="student-id-help" />
         </label>
@@ -44,7 +66,7 @@ export function ProjectCreatePage() {
         <button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Creating...' : 'Create'}
         </button>
-        <FormStatus error={mutation.error?.message} success={success} />
+        <FormStatus error={clientError || mutation.error?.message} success={success} />
       </form>
     </section>
   );

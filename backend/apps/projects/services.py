@@ -15,13 +15,23 @@ class ProjectService:
 
     @transaction.atomic
     def create_project(
-        self, *, title: str, description: str = "", student_ids: list[int] | None = None
+        self,
+        *,
+        title: str,
+        description: str = "",
+        starts_on=None,
+        ends_on=None,
+        student_ids: list[int] | None = None,
     ) -> ResearchProject:
         if not getattr(self.actor, "is_advisor", False):
             raise PermissionDenied("Only advisors can create projects")
 
         project = ResearchProject.objects.create(
-            title=title, description=description, advisor=self.actor
+            title=title,
+            description=description,
+            advisor=self.actor,
+            starts_on=starts_on,
+            ends_on=ends_on,
         )
         ProjectMembership.objects.create(
             project=project, user=self.actor, role=ProjectMembership.Role.ADVISOR

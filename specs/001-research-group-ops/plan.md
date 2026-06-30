@@ -28,6 +28,12 @@ django-celery-results, Redis client, PostgreSQL driver, React 18, Vite 5,
 React Router, TanStack Query, React Hook Form, Zod, Vitest, Playwright,
 pytest, pytest-django
 
+**Frontend Scope Decision**: This feature keeps the approved React/Vite/TanStack
+Query stack. Requested paper-library, code-repository, PDF/DOI/BibTeX,
+WebSocket, Tailwind/shadcn, Redux Toolkit, and RTK Query capabilities are
+tracked as follow-up scope rather than being introduced into this feature's
+implementation plan.
+
 **Storage**: PostgreSQL for users, projects, memberships, tasks, draft versions,
 reports, inline comments, bookings, notifications, and audit records; Redis for
 Celery broker, reminder scheduling coordination, cache, and short-lived locks

@@ -32,6 +32,10 @@
 
 **Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]
 
+**Reliability/Operations Goals**: [health/readiness, queue timing, backup/restore, rollback, observability, or N/A]
+
+**Security/Compliance Constraints**: [auth, authorization, data isolation, secrets, transport, audit, or N/A]
+
 **Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]
 
 **Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
@@ -40,21 +44,33 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- **Code Quality**: Identify affected modules, ownership boundaries,
-  documentation needs, linting/formatting/type expectations, and any new
-  abstraction with its justification.
-- **Testing**: Define required automated tests by level (unit, contract,
-  integration, end-to-end) and map them to user stories, service contracts, or
-  edge cases. Document any test gap with a concrete reason and owner.
-- **User Experience**: For user-facing work, record existing UX patterns to
-  preserve, responsive behavior, accessibility checks, and required error,
-  loading, and empty states.
-- **Performance**: Define measurable targets and the method used to validate
-  them for affected journeys, including latency, throughput, memory, bundle
-  size, or rendering metrics where relevant.
-- **Architecture**: Confirm the design uses existing project patterns and
-  shared concerns. Record any added service, framework, state store, persistence
-  pattern, or cross-cutting deviation in Complexity Tracking.
+- **Production-Grade Code Quality**: Identify affected modules, ownership
+  boundaries, documentation needs, linting/formatting/type expectations,
+  migration needs, configuration validation, and any new abstraction with its
+  justification.
+- **Tests Prove Releasability**: Define required automated tests by level (unit,
+  contract, integration, end-to-end, readiness/smoke) and map them to user
+  stories, service contracts, edge cases, security boundaries, data changes, or
+  operational checks. Document any test gap with reason, owner, expiry date, and
+  release risk.
+- **Operable User Experience**: For user-facing work, record existing UX
+  patterns to preserve, responsive behavior, accessibility checks, required
+  loading/empty/success/error states, and recoverable feedback for persistence,
+  permission, notification, or background-job failures.
+- **Measured Performance and Reliability**: Define measurable targets and
+  validation methods for affected journeys, including latency, throughput,
+  memory, bundle size, rendering metrics, queue timing, health/readiness,
+  recovery objectives, or availability signals where relevant.
+- **Secure, Observable, Maintainable Architecture**: Confirm the design uses
+  existing project patterns and shared concerns for validation, authorization,
+  project isolation, logging, error handling, configuration, secret management,
+  health checks, metrics, backups, migrations, and rollback. Record any added
+  service, framework, state store, persistence pattern, or cross-cutting
+  deviation in Complexity Tracking.
+- **Production Deployment Readiness**: Record deployment topology impact,
+  environment variables/secrets, data migration and rollback plan, monitoring
+  and alert signals, backup/restore implications, release checks, and any manual
+  operator steps needed before real production use.
 
 ## Project Structure
 

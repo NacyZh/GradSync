@@ -63,7 +63,7 @@ test.describe('authentication', () => {
 
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL('/');
-    await expect(page.getByRole('heading', { name: 'GradSync' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Advisor workspace' })).toBeVisible();
     await expect(page.getByText(currentUser.name)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   });

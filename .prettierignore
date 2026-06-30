@@ -5,6 +5,7 @@ frontend/build/
 frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+backend/e2e.sqlite3
 coverage/
 playwright-report/
 test-results/

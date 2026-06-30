@@ -1,5 +1,6 @@
 from django.contrib.auth import login, logout
 from django.core.exceptions import ValidationError
+from django.middleware.csrf import get_token
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -30,6 +31,7 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
         login(request, user)
+        get_token(request)
         return Response(UserSerializer(user).data)
 
 

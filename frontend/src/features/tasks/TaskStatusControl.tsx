@@ -1,12 +1,18 @@
 import { useMutation } from '@tanstack/react-query';
 
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { updateTask } from './api';
 
 export function TaskStatusControl({ projectId, taskId, status }: { projectId: number; taskId: number; status: string }) {
-  const mutation = useMutation({ mutationFn: (nextStatus: string) => updateTask(projectId, taskId, { status: nextStatus }) });
+  const { notify } = useAppFeedback();
+  const mutation = useMutation({
+    mutationFn: (nextStatus: string) => updateTask(projectId, taskId, { status: nextStatus }),
+    onSuccess: () => notify('Task status updated', 'success'),
+    onError: (error) => notify(error.message, 'error'),
+  });
 
   return (
-    <label>
+    <label id={`task-${taskId}-status`} className="inline-control">
       Status
       <select defaultValue={status} onChange={(event) => mutation.mutate(event.target.value)} aria-label="Task status">
         <option value="not_started">Not started</option>

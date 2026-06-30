@@ -16,6 +16,15 @@ class BookingService(ProjectScopedService):
         super().__init__(user)
         self.project = project
 
+    def _ensure_future_booking(self, booking: Booking) -> None:
+        starts_at = (
+            parse_datetime(booking.starts_at)
+            if isinstance(booking.starts_at, str)
+            else booking.starts_at
+        )
+        if starts_at <= timezone.now():
+            raise ValidationError("Bookings can only be changed before the reservation starts")
+
     @transaction.atomic
     def create_booking(self, *, resource, starts_at, ends_at, purpose: str = "") -> Booking:
         self.require_project_member(self.project)
@@ -52,6 +61,7 @@ class BookingService(ProjectScopedService):
     ) -> Booking:
         self.require_project_member(self.project)
         ensure_project_writable(self.project)
+        self._ensure_future_booking(booking)
         if (
             booking.requested_by_id != self.user.id
             and not self.project.memberships.filter(
@@ -95,6 +105,7 @@ class BookingService(ProjectScopedService):
     def cancel_booking(self, booking: Booking) -> Booking:
         self.require_project_member(self.project)
         ensure_project_writable(self.project)
+        self._ensure_future_booking(booking)
         if (
             booking.requested_by_id != self.user.id
             and not self.project.memberships.filter(

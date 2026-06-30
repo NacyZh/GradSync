@@ -404,6 +404,12 @@ components:
           type: string
         advisorId:
           type: string
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: string
+          format: date
         studentIds:
           type: array
           items:

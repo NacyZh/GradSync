@@ -54,8 +54,10 @@ describe('role-aware navigation', () => {
     renderLayout();
 
     await screen.findByText('admin');
-    expect(screen.getByRole('link', { name: 'Accounts' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'New Project' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Team' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open notifications' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 
@@ -70,8 +72,8 @@ describe('role-aware navigation', () => {
     renderLayout();
 
     await screen.findByText('advisor');
-    expect(screen.getByRole('link', { name: 'New Project' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Team' })).not.toBeInTheDocument();
   });
 
   it('hides project creation and account admin from student', async () => {
@@ -85,8 +87,8 @@ describe('role-aware navigation', () => {
     renderLayout();
 
     await screen.findByText('student');
-    expect(screen.queryByRole('link', { name: 'New Project' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Projects' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Team' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Resources' })).toBeInTheDocument();
   });
 

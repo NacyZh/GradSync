@@ -65,8 +65,9 @@ verify version history, comment placement, and review status remain intact.
 3. **Given** a student submits a weekly progress report, **When** the advisor
    reviews it, **Then** the advisor can add inline comments and mark the report
    as reviewed or needing revision.
-4. **Given** a draft or report is submitted, **When** the submission is accepted,
-   **Then** the advisor receives an email notification for the new review item.
+4. **Given** a draft or report is submitted, **When** the submission is saved
+   successfully and enters the review queue, **Then** the advisor receives an
+   email notification for the new review item.
 5. **Given** a submitted draft or report is awaiting review, **When** it remains
    pending beyond the configured review reminder period, **Then** the advisor
    receives a pending-review email reminder.
@@ -102,8 +103,7 @@ visibility and email confirmations.
   before submitting drafts, reports, or bookings.
 - An advisor attempts to move a task, draft, report, or comment from one project
   to an unrelated project.
-- A parent task deadline is later than one of its child task deadlines, or a
-  child deadline is set beyond the parent deadline.
+- A child task deadline is set after its parent task deadline.
 - A draft receives a new version after advisor comments were added to an older
   version.
 - A weekly report is submitted late, skipped, duplicated for the same week, or
@@ -149,7 +149,9 @@ visibility and email confirmations.
   bookings, and notification events for that project only.
 - **FR-011**: The system MUST allow authorized users to view available lab
   equipment and seats, reserve them for project-related work, modify their own
-  future reservations, and cancel reservations according to project policy.
+  future reservations until the reservation start time, cancel their own future
+  reservations until the reservation start time, and allow advisors to cancel
+  project reservations when project policy or resource availability changes.
 - **FR-012**: The system MUST prevent overlapping reservations for the same
   equipment item or seat and explain conflicts before a booking is confirmed.
 - **FR-013**: The system MUST send notification emails for new draft submissions,
@@ -277,3 +279,19 @@ visibility and email confirmations.
   be added later but are not required for this specification.
 - Archived projects remain readable to authorized members for historical
   continuity unless project policy later defines a retention period.
+
+## Scope Decisions
+
+- This feature covers project-scoped research operations: projects, tasks,
+  draft/report submissions, inline review comments, resource bookings,
+  notification delivery records, and the role-aware frontend workflows needed to
+  complete those tasks.
+- A full paper library/literature-management module, PDF reader annotations,
+  DOI metadata ingestion, BibTeX/EndNote export, code repository browsing,
+  repository diff/search workflows, and WebSocket real-time delivery are out of
+  scope for this feature and should be specified as separate follow-up features.
+- The frontend implementation remains aligned with the approved plan stack for
+  this feature. Tailwind CSS, shadcn/ui, Redux Toolkit, and RTK Query are not
+  adopted here because the planned and implemented frontend uses React 18,
+  TypeScript, Vite, React Router, TanStack Query, React Hook Form, Zod, Vitest,
+  and Playwright.

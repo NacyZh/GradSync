@@ -13,7 +13,16 @@ class ProjectMembershipSerializer(serializers.ModelSerializer):
 class ProjectCreateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255)
     description = serializers.CharField(required=False, allow_blank=True)
+    starts_on = serializers.DateField(required=False, allow_null=True)
+    ends_on = serializers.DateField(required=False, allow_null=True)
     student_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+
+    def validate(self, attrs):
+        starts_on = attrs.get("starts_on")
+        ends_on = attrs.get("ends_on")
+        if starts_on and ends_on and ends_on < starts_on:
+            raise serializers.ValidationError("Project end date cannot be before start date")
+        return attrs
 
     def create(self, validated_data):
         return ProjectService(self.context["request"].user).create_project(**validated_data)
@@ -43,6 +52,13 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         fields = ["title", "description", "starts_on", "ends_on"]
         extra_kwargs = {field: {"required": False} for field in fields}
 
+    def validate(self, attrs):
+        starts_on = attrs.get("starts_on", getattr(self.instance, "starts_on", None))
+        ends_on = attrs.get("ends_on", getattr(self.instance, "ends_on", None))
+        if starts_on and ends_on and ends_on < starts_on:
+            raise serializers.ValidationError("Project end date cannot be before start date")
+        return attrs
+
 
 class ProjectDashboardSerializer(ProjectSerializer):
     current_tasks = serializers.SerializerMethodField()
@@ -60,7 +76,8 @@ class ProjectDashboardSerializer(ProjectSerializer):
         from apps.tasks.serializers import TaskSerializer
 
         return TaskSerializer(
-            obj.tasks.exclude(status__in=["completed", "cancelled"])[:20], many=True
+            obj.tasks.exclude(status__in=["completed", "cancelled"]).order_by("parent_task_id", "id")[:20],
+            many=True,
         ).data
 
     def get_pending_reviews(self, obj):
