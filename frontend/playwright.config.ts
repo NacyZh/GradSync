@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from 'node:fs';
 
 const useFullStack = process.env.GRADSYNC_E2E_MODE === 'fullstack';
-const backendPython = process.env.GRADSYNC_BACKEND_PYTHON ?? '../.venv/bin/python';
+const backendPython =
+  process.env.GRADSYNC_BACKEND_PYTHON ??
+  (existsSync('../.venv/bin/python') ? '../.venv/bin/python' : 'python3');
 const backendEnv = {
   DJANGO_SETTINGS_MODULE: 'gradsync.settings.e2e',
   POSTGRES_HOST: '',

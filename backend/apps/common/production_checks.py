@@ -1,6 +1,6 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from datetime import datetime, timedelta, timezone
 
 REQUIRED_OPERATIONAL_DOCS = (
     "docs/ops/credential-inventory.md",
@@ -57,7 +57,7 @@ def _validate_restore_drill_evidence(repo_root: Path, relative_path: str) -> lis
     except ValueError:
         issues.append(f"{relative_path} Completed at must be ISO-8601")
     else:
-        if completed < datetime.now(timezone.utc) - timedelta(days=120):
+        if completed < datetime.now(UTC) - timedelta(days=120):
             issues.append(f"{relative_path} restore drill evidence is older than 120 days")
     if "passed" not in _table_value(text, "Outcome").lower():
         issues.append(f"{relative_path} Outcome must record a passed restore validation")

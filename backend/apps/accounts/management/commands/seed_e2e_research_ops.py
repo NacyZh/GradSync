@@ -17,7 +17,7 @@ class Command(BaseCommand):
         call_command("flush", interactive=False, verbosity=0)
         user_model = get_user_model()
 
-        admin = user_model.objects.create_user(
+        user_model.objects.create_user(
             email="admin@gradsync.local",
             password="password123",
             name="Admin User",
@@ -67,7 +67,7 @@ class Command(BaseCommand):
         )
 
         draft = Draft.objects.create(project=project, student=student, title="Paper A")
-        version = DraftVersion.objects.create(
+        DraftVersion.objects.create(
             project=project,
             draft=draft,
             version_number=1,
