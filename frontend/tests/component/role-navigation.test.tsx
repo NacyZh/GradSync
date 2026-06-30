@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Layout } from '../../src/app/Layout';
 import { AuthProvider, type CurrentUser } from '../../src/features/auth/AuthProvider';
@@ -9,7 +9,7 @@ import { renderWithClient } from './test-utils';
 function mockCurrentUser(user: CurrentUser | null) {
   vi.stubGlobal(
     'fetch',
-    vi.fn((_url: string) => {
+    vi.fn(() => {
       if (user) {
         return Promise.resolve(
           new Response(JSON.stringify(user), {
@@ -45,8 +45,11 @@ describe('role-aware navigation', () => {
 
   it('shows account management and project links for admin', async () => {
     mockCurrentUser({
-      id: 1, email: 'admin@test.local', name: 'Admin',
-      global_role: 'admin', status: 'active',
+      id: 1,
+      email: 'admin@test.local',
+      name: 'Admin',
+      global_role: 'admin',
+      status: 'active',
     });
     renderLayout();
 
@@ -58,8 +61,11 @@ describe('role-aware navigation', () => {
 
   it('shows project links for advisor but no account admin', async () => {
     mockCurrentUser({
-      id: 2, email: 'advisor@test.local', name: 'Advisor',
-      global_role: 'advisor', status: 'active',
+      id: 2,
+      email: 'advisor@test.local',
+      name: 'Advisor',
+      global_role: 'advisor',
+      status: 'active',
     });
     renderLayout();
 
@@ -70,8 +76,11 @@ describe('role-aware navigation', () => {
 
   it('hides project creation and account admin from student', async () => {
     mockCurrentUser({
-      id: 3, email: 'student@test.local', name: 'Student',
-      global_role: 'student', status: 'active',
+      id: 3,
+      email: 'student@test.local',
+      name: 'Student',
+      global_role: 'student',
+      status: 'active',
     });
     renderLayout();
 

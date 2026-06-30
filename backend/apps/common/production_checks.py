@@ -90,17 +90,33 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
         if release_workflow.exists():
             workflow_text = release_workflow.read_text()
             for required in (
-                "GRADSYNC_REGISTRY_TOKEN",
                 "PRODUCTION_DEPLOY_SSH_KEY",
                 "PRODUCTION_ENV_FILE",
+                "GRADSYNC_PRODUCTION_HOST",
+                "GRADSYNC_DEPLOY_PATH",
                 "environment:",
                 "deploy-production",
-                "docker push",
+                "scripts/deploy-production.sh",
             ):
                 if required not in workflow_text:
                     issues.append(f"release workflow is missing {required}")
         else:
             issues.append(".github/workflows/release.yml is missing")
+        deploy_script = repo_root / "scripts/deploy-production.sh"
+        if not deploy_script.exists():
+            issues.append("scripts/deploy-production.sh is missing")
+        else:
+            deploy_text = deploy_script.read_text()
+            for required in (
+                "git pull --ff-only",
+                "docker compose",
+                "python manage.py check --deploy",
+                "/healthz/",
+                "/readyz/",
+                "/api/schema/",
+            ):
+                if required not in deploy_text:
+                    issues.append(f"deploy script is missing {required}")
     return issues
 
 

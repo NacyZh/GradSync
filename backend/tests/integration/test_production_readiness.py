@@ -79,15 +79,28 @@ def test_production_operational_docs_are_present_and_actionable():
         assert "Acceptance" in text or "Validation" in text or "Gate" in text
 
 
-def test_release_workflow_publishes_images_and_uses_protected_deploy_environment():
+def test_release_workflow_deploys_by_ssh_with_protected_environment():
     workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text()
 
-    assert "GRADSYNC_REGISTRY_TOKEN" in workflow
-    assert "docker push" in workflow
     assert "deploy-production" in workflow
     assert "environment:" in workflow
     assert "PRODUCTION_DEPLOY_SSH_KEY" in workflow
     assert "PRODUCTION_ENV_FILE" in workflow
+    assert "GRADSYNC_PRODUCTION_HOST" in workflow
+    assert "GRADSYNC_DEPLOY_PATH" in workflow
+    assert "scripts/deploy-production.sh" in workflow
+
+
+def test_deploy_script_fetches_code_and_restarts_stack():
+    script = (REPO_ROOT / "scripts/deploy-production.sh").read_text()
+
+    assert "git pull --ff-only" in script
+    assert "docker compose -f \"$COMPOSE_FILE\" build backend frontend" in script
+    assert "docker compose -f \"$COMPOSE_FILE\" run --rm migrate" in script
+    assert "python manage.py check --deploy" in script
+    assert "$PUBLIC_URL/healthz/" in script
+    assert "$PUBLIC_URL/readyz/" in script
+    assert "$PUBLIC_URL/api/schema/" in script
 
 
 def test_env_template_names_operational_launch_inputs():

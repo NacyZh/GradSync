@@ -11,7 +11,9 @@ def _force_login(api_client, user):
     """Helper: log the given user in via the session API."""
     user.set_password(PASSWORD)
     user.save()
-    api_client.post("/api/accounts/login/", {"email": user.email, "password": PASSWORD}, format="json")
+    api_client.post(
+        "/api/accounts/login/", {"email": user.email, "password": PASSWORD}, format="json"
+    )
     # Re-fetch to get the CSRF token set on the next request.
     api_client.get("/api/accounts/me/")
 
@@ -53,7 +55,7 @@ class TestAdminAccountManagement:
     def test_duplicate_email_rejected(self, api_client):
         admin = UserFactory(global_role="admin", status="active")
         _force_login(api_client, admin)
-        existing = UserFactory(email="exists@example.com")
+        UserFactory(email="exists@example.com")
 
         response = api_client.post(
             "/api/accounts/admin/",

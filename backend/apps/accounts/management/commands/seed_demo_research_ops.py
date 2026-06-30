@@ -9,10 +9,30 @@ from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyPr
 from apps.tasks.models import Task
 
 DEMO_ACCOUNTS = [
-    {"email": "admin@gradsync.local", "name": "Admin Demo", "global_role": "admin", "password": "admin123"},
-    {"email": "advisor@example.com", "name": "Advisor Demo", "global_role": "advisor", "password": "advisor123"},
-    {"email": "student@example.com", "name": "Student Demo", "global_role": "student", "password": "student123"},
-    {"email": "reviewer@example.com", "name": "Reviewer Demo", "global_role": "advisor", "password": "reviewer123"},
+    {
+        "email": "admin@gradsync.local",
+        "name": "Admin Demo",
+        "global_role": "admin",
+        "password": "admin123",
+    },
+    {
+        "email": "advisor@example.com",
+        "name": "Advisor Demo",
+        "global_role": "advisor",
+        "password": "advisor123",
+    },
+    {
+        "email": "student@example.com",
+        "name": "Student Demo",
+        "global_role": "student",
+        "password": "student123",
+    },
+    {
+        "email": "reviewer@example.com",
+        "name": "Reviewer Demo",
+        "global_role": "advisor",
+        "password": "reviewer123",
+    },
 ]
 
 
@@ -36,7 +56,9 @@ class Command(BaseCommand):
             user.save(update_fields=["password"])
             created_users[acct["email"]] = user
             verb = "Created" if created else "Updated"
-            self.stdout.write(f"  {verb} {acct['global_role']}: {acct['email']} / {acct['password']}")
+            self.stdout.write(
+                f"  {verb} {acct['global_role']}: {acct['email']} / {acct['password']}"
+            )
 
         advisor = created_users["advisor@example.com"]
         student = created_users["student@example.com"]
@@ -126,4 +148,6 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Demo login credentials:"))
         for acct in DEMO_ACCOUNTS:
-            self.stdout.write(f"  {acct['global_role']:10s} {acct['email']:30s} / {acct['password']}")
+            self.stdout.write(
+                f"  {acct['global_role']:10s} {acct['email']:30s} / {acct['password']}"
+            )

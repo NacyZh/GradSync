@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { AsyncState } from '../../shared/ui/AsyncState';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { accountAction, createAccount, listAccounts } from './api';
-import type { CurrentUser } from '../auth/AuthProvider';
 
 export function AccountAdminPage() {
   const queryClient = useQueryClient();

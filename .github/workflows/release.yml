@@ -1,4 +1,4 @@
-name: Release Gate
+name: CI/CD
 
 on:
   pull_request:
@@ -8,13 +8,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
-  id-token: write
-
-env:
-  REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
 
 jobs:
   backend:
@@ -87,84 +80,43 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-  containers:
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
-    outputs:
-      backend-image: ${{ steps.meta.outputs.backend-image }}
-      frontend-image: ${{ steps.meta.outputs.frontend-image }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate release credentials
-        if: github.event_name != 'pull_request'
-        run: |
-          test -n "${{ secrets.GRADSYNC_REGISTRY_TOKEN }}" || { echo "GRADSYNC_REGISTRY_TOKEN is required"; exit 1; }
-          test -n "${{ vars.GRADSYNC_PRODUCTION_HOST }}" || { echo "GRADSYNC_PRODUCTION_HOST variable is required"; exit 1; }
-      - name: Log in to registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GRADSYNC_REGISTRY_TOKEN }}
-      - name: Build backend image
-        run: docker build -f docker/backend.Dockerfile -t "${BACKEND_IMAGE}:${{ github.sha }}" -t "${BACKEND_IMAGE}:main" .
-      - name: Build frontend image
-        run: docker build -f docker/frontend.Dockerfile -t "${FRONTEND_IMAGE}:${{ github.sha }}" -t "${FRONTEND_IMAGE}:main" .
-      - name: Audit Python dependencies
-        working-directory: backend
-        run: python -m pip install pip-audit && pip-audit
-      - name: Audit frontend dependencies
-        working-directory: frontend
-        run: npm audit --audit-level=high
-      - name: Scan backend image
-        uses: aquasecurity/trivy-action@0.24.0
-        with:
-          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
-          severity: HIGH,CRITICAL
-          exit-code: "1"
-      - name: Scan frontend image
-        uses: aquasecurity/trivy-action@0.24.0
-        with:
-          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-          severity: HIGH,CRITICAL
-          exit-code: "1"
-      - name: Push backend image
-        if: github.event_name != 'pull_request'
-        run: |
-          docker push "${BACKEND_IMAGE}:${{ github.sha }}"
-          docker push "${BACKEND_IMAGE}:main"
-      - name: Push frontend image
-        if: github.event_name != 'pull_request'
-        run: |
-          docker push "${FRONTEND_IMAGE}:${{ github.sha }}"
-          docker push "${FRONTEND_IMAGE}:main"
-      - name: Record image metadata
-        id: meta
-        run: |
-          echo "backend-image=${BACKEND_IMAGE}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "frontend-image=${FRONTEND_IMAGE}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-
   deploy-production:
     runs-on: ubuntu-latest
-    needs: [containers]
+    needs: [backend, frontend]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: https://gradsync.example.edu
+      url: https://120021123.xyz
+    env:
+      DEPLOY_HOST: ${{ vars.GRADSYNC_PRODUCTION_HOST }}
+      DEPLOY_USER: ${{ vars.GRADSYNC_PRODUCTION_USER || 'deploy' }}
+      DEPLOY_PORT: ${{ vars.GRADSYNC_PRODUCTION_SSH_PORT || '22' }}
+      DEPLOY_PATH: ${{ vars.GRADSYNC_DEPLOY_PATH || '/home/GradSync/GradSync' }}
+      DEPLOY_BRANCH: main
+      PUBLIC_URL: ${{ vars.GRADSYNC_PUBLIC_URL || 'https://120021123.xyz' }}
+      PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
     steps:
       - uses: actions/checkout@v4
-      - name: Validate deployment credentials
+      - name: Validate deployment inputs
         run: |
-          test -n "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" || { echo "PRODUCTION_DEPLOY_SSH_KEY is required"; exit 1; }
-          test -n "${{ secrets.PRODUCTION_ENV_FILE }}" || { echo "PRODUCTION_ENV_FILE is required"; exit 1; }
-          test -n "${{ vars.GRADSYNC_PRODUCTION_HOST }}" || { echo "GRADSYNC_PRODUCTION_HOST variable is required"; exit 1; }
-      - name: Deploy approved images
-        env:
-          BACKEND_IMAGE: ${{ needs.containers.outputs.backend-image }}
-          FRONTEND_IMAGE: ${{ needs.containers.outputs.frontend-image }}
-          DEPLOY_HOST: ${{ vars.GRADSYNC_PRODUCTION_HOST }}
-          DEPLOY_USER: ${{ vars.GRADSYNC_PRODUCTION_USER }}
+          test -n "${DEPLOY_HOST}" || { echo "GRADSYNC_PRODUCTION_HOST variable is required"; exit 1; }
+          test -n "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" || { echo "PRODUCTION_DEPLOY_SSH_KEY secret is required"; exit 1; }
+      - name: Configure SSH
         run: |
-          echo "Deploy ${BACKEND_IMAGE} and ${FRONTEND_IMAGE} to ${DEPLOY_USER:-deploy}@${DEPLOY_HOST}"
-          echo "Production environment protection must approve this job before host credentials are used."
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/gradsync_deploy
+          chmod 600 ~/.ssh/gradsync_deploy
+          ssh-keyscan -p "${DEPLOY_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+      - name: Sync production env file
+        run: |
+          if [ -n "${PRODUCTION_ENV_FILE}" ]; then
+            printf '%s' "${PRODUCTION_ENV_FILE}" | ssh -i ~/.ssh/gradsync_deploy -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+              "umask 077; cat > '${DEPLOY_PATH}/.env.production.tmp' && mv '${DEPLOY_PATH}/.env.production.tmp' '${DEPLOY_PATH}/.env.production'"
+          else
+            echo "PRODUCTION_ENV_FILE is empty; keeping existing server .env.production"
+          fi
+      - name: Deploy on production host
+        run: |
+          ssh -i ~/.ssh/gradsync_deploy -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' sh -s" \
+            < scripts/deploy-production.sh

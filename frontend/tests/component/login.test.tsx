@@ -22,7 +22,7 @@ describe('login page', () => {
     // Return 401 so AuthProvider resolves user=null.
     vi.stubGlobal(
       'fetch',
-      vi.fn((_url: string, _init?: RequestInit) =>
+      vi.fn(() =>
         Promise.resolve(
           new Response(JSON.stringify({ message: 'Authentication required' }), {
             status: 401,

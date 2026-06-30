@@ -75,7 +75,8 @@ class AccountListCreateView(generics.ListCreateAPIView):
             )
         except ValidationError as e:
             from rest_framework.exceptions import ValidationError as DRFValidationError
-            raise DRFValidationError({"message": str(e)})
+
+            raise DRFValidationError({"message": str(e)}) from e
         # Return the created user data.
         serializer._user = user
 
@@ -108,7 +109,8 @@ class AccountDetailView(generics.RetrieveUpdateAPIView):
             )
         except ValidationError as e:
             from rest_framework.exceptions import ValidationError as DRFValidationError
-            raise DRFValidationError({"message": str(e)})
+
+            raise DRFValidationError({"message": str(e)}) from e
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)

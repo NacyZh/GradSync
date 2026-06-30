@@ -87,12 +87,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ── Session & CSRF ──
 SESSION_COOKIE_AGE = int(os.getenv("SESSION_COOKIE_AGE", "1800"))  # 30 min default
 SESSION_SAVE_EVERY_REQUEST = True  # Refresh session on each request
-SESSION_EXPIRE_AT_BROWSER_CLOSE = os.getenv("SESSION_EXPIRE_AT_BROWSER_CLOSE", "false").lower() == "true"
+SESSION_EXPIRE_AT_BROWSER_CLOSE = (
+    os.getenv("SESSION_EXPIRE_AT_BROWSER_CLOSE", "false").lower() == "true"
+)
 CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://127.0.0.1:8080").split(",")
+    for origin in os.getenv(
+        "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://127.0.0.1:8080"
+    ).split(",")
     if origin.strip()
 ]
 

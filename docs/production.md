@@ -15,12 +15,44 @@
 
 ## Deployment
 
-1. Build and scan images in CI.
-2. Back up PostgreSQL before applying a release.
-3. Pull or build the approved images on the host.
-4. Run `docker compose -f docker-compose.prod.yml up -d migrate`.
-5. Run `docker compose -f docker-compose.prod.yml up -d`.
-6. Watch backend logs, worker logs, queue depth, notification failures, and
+Pushes to `main` run the GitHub Actions CI/CD workflow. After backend and
+frontend checks pass, the `deploy-production` job connects to the production
+host over SSH and runs `scripts/deploy-production.sh`.
+
+The production host must already have:
+
+- The repository cloned at `GRADSYNC_DEPLOY_PATH` (default
+  `/home/GradSync/GradSync`).
+- A clean working tree that can accept `git pull --ff-only`.
+- Docker Engine and the Docker Compose plugin installed.
+- A valid `.env.production` file, either maintained on the host or synced from
+  the `PRODUCTION_ENV_FILE` GitHub secret.
+- Git credentials or a deploy key that allow the host to fetch the GitHub
+  repository.
+
+GitHub production environment configuration:
+
+| Name | Type | Purpose |
+|------|------|---------|
+| `PRODUCTION_DEPLOY_SSH_KEY` | Secret | Private SSH key used by Actions to connect to the host |
+| `PRODUCTION_ENV_FILE` | Secret | Optional full `.env.production` contents to sync before deploy |
+| `GRADSYNC_PRODUCTION_HOST` | Variable | Production server host or IP |
+| `GRADSYNC_PRODUCTION_USER` | Variable | SSH user, defaults to `deploy` |
+| `GRADSYNC_PRODUCTION_SSH_PORT` | Variable | SSH port, defaults to `22` |
+| `GRADSYNC_DEPLOY_PATH` | Variable | Repository path on the server |
+| `GRADSYNC_PUBLIC_URL` | Variable | Public URL used for post-deploy checks |
+
+The deploy script performs:
+
+1. `git fetch` and `git pull --ff-only` on the server.
+2. `docker compose -f docker-compose.prod.yml build backend frontend`.
+3. Start PostgreSQL and Redis.
+4. Run migrations.
+5. Recreate backend, frontend, worker, and scheduler.
+6. Wait for healthy services.
+7. Run `python manage.py check --deploy`.
+8. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
+9. Watch backend logs, worker logs, queue depth, notification failures, and
    request latency for at least one reminder cycle.
 
 ## Host Nginx
