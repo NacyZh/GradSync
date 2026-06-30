@@ -125,7 +125,17 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/gradsync_deploy
           chmod 600 ~/.ssh/gradsync_deploy
-          ssh-keyscan -p "${DEPLOY_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+          echo "Scanning SSH host key for ${DEPLOY_HOST}:${DEPLOY_PORT}"
+          ssh-keyscan -T 20 -p "${DEPLOY_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+          echo "Validating SSH authentication for ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PORT}"
+          ssh \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            -o StrictHostKeyChecking=yes \
+            -i ~/.ssh/gradsync_deploy \
+            -p "${DEPLOY_PORT}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "echo ssh-ok"
       - name: Sync production env file
         run: |
           if [ -n "${PRODUCTION_ENV_FILE}" ]; then
