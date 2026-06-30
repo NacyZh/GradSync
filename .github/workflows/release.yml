@@ -126,7 +126,16 @@ jobs:
           printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/gradsync_deploy
           chmod 600 ~/.ssh/gradsync_deploy
           echo "Scanning SSH host key for ${DEPLOY_HOST}:${DEPLOY_PORT}"
-          ssh-keyscan -T 20 -p "${DEPLOY_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+          if ! timeout 20 bash -c "cat < /dev/null > /dev/tcp/${DEPLOY_HOST}/${DEPLOY_PORT}"; then
+            echo "Cannot open TCP connection to ${DEPLOY_HOST}:${DEPLOY_PORT} from GitHub Actions."
+            echo "Check the server public IP, SSH port, cloud security group, host firewall, and sshd status."
+            exit 1
+          fi
+          if ! ssh-keyscan -T 20 -p "${DEPLOY_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts; then
+            echo "TCP connection opened, but ssh-keyscan failed for ${DEPLOY_HOST}:${DEPLOY_PORT}."
+            echo "Check that the service on this port is SSH and that it sends an SSH host key."
+            exit 1
+          fi
           echo "Validating SSH authentication for ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PORT}"
           ssh \
             -o BatchMode=yes \
