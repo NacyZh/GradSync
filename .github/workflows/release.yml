@@ -123,8 +123,8 @@ jobs:
       - name: Configure SSH
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/gradsync_deploy
-          chmod 600 ~/.ssh/gradsync_deploy
+          printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/gradsync_github_deploy
+          chmod 600 ~/.ssh/gradsync_github_deploy
           echo "Scanning SSH host key for ${DEPLOY_HOST}:${DEPLOY_PORT}"
           if ! timeout 20 bash -c "cat < /dev/null > /dev/tcp/${DEPLOY_HOST}/${DEPLOY_PORT}"; then
             echo "Cannot open TCP connection to ${DEPLOY_HOST}:${DEPLOY_PORT} from GitHub Actions."
@@ -141,14 +141,14 @@ jobs:
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
             -o StrictHostKeyChecking=yes \
-            -i ~/.ssh/gradsync_deploy \
+            -i ~/.ssh/gradsync_github_deploy \
             -p "${DEPLOY_PORT}" \
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "echo ssh-ok"
       - name: Sync production env file
         run: |
           if [ -n "${PRODUCTION_ENV_FILE}" ]; then
-            printf '%s' "${PRODUCTION_ENV_FILE}" | ssh -i ~/.ssh/gradsync_deploy -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            printf '%s' "${PRODUCTION_ENV_FILE}" | ssh -i ~/.ssh/gradsync_github_deploy -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
               "umask 077; cat > '${DEPLOY_PATH}/.env.production.tmp' && mv '${DEPLOY_PATH}/.env.production.tmp' '${DEPLOY_PATH}/.env.production'"
           else
             echo "PRODUCTION_ENV_FILE is empty; keeping existing server .env.production"
