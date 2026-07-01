@@ -104,7 +104,7 @@ jobs:
           GRADSYNC_BACKEND_PYTHON: ../.venv/bin/python
         run: npm run test:e2e -- production-ui.spec.ts
       - name: Check generated artifacts after frontend tests
-        run: sh scripts/check-generated-artifacts.sh
+        run: sh scripts/check-generated-artifacts.sh --clean
       - name: Build frontend
         working-directory: frontend
         run: npm run build

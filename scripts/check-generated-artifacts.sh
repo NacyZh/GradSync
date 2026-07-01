@@ -6,7 +6,16 @@ if [ ! -d .git ]; then
   exit 2
 fi
 
-found="$(
+find_generated_artifacts() {
+  action="${1:-print}"
+
+  if [ "$action" = "delete" ]; then
+    result_action="-exec rm -rf {} +"
+  else
+    result_action="-print"
+  fi
+
+  # shellcheck disable=SC2086
   find backend frontend \
     -path 'frontend/node_modules' -prune -o \
     \( \
@@ -24,8 +33,17 @@ found="$(
       -name 'vite.config.d.ts' -o \
       -name '*.spec.js-snapshots' -o \
       -name '*.snap' \
-    \) -print
-)"
+    \) $result_action
+}
+
+if [ "${1:-}" = "--clean" ]; then
+  find_generated_artifacts delete
+elif [ "${1:-}" != "" ]; then
+  echo "Usage: sh scripts/check-generated-artifacts.sh [--clean]" >&2
+  exit 2
+fi
+
+found="$(find_generated_artifacts)"
 
 if [ -n "$found" ]; then
   echo "Generated runtime/build artifacts must not remain in source scope:" >&2
