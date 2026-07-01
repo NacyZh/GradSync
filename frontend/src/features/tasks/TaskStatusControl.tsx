@@ -1,9 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
 
+import { Label } from '@/components/ui/label';
+
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { updateTask } from './api';
 
-export function TaskStatusControl({ projectId, taskId, status }: { projectId: number; taskId: number; status: string }) {
+export function TaskStatusControl({ projectId, taskId, status, disabled = false }: { projectId: number; taskId: number; status: string; disabled?: boolean }) {
   const { notify } = useAppFeedback();
   const mutation = useMutation({
     mutationFn: (nextStatus: string) => updateTask(projectId, taskId, { status: nextStatus }),
@@ -12,9 +14,15 @@ export function TaskStatusControl({ projectId, taskId, status }: { projectId: nu
   });
 
   return (
-    <label id={`task-${taskId}-status`} className="inline-control">
-      Status
-      <select defaultValue={status} onChange={(event) => mutation.mutate(event.target.value)} aria-label="Task status">
+    <div id={`task-${taskId}-status`} className="grid gap-2">
+      <Label htmlFor={`task-${taskId}-status-select`}>Status</Label>
+      <select
+        id={`task-${taskId}-status-select`}
+        defaultValue={status}
+        onChange={(event) => mutation.mutate(event.target.value)}
+        aria-label="Task status"
+        disabled={disabled || mutation.isPending}
+      >
         <option value="not_started">Not started</option>
         <option value="in_progress">In progress</option>
         <option value="blocked">Blocked</option>
@@ -22,8 +30,9 @@ export function TaskStatusControl({ projectId, taskId, status }: { projectId: nu
         <option value="completed">Completed</option>
         <option value="cancelled">Cancelled</option>
       </select>
+      {disabled ? <span className="text-sm text-muted-foreground">Archived projects are read-only until reopened.</span> : null}
       {mutation.isSuccess ? <span role="status">Task status updated</span> : null}
       {mutation.error ? <span role="alert">{mutation.error.message}</span> : null}
-    </label>
+    </div>
   );
 }

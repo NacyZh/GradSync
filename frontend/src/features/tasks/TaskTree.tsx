@@ -1,6 +1,11 @@
+import { CalendarClock, ChevronRight, UserRound } from 'lucide-react';
+
+import { StatusBadge } from '../../shared/ui/StatusBadge';
+
 export type TaskNode = {
   id: number;
   title: string;
+  description?: string;
   status?: string;
   priority?: string;
   deadline_at?: string;
@@ -8,31 +13,65 @@ export type TaskNode = {
   children?: TaskNode[];
 };
 
-function formatStatus(status?: string) {
-  return (status ?? 'not_started').replaceAll('_', ' ');
+type TaskTreeProps = {
+  tasks: TaskNode[];
+  projectId?: number;
+  selectedTaskId?: number;
+  onSelectTask?: (task: TaskNode) => void;
+};
+
+function formatDate(value?: string) {
+  if (!value) return null;
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
 }
 
-export function TaskTree({ tasks, projectId }: { tasks: TaskNode[]; projectId?: number }) {
+function priorityTone(priority?: string) {
+  if (priority === 'urgent' || priority === 'high') return 'text-destructive';
+  if (priority === 'low') return 'text-muted-foreground';
+  return 'text-foreground';
+}
+
+export function TaskTree({ tasks, projectId, selectedTaskId, onSelectTask }: TaskTreeProps) {
   return (
-    <ul className="task-tree" aria-label="Task hierarchy">
+    <ul className="task-tree" aria-label="Task hierarchy" data-density="compact">
       {tasks.map((task) => (
-        <li key={task.id}>
-          <details open>
-            <summary>
-              <span className="task-title">{task.title}</span>
-              <span className={`status-pill ${task.status ?? 'not_started'}`}>{formatStatus(task.status)}</span>
-              {task.deadline_at ? <time dateTime={task.deadline_at}>{new Date(task.deadline_at).toLocaleDateString()}</time> : null}
+        <li key={task.id} id={`task-${task.id}`}>
+          <details open className={selectedTaskId === task.id ? 'ring-2 ring-ring ring-offset-2 ring-offset-background' : undefined}>
+            <summary className="group">
+              <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
+              <span className="task-title min-w-0 flex-1 truncate">{task.title}</span>
+              <StatusBadge status={task.status ?? 'not_started'} />
+              {task.deadline_at ? (
+                <time className="hidden text-xs text-muted-foreground sm:inline" dateTime={task.deadline_at}>
+                  {formatDate(task.deadline_at)}
+                </time>
+              ) : null}
             </summary>
             <div className="task-meta">
-              <span>Priority: {task.priority ?? 'normal'}</span>
-              <span>Assignee: {task.assignee_id ? `User ${task.assignee_id}` : 'Unassigned'}</span>
+              <span className={priorityTone(task.priority)}>Priority: {task.priority ?? 'normal'}</span>
+              <span className="inline-flex items-center gap-1">
+                <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
+                Assignee: {task.assignee_id ? `User ${task.assignee_id}` : 'Unassigned'}
+              </span>
+              {task.deadline_at ? (
+                <span className="inline-flex items-center gap-1">
+                  <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
+                  Due {formatDate(task.deadline_at)}
+                </span>
+              ) : null}
               {projectId ? (
-                <a href={`#task-${task.id}-status`} className="inline-action">
+                <a
+                  href={`#task-${task.id}-status`}
+                  className="inline-action font-bold text-primary"
+                  onClick={() => onSelectTask?.(task)}
+                >
                   Update status
                 </a>
               ) : null}
             </div>
-            {task.children && task.children.length > 0 ? <TaskTree tasks={task.children} projectId={projectId} /> : null}
+            {task.children && task.children.length > 0 ? (
+              <TaskTree tasks={task.children} projectId={projectId} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} />
+            ) : null}
           </details>
         </li>
       ))}

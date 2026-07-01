@@ -16,7 +16,15 @@ export const selectedProject = {
   description: 'Research operations validation',
   status: 'active',
   memberships: [],
-  current_tasks: [{ id: 11, title: 'Analyze sample', status: 'in_progress', priority: 'high', deadline_at: '2026-06-30T08:00:00Z', assignee_id: 12 }],
+  current_tasks: [{
+    id: 11,
+    title: 'Analyze sample',
+    status: 'in_progress',
+    priority: 'high',
+    deadline_at: '2026-06-30T08:00:00Z',
+    assignee_id: 12,
+    children: [{ id: 12, title: 'Draft chart', status: 'not_started', priority: 'high', assignee_id: 12 }],
+  }],
   pending_reviews: [{ target_type: 'progress_report', target_id: '21', submitted_at: '2026-06-20T00:00:00Z' }],
   upcoming_bookings: [{ id: 31, resource_id: 41, starts_at: '2026-06-27T08:00:00Z', ends_at: '2026-06-27T09:00:00Z', status: 'reserved' }],
   activity: [
@@ -74,6 +82,9 @@ export async function mockAuthenticatedApi(page: Page) {
   });
   await page.route('**/api/projects/1/tasks/11/', async (route) => {
     await fulfillJson(route, { id: 11, title: 'Analyze sample', status: 'completed', priority: 'high' });
+  });
+  await page.route('**/api/projects/1/tasks/12/', async (route) => {
+    await fulfillJson(route, { id: 12, title: 'Draft chart', status: 'completed', priority: 'high' });
   });
   await page.route('**/api/projects/1/tasks/', async (route) => {
     if (route.request().method() === 'POST') {

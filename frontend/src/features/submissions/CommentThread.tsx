@@ -1,6 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
+import { MessageSquareText } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
+import { DataState } from '../../shared/ui/DataState';
+import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { InlineComment } from './api';
 import { updateCommentStatus } from './api';
 
@@ -14,16 +18,24 @@ export function CommentThread({ projectId, comments = [] }: { projectId?: number
 
   return (
     <section aria-label="Comment thread">
-      {comments.length === 0 ? <p className="muted">No comments for this target yet.</p> : null}
+      {comments.length === 0 ? <DataState state="empty" title="No comments" message="No comments for this target yet." /> : null}
       <ul className="timeline">
         {comments.map((comment) => (
           <li key={comment.id}>
-            <strong>{comment.anchor}</strong>
-            <span>{comment.body}</span>
-            <small>{comment.status}</small>
-            <button className="button compact" type="button" onClick={() => mutation.mutate(comment.id)} disabled={comment.status === 'resolved'}>
+            <div className="min-w-0">
+              <strong className="flex items-center gap-2">
+                <MessageSquareText className="h-4 w-4 text-primary" aria-hidden="true" />
+                {comment.anchor}
+              </strong>
+              <span className="block text-sm text-muted-foreground">{comment.body}</span>
+              <small className="block text-xs text-muted-foreground">
+                {comment.target_type} #{comment.target_id}
+              </small>
+            </div>
+            <StatusBadge status={comment.status} />
+            <Button variant="outline" size="sm" type="button" onClick={() => mutation.mutate(comment.id)} disabled={comment.status === 'resolved' || mutation.isPending}>
               Resolve
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

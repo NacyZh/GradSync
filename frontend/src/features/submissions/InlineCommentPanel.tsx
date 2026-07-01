@@ -1,10 +1,14 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { MessageSquarePlus } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
+import { DataState } from '../../shared/ui/DataState';
+import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';
 import { createComment, listComments } from './api';
 import { CommentThread } from './CommentThread';
 
-export function InlineCommentPanel({ projectId, targetType, targetId }: { projectId?: number; targetType?: string; targetId?: number }) {
+export function InlineCommentPanel({ projectId, targetType, targetId, disabled = false }: { projectId?: number; targetType?: string; targetId?: number; disabled?: boolean }) {
   const { notify } = useAppFeedback();
   const commentsQuery = useQuery({
     queryKey: ['comments', projectId, targetType, targetId],
@@ -29,18 +33,22 @@ export function InlineCommentPanel({ projectId, targetType, targetId }: { projec
 
   return (
     <aside className="panel comment-panel" aria-label="Inline comments">
-      <h2>Inline comments</h2>
+      <h2 className="flex items-center gap-2">
+        <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
+        Inline comments
+      </h2>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Target: {targetType ?? 'draft_version'} #{targetId ?? 'not selected'}
+      </p>
+      {!targetId ? <DataState state="warning" title="No review target" message="Select a draft version or progress report before adding anchored comments." /> : null}
       <CommentThread projectId={projectId} comments={commentsQuery.data?.results ?? []} />
       <form className="stacked-form" onSubmit={onSubmit}>
-        <label>
-          Page or section anchor
-          <input name="anchor" defaultValue="general" />
-        </label>
-        <label>
-          Comment
-          <textarea name="body" />
-        </label>
-        <button type="submit">Add comment</button>
+        <FieldGroup>
+          <FormField id="comment-anchor" name="anchor" label="Page or section anchor" defaultValue="general" disabled={disabled || !targetId || mutation.isPending} />
+          <TextareaField id="comment-body" name="body" label="Comment" required disabled={disabled || !targetId || mutation.isPending} />
+        </FieldGroup>
+        <Button type="submit" disabled={disabled || !targetId || mutation.isPending}>Add comment</Button>
+        {disabled ? <p className="text-sm text-muted-foreground">Comments are disabled for archived or unauthorized targets.</p> : null}
       </form>
     </aside>
   );

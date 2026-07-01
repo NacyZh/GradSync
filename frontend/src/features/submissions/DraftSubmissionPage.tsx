@@ -1,10 +1,16 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { useCallback, useRef } from 'react';
+import { FilePlus2, History, UploadCloud } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui/AppFeedback';
+import { DataState } from '../../shared/ui/DataState';
+import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';
 import { FormStatus } from '../../shared/ui/FormStatus';
-import { AsyncState } from '../../shared/ui/AsyncState';
+import { PageShell } from '../../shared/ui/PageShell';
+import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { DraftVersionHistory } from './DraftVersionHistory';
 import { createDraft, listDrafts, submitDraftVersion } from './api';
 
@@ -49,63 +55,88 @@ export function DraftSubmissionPage() {
   useSubmitShortcut(submitShortcut);
 
   return (
-    <section className="submission-workspace">
-      <div className="page-heading">
-        <div>
-          <h1>Submit draft</h1>
-          <p>Create a draft family, submit immutable versions, and track review status in this project.</p>
-        </div>
-      </div>
-      <div className="two-column-workspace">
-        <section className="panel">
-          <h2>Draft library</h2>
-          {draftsQuery.isLoading ? <AsyncState state="loading" message="Loading drafts" /> : null}
-          {draftsQuery.data?.results.length === 0 ? <AsyncState state="empty" message="No draft families yet." /> : null}
+    <PageShell
+      title="Submit draft"
+      description="Create a draft family, submit immutable versions, and track review status in this project."
+      className="submission-workspace"
+    >
+      <div className="grid gap-4 xl:grid-cols-[minmax(20rem,0.85fr)_minmax(24rem,1.15fr)]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-4 w-4" aria-hidden="true" />
+              Draft library
+            </CardTitle>
+            <CardDescription>Families group immutable submitted versions.</CardDescription>
+          </CardHeader>
+          <CardContent>
+          {draftsQuery.isLoading ? <DataState state="loading" message="Loading drafts" /> : null}
+          {draftsQuery.data?.results.length === 0 ? <DataState state="empty" title="No draft families" message="No draft families yet." /> : null}
           <ul className="resource-list">
             {draftsQuery.data?.results.map((draft) => (
               <li key={draft.id}>
                 <strong>{draft.title}</strong>
-                <span className={`status-pill ${draft.status}`}>{draft.status}</span>
+                <StatusBadge status={draft.status} />
               </li>
             ))}
           </ul>
+          <h3 className="mt-5 text-sm font-extrabold">Version navigation</h3>
           <DraftVersionHistory versions={submitMutation.data ? [submitMutation.data] : []} />
-        </section>
-        <section className="panel">
-          <h2>Student actions</h2>
-          <form className="stacked-form" aria-label="Create draft" onSubmit={onCreateDraft}>
-            <label>
-              Draft title
-              <input name="title" required />
-            </label>
-            <button type="submit">Create draft</button>
-            <FormStatus error={createDraftMutation.error?.message} success={createDraftMutation.isSuccess ? 'Draft created' : undefined} />
-          </form>
-          <form ref={versionFormRef} className="stacked-form" aria-label="Submit draft" onSubmit={onSubmitVersion}>
-            <label>
-              Draft
-              <select name="draftId" required>
-                {draftsQuery.data?.results.map((draft) => (
-                  <option key={draft.id} value={draft.id}>
-                    {draft.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Content reference
-              <input name="contentReference" required />
-            </label>
-            <label>
-              Summary
-              <textarea name="summary" />
-            </label>
-            <button type="submit">Submit draft</button>
-            <KeyboardHint>Ctrl+Enter submits</KeyboardHint>
-            <FormStatus error={submitMutation.error?.message} success={submitMutation.isSuccess ? 'Draft version submitted' : undefined} />
-          </form>
+          </CardContent>
+        </Card>
+        <section className="grid gap-4" aria-label="Student draft actions">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+                Create draft family
+              </CardTitle>
+              <CardDescription>Use a stable family for all versions of the same paper.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="stacked-form" aria-label="Create draft" onSubmit={onCreateDraft}>
+                <FormField id="draft-title" name="title" label="Draft title" required disabled={createDraftMutation.isPending} />
+                <Button type="submit" disabled={createDraftMutation.isPending}>
+                  Create draft
+                </Button>
+                <FormStatus error={createDraftMutation.error?.message} success={createDraftMutation.isSuccess ? 'Draft created' : undefined} />
+              </form>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UploadCloud className="h-4 w-4" aria-hidden="true" />
+                Submit version
+              </CardTitle>
+              <CardDescription>Comments stay anchored to this exact version.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form ref={versionFormRef} className="stacked-form" aria-label="Submit draft" onSubmit={onSubmitVersion}>
+                <FieldGroup>
+                  <label className="grid gap-1.5 text-sm font-bold text-muted-foreground">
+                    Draft
+                    <select name="draftId" required disabled={submitMutation.isPending}>
+                      {draftsQuery.data?.results.map((draft) => (
+                        <option key={draft.id} value={draft.id}>
+                          {draft.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <FormField id="draft-content-reference" name="contentReference" label="Content reference" required disabled={submitMutation.isPending} />
+                  <TextareaField id="draft-summary" name="summary" label="Summary" disabled={submitMutation.isPending} />
+                </FieldGroup>
+                <Button type="submit" disabled={submitMutation.isPending}>
+                  Submit draft
+                </Button>
+                <KeyboardHint>Ctrl+Enter submits</KeyboardHint>
+                <FormStatus error={submitMutation.error?.message} success={submitMutation.isSuccess ? 'Draft version submitted' : undefined} />
+              </form>
+            </CardContent>
+          </Card>
         </section>
       </div>
-    </section>
+    </PageShell>
   );
 }

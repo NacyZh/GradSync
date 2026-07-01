@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 
+import { Label } from '@/components/ui/label';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import type { DraftVersion, WeeklyReport } from './api';
 import { reviewDraftVersion, reviewWeeklyReport } from './api';
@@ -11,9 +12,10 @@ type Props = {
   versionId?: number;
   reportId?: number;
   targetType?: 'draft' | 'report';
+  disabled?: boolean;
 };
 
-export function ReviewStatusControl({ status, projectId, draftId, versionId, reportId, targetType = 'report' }: Props) {
+export function ReviewStatusControl({ status, projectId, draftId, versionId, reportId, targetType = 'report', disabled = false }: Props) {
   const { notify } = useAppFeedback();
   const mutation = useMutation<DraftVersion | WeeklyReport | null, Error, string>({
     mutationFn: (reviewStatus: string) => {
@@ -31,16 +33,23 @@ export function ReviewStatusControl({ status, projectId, draftId, versionId, rep
   });
 
   return (
-    <label>
-      Review status
-      <select defaultValue={status} onChange={(event) => mutation.mutate(event.target.value)}>
+    <div className="grid gap-2">
+      <Label htmlFor={`review-status-${targetType}-${reportId ?? versionId ?? 'target'}`}>Review status</Label>
+      <select
+        id={`review-status-${targetType}-${reportId ?? versionId ?? 'target'}`}
+        defaultValue={status}
+        onChange={(event) => mutation.mutate(event.target.value)}
+        aria-label="Review status"
+        disabled={disabled || mutation.isPending}
+      >
         <option value="pending_review">Pending review</option>
         <option value="reviewed">Reviewed</option>
         <option value="needs_revision">Needs revision</option>
         <option value="closed">Closed</option>
       </select>
+      {disabled ? <span className="text-sm text-muted-foreground">Review controls are disabled for archived or unauthorized targets.</span> : null}
       {mutation.isSuccess ? <span role="status">Review status updated</span> : null}
       {mutation.error ? <span role="alert">{mutation.error.message}</span> : null}
-    </label>
+    </div>
   );
 }
