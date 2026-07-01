@@ -1,5 +1,15 @@
 import type { PropsWithChildren } from 'react';
+import { Bell, BriefcaseBusiness, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, Users } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 import { useAuth } from '../features/auth/AuthProvider';
 import { ProjectContextBanner } from '../features/projects/ProjectContextBanner';
@@ -17,10 +27,10 @@ export function Layout({ children }: PropsWithChildren) {
 
   const primaryLinks = user
     ? [
-        { to: '/', label: 'Dashboard', roles: ['admin', 'advisor', 'student'] },
-        { to: '/projects/new', label: 'Projects', roles: ['admin', 'advisor'] },
-        { to: '/resources', label: 'Resources', roles: ['admin', 'advisor', 'student'] },
-        { to: '/admin/accounts', label: 'Team', roles: ['admin'] },
+        { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'advisor', 'student'] },
+        { to: '/projects/new', label: 'Projects', icon: BriefcaseBusiness, roles: ['admin', 'advisor'] },
+        { to: '/resources', label: 'Resources', icon: Settings, roles: ['admin', 'advisor', 'student'] },
+        { to: '/admin/accounts', label: 'Team', icon: Users, roles: ['admin'] },
       ].filter((link) => link.roles.includes(user.global_role))
     : [];
 
@@ -34,25 +44,39 @@ export function Layout({ children }: PropsWithChildren) {
         {user ? (
           <div className="topbar-right">
             <label className="global-search">
-              <span>Search</span>
-              <input placeholder="Search projects, tasks, reviews" />
+              <span className="sr-only">Search</span>
+              <span className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input className="pl-9" placeholder="Search projects, tasks, reviews" />
+              </span>
             </label>
-            <Link className="icon-button notification-button" to="/#notifications" aria-label="Open notifications">
-              <span aria-hidden="true">!</span>
-              <span className="unread-dot" aria-hidden="true" />
-            </Link>
-            <button className="icon-button" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
-              {theme === 'dark' ? 'Light' : 'Dark'}
-            </button>
-            <span className="topbar-user">{user.name}</span>
-            <span className="topbar-role">{user.global_role}</span>
-            <button
-              className="button topbar-signout"
-              onClick={onSignOut}
-              disabled={isLoggingOut}
-            >
-              {isLoggingOut ? 'Signing out…' : 'Sign out'}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild variant="outline" size="icon" className="relative" aria-label="Open notifications">
+                  <Link to="/#notifications">
+                    <Bell className="h-4 w-4" aria-hidden="true" />
+                    <span className="unread-dot" aria-hidden="true" />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Open notifications</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+                  {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}</TooltipContent>
+            </Tooltip>
+            <div className="hidden min-w-0 text-right sm:block">
+              <span className="topbar-user block truncate">{user.name}</span>
+              <span className="topbar-role mt-1">{user.global_role}</span>
+            </div>
+            <Button variant="outline" onClick={onSignOut} disabled={isLoggingOut}>
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              {isLoggingOut ? 'Signing out' : 'Sign out'}
+            </Button>
           </div>
         ) : null}
       </header>
@@ -60,9 +84,15 @@ export function Layout({ children }: PropsWithChildren) {
         {user ? (
           <aside className="sidebar" aria-label="Workspace navigation">
             <nav className="sidebar-nav" aria-label="Primary workspace">
-              {primaryLinks.map((link) => (
-                <NavLink key={link.to} to={link.to} end={link.to === '/'}>
-                  {link.label}
+              {primaryLinks.map(({ icon: Icon, ...link }) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  end={link.to === '/'}
+                  className={({ isActive }) => cn(isActive && 'active')}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  <span>{link.label}</span>
                 </NavLink>
               ))}
             </nav>

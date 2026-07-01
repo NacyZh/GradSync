@@ -4,7 +4,11 @@ import type { ReactElement } from 'react';
 
 import { AppFeedbackProvider } from '../../src/shared/ui/AppFeedback';
 
-export function renderWithClient(ui: ReactElement) {
+type RenderWithClientOptions = {
+  includeFeedbackProvider?: boolean;
+};
+
+export function renderWithClient(ui: ReactElement, options: RenderWithClientOptions = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -12,9 +16,7 @@ export function renderWithClient(ui: ReactElement) {
     },
   });
 
-  return render(
-    <QueryClientProvider client={client}>
-      <AppFeedbackProvider>{ui}</AppFeedbackProvider>
-    </QueryClientProvider>,
-  );
+  const content = options.includeFeedbackProvider === false ? ui : <AppFeedbackProvider>{ui}</AppFeedbackProvider>;
+
+  return render(<QueryClientProvider client={client}>{content}</QueryClientProvider>);
 }

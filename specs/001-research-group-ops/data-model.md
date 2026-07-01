@@ -16,6 +16,13 @@ User
 │       │   └── LabResource
 │       ├── Notification
 │       └── AuditEvent
+
+FrontendViewModel
+├── WorkspaceShellState
+├── ProjectContextState
+├── ReviewWorkspaceState
+├── BookingWorkspaceState
+└── NotificationCenterState
 ```
 
 ## User
@@ -349,3 +356,124 @@ Immutable record of significant project activity.
 **Validation Rules**
 - Target record must belong to the same project when a target is present
 - Audit events are append-only
+
+## FrontendViewModel
+
+Client-side view state that composes server-owned project records into
+production-grade role workflows. These are not persisted database entities; they
+define the frontend architecture contract for Tailwind CSS and shadcn/ui
+implementation.
+
+**Fields**
+- `active_role`: advisor, student, reviewer, administrator
+- `active_project_id`
+- `navigation_items`: role-filtered links with label, icon, route, and disabled
+  reason when unavailable
+- `pending_actions`: actionable user tasks derived from tasks, submissions,
+  bookings, comments, and notifications
+- `feedback_state`: loading, empty, success, warning, error, confirming
+- `theme`: light, dark, system
+
+**Relationships**
+- Reads `User`, `ProjectMembership`, `ResearchProject`, `Task`,
+  `DraftVersion`, `WeeklyProgressReport`, `Booking`, `Notification`, and
+  `AuditEvent` API responses through typed TanStack Query hooks
+- Renders accessible shadcn/ui primitives through GradSync shared UI adapters
+
+**Validation Rules**
+- Must never infer authorization from client state; server responses remain the
+  source of truth
+- Must keep project identity visible before project-scoped create, submit,
+  comment, review, book, cancel, archive, or reopen actions
+- Must expose recoverable feedback for validation, permission, network, and
+  background-delivery failures
+- Must preserve keyboard navigation, focus management, labels, and contrast for
+  every workflow route
+
+## WorkspaceShellState
+
+Role-aware application shell used on authenticated routes.
+
+**Fields**
+- `current_user`
+- `sidebar_collapsed`
+- `selected_project_summary`
+- `global_search_query`
+- `notification_summary`
+- `theme_preference`
+
+**Relationships**
+- Uses `User`, visible projects, and notification summary endpoints
+- Owns top-level navigation, project switcher, notification entry point, and
+  theme control
+
+**Validation Rules**
+- Advisor-only and administrator-only destinations must be hidden or disabled
+  for users without that role
+- Collapsed, tablet, and mobile navigation states must retain accessible labels
+  and focus order
+
+## ProjectContextState
+
+View state for project-scoped dashboards and workflows.
+
+**Fields**
+- `project`
+- `task_filters`
+- `submission_filters`
+- `booking_filters`
+- `activity_filters`
+- `selected_record_id`
+- `dirty_form_state`
+
+**Relationships**
+- Reads project dashboard, task, submission, booking, notification, and audit
+  responses for one project
+
+**Validation Rules**
+- Changing projects must clear record selection and unsaved form state after
+  confirmation
+- Empty states must explain whether no records exist or the current filters hide
+  all records
+
+## ReviewWorkspaceState
+
+View state for draft and weekly report review.
+
+**Fields**
+- `selected_review_target_type`
+- `selected_review_target_id`
+- `comment_anchor`
+- `comment_draft`
+- `review_status_pending`
+- `version_compare_mode`
+
+**Relationships**
+- Composes `Draft`, `DraftVersion`, `WeeklyProgressReport`, and `InlineComment`
+  records
+
+**Validation Rules**
+- Comments must show the selected version/report context before submission
+- Review status controls must be disabled with clear reasons when the project is
+  archived or the user lacks review privileges
+
+## BookingWorkspaceState
+
+View state for resource availability and booking management.
+
+**Fields**
+- `availability_window`
+- `resource_filters`
+- `selected_resource_id`
+- `booking_form_state`
+- `conflict_explanation`
+- `cancel_confirmation_state`
+
+**Relationships**
+- Composes `LabResource`, `Booking`, project membership, and notification
+  records
+
+**Validation Rules**
+- Start and end time controls must prevent invalid ranges before submit
+- Started bookings must render as immutable with a clear explanation
+- Destructive cancellation must use a confirmation dialog with focus trapping

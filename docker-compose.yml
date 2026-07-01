@@ -3,7 +3,16 @@ services:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
+    command: >
+      sh -c "until python manage.py migrate --noinput; do
+        echo 'Waiting for database migrations to become available...';
+        sleep 2;
+      done
+      && python manage.py seed_demo_research_ops
+      && python manage.py runserver 0.0.0.0:8000"
     env_file: .env.example
+    environment:
+      DJANGO_SETTINGS_MODULE: gradsync.settings.local
     volumes:
       - ./backend:/app/backend
     ports:
@@ -30,6 +39,8 @@ services:
       dockerfile: docker/backend.Dockerfile
     command: celery -A gradsync worker -l info
     env_file: .env.example
+    environment:
+      DJANGO_SETTINGS_MODULE: gradsync.settings.local
     volumes:
       - ./backend:/app/backend
     depends_on:
@@ -42,6 +53,8 @@ services:
       dockerfile: docker/backend.Dockerfile
     command: celery -A gradsync beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file: .env.example
+    environment:
+      DJANGO_SETTINGS_MODULE: gradsync.settings.local
     volumes:
       - ./backend:/app/backend
     depends_on:

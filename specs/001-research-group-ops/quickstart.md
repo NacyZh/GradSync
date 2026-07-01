@@ -23,9 +23,11 @@ specification, data model, and API contract.
 2. Run database migrations and seed validation data:
 
    ```bash
-   docker compose exec backend python manage.py migrate
    docker compose exec backend python manage.py seed_demo_research_ops
    ```
+
+   The local backend container also runs migrations and demo seeding on startup.
+   Re-run the seed command only when demo account data needs to be refreshed.
 
 3. Run automated checks:
 
@@ -103,9 +105,28 @@ eligibility.
 **Expected outcome**: Archived projects remain readable but block new records
 until reopened.
 
+### Scenario 7: Production Frontend Architecture and Design System
+
+1. Start the local stack and sign in as admin, advisor, student, and reviewer.
+2. Navigate through the authenticated workspace shell on desktop, tablet, and
+   mobile viewport widths.
+3. Confirm role-aware navigation, selected-project context, notification entry,
+   theme toggle, loading states, empty states, validation errors, and destructive
+   confirmation dialogs use Tailwind CSS tokens and shadcn/ui components rather
+   than ad hoc demo controls.
+4. Complete project creation, task update, draft/report submission, review
+   status update, inline comment creation, booking creation, booking
+   cancellation, archive, and reopen workflows using keyboard navigation only.
+5. Run component, accessibility, build, and full-stack Playwright checks.
+
+**Expected outcome**: The frontend behaves as a production operations workspace
+with consistent layout, accessible controls, stable project context,
+recoverable feedback, and no demo-only placeholder surfaces.
+
 ## Contract References
 
 - API contract: [contracts/openapi.yaml](./contracts/openapi.yaml)
+- Frontend UI contract: [contracts/frontend-ui.md](./contracts/frontend-ui.md)
 - Data model: [data-model.md](./data-model.md)
 - Feature specification: [spec.md](./spec.md)
 

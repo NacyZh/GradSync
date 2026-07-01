@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { useAuth } from '../features/auth/AuthProvider';
 import { listProjects } from '../features/projects/api';
 import { AsyncState } from '../shared/ui/AsyncState';
-import { Layout } from './Layout';
 
 export function HomePage() {
   const { user, isLoading: isLoadingUser } = useAuth();
@@ -18,7 +21,7 @@ export function HomePage() {
   const role = user?.global_role;
 
   return (
-    <Layout>
+    <>
       <section className="page-heading dashboard-hero">
         <div>
           <h1>{role === 'student' ? 'Student workspace' : role === 'advisor' ? 'Advisor workspace' : 'GradSync dashboard'}</h1>
@@ -26,18 +29,12 @@ export function HomePage() {
         </div>
         <nav aria-label="Primary actions" className="action-row">
           {(role === 'admin' || role === 'advisor') ? (
-            <Link className="button primary" to="/projects/new">
-              New project
-            </Link>
+            <Button asChild><Link to="/projects/new">New project</Link></Button>
           ) : null}
           {role === 'admin' ? (
-            <Link className="button" to="/admin/accounts">
-              Manage accounts
-            </Link>
+            <Button asChild variant="outline"><Link to="/admin/accounts">Manage accounts</Link></Button>
           ) : null}
-          <Link className="button" to="/resources">
-            Resources
-          </Link>
+          <Button asChild variant="outline"><Link to="/resources">Resources</Link></Button>
         </nav>
       </section>
 
@@ -45,21 +42,27 @@ export function HomePage() {
 
       {user && (
         <section className="dashboard-grid" aria-label="Application overview">
-          <article className="metric-card">
-            <span>Projects</span>
-            <strong>{projects.length}</strong>
-            <small>visible workspaces</small>
-          </article>
-          <article className="metric-card">
-            <span>Pending reviews</span>
-            <strong>{role === 'student' ? 'Track' : 'Review'}</strong>
-            <small>{role === 'student' ? 'drafts and reports' : 'student submissions'}</small>
-          </article>
-          <article className="metric-card" id="notifications">
-            <span>Notifications</span>
-            <strong>Live</strong>
-            <small>delivery status and reminders</small>
-          </article>
+          <Card>
+            <CardHeader>
+              <CardDescription>Projects</CardDescription>
+              <CardTitle className="text-2xl">{projects.length}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">visible workspaces</CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardDescription>Pending reviews</CardDescription>
+              <CardTitle className="text-2xl">{role === 'student' ? 'Track' : 'Review'}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">{role === 'student' ? 'drafts and reports' : 'student submissions'}</CardContent>
+          </Card>
+          <Card id="notifications">
+            <CardHeader>
+              <CardDescription>Notifications</CardDescription>
+              <CardTitle className="text-2xl">Live</CardTitle>
+            </CardHeader>
+            <CardContent><Badge variant="success">delivery status and reminders</Badge></CardContent>
+          </Card>
           <article className="panel">
             <h2>Your projects</h2>
             {projectsQuery.isLoading ? <AsyncState state="loading" message="Loading projects" /> : null}
@@ -82,7 +85,6 @@ export function HomePage() {
               </ul>
             ) : null}
           </article>
-
           {role === 'student' ? (
             <article className="panel">
               <h2>Next actions</h2>
@@ -122,6 +124,6 @@ export function HomePage() {
           </article>
         </section>
       )}
-    </Layout>
+    </>
   );
 }

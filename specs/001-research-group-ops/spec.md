@@ -290,8 +290,9 @@ visibility and email confirmations.
   DOI metadata ingestion, BibTeX/EndNote export, code repository browsing,
   repository diff/search workflows, and WebSocket real-time delivery are out of
   scope for this feature and should be specified as separate follow-up features.
-- The frontend implementation remains aligned with the approved plan stack for
-  this feature. Tailwind CSS, shadcn/ui, Redux Toolkit, and RTK Query are not
-  adopted here because the planned and implemented frontend uses React 18,
-  TypeScript, Vite, React Router, TanStack Query, React Hook Form, Zod, Vitest,
-  and Playwright.
+- The frontend implementation must be upgraded from the current demo-level
+  screens to a production-grade React/Vite application architecture using
+  Tailwind CSS and shadcn/ui as the design-system foundation. TanStack Query
+  remains the server-state layer for Django REST contracts; Redux Toolkit and
+  RTK Query remain out of scope unless a future feature identifies complex
+  client-only state that TanStack Query and local component state cannot handle.

@@ -17,9 +17,23 @@ records.
 ```bash
 cp .env.example .env
 docker compose up --build
-docker compose exec backend python manage.py migrate
+```
+
+The local backend container runs migrations and seeds demo accounts on startup.
+To refresh the seeded demo data manually, run:
+
+```bash
 docker compose exec backend python manage.py seed_demo_research_ops
 ```
+
+Seeded demo accounts:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@gradsync.local` | `admin123` |
+| Advisor | `advisor@example.com` | `advisor123` |
+| Student | `student@example.com` | `student123` |
+| Reviewer | `reviewer@example.com` | `reviewer123` |
 
 ## Validation
 

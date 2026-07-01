@@ -354,3 +354,69 @@ Task: "T088 [P] [US3] Add Playwright flow for resource booking conflict and non-
 - [X] T162 Enforce future-only booking modification and cancellation by rejecting update_booking() and cancel_booking() when the reservation has started, then add backend tests and frontend validation/error feedback in backend/apps/resources/services.py, backend/tests/unit/test_booking_rules.py, backend/tests/integration/test_booking_project_scope.py, frontend/src/features/resources/BookingActions.tsx, frontend/src/features/resources/BookingForm.tsx, and frontend/tests/component/resource-booking.test.tsx per FR-011 / T117 (partial)
 - [X] T163 Add project start/end date support and date-order validation to project creation, including backend serializer/service handling, API contract tests, frontend project creation fields, and user-friendly validation messages in backend/apps/projects/serializers.py, backend/apps/projects/services.py, backend/tests/contract/test_projects_api.py, frontend/src/features/projects/ProjectCreatePage.tsx, and frontend/tests/component/project-work.test.tsx per FR-001 (partial)
 - [X] T164 Clean generated runtime/build artifacts from source scope and add ignore/release safeguards for Python __pycache__/.pyc, TypeScript .tsbuildinfo, generated Vite outputs, local frontend dist, and dependency caches so reviews and production images include only intentional source/build artifacts per Constitution I (unrequested)
+
+## Phase 13: Convergence
+
+**Purpose**: Replace the remaining demo-level frontend with a production-grade
+Tailwind CSS and shadcn/ui architecture that satisfies
+`contracts/frontend-ui.md`, preserves project isolation, and keeps every
+advisor/student/admin workflow independently testable.
+
+- [X] T165 CRITICAL: Add Tailwind CSS, shadcn/ui, Radix UI, class-variance-authority, and lucide-react setup in frontend/package.json, frontend/package-lock.json, frontend/tailwind.config.ts, frontend/postcss.config.js, frontend/components.json, frontend/vite.config.ts, and frontend/tsconfig.app.json
+- [X] T166 CRITICAL: Replace ad hoc global styling with Tailwind layers, design tokens, theme variables, responsive density rules, and accessible focus states in frontend/src/app/styles.css
+- [X] T167 [P] Add shadcn/ui base primitives for buttons, forms, overlays, navigation surfaces, feedback, and dense records in frontend/src/lib/utils.ts, frontend/src/components/ui/button.tsx, frontend/src/components/ui/input.tsx, frontend/src/components/ui/textarea.tsx, frontend/src/components/ui/label.tsx, frontend/src/components/ui/select.tsx, frontend/src/components/ui/dialog.tsx, frontend/src/components/ui/alert-dialog.tsx, frontend/src/components/ui/dropdown-menu.tsx, frontend/src/components/ui/popover.tsx, frontend/src/components/ui/tabs.tsx, frontend/src/components/ui/badge.tsx, frontend/src/components/ui/card.tsx, frontend/src/components/ui/table.tsx, frontend/src/components/ui/toast.tsx, frontend/src/components/ui/skeleton.tsx, frontend/src/components/ui/alert.tsx, and frontend/src/components/ui/tooltip.tsx
+- [X] T168 [P] Add GradSync shared UI adapters for page shell, project context, data states, confirmations, feedback, forms, status badges, and typed workspace composition in frontend/src/shared/ui/PageShell.tsx, frontend/src/shared/ui/ProjectContextBar.tsx, frontend/src/shared/ui/DataState.tsx, frontend/src/shared/ui/ConfirmDialog.tsx, frontend/src/shared/ui/FeedbackProvider.tsx, frontend/src/shared/ui/FormField.tsx, and frontend/src/shared/ui/StatusBadge.tsx
+- [X] T169 [P] Add component tests for Tailwind/shadcn primitives, shared UI adapters, focus behavior, theme switching, toasts, skeletons, dialogs, tooltips, and live-region feedback in frontend/tests/component/design-system.test.tsx
+- [X] T170 [P] Add component tests for the production workspace shell, role-aware navigation, project context visibility, responsive states, and route guards in frontend/tests/component/role-navigation.test.tsx
+- [X] T171 Rebuild the authenticated app shell with Tailwind/shadcn layout regions, role-aware navigation, project context placement, theme toggle, notification entry point, and route composition in frontend/src/app/Layout.tsx, frontend/src/app/HomePage.tsx, frontend/src/app/App.tsx, and frontend/src/routes/index.tsx
+- [ ] T172 Rebuild the project dashboard and task workspace with dense task hierarchy, status controls, member summary, activity timeline, loading/empty/error states, and project-scoped action affordances in frontend/src/features/projects/ProjectDashboardPage.tsx, frontend/src/features/projects/ProjectCreatePage.tsx, frontend/src/features/projects/ProjectMembersPanel.tsx, frontend/src/features/tasks/TaskTree.tsx, frontend/src/features/tasks/TaskForm.tsx, and frontend/src/features/tasks/TaskStatusControl.tsx
+- [ ] T173 Rebuild the submission and review workspace with draft version navigation, weekly report history, review queue, inline comment timeline, comment thread controls, review status controls, and archived/unauthorized explanations in frontend/src/features/submissions/DraftSubmissionPage.tsx, frontend/src/features/submissions/DraftVersionHistory.tsx, frontend/src/features/submissions/WeeklyReportPage.tsx, frontend/src/features/submissions/WeeklyReportHistory.tsx, frontend/src/features/submissions/ReviewQueuePage.tsx, frontend/src/features/submissions/InlineCommentPanel.tsx, frontend/src/features/submissions/CommentThread.tsx, and frontend/src/features/submissions/ReviewStatusControl.tsx
+- [ ] T174 Rebuild the resource booking workspace with searchable resources, availability controls, conflict explanation, booking form, immutable started-booking states, and destructive confirmation flow in frontend/src/features/resources/ResourceListPage.tsx, frontend/src/features/resources/BookingCalendar.tsx, frontend/src/features/resources/BookingForm.tsx, frontend/src/features/resources/BookingActions.tsx, and frontend/src/features/resources/BookingConflictAlert.tsx
+- [ ] T175 Rebuild notification and account administration surfaces with delivery status, project context, action paths, retry/failure states, dense account management controls, and role-safe navigation in frontend/src/features/notifications/NotificationList.tsx and frontend/src/features/admin/AccountAdminPage.tsx
+- [ ] T176 [P] Update full-stack Playwright flows for production UI landmarks, role workspaces, project setup, submissions/review, bookings, archived read-only behavior, and accessibility assertions in frontend/tests/e2e/accessibility.spec.ts, frontend/tests/e2e/role-workspaces.spec.ts, frontend/tests/e2e/project-work.spec.ts, frontend/tests/e2e/submission-review.spec.ts, frontend/tests/e2e/resource-booking.spec.ts, and frontend/tests/e2e/archived-project.spec.ts
+- [ ] T177 [P] Add production layout screenshot checks for desktop, tablet, mobile, light theme, dark theme, no-overlap validation, and core workspace states in frontend/tests/e2e/production-ui.spec.ts
+- [ ] T178 Add route-level code splitting and bundle guard coverage for large workspace routes, Tailwind content scanning, and generated CSS scope in frontend/src/routes/index.tsx, frontend/vite.config.ts, and frontend/tests/component/role-navigation.test.tsx
+- [ ] T179 Add CI and generated-artifact safeguards for Tailwind/shadcn build outputs, linting, component tests, full-stack Playwright tests, ignored generated files, and Docker build context in .github/workflows/release.yml, scripts/check-generated-artifacts.sh, .gitignore, and .dockerignore
+- [ ] T180 Update production frontend validation guidance, shadcn component workflow, Tailwind token rules, Scenario 7 checks, and administrator account notes in README.md, docs/production.md, and specs/001-research-group-ops/quickstart.md
+
+### Phase 13 Dependencies
+
+- Phase 13 depends on completed Phase 12 production, CI/CD, and full-stack e2e foundations.
+- T165 and T166 block all Tailwind/shadcn implementation tasks.
+- T167 and T168 block T171 through T175 because workspaces must use shared primitives instead of one-off controls.
+- T169 and T170 must be added before or with T171 so the shell and design-system contract are test-constrained.
+- T171 must complete before T172 through T175 route-level workspace rewrites.
+- T172, T173, T174, and T175 can proceed in parallel after T168 and T171 when separate developers own each workflow.
+- T176 and T177 run after their corresponding workspace rewrites are functional.
+- T178, T179, and T180 are final validation and release-hardening tasks.
+
+### Phase 13 Independent Test Criteria
+
+- The frontend passes `npm run build`, `npm run lint`, component tests, and full-stack Playwright tests with Tailwind CSS and shadcn/ui enabled.
+- Every project-scoped route exposes the selected project context before create, submit, review, comment, book, cancel, archive, or reopen actions.
+- Advisor, student, and admin workspaces remain role-aware and keyboard accessible across desktop, tablet, and mobile layouts.
+- Project dashboard, submission review, booking, notification, and account management screens show distinct loading, empty, filtered-empty, warning, error, and success states.
+- Screenshot/layout checks confirm core workspace surfaces do not overlap text, controls, status messages, or project context in light or dark theme.
+
+### Phase 13 Parallel Examples
+
+```bash
+Task: "T167 [P] Add shadcn/ui base primitives for buttons, forms, overlays, navigation surfaces, feedback, and dense records in frontend/src/lib/utils.ts, frontend/src/components/ui/button.tsx, frontend/src/components/ui/input.tsx, frontend/src/components/ui/textarea.tsx, frontend/src/components/ui/label.tsx, frontend/src/components/ui/select.tsx, frontend/src/components/ui/dialog.tsx, frontend/src/components/ui/alert-dialog.tsx, frontend/src/components/ui/dropdown-menu.tsx, frontend/src/components/ui/popover.tsx, frontend/src/components/ui/tabs.tsx, frontend/src/components/ui/badge.tsx, frontend/src/components/ui/card.tsx, frontend/src/components/ui/table.tsx, frontend/src/components/ui/toast.tsx, frontend/src/components/ui/skeleton.tsx, frontend/src/components/ui/alert.tsx, and frontend/src/components/ui/tooltip.tsx"
+Task: "T168 [P] Add GradSync shared UI adapters for page shell, project context, data states, confirmations, feedback, forms, status badges, and typed workspace composition in frontend/src/shared/ui/PageShell.tsx, frontend/src/shared/ui/ProjectContextBar.tsx, frontend/src/shared/ui/DataState.tsx, frontend/src/shared/ui/ConfirmDialog.tsx, frontend/src/shared/ui/FeedbackProvider.tsx, frontend/src/shared/ui/FormField.tsx, and frontend/src/shared/ui/StatusBadge.tsx"
+Task: "T169 [P] Add component tests for Tailwind/shadcn primitives, shared UI adapters, focus behavior, theme switching, toasts, skeletons, dialogs, tooltips, and live-region feedback in frontend/tests/component/design-system.test.tsx"
+Task: "T170 [P] Add component tests for the production workspace shell, role-aware navigation, project context visibility, responsive states, and route guards in frontend/tests/component/role-navigation.test.tsx"
+```
+
+```bash
+Task: "T172 Rebuild the project dashboard and task workspace with dense task hierarchy, status controls, member summary, activity timeline, loading/empty/error states, and project-scoped action affordances in frontend/src/features/projects/ProjectDashboardPage.tsx, frontend/src/features/projects/ProjectCreatePage.tsx, frontend/src/features/projects/ProjectMembersPanel.tsx, frontend/src/features/tasks/TaskTree.tsx, frontend/src/features/tasks/TaskForm.tsx, and frontend/src/features/tasks/TaskStatusControl.tsx"
+Task: "T173 Rebuild the submission and review workspace with draft version navigation, weekly report history, review queue, inline comment timeline, comment thread controls, review status controls, and archived/unauthorized explanations in frontend/src/features/submissions/DraftSubmissionPage.tsx, frontend/src/features/submissions/DraftVersionHistory.tsx, frontend/src/features/submissions/WeeklyReportPage.tsx, frontend/src/features/submissions/WeeklyReportHistory.tsx, frontend/src/features/submissions/ReviewQueuePage.tsx, frontend/src/features/submissions/InlineCommentPanel.tsx, frontend/src/features/submissions/CommentThread.tsx, and frontend/src/features/submissions/ReviewStatusControl.tsx"
+Task: "T174 Rebuild the resource booking workspace with searchable resources, availability controls, conflict explanation, booking form, immutable started-booking states, and destructive confirmation flow in frontend/src/features/resources/ResourceListPage.tsx, frontend/src/features/resources/BookingCalendar.tsx, frontend/src/features/resources/BookingForm.tsx, frontend/src/features/resources/BookingActions.tsx, and frontend/src/features/resources/BookingConflictAlert.tsx"
+Task: "T175 Rebuild notification and account administration surfaces with delivery status, project context, action paths, retry/failure states, dense account management controls, and role-safe navigation in frontend/src/features/notifications/NotificationList.tsx and frontend/src/features/admin/AccountAdminPage.tsx"
+```
+
+### Phase 13 Delivery Strategy
+
+1. Complete T165 through T171 first as the production frontend foundation.
+2. Deliver US1-facing project dashboard and task workspace through T172 as the first independently reviewable increment.
+3. Deliver US2 submission/review and US3 booking workspaces through T173 and T174.
+4. Complete notification/admin surfaces, e2e coverage, screenshot validation, bundle checks, CI safeguards, and documentation through T175 through T180.

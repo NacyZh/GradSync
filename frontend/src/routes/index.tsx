@@ -35,11 +35,7 @@ function rolePage(page: ReactElement, ...allowedRoles: ('admin' | 'advisor' | 's
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: (
-      <ProtectedRoute>
-        <HomePage />
-      </ProtectedRoute>
-    ),
+    element: protectedPage(<HomePage />),
   },
   {
     path: '/login',
