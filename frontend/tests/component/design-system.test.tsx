@@ -93,7 +93,7 @@ describe('production design system', () => {
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'));
 
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
-    expect(screen.getByRole('alertdialog', { name: 'Archive project' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Archive project' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Archive' })).toBeInTheDocument();
   });
 });
