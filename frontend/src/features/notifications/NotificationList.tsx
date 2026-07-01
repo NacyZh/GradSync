@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
+import { AlertCircle, BellRing, ExternalLink, MailCheck, RotateCcw } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { DataState } from '../../shared/ui/DataState';
+import { StatusBadge } from '../../shared/ui/StatusBadge';
+import type { NotificationRecord } from './api';
 import { listProjectNotifications } from './api';
 
 export function NotificationList({ projectId }: { projectId?: number }) {
@@ -8,24 +14,119 @@ export function NotificationList({ projectId }: { projectId?: number }) {
     queryFn: () => listProjectNotifications(projectId ?? 0),
     enabled: Boolean(projectId),
   });
+  const notifications = notificationsQuery.data?.results ?? [];
+  const failedCount = notifications.filter((notification) => notification.status === 'failed').length;
+  const pendingCount = notifications.filter((notification) => notification.status === 'pending' || notification.status === 'queued').length;
 
   return (
     <section className="panel notification-center" aria-labelledby="notifications-heading">
-      <h2 id="notifications-heading">Notifications</h2>
-      {notificationsQuery.isLoading ? <p className="muted">Loading delivery status...</p> : null}
-      {notificationsQuery.data?.results.length ? null : <p>No notifications loaded.</p>}
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="notifications-heading" className="flex items-center gap-2">
+            <BellRing className="h-4 w-4" aria-hidden="true" />
+            Notifications
+          </h2>
+          <p className="text-sm text-muted-foreground">Project-scoped delivery status, action paths, and retry visibility.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant={failedCount ? 'destructive' : 'muted'}>{failedCount} failed</Badge>
+          <Badge variant={pendingCount ? 'warning' : 'muted'}>{pendingCount} pending</Badge>
+        </div>
+      </div>
+      {!projectId ? <DataState state="warning" title="No project context" message="Select a project to inspect notification delivery." /> : null}
+      {notificationsQuery.isLoading ? <DataState state="loading" message="Loading delivery status." /> : null}
+      {notificationsQuery.error ? <DataState state="error" title="Notifications unavailable" message={notificationsQuery.error.message} /> : null}
+      {!notificationsQuery.isLoading && !notificationsQuery.error && projectId && notifications.length === 0 ? (
+        <DataState state="empty" title="No notifications" message="No delivery records are loaded for this project." />
+      ) : null}
       <ul className="notification-list">
-        {notificationsQuery.data?.results.map((notification) => (
-          <li key={notification.id}>
-            <span className={`status-dot ${notification.status}`} aria-hidden="true" />
-            <div>
-              <strong>{notification.subject}</strong>
-              <p>{notification.event_type ?? notification.target_type} · {notification.status}</p>
-              {notification.action_path ? <a href={notification.action_path}>Open record</a> : null}
-            </div>
-          </li>
+        {notifications.map((notification) => (
+          <NotificationRow key={notification.id} notification={notification} />
         ))}
       </ul>
     </section>
   );
+}
+
+function NotificationRow({ notification }: { notification: NotificationRecord }) {
+  const eventType = notification.event_type ?? notification.eventType;
+  const targetType = notification.target_type ?? notification.targetType;
+  const targetId = notification.target_id ?? notification.targetId;
+  const projectId = notification.project_id ?? notification.projectId;
+  const actionPath = notification.action_path ?? notification.actionPath;
+  const eligibleAt = notification.eligible_at ?? notification.eligibleAt;
+  const sentAt = notification.sent_at ?? notification.sentAt;
+  const reason = notification.failure_reason ?? notification.failureReason ?? notification.skipped_reason ?? notification.skippedReason;
+  const retryAllowed = notification.status === 'failed';
+
+  return (
+    <li className="items-start">
+      <span className={`status-dot ${notification.status}`} aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <strong className="min-w-0 truncate">{notification.subject}</strong>
+          <StatusBadge status={notification.status} />
+        </div>
+        <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <dt className="font-bold text-muted-foreground">Event</dt>
+            <dd>{formatToken(eventType ?? targetType ?? 'notification')}</dd>
+          </div>
+          <div>
+            <dt className="font-bold text-muted-foreground">Project</dt>
+            <dd>{projectId ? `Project #${projectId}` : 'Current project'}</dd>
+          </div>
+          <div>
+            <dt className="font-bold text-muted-foreground">Target</dt>
+            <dd>{formatToken(targetType ?? 'record')} #{targetId ?? 'unknown'}</dd>
+          </div>
+          <div>
+            <dt className="font-bold text-muted-foreground">Delivery</dt>
+            <dd>{sentAt ? `Sent ${formatDateTime(sentAt)}` : `Eligible ${formatDateTime(eligibleAt)}`}</dd>
+          </div>
+        </dl>
+        {reason ? (
+          <p className="mt-3 inline-flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+            <AlertCircle className="mt-0.5 h-4 w-4" aria-hidden="true" />
+            {reason}
+          </p>
+        ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {actionPath ? (
+            <Button asChild variant="outline" size="sm">
+              <a href={actionPath}>
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                Open record
+              </a>
+            </Button>
+          ) : null}
+          {retryAllowed ? (
+            <Button type="button" variant="outline" size="sm" disabled title="Retry is handled by the delivery worker">
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              Retry queued by worker
+            </Button>
+          ) : (
+            <Badge variant="muted">
+              <MailCheck className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+              {notification.status === 'sent' ? 'Delivered' : 'Worker monitored'}
+            </Badge>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function formatToken(value: string) {
+  return value.replaceAll('_', ' ');
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return 'not scheduled';
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
 }
