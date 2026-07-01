@@ -8,16 +8,24 @@ test('main application landmarks are present', async ({ page }) => {
     await loginAs(page);
   }
   await page.goto('/');
+  await expect(page.getByRole('banner')).toBeVisible();
   await expect(page.locator('main')).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Workspace navigation' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Primary workspace' })).toBeVisible();
+  await expect(page.getByRole('searchbox').or(page.getByPlaceholder('Search projects, tasks, reviews'))).toBeVisible();
   await page.getByRole('button', { name: 'Switch to dark theme' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus-visible').first()).toBeVisible();
   await page.goto('/projects/new');
+  await expect(page.getByRole('main')).toContainText('Create project');
   await expect(page.getByLabel('Project title')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create' })).toBeVisible();
   await page.goto('/projects/1/resources');
   await expect(page.getByRole('region', { name: 'Selected project context' })).toBeVisible();
   await expect(page.getByLabel('Availability start')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Resource filters' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Booking calendar' })).toBeVisible();
   await page.setViewportSize({ width: 900, height: 700 });
   await expect(page.getByRole('complementary', { name: 'Workspace navigation' })).toBeVisible();
 });

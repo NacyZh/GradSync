@@ -43,6 +43,23 @@ docker compose exec frontend npm test
 docker compose exec frontend npm run test:e2e
 ```
 
+Frontend release checks include Tailwind/shadcn component coverage, role-aware
+workspace navigation tests, full-stack Playwright workflow tests, and production
+layout screenshot checks:
+
+```bash
+cd frontend
+npm run lint
+npm test
+GRADSYNC_E2E_MODE=fullstack npm run test:e2e
+npm run test:e2e -- production-ui.spec.ts
+npm run build
+```
+
+Run `sh scripts/check-generated-artifacts.sh` from the repository root before
+reviewing a branch. Playwright screenshots and traces are written to `/tmp` by
+the test config and must not be committed.
+
 See `specs/001-research-group-ops/quickstart.md` for scenario validation.
 
 ## Production Deployment

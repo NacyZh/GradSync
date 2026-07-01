@@ -21,16 +21,24 @@ test.describe('role workspaces', () => {
     await page.route('**/api/projects/', async (route) => {
       await fulfillJson(route, { results: [] });
     });
+    await page.route('**/api/accounts/?**', async (route) => {
+      await fulfillJson(route, { results: [adminUser], next: null, previous: null });
+    });
 
     await page.goto('/');
     await expect(page.getByText('Admin User')).toBeVisible();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Workspace navigation' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Role workspace' })).toContainText('Administration');
     await expect(page.getByRole('banner').getByText('admin', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Team' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Projects' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open notifications' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Switch to dark theme' })).toBeVisible();
 
     await page.getByRole('link', { name: 'Manage accounts' }).click();
     await expect(page).toHaveURL('/admin/accounts');
+    await expect(page.getByRole('heading', { name: 'Account administration' })).toBeVisible();
   });
 
   test('advisor sees project management but no account admin', async ({ page }) => {
@@ -54,6 +62,7 @@ test.describe('role workspaces', () => {
 
     await page.goto('/');
     await expect(page.getByText('Advisor User')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Role workspace' })).toContainText('Advisor review');
     await expect(page.getByRole('link', { name: 'Projects' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Team' })).not.toBeVisible();
 
@@ -83,6 +92,7 @@ test.describe('role workspaces', () => {
 
     await page.goto('/');
     await expect(page.getByText('Student User')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Role workspace' })).toContainText('Student work');
     await expect(page.getByLabel('Primary workspace').getByRole('link', { name: 'Resources' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Projects' })).not.toBeVisible();
     await expect(page.getByRole('link', { name: 'Team' })).not.toBeVisible();

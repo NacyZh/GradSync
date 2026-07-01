@@ -1,22 +1,42 @@
-import type { ReactElement } from 'react';
+import { lazy, Suspense, type ReactElement } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 
 import { HomePage } from '../app/HomePage';
 import { Layout } from '../app/Layout';
-import { AccountAdminPage } from '../features/admin/AccountAdminPage';
 import { LoginPage } from '../features/auth/LoginPage';
-import { ProjectCreatePage } from '../features/projects/ProjectCreatePage';
-import { ProjectDashboardPage } from '../features/projects/ProjectDashboardPage';
-import { DraftSubmissionPage } from '../features/submissions/DraftSubmissionPage';
-import { ReviewQueuePage } from '../features/submissions/ReviewQueuePage';
-import { WeeklyReportPage } from '../features/submissions/WeeklyReportPage';
-import { ResourceListPage } from '../features/resources/ResourceListPage';
+import { DataState } from '../shared/ui/DataState';
 import { ProtectedRoute, RoleRoute } from './ProtectedRoute';
+
+export const routeWorkspaceBundles = {
+  accountAdmin: () => import('../features/admin/AccountAdminPage'),
+  projectCreate: () => import('../features/projects/ProjectCreatePage'),
+  projectDashboard: () => import('../features/projects/ProjectDashboardPage'),
+  draftSubmission: () => import('../features/submissions/DraftSubmissionPage'),
+  weeklyReport: () => import('../features/submissions/WeeklyReportPage'),
+  reviewQueue: () => import('../features/submissions/ReviewQueuePage'),
+  resources: () => import('../features/resources/ResourceListPage'),
+} as const;
+
+const AccountAdminPage = lazy(async () => ({ default: (await routeWorkspaceBundles.accountAdmin()).AccountAdminPage }));
+const ProjectCreatePage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectCreate()).ProjectCreatePage }));
+const ProjectDashboardPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectDashboard()).ProjectDashboardPage }));
+const DraftSubmissionPage = lazy(async () => ({ default: (await routeWorkspaceBundles.draftSubmission()).DraftSubmissionPage }));
+const WeeklyReportPage = lazy(async () => ({ default: (await routeWorkspaceBundles.weeklyReport()).WeeklyReportPage }));
+const ReviewQueuePage = lazy(async () => ({ default: (await routeWorkspaceBundles.reviewQueue()).ReviewQueuePage }));
+const ResourceListPage = lazy(async () => ({ default: (await routeWorkspaceBundles.resources()).ResourceListPage }));
+
+function routeContent(page: ReactElement) {
+  return (
+    <Suspense fallback={<DataState state="loading" title="Loading workspace" message="Preparing the requested workspace." />}>
+      {page}
+    </Suspense>
+  );
+}
 
 function protectedPage(page: ReactElement) {
   return (
     <ProtectedRoute>
-      <Layout>{page}</Layout>
+      <Layout>{routeContent(page)}</Layout>
     </ProtectedRoute>
   );
 }
@@ -26,7 +46,7 @@ function rolePage(page: ReactElement, ...allowedRoles: ('admin' | 'advisor' | 's
   return (
     <ProtectedRoute>
       <RoleRoute allowedRoles={allowedRoles}>
-        <Layout>{page}</Layout>
+        <Layout>{routeContent(page)}</Layout>
       </RoleRoute>
     </ProtectedRoute>
   );

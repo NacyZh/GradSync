@@ -36,8 +36,10 @@ test('student submits draft/report and advisor updates review status', async ({ 
     await loginAs(page, 'student@example.edu');
   }
   await page.goto('/projects/1/drafts');
+  await expect(page.getByRole('banner')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText('Graphene Lab');
   await expect(page.getByRole('heading', { name: 'Submit draft' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Student draft actions' })).toBeVisible();
   await page.getByLabel('Draft title').fill('Paper A');
   await page.getByRole('button', { name: 'Create draft' }).click();
   await expect(page.getByLabel('Create draft').getByRole('status')).toContainText('Draft created');
@@ -47,6 +49,7 @@ test('student submits draft/report and advisor updates review status', async ({ 
   await expect(page.getByLabel('Submit draft').getByRole('status')).toContainText('Draft version submitted');
 
   await page.goto('/projects/1/reports');
+  await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText('Graphene Lab');
   await page.getByLabel('Week start').fill('2026-06-22');
   await page.getByLabel('Completed work').fill('Completed experiments');
   await page.getByLabel('Next steps').fill('Write results');
@@ -62,7 +65,9 @@ test('student submits draft/report and advisor updates review status', async ({ 
     await page.goto('/projects/1/reviews');
   }
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText('Graphene Lab');
   await expect(page.getByRole('region', { name: 'Submission review' })).toContainText('Week 2026-06-22');
+  await expect(page.getByRole('complementary', { name: 'Inline comments' })).toBeVisible();
   await page.getByRole('listitem').filter({ hasText: 'Week 2026-06-22' }).getByLabel('Review status').selectOption('reviewed');
   await expect(page.getByLabel('Report reviews').getByRole('status')).toContainText('Review status updated');
 });

@@ -21,7 +21,10 @@ test('advisor can create a project and dashboard shows isolated project activity
     await loginAs(page);
   }
   await page.goto('/projects/new');
+  await expect(page.getByRole('banner')).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Workspace navigation' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Create project' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Project setup guidance' })).toContainText('Project-scoped by default');
   await page.getByLabel('Project title').fill('Quantum Thesis');
   await page.getByLabel('Student IDs').fill('12,13');
   await page.getByRole('button', { name: 'Create' }).click();
@@ -29,11 +32,13 @@ test('advisor can create a project and dashboard shows isolated project activity
 
   await page.goto('/projects/1');
   await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText('Graphene Lab');
+  await expect(page.getByRole('region', { name: 'Project summary' })).toContainText('Current tasks');
   await expect(page.getByRole('region', { name: 'Current tasks' })).toContainText('Analyze sample');
   await page.getByRole('link', { name: 'Update status' }).nth(1).click();
   await expect(page.getByRole('region', { name: 'Task details' })).toContainText('Priority: high');
   await expect(page.getByRole('region', { name: 'Pending reviews' })).toContainText(/Review progress_report #\d+/);
   await expect(page.getByRole('region', { name: 'Activity' })).toContainText('Pending review reminder');
+  await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toContainText('Pending review reminder');
   await page.getByLabel('Task status').selectOption('completed');
   await expect(page.getByRole('region', { name: 'Current tasks' }).getByRole('status')).toContainText('Task status updated');
 

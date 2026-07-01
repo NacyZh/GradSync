@@ -90,9 +90,13 @@ test('resource booking shows availability and handles conflict before success', 
 
   await page.goto('/projects/1/resources');
   await expect(page.getByRole('heading', { name: 'Lab resources' })).toBeVisible();
+  await expect(page.getByRole('banner')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText('Graphene Lab');
+  await expect(page.getByRole('region', { name: 'Resource filters' })).toContainText('0 active filters');
+  await expect(page.getByRole('region', { name: 'Resource list' })).toContainText('Confocal microscope');
   await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Confocal microscope');
   await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Open bench');
+  await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toBeVisible();
 
   if (fullStackE2E) {
     await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Available');
@@ -100,6 +104,7 @@ test('resource booking shows availability and handles conflict before success', 
     await page.getByLabel('End', { exact: true }).fill(futureDateTimeLocal(4, 9));
     await page.getByRole('button', { name: 'Reserve' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Booking confirmed' }).first()).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Upcoming booking actions' })).toContainText(/future|started/i);
     await page.getByRole('button', { name: 'Cancel booking' }).first().click();
     await expect(page.getByRole('dialog', { name: 'Cancel booking?' })).toBeVisible();
     await page.getByRole('dialog', { name: 'Cancel booking?' }).getByRole('button', { name: 'Cancel booking' }).click();
@@ -115,6 +120,7 @@ test('resource booking shows availability and handles conflict before success', 
   await expect(page.getByRole('alert')).toContainText('Resource is already reserved');
   await page.getByRole('button', { name: 'Reserve' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Booking confirmed' }).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Upcoming booking actions' })).toContainText(/future|started/i);
   await page.getByRole('button', { name: 'Cancel booking' }).click();
   await expect(page.getByRole('dialog', { name: 'Cancel booking?' })).toBeVisible();
   await page.getByRole('dialog', { name: 'Cancel booking?' }).getByRole('button', { name: 'Cancel booking' }).click();

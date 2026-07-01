@@ -5,6 +5,11 @@
 - Build backend and frontend images from the release commit.
 - Run backend tests, frontend tests, frontend build, migration check, dependency
   audit, image scan, and `python manage.py check --deploy`.
+- Run the production frontend gate: `npm run lint`, `npm test`, full-stack
+  Playwright workflows, `npm run test:e2e -- production-ui.spec.ts`, and
+  `npm run build` from `frontend/`.
+- Run `sh scripts/check-generated-artifacts.sh` before frontend build artifacts
+  are produced and before opening the release review.
 - Copy `.env.production.example` to `.env.production` and replace every
   placeholder secret before starting the stack.
 - Start with `docker compose -f docker-compose.prod.yml up --build`.
@@ -101,6 +106,26 @@ curl -I https://120021123.xyz/healthz/
 curl -I https://120021123.xyz/readyz/
 curl -I https://120021123.xyz/api/schema/
 ```
+
+## Production Frontend
+
+The React workspace is a Tailwind CSS and shadcn/ui application. New reusable
+primitives belong in `frontend/src/components/ui`, GradSync-specific states and
+feedback wrappers belong in `frontend/src/shared/ui`, and workflow composition
+stays under `frontend/src/features/*`. Do not add one-off global controls when a
+shadcn/Radix primitive or existing shared adapter already covers the behavior.
+
+Tailwind tokens are defined in `frontend/src/app/styles.css` and extended
+through `frontend/tailwind.config.ts`. Keep content scanning limited to
+`index.html`, `src`, and frontend tests; do not scan `dist`, `node_modules`,
+Playwright output, or generated runtime directories. Project-scoped routes must
+show the selected project context before create, submit, review, comment, book,
+cancel, archive, or reopen actions.
+
+Route-level code splitting is defined in `frontend/src/routes/index.tsx`, and
+the Vite build groups large workspaces into explicit `workspace-*` chunks.
+Preserve those lazy route boundaries when adding project, submission, resource,
+notification, or admin surfaces.
 
 ## Rollback
 

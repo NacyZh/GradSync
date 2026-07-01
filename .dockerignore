@@ -6,6 +6,8 @@ frontend/node_modules/
 frontend/dist/
 frontend/build/
 frontend/*.tsbuildinfo
+frontend/build-guards.js
+frontend/build-guards.d.ts
 frontend/vite.config.js
 frontend/vite.config.d.ts
 backend/e2e.sqlite3
@@ -16,6 +18,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 coverage/
+frontend/coverage/
 htmlcov/
 *.log*
 .env
@@ -23,4 +26,6 @@ htmlcov/
 !.env.example
 !.env.production.example
 playwright-report/
+frontend/playwright-report/
 test-results/
+frontend/test-results/

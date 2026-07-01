@@ -12,6 +12,15 @@ specification, data model, and API contract.
   application secrets
 - Test users for at least one advisor and two students
 
+Seeded local validation accounts:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@gradsync.local` | `admin123` |
+| Advisor | `advisor@example.com` | `advisor123` |
+| Student | `student@example.com` | `student123` |
+| Reviewer | `reviewer@example.com` | `reviewer123` |
+
 ## Setup
 
 1. Build and start the application stack:
@@ -114,14 +123,33 @@ until reopened.
    theme toggle, loading states, empty states, validation errors, and destructive
    confirmation dialogs use Tailwind CSS tokens and shadcn/ui components rather
    than ad hoc demo controls.
-4. Complete project creation, task update, draft/report submission, review
+4. Confirm the admin account workspace can filter accounts by role/status and
+   expose suspend, reactivate, and archive controls without leaking those routes
+   to advisor or student users.
+5. Confirm project dashboard, review queue, booking workspace, notification
+   center, and account administration routes load through route-level bundles
+   and preserve selected-project context before create, submit, review, comment,
+   book, cancel, archive, or reopen actions.
+6. Complete project creation, task update, draft/report submission, review
    status update, inline comment creation, booking creation, booking
    cancellation, archive, and reopen workflows using keyboard navigation only.
-5. Run component, accessibility, build, and full-stack Playwright checks.
+7. Run component, accessibility, build, full-stack Playwright, and production UI
+   screenshot/layout checks:
+
+   ```bash
+   sh scripts/check-generated-artifacts.sh
+   cd frontend
+   npm run lint
+   npm test
+   GRADSYNC_E2E_MODE=fullstack npm run test:e2e
+   npm run test:e2e -- production-ui.spec.ts
+   npm run build
+   ```
 
 **Expected outcome**: The frontend behaves as a production operations workspace
 with consistent layout, accessible controls, stable project context,
-recoverable feedback, and no demo-only placeholder surfaces.
+recoverable feedback, route-level workspace bundles, ignored generated
+artifacts, and no demo-only placeholder surfaces.
 
 ## Contract References
 

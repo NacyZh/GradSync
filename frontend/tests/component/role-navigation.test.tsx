@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Layout } from '../../src/app/Layout';
 import { AuthProvider, type CurrentUser } from '../../src/features/auth/AuthProvider';
+import { routeWorkspaceBundles } from '../../src/routes';
 import { ProtectedRoute, RoleRoute } from '../../src/routes/ProtectedRoute';
+import { productionChunkSizeWarningLimit, productionManualChunks } from '../../build-guards';
+import tailwindConfig from '../../tailwind.config';
 import { renderWithClient } from './test-utils';
 
 function mockCurrentUser(user: CurrentUser | null) {
@@ -158,5 +161,33 @@ describe('role-aware navigation', () => {
 
     await screen.findByText('content');
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  });
+
+  it('keeps large workspaces behind explicit route-level bundles', () => {
+    expect(Object.keys(routeWorkspaceBundles)).toEqual([
+      'accountAdmin',
+      'projectCreate',
+      'projectDashboard',
+      'draftSubmission',
+      'weeklyReport',
+      'reviewQueue',
+      'resources',
+    ]);
+    expect(String(routeWorkspaceBundles.projectDashboard)).toMatch(/import\(|dynamic_import/);
+    expect(String(routeWorkspaceBundles.reviewQueue)).toContain('/features/submissions/');
+    expect(String(routeWorkspaceBundles.resources)).toContain('/features/resources/');
+  });
+
+  it('guards production bundle and Tailwind scan boundaries', () => {
+    expect(productionChunkSizeWarningLimit).toBeLessThanOrEqual(450);
+    expect(productionManualChunks('/repo/frontend/src/features/submissions/ReviewQueuePage.tsx')).toBe('workspace-submissions');
+    expect(productionManualChunks('/repo/frontend/src/features/resources/ResourceListPage.tsx')).toBe('workspace-resources');
+    expect(productionManualChunks('/repo/frontend/src/features/admin/AccountAdminPage.tsx')).toBe('workspace-admin');
+    expect(productionManualChunks('/repo/frontend/node_modules/react/index.js')).toBe('vendor');
+
+    expect(tailwindConfig.content).toContain('./src/**/*.{ts,tsx}');
+    expect(tailwindConfig.content).toContain('./tests/component/**/*.{ts,tsx}');
+    expect(tailwindConfig.content).not.toContain('./dist/**/*');
+    expect(tailwindConfig.content).not.toContain('./node_modules/**/*');
   });
 });
