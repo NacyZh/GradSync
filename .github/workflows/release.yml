@@ -155,6 +155,6 @@ jobs:
           fi
       - name: Deploy on production host
         run: |
-          ssh -i ~/.ssh/gradsync_deploy -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+          ssh -i ~/.ssh/gradsync_github_deploy -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' sh -s" \
             < scripts/deploy-production.sh
