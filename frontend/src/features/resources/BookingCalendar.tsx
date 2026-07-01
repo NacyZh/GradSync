@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DataState } from '../../shared/ui/DataState';
-import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { BookingConflictAlert } from './BookingConflictAlert';
 import type { LabResource } from './api';
 import { listResourceAvailability } from './api';
@@ -109,6 +108,7 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
         <BookingConflictAlert
           title="Conflicts in this window"
           message={`${unavailable.length} resource${unavailable.length === 1 ? '' : 's'} already have overlapping project bookings. Choose another time or resource.`}
+          role="status"
         />
       ) : null}
       {hasValidWindow && !availabilityQuery.isLoading && !availabilityQuery.error && availability.length === 0 ? (
@@ -125,6 +125,7 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
 
 function AvailabilityRow({ resource }: { resource: LabResource }) {
   const conflicts = resource.conflicting_booking_count ?? 0;
+  const statusLabel = resource.available ? 'Available' : 'Unavailable';
 
   return (
     <li>
@@ -135,7 +136,10 @@ function AvailabilityRow({ resource }: { resource: LabResource }) {
         </p>
         {conflicts ? <small className="text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'}</small> : null}
       </div>
-      <StatusBadge status={resource.available ? 'available' : 'unavailable'} />
+      <span className={`status-pill ${resource.available ? 'available' : 'unavailable'}`}>
+        {statusLabel}
+        {conflicts ? ` · ${conflicts} conflict${conflicts === 1 ? '' : 's'}` : ''}
+      </span>
     </li>
   );
 }

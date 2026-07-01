@@ -63,6 +63,7 @@ class Command(BaseCommand):
             assignee=student,
             created_by=advisor,
             parent_task=task,
+            priority="high",
             deadline_at=timezone.now() + timezone.timedelta(hours=12),
         )
 

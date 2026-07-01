@@ -33,7 +33,7 @@ class ProjectTaskViewSet(
             value = self.request.query_params.get(field)
             if value:
                 queryset = queryset.filter(**{field: value})
-        if not self.request.query_params.get("include_children"):
+        if self.action == "list" and not self.request.query_params.get("include_children"):
             queryset = queryset.filter(parent_task__isnull=True)
         return queryset.prefetch_related("children")
 

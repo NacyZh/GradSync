@@ -40,3 +40,35 @@ def test_task_parent_must_stay_in_project(api_client):
     )
 
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_member_can_update_child_task_from_project_detail_endpoint(api_client):
+    advisor = UserFactory(global_role="advisor")
+    student = UserFactory(global_role="student")
+    project = ResearchProject.objects.create(title="Project", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    parent = Task.objects.create(
+        project=project,
+        title="Parent",
+        assignee=student,
+        created_by=advisor,
+    )
+    child = Task.objects.create(
+        project=project,
+        title="Child",
+        parent_task=parent,
+        assignee=student,
+        created_by=advisor,
+    )
+
+    response = authenticate(api_client, advisor).patch(
+        f"/api/projects/{project.id}/tasks/{child.id}/",
+        {"status": "completed"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    child.refresh_from_db()
+    assert child.status == "completed"

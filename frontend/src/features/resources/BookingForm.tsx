@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarPlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,16 @@ export function BookingForm({ projectId, resources = [], defaultStartsAt = '', d
     () => resources.filter((resource) => resource.status !== 'retired' && resource.status !== 'unavailable'),
     [resources],
   );
+  const [selectedResourceId, setSelectedResourceId] = useState('');
+  useEffect(() => {
+    if (availableResources.length === 0) {
+      setSelectedResourceId('');
+      return;
+    }
+    if (!availableResources.some((resource) => String(resource.id) === selectedResourceId)) {
+      setSelectedResourceId(String(availableResources[0].id));
+    }
+  }, [availableResources, selectedResourceId]);
   const mutation = useMutation({
     mutationFn: (payload: { resource_id: number; starts_at: string; ends_at: string; purpose?: string }) => createBooking(projectId ?? 0, payload),
     onSuccess: () => notify('Booking confirmed', 'success'),
@@ -87,7 +97,7 @@ export function BookingForm({ projectId, resources = [], defaultStartsAt = '', d
       ) : null}
       <div className="grid gap-1.5">
         <Label htmlFor="bookingResource">Resource</Label>
-        <Select name="resourceId" required defaultValue={availableResources[0] ? String(availableResources[0].id) : undefined} disabled={disabled || availableResources.length === 0}>
+        <Select name="resourceId" required value={selectedResourceId} onValueChange={setSelectedResourceId} disabled={disabled || availableResources.length === 0}>
           <SelectTrigger id="bookingResource" aria-label="Resource">
             <SelectValue placeholder="Choose a resource" />
           </SelectTrigger>
