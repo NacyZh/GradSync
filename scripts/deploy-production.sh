@@ -6,6 +6,7 @@ set -eu
 BRANCH="${GRADSYNC_DEPLOY_BRANCH:-master}"
 COMPOSE_FILE="${GRADSYNC_COMPOSE_FILE:-docker-compose.prod.yml}"
 PUBLIC_URL="${GRADSYNC_PUBLIC_URL:-https://120021123.xyz}"
+PRUNE_BUILDER_CACHE="${GRADSYNC_PRUNE_BUILDER_CACHE:-true}"
 
 cd "$GRADSYNC_DEPLOY_PATH"
 
@@ -24,8 +25,17 @@ git fetch origin "$BRANCH"
 git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH"
 
+echo "Stopping application services before image build to reduce memory pressure"
+docker compose -f "$COMPOSE_FILE" stop backend frontend worker scheduler || true
+docker compose -f "$COMPOSE_FILE" rm -f backend frontend worker scheduler || true
+
+if [ "$PRUNE_BUILDER_CACHE" = "true" ]; then
+  echo "Pruning Docker builder cache before image build"
+  docker builder prune -af || true
+fi
+
 echo "Building production images"
-docker compose -f "$COMPOSE_FILE" build backend frontend
+docker compose -f "$COMPOSE_FILE" build --pull backend frontend
 
 echo "Starting data services"
 docker compose -f "$COMPOSE_FILE" up -d db redis

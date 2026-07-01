@@ -46,14 +46,17 @@ GitHub production environment configuration:
 The deploy script performs:
 
 1. `git fetch` and `git pull --ff-only` on the server.
-2. `docker compose -f docker-compose.prod.yml build backend frontend`.
-3. Start PostgreSQL and Redis.
-4. Run migrations.
-5. Recreate backend, frontend, worker, and scheduler.
-6. Wait for healthy services.
-7. Run `python manage.py check --deploy`.
-8. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
-9. Watch backend logs, worker logs, queue depth, notification failures, and
+2. Stop and remove backend, frontend, worker, and scheduler containers before
+   image builds to reduce memory pressure on small hosts.
+3. Prune Docker builder cache when `GRADSYNC_PRUNE_BUILDER_CACHE=true`.
+4. `docker compose -f docker-compose.prod.yml build --pull backend frontend`.
+5. Start PostgreSQL and Redis.
+6. Run migrations.
+7. Recreate backend, frontend, worker, and scheduler.
+8. Wait for healthy services.
+9. Run `python manage.py check --deploy`.
+10. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
+11. Watch backend logs, worker logs, queue depth, notification failures, and
    request latency for at least one reminder cycle.
 
 ## Host Nginx
