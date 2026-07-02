@@ -3,8 +3,10 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.library.models import PaperAttachment, PaperRecord
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
+from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 from apps.resources.models import Booking, LabResource
 from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
@@ -117,6 +119,42 @@ class Command(BaseCommand):
             subject="Pending review reminder",
             action_path=f"/projects/{project.id}/reviews",
             eligible_at=timezone.now(),
+        )
+        paper = PaperRecord.objects.create(
+            project=project,
+            title="Graph Neural Methods",
+            authors=["Lin Chen"],
+            tags=["graph"],
+            fingerprint="graph neural methods|lin chen|",
+            created_by=advisor,
+        )
+        PaperAttachment.objects.create(
+            paper=paper,
+            project=project,
+            storage_key="e2e/graph.pdf",
+            filename="graph.pdf",
+            content_type="application/pdf",
+            size_bytes=1024,
+            checksum_sha256="a" * 64,
+            uploaded_by=advisor,
+        )
+        artifact = CodeArtifact.objects.create(
+            project=project,
+            name="Simulator",
+            description="Seeded simulator artifact for full-stack download checks.",
+            tags=["simulation"],
+            created_by=advisor,
+        )
+        CodeArtifactVersion.objects.create(
+            artifact=artifact,
+            project=project,
+            version_label="v1",
+            storage_key="e2e/sim.zip",
+            filename="sim.zip",
+            content_type="application/zip",
+            size_bytes=2048,
+            checksum_sha256="b" * 64,
+            uploaded_by=advisor,
         )
 
         self.stdout.write(

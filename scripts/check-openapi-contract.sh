@@ -15,9 +15,21 @@ if [ -z "$PYTHON" ]; then
     PYTHON="python3"
   fi
 fi
+if [ "$PYTHON" = "python" ] && ! command -v python >/dev/null 2>&1; then
+  if [ -x ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+  else
+    PYTHON="python3"
+  fi
+fi
+case "$PYTHON" in
+  /*) BACKEND_PYTHON="$PYTHON" ;;
+  */*) BACKEND_PYTHON="../$PYTHON" ;;
+  *) BACKEND_PYTHON="$PYTHON" ;;
+esac
 (
   cd backend
-  "../$PYTHON" manage.py spectacular --format openapi-json --file "$GENERATED" >/dev/null
+  "$BACKEND_PYTHON" manage.py spectacular --format openapi-json --file "$GENERATED" >/dev/null
 )
 
 "$PYTHON" - "$CONTRACT" "$GENERATED" <<'PY'
