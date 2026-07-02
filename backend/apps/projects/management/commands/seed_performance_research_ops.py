@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
-from apps.projects.models import ProjectMembership, ResearchProject
 from apps.library.models import PaperRecord
+from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 from apps.tasks.models import Task
 
@@ -27,13 +27,16 @@ class Command(BaseCommand):
             if index == 0:
                 paper_existing = project.paper_records.count()
                 for paper_index in range(paper_existing, 1000):
+                    year = 2020 + (paper_index % 7)
                     PaperRecord.objects.create(
                         project=project,
                         title=f"Performance Paper {paper_index}",
                         authors=[f"Author {paper_index}"],
-                        publication_year=2020 + (paper_index % 7),
+                        publication_year=year,
                         tags=["performance", f"tag-{paper_index % 10}"],
-                        fingerprint=f"performance paper {paper_index}|author {paper_index}|{2020 + (paper_index % 7)}",
+                        fingerprint=(
+                            f"performance paper {paper_index}|author {paper_index}|{year}"
+                        ),
                         created_by=advisor,
                     )
                 artifact_existing = project.code_artifacts.count()

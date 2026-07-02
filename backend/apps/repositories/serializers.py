@@ -54,7 +54,9 @@ class CodeArtifactVersionCreateSerializer(serializers.Serializer):
     commitReference = serializers.CharField(required=False, allow_blank=True)
     releaseNotes = serializers.CharField(required=False, allow_blank=True)
     filename = serializers.CharField(max_length=255)
-    contentType = serializers.CharField(required=False, allow_blank=True, default="application/octet-stream")
+    contentType = serializers.CharField(
+        required=False, allow_blank=True, default="application/octet-stream"
+    )
     sizeBytes = serializers.IntegerField(required=False, min_value=0, default=0)
     checksumSha256 = serializers.CharField(max_length=64)
 

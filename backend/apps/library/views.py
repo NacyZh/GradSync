@@ -33,7 +33,9 @@ class PaperViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.Gene
     permission_classes = [IsAuthenticated]
 
     def get_project(self):
-        return get_object_or_404(projects_visible_to(self.request.user), pk=self.kwargs["project_id"])
+        return get_object_or_404(
+            projects_visible_to(self.request.user), pk=self.kwargs["project_id"]
+        )
 
     def get_queryset(self):
         project = self.get_project()
@@ -73,7 +75,11 @@ class PaperViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.Gene
         except DjangoValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             detail = _flatten_error_detail(detail)
-            status_code = status.HTTP_409_CONFLICT if isinstance(detail, dict) else status.HTTP_400_BAD_REQUEST
+            status_code = (
+                status.HTTP_409_CONFLICT
+                if isinstance(detail, dict)
+                else status.HTTP_400_BAD_REQUEST
+            )
             return Response(detail, status=status_code)
         return Response(PaperRecordSerializer(paper).data, status=status.HTTP_201_CREATED)
 

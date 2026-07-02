@@ -24,14 +24,20 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
     permission_classes = [IsAuthenticated]
 
     def get_project(self):
-        return get_object_or_404(projects_visible_to(self.request.user), pk=self.kwargs["project_id"])
+        return get_object_or_404(
+            projects_visible_to(self.request.user), pk=self.kwargs["project_id"]
+        )
 
     def get_queryset(self):
-        queryset = CodeArtifact.objects.filter(project=self.get_project()).prefetch_related("versions")
+        queryset = CodeArtifact.objects.filter(project=self.get_project()).prefetch_related(
+            "versions"
+        )
         query = self.request.query_params.get("q")
         if query:
             queryset = queryset.filter(
-                Q(name__icontains=query) | Q(description__icontains=query) | Q(tags__icontains=query)
+                Q(name__icontains=query)
+                | Q(description__icontains=query)
+                | Q(tags__icontains=query)
             )
         tag = self.request.query_params.get("tag")
         if tag:

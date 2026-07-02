@@ -29,7 +29,11 @@ class CodeArtifactService:
             created_by=self.user,
         )
         record_event(
-            self.project, self.user, "code_artifact.created", f"Created code artifact {artifact.id}", artifact
+            self.project,
+            self.user,
+            "code_artifact.created",
+            f"Created code artifact {artifact.id}",
+            artifact,
         )
         return artifact
 
@@ -74,6 +78,10 @@ class CodeArtifactService:
             uploaded_by=self.user,
         )
         record_event(
-            self.project, self.user, "code_artifact_version.uploaded", f"Uploaded code version {version.id}", version
+            self.project,
+            self.user,
+            "code_artifact_version.uploaded",
+            f"Uploaded code version {version.id}",
+            version,
         )
         return version

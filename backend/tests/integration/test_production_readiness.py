@@ -95,11 +95,11 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     script = (REPO_ROOT / "scripts/deploy-production.sh").read_text()
 
     assert "git pull --ff-only" in script
-    assert "docker compose -f \"$COMPOSE_FILE\" stop backend frontend worker scheduler" in script
-    assert "docker compose -f \"$COMPOSE_FILE\" rm -f backend frontend worker scheduler" in script
+    assert 'docker compose -f "$COMPOSE_FILE" stop backend frontend worker scheduler' in script
+    assert 'docker compose -f "$COMPOSE_FILE" rm -f backend frontend worker scheduler' in script
     assert "docker builder prune -af" in script
-    assert "docker compose -f \"$COMPOSE_FILE\" build --pull backend frontend" in script
-    assert "docker compose -f \"$COMPOSE_FILE\" run --rm migrate" in script
+    assert 'docker compose -f "$COMPOSE_FILE" build --pull backend frontend' in script
+    assert 'docker compose -f "$COMPOSE_FILE" run --rm migrate' in script
     assert "python manage.py check --deploy" in script
     assert "$PUBLIC_URL/healthz/" in script
     assert "$PUBLIC_URL/readyz/" in script

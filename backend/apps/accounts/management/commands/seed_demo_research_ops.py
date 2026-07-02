@@ -2,11 +2,11 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.library.models import PaperAttachment, PaperRecord
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
-from apps.resources.models import Booking, LabResource
-from apps.library.models import PaperAttachment, PaperRecord
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
+from apps.resources.models import Booking, LabResource
 from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
 
@@ -174,7 +174,11 @@ class Command(BaseCommand):
         artifact, _ = CodeArtifact.objects.get_or_create(
             project=project,
             name="Demo simulator",
-            defaults={"description": "Seeded code artifact", "tags": ["demo"], "created_by": student},
+            defaults={
+                "description": "Seeded code artifact",
+                "tags": ["demo"],
+                "created_by": student,
+            },
         )
         CodeArtifactVersion.objects.get_or_create(
             artifact=artifact,

@@ -172,10 +172,14 @@ describe('role-aware navigation', () => {
       'weeklyReport',
       'reviewQueue',
       'resources',
+      'paperLibrary',
+      'codeRepository',
     ]);
     expect(String(routeWorkspaceBundles.projectDashboard)).toMatch(/import\(|dynamic_import/);
     expect(String(routeWorkspaceBundles.reviewQueue)).toContain('/features/submissions/');
     expect(String(routeWorkspaceBundles.resources)).toContain('/features/resources/');
+    expect(String(routeWorkspaceBundles.paperLibrary)).toContain('/features/library/');
+    expect(String(routeWorkspaceBundles.codeRepository)).toContain('/features/repositories/');
   });
 
   it('guards production bundle and Tailwind scan boundaries', () => {

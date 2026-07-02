@@ -83,8 +83,9 @@ def test_paper_create_import_duplicate_and_authorized_download(api_client):
 
 @pytest.mark.django_db
 def test_paper_upload_rejection_is_enforced_by_policy():
-    from apps.library.upload_policy import validate_paper_upload
     from django.core.exceptions import ValidationError
+
+    from apps.library.upload_policy import validate_paper_upload
 
     with pytest.raises(ValidationError):
         validate_paper_upload(

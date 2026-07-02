@@ -40,7 +40,9 @@ def test_paper_duplicate_precedence_checksum_then_doi_then_title_author_year():
         authors=["B"],
         publication_year=2026,
         doi="10.1/doi",
-        fingerprint=title_author_year_fingerprint(title="DOI Paper", authors=["B"], publication_year=2026),
+        fingerprint=title_author_year_fingerprint(
+            title="DOI Paper", authors=["B"], publication_year=2026
+        ),
         created_by=user,
     )
 

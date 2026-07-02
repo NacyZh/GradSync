@@ -63,8 +63,9 @@ def test_code_artifact_create_version_conflict_and_download_authorization(api_cl
 
 @pytest.mark.django_db
 def test_code_upload_rejection_is_enforced_by_policy():
-    from apps.repositories.upload_policy import validate_code_upload
     from django.core.exceptions import ValidationError
+
+    from apps.repositories.upload_policy import validate_code_upload
 
     with pytest.raises(ValidationError):
         validate_code_upload(filename="source.zip", size_bytes=201 * 1024 * 1024)

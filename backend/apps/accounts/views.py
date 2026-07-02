@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from apps.common.permissions import IsAdministrator
 
+from .locale_services import get_locale, set_locale
 from .models import User
 from .serializers import (
     AccountCreateSerializer,
@@ -17,7 +18,6 @@ from .serializers import (
     LoginSerializer,
     UserSerializer,
 )
-from .locale_services import get_locale, set_locale
 from .services import AccountsService
 
 

@@ -11,7 +11,15 @@ class PaperAttachmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PaperAttachment
-        fields = ["id", "paperId", "filename", "contentType", "sizeBytes", "checksumSha256", "status"]
+        fields = [
+            "id",
+            "paperId",
+            "filename",
+            "contentType",
+            "sizeBytes",
+            "checksumSha256",
+            "status",
+        ]
 
 
 class PaperRecordSerializer(serializers.ModelSerializer):

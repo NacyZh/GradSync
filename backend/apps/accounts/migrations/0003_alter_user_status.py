@@ -4,23 +4,22 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0002_alter_user_date_joined_alter_user_first_name_and_more'),
+        ("accounts", "0002_alter_user_date_joined_alter_user_first_name_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='user',
-            name='status',
+            model_name="user",
+            name="status",
             field=models.CharField(
                 choices=[
-                    ('invited', 'Invited'),
-                    ('active', 'Active'),
-                    ('suspended', 'Suspended'),
-                    ('archived', 'Archived'),
+                    ("invited", "Invited"),
+                    ("active", "Active"),
+                    ("suspended", "Suspended"),
+                    ("archived", "Archived"),
                 ],
-                default='active',
+                default="active",
                 max_length=20,
             ),
         ),
