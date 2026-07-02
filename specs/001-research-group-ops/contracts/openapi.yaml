@@ -5,7 +5,8 @@ info:
   description: >
     Project-scoped API contract for research projects, hierarchical tasks,
     versioned drafts, weekly reports, inline advisor comments, lab resource
-    bookings, and email notification records.
+    bookings, paper libraries, code artifacts, locale preferences, downloads,
+    and email notification records.
 servers:
   - url: /api
 security:
@@ -334,6 +335,254 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Notification"
+  /projects/{projectId}/papers:
+    get:
+      summary: Search project paper records
+      operationId: listProjectPapers
+      tags: [Papers]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: tag
+          in: query
+          schema:
+            type: string
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: author
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project-scoped paper records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaperRecord"
+    post:
+      summary: Create or edit a project paper metadata record
+      operationId: createProjectPaper
+      tags: [Papers]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaperRecordCreate"
+      responses:
+        "201":
+          description: Paper record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaperRecord"
+        "409":
+          description: Duplicate paper detected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicatePaperError"
+  /projects/{projectId}/papers/imports:
+    post:
+      summary: Stage a paper import batch with duplicate detection
+      operationId: stagePaperImport
+      tags: [Papers]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaperImportRequest"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PaperImportUploadRequest"
+      responses:
+        "201":
+          description: Import batch staged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaperImportBatch"
+  /projects/{projectId}/papers/imports/{batchId}/commit:
+    post:
+      summary: Commit accepted paper import batch items
+      operationId: commitPaperImport
+      tags: [Papers]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Import batch committed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaperImportBatch"
+  /projects/{projectId}/papers/{paperId}/download:
+    post:
+      summary: Download an authorized paper attachment
+      operationId: downloadPaperAttachment
+      tags: [Papers, Downloads]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: paperId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Download descriptor or file response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownloadDescriptor"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /projects/{projectId}/code-artifacts:
+    get:
+      summary: Search project code artifacts
+      operationId: listCodeArtifacts
+      tags: [CodeArtifacts]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: tag
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project-scoped code artifacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CodeArtifact"
+    post:
+      summary: Create a project code artifact
+      operationId: createCodeArtifact
+      tags: [CodeArtifacts]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CodeArtifactCreate"
+      responses:
+        "201":
+          description: Code artifact created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeArtifact"
+  /projects/{projectId}/code-artifacts/{artifactId}/versions:
+    post:
+      summary: Upload a code artifact version
+      operationId: uploadCodeArtifactVersion
+      tags: [CodeArtifacts]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CodeArtifactVersionCreate"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CodeArtifactVersionUploadRequest"
+      responses:
+        "201":
+          description: Code artifact version uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeArtifactVersion"
+        "409":
+          description: Duplicate checksum or version label
+  /projects/{projectId}/code-artifacts/{artifactId}/versions/{versionId}/download:
+    post:
+      summary: Download an authorized code artifact version
+      operationId: downloadCodeArtifactVersion
+      tags: [CodeArtifacts, Downloads]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Download descriptor or file response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownloadDescriptor"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /account/locale:
+    get:
+      summary: Get current user's locale preference
+      operationId: getLocalePreference
+      tags: [Account]
+      responses:
+        "200":
+          description: Locale preference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalePreference"
+    put:
+      summary: Update current user's locale preference
+      operationId: updateLocalePreference
+      tags: [Account]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocalePreferenceUpdate"
+      responses:
+        "200":
+          description: Locale preference updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalePreference"
 components:
   securitySchemes:
     sessionAuth:
@@ -725,3 +974,292 @@ components:
         eligibleAt:
           type: string
           format: date-time
+    PaperRecord:
+      type: object
+      required: [id, projectId, title, authors, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        venue:
+          type: string
+        publicationYear:
+          type: integer
+        doi:
+          type: string
+        externalIds:
+          type: object
+          additionalProperties:
+            type: string
+        abstract:
+          type: string
+        notes:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        importSource:
+          type: string
+          enum: [manual, doi, bibtex, file_metadata, batch]
+        status:
+          type: string
+          enum: [active, duplicate_blocked, archived]
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaperAttachment"
+    PaperRecordCreate:
+      type: object
+      required: [title, authors]
+      properties:
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        venue:
+          type: string
+        publicationYear:
+          type: integer
+        doi:
+          type: string
+        externalIds:
+          type: object
+          additionalProperties:
+            type: string
+        abstract:
+          type: string
+        notes:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    PaperAttachment:
+      type: object
+      required: [id, paperId, filename, checksumSha256, status]
+      properties:
+        id:
+          type: string
+        paperId:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        checksumSha256:
+          type: string
+        status:
+          type: string
+          enum: [active, replaced, archived]
+    PaperImportRequest:
+      type: object
+      required: [sourceType, items]
+      properties:
+        sourceType:
+          type: string
+          enum: [file, doi, bibtex, mixed]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaperRecordCreate"
+    PaperImportUploadRequest:
+      type: object
+      required: [sourceType]
+      properties:
+        sourceType:
+          type: string
+          enum: [file, doi, bibtex, mixed]
+        metadata:
+          type: string
+          description: JSON or BibTeX metadata payload submitted with files.
+        files:
+          type: array
+          items:
+            type: string
+            format: binary
+    PaperImportBatch:
+      type: object
+      required: [id, projectId, status, totalItems, acceptedCount, duplicateCount, errorCount]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        status:
+          type: string
+          enum: [staged, committed, failed, cancelled]
+        totalItems:
+          type: integer
+        acceptedCount:
+          type: integer
+        duplicateCount:
+          type: integer
+        errorCount:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaperImportResult"
+    PaperImportResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted, duplicate, error]
+        paper:
+          $ref: "#/components/schemas/PaperRecord"
+        duplicateOfPaperId:
+          type: string
+        duplicateReason:
+          type: string
+          enum: [checksum, doi, external_id, title_author_year]
+        message:
+          type: string
+    DuplicatePaperError:
+      type: object
+      required: [message, duplicateOfPaperId, duplicateReason]
+      properties:
+        message:
+          type: string
+        duplicateOfPaperId:
+          type: string
+        duplicateReason:
+          type: string
+          enum: [checksum, doi, external_id, title_author_year]
+    CodeArtifact:
+      type: object
+      required: [id, projectId, name, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [active, superseded, archived]
+        latestVersion:
+          $ref: "#/components/schemas/CodeArtifactVersion"
+    CodeArtifactCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    CodeArtifactVersion:
+      type: object
+      required: [id, artifactId, projectId, filename, checksumSha256, status]
+      properties:
+        id:
+          type: string
+        artifactId:
+          type: string
+        projectId:
+          type: string
+        versionLabel:
+          type: string
+        commitReference:
+          type: string
+        releaseNotes:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        checksumSha256:
+          type: string
+        status:
+          type: string
+          enum: [active, superseded, archived]
+    CodeArtifactVersionCreate:
+      type: object
+      required: [filename, checksumSha256]
+      properties:
+        versionLabel:
+          type: string
+        commitReference:
+          type: string
+        releaseNotes:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        checksumSha256:
+          type: string
+    CodeArtifactVersionUploadRequest:
+      type: object
+      required: [file]
+      properties:
+        versionLabel:
+          type: string
+        commitReference:
+          type: string
+        releaseNotes:
+          type: string
+        file:
+          type: string
+          format: binary
+        checksumSha256:
+          type: string
+    DownloadDescriptor:
+      type: object
+      required: [filename, deliveryMode]
+      properties:
+        filename:
+          type: string
+        deliveryMode:
+          type: string
+          enum: [direct_response, signed_url]
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    LocalePreference:
+      type: object
+      required: [locale]
+      properties:
+        locale:
+          type: string
+          enum: [en, zh]
+        updatedAt:
+          type: string
+          format: date-time
+    LocalePreferenceUpdate:
+      type: object
+      required: [locale]
+      properties:
+        locale:
+          type: string
+          enum: [en, zh]

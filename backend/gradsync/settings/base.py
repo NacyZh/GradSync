@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     "apps.tasks",
     "apps.submissions",
     "apps.resources",
+    "apps.library",
+    "apps.repositories",
     "apps.notifications",
     "apps.audit",
 ]

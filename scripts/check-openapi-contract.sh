@@ -37,7 +37,13 @@ def normalize(path: str) -> str:
     path = path.removeprefix("/api")
     if path != "/" and path.endswith("/"):
         path = path[:-1]
-    path = path.replace("{project_id}", "{projectId}").replace("{pk}", "{id}")
+    path = (
+        path.replace("{project_id}", "{projectId}")
+        .replace("{batch_id}", "{batchId}")
+        .replace("{version_id}", "{versionId}")
+        .replace("{membership_id}", "{membershipId}")
+        .replace("{pk}", "{id}")
+    )
     parts = path.split("/")
     normalized = []
     previous = ""
@@ -55,6 +61,14 @@ def normalize(path: str) -> str:
                 normalized.append("{commentId}")
             elif previous == "reports":
                 normalized.append("{reportId}")
+            elif previous == "papers":
+                normalized.append("{paperId}")
+            elif previous == "imports":
+                normalized.append("{batchId}")
+            elif previous == "code-artifacts":
+                normalized.append("{artifactId}")
+            elif previous == "versions":
+                normalized.append("{versionId}")
             else:
                 normalized.append(part)
         else:

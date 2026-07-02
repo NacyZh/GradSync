@@ -148,8 +148,18 @@ class ProjectDashboardSerializer(ProjectSerializer):
             }
             for notification in instance.notifications.select_related("sender")[:20]
         ]
+        download_events = [
+            {
+                "source": "download",
+                "event_type": "download." + event.target_type,
+                "summary": f"Downloaded {event.filename}",
+                "actor_id": event.actor_id,
+                "created_at": event.downloaded_at,
+            }
+            for event in instance.download_events.select_related("actor")[:20]
+        ]
         data["activity"] = sorted(
-            [*audit_events, *comment_events, *notification_events],
+            [*audit_events, *comment_events, *notification_events, *download_events],
             key=lambda item: item["created_at"],
             reverse=True,
         )[:20]

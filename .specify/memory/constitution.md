@@ -1,16 +1,18 @@
 <!--
 Sync Impact Report
-Version change: 1.0.0 -> 1.1.0
+Version change: 1.1.0 -> 2.0.0
 Modified principles:
-- I. Code Quality by Default -> I. Production-Grade Code Quality
-- II. Testing is a Release Gate -> II. Tests Prove Releasability
-- III. User Experience Consistency -> III. Operable User Experience
-- IV. Measured Performance -> IV. Measured Performance and Reliability
-- V. Simple, Maintainable Architecture -> V. Secure, Observable, Maintainable Architecture
+- I. Production-Grade Code Quality -> I. SDD-First Development Workflow
+- II. Tests Prove Releasability -> II. Requirements and Specification Standards
+- III. Operable User Experience -> III. Plan and Technology Governance
+- IV. Measured Performance and Reliability -> IV. Task Decomposition and Traceability
+- V. Secure, Observable, Maintainable Architecture -> V. Universal Coding, Testing, Security, and Performance Baselines
 Added sections:
-- Production Readiness Gates
+- Git and Branch Collaboration Rules
+- CI/CD Gate Rules
+- Documentation Rules
 Removed sections:
-- Quality Gates
+- Production Readiness Gates
 Templates requiring updates:
 - ✅ .specify/templates/plan-template.md
 - ✅ .specify/templates/spec-template.md
@@ -20,142 +22,214 @@ Runtime guidance reviewed:
 - ✅ README.md
 - ✅ AGENTS.md
 - ✅ docs/production.md
-- ✅ docs/ops/infrastructure.md
-- ✅ docs/ops/backup-restore-drill.md
-- ✅ docs/ops/monitoring-alerts.md
 Follow-up TODOs:
 - None
 -->
 # GradSync Constitution
 
+This constitution is the global mandatory constraint set for Spec-Kit SDD
+specification-driven development in GradSync. All `/speckit.*` commands, AI code
+generation, manual development, and CI validation MUST comply. No feature,
+defect fix, refactor, or release change is exempt.
+
 ## Core Principles
 
-### I. Production-Grade Code Quality
-Production code MUST be readable, cohesive, and aligned with the existing Django,
-React, PostgreSQL, Redis, and Docker Compose structure. New abstractions MUST
-solve demonstrated duplication, complexity, deployment isolation, or contract
-boundaries. Every change MUST preserve formatting, linting, static analysis,
-type expectations, migrations, and configuration validation used by the affected
-area. Public behavior, interfaces, operational assumptions, and non-obvious
-implementation choices MUST be documented where a maintainer or operator would
-otherwise need to infer intent.
+### I. SDD-First Development Workflow
+All new features, iterative changes, defect fixes, and business behavior
+changes MUST follow this order: write or update the relevant `spec.md`, produce
+or refresh the implementation `plan.md` and design artifacts, then implement
+code. Business code MUST NOT be written before the corresponding specification
+and plan exist.
 
-Rationale: GradSync handles academic work records, reviews, bookings, and
-notifications that must remain maintainable and deployable after development
-ends.
+The single source of truth is the `specs/` directory. Code, APIs, tests, CI
+checks, and documentation MUST align with the acceptance criteria in the
+applicable specification. Any requirement change or logic adjustment MUST update
+the relevant specification first and then regenerate or amend downstream plan,
+tasks, contracts, tests, and implementation. Direct code-only business changes
+are prohibited.
 
-### II. Tests Prove Releasability
-Every feature, bug fix, and behavioral change MUST include automated tests that
-prove the affected user journey, service contract, security boundary, data
-migration, or operational check. Tests MUST be written at the lowest useful level
-and include integration or end-to-end coverage when behavior crosses modules,
-persistence, network boundaries, background jobs, authorization, or UI workflows.
-Known test gaps MUST be documented in the plan with a concrete reason, owner,
-expiry date, and release risk before implementation can proceed.
+TDD is mandatory. Before generating or writing business implementation code,
+unit, integration, contract, or end-to-end tests appropriate to the change MUST
+be produced and must fail for the missing behavior unless the plan records an
+explicit approved exception. Scope MUST be controlled in each specification by
+stating included capabilities and excluded/non-goal capabilities.
 
-Rationale: untested behavior is not releasable behavior, and regressions in core
-academic workflows, access control, or deployment readiness are costly after
-production launch.
+Rationale: GradSync must keep business intent, generated code, human code,
+tests, and release validation aligned through a reviewable SDD chain.
 
-### III. Operable User Experience
-User-facing changes MUST follow established interaction patterns, language,
-accessibility expectations, and visual system of the product. Screens and flows
-MUST be usable on supported viewport sizes, expose clear loading, empty, success,
-and error states, and avoid one-off controls, copy styles, or layout conventions
-unless the plan records why the existing pattern is insufficient. Accessibility
-checks MUST cover keyboard use, focus order, labels, contrast, and assistive text
-for new or changed UI. User workflows that trigger persistence, notifications,
-or privileged actions MUST provide recoverable feedback and must not hide
-operational failure.
+### II. Requirements and Specification Standards
+Every feature folder's `spec.md` MUST contain five complete modules:
 
-Rationale: production users need consistent workflows that remain diagnosable
-when validation, permissions, network calls, or background processing fail.
+1. Business background, user roles, and core goals.
+2. Complete positive business flows.
+3. Full exception, boundary, and degradation scenarios.
+4. Quantifiable and automatable acceptance criteria.
+5. Dependencies, external systems, business assumptions, and unsupported
+   capabilities for the current scope.
 
-### IV. Measured Performance and Reliability
-Each feature plan MUST define measurable performance and reliability expectations
-for the user journeys it affects, including latency, throughput, memory, bundle
-size, rendering targets, queue timing, recovery objectives, or availability
-signals where relevant. Implementations MUST avoid unbounded work on critical
-paths, repeated network or storage calls, unnecessary client payloads, avoidable
-layout instability, and background jobs without retry or failure visibility.
-Performance-sensitive or reliability-sensitive changes MUST include a
-measurement method and pass the target before release.
+The specification MUST define independently testable user journeys, measurable
+success criteria, important edge cases, security and privacy boundaries, and
+scope exclusions. Ambiguous questions MUST be recorded in the specification
+appendix or clarification section, and the clarification loop MUST be closed
+before entering the plan phase.
 
-Rationale: performance and reliability requirements must be explicit so user
-experience and operations do not degrade silently as the system grows.
+The initial specification MUST be reviewed and accepted by product, testing, and
+development stakeholders before `/speckit-plan` proceeds. If this review is not
+represented by a project workflow artifact, the plan MUST record the missing
+review as a release risk and cannot proceed to implementation until resolved.
 
-### V. Secure, Observable, Maintainable Architecture
-The system MUST favor direct, well-scoped designs over speculative layers while
-meeting real deployment requirements. Feature work MUST integrate with existing
-modules and contracts before adding new services, frameworks, state stores, or
-persistence patterns. Cross-cutting concerns such as validation, authorization,
-project isolation, logging, error handling, configuration, secret management,
-health checks, metrics, backups, migrations, and rollback MUST use the shared
-project approach where one exists. Any intentional deviation MUST be recorded in
-the plan with the simpler alternative that was rejected and the operational
-impact accepted.
+Rationale: Specifications must be complete enough to drive implementation and
+CI validation without relying on hidden oral context.
 
-Rationale: production architecture must be simple enough to review and operate,
-but complete enough to secure, observe, recover, and evolve safely.
+### III. Plan and Technology Governance
+Executing `/speckit-plan` MUST produce or update all required design artifacts:
 
-## Production Readiness Gates
+1. `plan.md`: architecture, module boundaries, feature-specific technology
+   choices, deployment approach, risks, dependencies, and trade-off rationale.
+2. `data-model.md`: entities, field constraints, indexes, relationships, and
+   migration approach.
+3. `contracts/openapi.yaml` or `contracts/openapi.json`: frontend/backend or
+   service API contracts when interfaces exist.
+4. `research.md`: third-party dependency research, performance and security
+   risk assessment, and technology comparisons.
 
-Plans MUST pass a Constitution Check before Phase 0 research and again after
-Phase 1 design. The check MUST confirm:
+Concrete technology stacks, frameworks, middleware, and database choices are
+defined inside the current feature's `plan.md`. All technology choices MUST have
+research-backed comparison notes in `research.md`; heavy dependencies MUST NOT
+be introduced without a documented reason. Choices MUST account for
+maintainability, operational cost, and the team's existing capabilities.
 
-- Code quality expectations, ownership boundaries, migration needs,
-  configuration validation, and documentation needs are explicit.
-- Required automated tests are identified by level and mapped to user stories,
-  contracts, security boundaries, data changes, and operational readiness checks.
-- User experience consistency, accessibility, and recoverable error feedback are
-  captured for user-facing work.
-- Performance and reliability targets, scale assumptions, and measurement
-  methods are defined for affected journeys.
-- Security controls cover authentication, authorization, project isolation,
-  secret handling, CSRF/CORS, transport security, and auditability where
-  applicable.
-- Observability and operations cover structured logs, request IDs, health and
-  readiness probes, metrics, alert signals, background job visibility, backup
-  and restore impact, migration safety, rollback approach, and release checks.
-- Architectural complexity is justified when the direct project approach is not
-  used.
+Any new middleware, database, storage service, queue, framework, or external
+service MUST include deployment, monitoring, failure-degradation, rollback, and
+secret/configuration handling in the plan. Plans MUST fail the Constitution
+Check if these concerns are absent.
 
-Implementation tasks MUST include the work needed to satisfy these gates. A gate
-violation can proceed only when the plan records the risk, why it is necessary,
-the simpler alternative considered, mitigation, follow-up owner, and expiry date.
+Rationale: Technical decisions must be local to the feature plan but governed by
+consistent evidence, maintainability, and operations requirements.
+
+### IV. Task Decomposition and Traceability
+`tasks.md` MUST decompose work into tasks that each fit within 8 hours of
+development effort. Larger tasks MUST be split before implementation begins.
+
+Every task MUST trace to one or more specification acceptance criteria or
+explicit plan gates and include a self-check expectation. Tasks MUST identify
+dependencies, parallel or serial execution order, and ownership area such as
+frontend, backend, test, documentation, operations, or CI. Test tasks MUST appear
+before implementation tasks for the behavior they prove.
+
+Implementation MUST stop at each story checkpoint until the story is
+independently testable against its acceptance criteria. Tasks that cannot be
+tested independently MUST state the dependency and risk in `tasks.md`.
+
+Rationale: Fine-grained, traceable tasks make SDD executable by AI agents and
+human reviewers while preserving TDD order.
+
+### V. Universal Coding, Testing, Security, and Performance Baselines
+All implementation, regardless of language or framework, MUST isolate
+responsibilities across:
+
+- Access layer: external requests, parameter intake, routing, and dispatch.
+- Business layer: core business logic and workflow orchestration.
+- Data layer: persistence, cache, and external service calls.
+- Shared core layer: common utilities, authorization, logging, exceptions,
+  constants, and reusable cross-cutting behavior.
+
+Code MUST use semantic naming, plan-defined style conventions, configuration or
+environment injection for secrets/addresses, validation for all external input,
+single-responsibility functions, documentation comments for public interfaces,
+data entities, and core functions, shared utilities for repeated logic, and
+extension-compatible changes that do not casually remove old fields or
+interfaces.
+
+Tests MUST cover core business logic with unit tests, external interfaces and
+critical flows with integration or contract tests, and normal, exceptional,
+boundary, and concurrency scenarios where relevant. Test environments MUST be
+isolated and MUST NOT operate on production resources.
+
+Security is mandatory for every feature. External interfaces MUST enforce
+authentication and role/permission checks. Implementations MUST protect against
+SQL injection, XSS, privilege escalation, replay attacks, unsafe uploads, and
+secret leakage. Sensitive data MUST be encrypted where required, transported
+over encrypted channels, and masked in logs. File uploads MUST validate type,
+size, path, and executable-risk constraints. Open interfaces MUST include
+rate-limiting, circuit-breaking, or degradation strategies when exposed to abuse
+or dependency failure.
+
+Performance baselines apply globally. Large lists MUST be paginated; batch
+interfaces MUST limit single-request volume; hot data SHOULD use an explicit
+cache strategy when justified by the plan; large database tables MUST have
+reasonable indexes; batch operations MUST be chunked to avoid long transactions
+and blocking.
+
+Rationale: These engineering baselines are independent of the selected stack and
+must hold for all GradSync code.
+
+## Git and Branch Collaboration Rules
+
+Branches MUST follow `spec/feature-{spec-id}` for feature work unless the
+repository's hosting workflow requires an equivalent naming convention. One
+specification MUST map to one independent branch.
+
+Commits MUST use `[{spec-id}] 描述变更内容`, for example
+`[005] 完成用户登录接口实现`. Pull requests MUST include the relevant
+specification documents, plan artifacts, code, and tests. A PR that changes
+business behavior without a corresponding spec and plan update MUST be blocked.
+
+## CI/CD Gate Rules
+
+CI MUST validate specification directory completeness, code style, formatting,
+unit tests, integration/contract tests required by the plan, and release
+readiness checks before merge. Missing acceptance criteria, missing tests,
+business-code changes without a corresponding specification, or spec/code logic
+drift MUST block the merge.
+
+CI/CD pipelines MUST prevent generated runtime/build artifacts from remaining in
+source scope and MUST reject unsafe configuration defaults for production.
+Production release gates MUST include smoke, readiness, security, migration, and
+rollback checks required by the current plan.
+
+## Documentation Rules
+
+Interfaces, data models, scheduled jobs, third-party integrations, deployment
+assumptions, and major architecture or technology decisions MUST be documented.
+Requirement or logic changes MUST update the corresponding `spec.md`,
+OpenAPI/interface contract, and relevant design artifacts. The project root
+README MUST record common local startup, environment, and test commands.
+Significant architecture and technology changes MUST be recorded in
+`research.md` with comparison and rationale.
 
 ## Development Workflow
 
-Feature specifications MUST describe independently testable user journeys,
-measurable success criteria, important edge cases, UX expectations, security and
-privacy boundaries, operational outcomes, and performance or reliability
-expectations. Implementation plans MUST translate those requirements into
-concrete technical decisions, test strategy, deployment impact, observability,
-migration and rollback handling, and release validation. Task lists MUST keep
-tests, security checks, operability work, and quality checks visible in the story
-where they apply. Each completed story MUST be independently demonstrable and
-production-deployable before later stories are layered on top.
+Feature specifications MUST be created or updated before plans. Plans MUST
+translate specifications into architecture, data model, contracts, research,
+deployment impact, security controls, tests, observability, migration, rollback,
+and release validation. Tasks MUST convert the plan into traceable, test-first,
+8-hour-or-less work units. Implementation MUST follow tasks in dependency order
+and mark completed tasks only after validation passes.
 
-Reviews MUST verify constitution compliance before merge. Reviewers MUST block
-changes that lack required tests, introduce unjustified architectural complexity,
-break established UX patterns, weaken security or project isolation, omit
-operational visibility, skip migration or rollback planning, or leave performance
-and reliability requirements unmeasured.
+Reviewers MUST block changes that bypass the SDD order, lack required
+stakeholder review, miss tests, weaken security, omit operational visibility,
+introduce unjustified dependencies, skip migration or rollback planning, ignore
+performance baselines, or leave scope boundaries unclear.
 
 ## Governance
 
 This constitution supersedes conflicting development practices for GradSync.
-Amendments require a documented change to this file, a Sync Impact Report, and
+Amendments require a documented update to this file, a Sync Impact Report, and
 updates to affected Spec Kit templates or runtime guidance in the same change.
 
 Versioning follows semantic versioning:
 
-- MAJOR for removed principles or backward-incompatible governance changes.
-- MINOR for new principles, new required sections, or materially expanded gates.
-- PATCH for clarifications, wording fixes, or non-semantic refinements.
+- MAJOR for backward-incompatible governance changes, principle replacements,
+  or removed/redefined required workflows.
+- MINOR for new principles, new required sections, or materially expanded gates
+  that preserve existing workflow semantics.
+- PATCH for clarifications, wording fixes, typo fixes, or non-semantic
+  refinements.
 
-Every generated plan, specification, and task list MUST be checked against the
-current constitution. Compliance exceptions MUST be explicit, time-bounded,
-owned, and reviewed before release.
+Every generated specification, plan, task list, implementation, and CI workflow
+MUST be checked against the current constitution. Compliance exceptions MUST be
+explicit, time-bounded, owned, reviewed, and represented in the relevant plan
+before release.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-25 | **Last Amended**: 2026-06-30
+**Version**: 2.0.0 | **Ratified**: 2026-06-25 | **Last Amended**: 2026-07-02

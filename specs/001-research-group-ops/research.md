@@ -134,6 +134,83 @@ review targets, and comments reference a specific version plus an anchor.
 because it would break review history. Attaching comments only to a draft family
 was rejected because comments could drift after new versions.
 
+## Decision: Project-scoped paper library with metadata-first import and managed attachments
+
+**Rationale**: Papers need to be searchable, downloadable, and isolated by
+project membership. A metadata-first model stores title, authors, venue, year,
+DOI/external identifiers, tags, import source, uploader, checksum, and optional
+file attachment references in PostgreSQL, while files use Django's storage
+abstraction so local media or object storage can be selected per environment.
+This keeps authorization and duplicate detection in domain services instead of
+in the frontend or storage backend.
+
+**Alternatives considered**: Treating papers as draft versions was rejected
+because library papers are reference assets rather than student submissions with
+review status. A dedicated external literature manager was rejected for this
+feature because project isolation, duplicate explanations, authorization, and
+audit events must be first-class GradSync behavior. Storing only files without
+structured metadata was rejected because it cannot support reliable search,
+deduplication, or citation lookup workflows.
+
+## Decision: Explainable duplicate detection for paper import
+
+**Rationale**: Duplicate prevention must be deterministic and user-facing.
+Imports compute and persist file checksums when a file is present, normalize DOI
+and external identifiers, and fall back to normalized title, first author, and
+year matching when identifiers are absent. Batch imports are staged before
+commit so users can see accepted records, duplicate matches, and validation
+errors together.
+
+**Alternatives considered**: Exact filename matching was rejected because
+renamed PDFs would bypass it. Fully automated fuzzy matching was rejected as the
+only gate because false positives could block legitimate papers without a clear
+reason. Global deduplication across all projects was rejected because unrelated
+projects may intentionally keep separate metadata, notes, or attachments.
+
+## Decision: Project code artifacts as versioned upload records, not hosted Git replacement
+
+**Rationale**: The requested code library needs upload, search, download, and
+project separation. Modeling code as `CodeArtifact` plus immutable
+`CodeArtifactVersion` records supports source archives or repository snapshots,
+version labels or commit references, checksums, upload metadata, supersede/archive
+states, and download audit events without introducing a full Git hosting system.
+
+**Alternatives considered**: Embedding a hosted Git service or implementing
+branch/diff/merge workflows was rejected because it would materially expand the
+product into repository hosting and CI execution. Storing code as generic
+attachments was rejected because code needs version labels, commit/reference
+metadata, and supersede behavior distinct from paper files.
+
+## Decision: Download authorization and audit are enforced at request time
+
+**Rationale**: Paper and code files may outlive membership changes, so download
+URLs must be mediated by backend endpoints that re-check current project
+membership, archived/read-only rules, and attachment status before issuing a
+file response or short-lived storage URL. Every successful download writes an
+audit event with actor, target, project, timestamp, and file/version metadata.
+
+**Alternatives considered**: Public or long-lived direct file URLs were rejected
+because they bypass project isolation after membership changes. Frontend-only
+download hiding was rejected because it cannot protect the file endpoint.
+
+## Decision: Application-owned Chinese/English locale catalogs with persisted user preference
+
+**Rationale**: Language switching is required for the existing React/Vite
+workspace without changing authorization or stored research content. A typed
+message catalog in the frontend plus a persisted user locale preference on the
+backend supports Chinese and English labels, validation summaries, empty states,
+confirmations, navigation, and workflow feedback while keeping server validation
+codes stable. Backend responses should expose machine-readable error codes with
+localized frontend messages where possible, and fallback to server messages when
+no catalog entry exists.
+
+**Alternatives considered**: Browser-only language detection was rejected
+because users need an explicit persistent choice across devices. Automatic
+translation of user-generated research content was rejected because it would
+alter scholarly records and introduce accuracy risk. Adding a heavy i18n
+framework immediately was deferred unless typed local catalogs become
+insufficient for pluralization, date/number formatting, or translation workflow.
+
 ## Decision: Booking conflict prevention through transactional validation
 
 **Rationale**: Equipment and seats cannot have overlapping reservations.

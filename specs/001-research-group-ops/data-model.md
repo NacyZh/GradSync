@@ -4,6 +4,7 @@
 
 ```text
 User
+├── UserLocalePreference
 ├── ProjectMembership
 │   └── ResearchProject
 │       ├── Task
@@ -14,6 +15,12 @@ User
 │       │   └── InlineComment
 │       ├── Booking
 │       │   └── LabResource
+│       ├── PaperRecord
+│       │   └── PaperAttachment
+│       ├── PaperImportBatch
+│       ├── CodeArtifact
+│       │   └── CodeArtifactVersion
+│       ├── DownloadEvent
 │       ├── Notification
 │       └── AuditEvent
 
@@ -22,6 +29,9 @@ FrontendViewModel
 ├── ProjectContextState
 ├── ReviewWorkspaceState
 ├── BookingWorkspaceState
+├── LibraryWorkspaceState
+├── CodeRepositoryWorkspaceState
+├── LocaleState
 └── NotificationCenterState
 ```
 
@@ -40,6 +50,7 @@ Represents an authenticated person who can participate in research projects.
 **Relationships**
 - Has many `ProjectMembership` records
 - Authors tasks, submissions, comments, bookings, notifications, and audit events
+- Has one `UserLocalePreference`
 
 **Validation Rules**
 - Email must be unique and deliverable format
@@ -61,7 +72,8 @@ Defines the strict boundary for research records and membership.
 
 **Relationships**
 - Has many memberships, tasks, drafts, weekly reports, bookings, notifications,
-  and audit events
+  paper records, paper import batches, code artifacts, download events, and audit
+  events
 - Belongs to one advisor owner
 
 **Validation Rules**
@@ -334,6 +346,210 @@ A record of an email-triggering event.
 - queued -> sent, failed
 - failed -> queued, skipped
 
+## PaperRecord
+
+A project-scoped literature item used as a searchable/downloadable research
+asset.
+
+**Fields**
+- `id`
+- `project_id`
+- `title`
+- `authors`: ordered author display strings or normalized author records
+- `venue`
+- `publication_year`
+- `doi`
+- `external_ids`: source-specific identifiers such as arXiv, PubMed, Semantic
+  Scholar, or imported catalog IDs
+- `abstract`
+- `notes`
+- `tags`
+- `import_source`: manual, doi, bibtex, file_metadata, batch
+- `fingerprint`: normalized deduplication fingerprint
+- `created_by_id`
+- `created_at`, `updated_at`, `archived_at`
+- `status`: active, duplicate_blocked, archived
+
+**Relationships**
+- Belongs to one project
+- Has zero or more `PaperAttachment` records
+- May be created by a `PaperImportBatch`
+- Has download events, audit events, and optional notifications
+
+**Validation Rules**
+- Project must be active for new imports or metadata edits
+- DOI and external identifiers must be normalized before matching
+- Active paper records in the same project cannot share the same file checksum,
+  DOI/external identifier, or normalized title-first-author-year fingerprint
+- Tags must be project-scoped and user-visible before filtering
+- Download requires current project membership
+
+**State Transitions**
+- active -> archived
+- duplicate_blocked is an import result state and cannot be downloaded
+
+## PaperAttachment
+
+File metadata for a paper record.
+
+**Fields**
+- `id`
+- `paper_id`
+- `project_id`
+- `storage_key`
+- `filename`
+- `content_type`
+- `size_bytes`
+- `checksum_sha256`
+- `uploaded_by_id`
+- `created_at`
+- `status`: active, replaced, archived
+
+**Relationships**
+- Belongs to one `PaperRecord` and one project
+- Has download events and audit events
+
+**Validation Rules**
+- Attachment project must match paper project
+- Checksum must be calculated before commit
+- File type and size must satisfy project policy
+
+**State Transitions**
+- active -> replaced, archived
+
+## PaperImportBatch
+
+Staging and result record for a paper import operation.
+
+**Fields**
+- `id`
+- `project_id`
+- `requested_by_id`
+- `source_type`: file, doi, bibtex, mixed
+- `status`: staged, committed, failed, cancelled
+- `total_items`
+- `accepted_count`
+- `duplicate_count`
+- `error_count`
+- `result_summary`
+- `created_at`, `committed_at`
+
+**Relationships**
+- Belongs to one project
+- May create many `PaperRecord` and `PaperAttachment` records
+- Has audit events
+
+**Validation Rules**
+- Batch items must be validated and duplicate-checked before commit
+- Duplicate results must include the matched paper ID and match reason
+- Archived projects cannot commit new imports
+
+**State Transitions**
+- staged -> committed, failed, cancelled
+
+## CodeArtifact
+
+A project-scoped code package, source archive, or repository snapshot.
+
+**Fields**
+- `id`
+- `project_id`
+- `name`
+- `description`
+- `tags`
+- `status`: active, superseded, archived
+- `created_by_id`
+- `created_at`, `updated_at`, `archived_at`
+
+**Relationships**
+- Belongs to one project
+- Has many `CodeArtifactVersion` records
+- Has download events and audit events
+
+**Validation Rules**
+- Name must be unique among active code artifacts in the same project
+- Archived projects cannot create or upload code versions
+- Search and download visibility is limited to current project members
+
+**State Transitions**
+- active -> superseded, archived
+- superseded -> active, archived
+
+## CodeArtifactVersion
+
+Immutable uploaded version of a code artifact.
+
+**Fields**
+- `id`
+- `artifact_id`
+- `project_id`
+- `version_label`
+- `commit_reference`
+- `release_notes`
+- `storage_key`
+- `filename`
+- `content_type`
+- `size_bytes`
+- `checksum_sha256`
+- `uploaded_by_id`
+- `uploaded_at`
+- `status`: active, superseded, archived
+
+**Relationships**
+- Belongs to one `CodeArtifact` and one project
+- Has download events and audit events
+
+**Validation Rules**
+- Version label or commit reference must be present
+- Version label and checksum cannot duplicate an active version in the same
+  artifact unless explicitly superseding
+- File type and size must satisfy project policy
+- Download requires current project membership
+
+**State Transitions**
+- active -> superseded, archived
+
+## DownloadEvent
+
+Audit-visible event for paper and code downloads.
+
+**Fields**
+- `id`
+- `project_id`
+- `actor_id`
+- `target_type`: paper_attachment, code_artifact_version
+- `target_id`
+- `filename`
+- `checksum_sha256`
+- `downloaded_at`
+- `delivery_mode`: direct_response, signed_url
+
+**Relationships**
+- Belongs to one project and actor
+- Targets one downloadable paper or code file
+- Mirrors an `AuditEvent`
+
+**Validation Rules**
+- Actor must be an active project member at download time
+- Target must belong to the same project and be downloadable
+
+## UserLocalePreference
+
+Persisted interface language preference.
+
+**Fields**
+- `user_id`
+- `locale`: en, zh
+- `updated_at`
+
+**Relationships**
+- Belongs to one user
+- Read by `WorkspaceShellState` and `LocaleState`
+
+**Validation Rules**
+- Unsupported locales fall back to English
+- Locale changes must not modify stored research content or authorization
+
 ## AuditEvent
 
 Immutable record of significant project activity.
@@ -376,8 +592,9 @@ implementation.
 
 **Relationships**
 - Reads `User`, `ProjectMembership`, `ResearchProject`, `Task`,
-  `DraftVersion`, `WeeklyProgressReport`, `Booking`, `Notification`, and
-  `AuditEvent` API responses through typed TanStack Query hooks
+  `DraftVersion`, `WeeklyProgressReport`, `Booking`, `PaperRecord`,
+  `CodeArtifact`, `Notification`, `UserLocalePreference`, and `AuditEvent` API
+  responses through typed TanStack Query hooks
 - Renders accessible shadcn/ui primitives through GradSync shared UI adapters
 
 **Validation Rules**
@@ -401,11 +618,13 @@ Role-aware application shell used on authenticated routes.
 - `global_search_query`
 - `notification_summary`
 - `theme_preference`
+- `locale_preference`
 
 **Relationships**
-- Uses `User`, visible projects, and notification summary endpoints
-- Owns top-level navigation, project switcher, notification entry point, and
-  theme control
+- Uses `User`, visible projects, notification summary endpoints, and locale
+  preference endpoints
+- Owns top-level navigation, project switcher, notification entry point, theme
+  control, and language switcher
 
 **Validation Rules**
 - Advisor-only and administrator-only destinations must be hidden or disabled
@@ -422,13 +641,15 @@ View state for project-scoped dashboards and workflows.
 - `task_filters`
 - `submission_filters`
 - `booking_filters`
+- `paper_filters`
+- `code_filters`
 - `activity_filters`
 - `selected_record_id`
 - `dirty_form_state`
 
 **Relationships**
-- Reads project dashboard, task, submission, booking, notification, and audit
-  responses for one project
+- Reads project dashboard, task, submission, booking, paper, code,
+  notification, and audit responses for one project
 
 **Validation Rules**
 - Changing projects must clear record selection and unsaved form state after
@@ -477,3 +698,68 @@ View state for resource availability and booking management.
 - Start and end time controls must prevent invalid ranges before submit
 - Started bookings must render as immutable with a clear explanation
 - Destructive cancellation must use a confirmation dialog with focus trapping
+
+## LibraryWorkspaceState
+
+View state for project paper library import, search, detail, and download.
+
+**Fields**
+- `paper_search_query`
+- `paper_filters`: author, venue, year, tag, DOI, import source, uploader
+- `selected_paper_id`
+- `import_batch_state`
+- `duplicate_review_state`
+- `upload_progress`
+- `download_status`
+
+**Relationships**
+- Composes `PaperRecord`, `PaperAttachment`, `PaperImportBatch`, and
+  `DownloadEvent` records for one project
+
+**Validation Rules**
+- Selected project context must be visible before import, edit, or download
+- Duplicate matches must show match reason and existing paper reference
+- Download controls must be disabled with explanation when unauthorized
+
+## CodeRepositoryWorkspaceState
+
+View state for project code artifact upload, search, version detail, and
+download.
+
+**Fields**
+- `code_search_query`
+- `code_filters`: tag, status, uploader, version label, commit reference
+- `selected_artifact_id`
+- `selected_version_id`
+- `upload_progress`
+- `supersede_confirmation_state`
+- `download_status`
+
+**Relationships**
+- Composes `CodeArtifact`, `CodeArtifactVersion`, and `DownloadEvent` records
+  for one project
+
+**Validation Rules**
+- Project context must be visible before upload, archive, supersede, or download
+- Upload form must validate archive type, size, and version/reference metadata
+- Download controls must be disabled with explanation when unauthorized
+
+## LocaleState
+
+Client-side view state for Chinese/English language switching.
+
+**Fields**
+- `active_locale`: en, zh
+- `available_locales`
+- `message_catalog_version`
+- `fallback_locale`
+- `is_persisting`
+
+**Relationships**
+- Reads and updates `UserLocalePreference`
+- Provides localized labels and messages to workspace shell and workflow views
+
+**Validation Rules**
+- Locale switch must preserve current route, project context, and focus order
+- Missing localized strings must fall back deterministically to English
+- Validation and error states must remain semantically equivalent across locales

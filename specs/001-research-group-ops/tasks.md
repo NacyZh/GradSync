@@ -420,3 +420,110 @@ Task: "T175 Rebuild notification and account administration surfaces with delive
 2. Deliver US1-facing project dashboard and task workspace through T172 as the first independently reviewable increment.
 3. Deliver US2 submission/review and US3 booking workspaces through T173 and T174.
 4. Complete notification/admin surfaces, e2e coverage, screenshot validation, bundle checks, CI safeguards, and documentation through T175 through T180.
+
+---
+
+## Phase 14: Specification Governance Alignment
+
+**Purpose**: Resolve the stricter constitution gates exposed by clarification before implementing the newly expanded paper library, code library, and language switching scope.
+
+- [X] T181 [Docs] Add the five constitution-mandated specification modules for business background/user roles/core goals, positive flows, exception/boundary/degradation scenarios, automatable AC, and dependencies/unsupported capabilities in specs/001-research-group-ops/spec.md (AC: Constitution II); self-check: each required module has an explicit heading and maps to existing user stories.
+- [X] T182 [Docs] Add measurable success criteria for paper import duplicate handling, paper/code search and authorized downloads, code upload/version conflict handling, and account-level locale switching in specs/001-research-group-ops/spec.md (AC: SC-009..SC-012); self-check: each new outcome is quantifiable and technology-agnostic.
+- [X] T183 [Docs] Record testing and development stakeholder review status or remaining blockers in specs/001-research-group-ops/spec.md and specs/001-research-group-ops/plan.md (AC: Constitution II); self-check: implementation remains blocked unless review is approved or risk is explicitly recorded.
+- [X] T184 [Docs] Revalidate and update the requirements checklist after T181-T183 in specs/001-research-group-ops/checklists/requirements.md (AC: checklist); self-check: only checkbox markers change and pass count reflects the updated spec.
+
+**Checkpoint**: Specification governance gaps are explicit and measurable before US4 implementation begins.
+
+---
+
+## Phase 15: User Story 4 - Manage Research Assets and Language Preference (Priority: P2)
+
+**Goal**: Project members import/search/download project-scoped papers, upload/search/download versioned code artifacts, and switch the authenticated workspace between Chinese and English with an account-level persisted preference.
+
+**Independent Test**: Import duplicate and non-duplicate papers into one project, upload code artifacts to two different projects, search and download authorized assets, verify unrelated project assets are invisible and unauthorized downloads are rejected, then switch Chinese/English on one signed-in session and verify the preference follows the same account on another session without losing route or project context.
+
+### Tests for User Story 4
+
+> Write these tests first and ensure they fail for the missing behavior before implementation.
+
+- [X] T185 [P] [US4] [Test] Add contract tests for project paper list/create/import/commit/download endpoints in backend/tests/contract/test_papers_api.py (AC: FR-021, FR-022, FR-027, FR-028); self-check: covers accepted import, duplicate response, upload rejection, and 403 download.
+- [X] T186 [P] [US4] [Test] Add contract tests for project code artifact create/version upload/download endpoints in backend/tests/contract/test_code_artifacts_api.py (AC: FR-024, FR-025, FR-027, FR-028); self-check: covers version/reference uniqueness, unsupported archive, oversized archive, and 403 download.
+- [X] T187 [P] [US4] [Test] Add contract tests for account locale get/update endpoints in backend/tests/contract/test_locale_api.py (AC: FR-026); self-check: verifies only en and zh are accepted and response persists by account.
+- [X] T188 [P] [US4] [Test] Add unit tests for paper DOI/external-id normalization, title-first-author-year fingerprinting, and duplicate precedence in backend/tests/unit/test_paper_duplicate_rules.py (AC: FR-022); self-check: checksum wins over DOI/external ID, which wins over normalized title-first-author-year.
+- [X] T189 [P] [US4] [Test] Add unit tests for paper/code upload size, content type, extension, checksum, and executable-risk validation in backend/tests/unit/test_asset_upload_policy.py (AC: FR-028); self-check: rejects paper files over 50 MB or outside PDF/BibTeX/text metadata and code files over 200 MB or outside zip/tar.gz.
+- [X] T190 [P] [US4] [Test] Add unit tests for code artifact version/reference uniqueness across active, archived, and superseded versions in backend/tests/unit/test_code_artifact_rules.py (AC: FR-025); self-check: duplicate version labels and commit references fail within the same project even after supersede/archive.
+- [X] T191 [P] [US4] [Test] Add integration tests for project-scoped paper/code search, cross-project isolation, download authorization, and download audit records in backend/tests/integration/test_research_assets_project_scope.py (AC: FR-021, FR-024, FR-027); self-check: removed or unrelated members cannot discover or download assets.
+- [X] T192 [P] [US4] [Test] Add frontend component tests for paper library import/search/detail, code artifact upload/version detail, download states, and language switcher behavior in frontend/tests/component/research-assets-locale.test.tsx (AC: UX-006, UX-007, FR-026); self-check: tests loading, empty, duplicate, validation, success, and unauthorized states.
+- [X] T193 [P] [US4] [Test] Add full-stack Playwright flow for paper import duplicate prevention, code upload/download isolation, and cross-session locale persistence in frontend/tests/e2e/research-assets-locale.spec.ts (AC: US4/AC1..AC4); self-check: runs against real Django API and seeded project memberships.
+
+### Implementation for User Story 4
+
+- [X] T194 [P] [US4] [Backend] Create library and repositories Django app configs and register them in backend/apps/library/apps.py, backend/apps/repositories/apps.py, backend/apps/library/__init__.py, backend/apps/repositories/__init__.py, and backend/gradsync/settings/base.py (AC: plan: module boundaries); self-check: django app loading succeeds in test settings.
+- [X] T195 [P] [US4] [Backend] Implement PaperRecord, PaperAttachment, and PaperImportBatch models in backend/apps/library/models.py (AC: FR-021, FR-022); self-check: models include project_id, metadata fields, checksum, status, uploader, and import result fields from data-model.md.
+- [X] T196 [P] [US4] [Backend] Implement CodeArtifact and CodeArtifactVersion models in backend/apps/repositories/models.py (AC: FR-024, FR-025); self-check: models include project_id, tags, version_label, commit_reference, checksum, file metadata, uploader, and status.
+- [X] T197 [P] [US4] [Backend] Implement DownloadEvent persistence and audit mirroring in backend/apps/audit/models.py and backend/apps/audit/services.py (AC: FR-027, FR-018); self-check: successful paper/code downloads create both download and audit-visible records.
+- [X] T198 [US4] [Backend] Create migrations for library, repositories, download events, and locale preference changes in backend/apps/library/migrations/0001_initial.py, backend/apps/repositories/migrations/0001_initial.py, backend/apps/audit/migrations/0002_download_event.py, and backend/apps/accounts/migrations/0002_locale_preference.py (AC: data-model); self-check: migrations apply cleanly on an empty test database.
+- [X] T199 [US4] [Backend] Implement paper metadata normalization and duplicate detection services in backend/apps/library/duplicate_services.py (AC: FR-022); self-check: duplicate explanations use checksum, DOI/external ID, then title-first-author-year precedence.
+- [X] T200 [US4] [Backend] Implement paper import staging, BibTeX/text metadata parsing, file checksum calculation, and upload policy validation in backend/apps/library/import_services.py and backend/apps/library/upload_policy.py (AC: FR-021, FR-022, FR-028); self-check: rejected imports store no file and return the violated rule.
+- [X] T201 [US4] [Backend] Implement code artifact upload, version uniqueness, supersede/archive, checksum calculation, and archive policy validation in backend/apps/repositories/services.py and backend/apps/repositories/upload_policy.py (AC: FR-024, FR-025, FR-028); self-check: same-project version/reference duplicates are rejected across active, archived, and superseded versions.
+- [X] T202 [US4] [Backend] Implement shared paper/code download authorization and descriptor service in backend/apps/common/downloads.py (AC: FR-027); self-check: service re-checks current project membership at request time before returning a file descriptor or signed URL.
+- [X] T203 [US4] [Backend] Implement account-level locale preference service in backend/apps/accounts/locale_services.py (AC: FR-026); self-check: preference is persisted per user and unsupported locales fall back to English without changing stored research content.
+- [X] T204 [US4] [Backend] Implement paper serializers and import result schemas in backend/apps/library/serializers.py (AC: contracts/openapi.yaml); self-check: serializer fields match PaperRecord, PaperAttachment, PaperImportBatch, and PaperImportResult contract names.
+- [X] T205 [US4] [Backend] Implement paper library viewsets for list/create/import/commit/download in backend/apps/library/views.py and backend/apps/library/urls.py (AC: FR-021, FR-022, FR-027, FR-028); self-check: every queryset is project-scoped and every mutation rejects archived projects.
+- [X] T206 [US4] [Backend] Implement code artifact serializers, viewsets, and URLs in backend/apps/repositories/serializers.py, backend/apps/repositories/views.py, and backend/apps/repositories/urls.py (AC: FR-024, FR-025, FR-027, FR-028); self-check: endpoints match openapi operation intent and enforce project membership.
+- [X] T207 [US4] [Backend] Implement locale preference serializer, views, and URL wiring in backend/apps/accounts/serializers.py, backend/apps/accounts/views.py, and backend/apps/accounts/urls.py (AC: FR-026); self-check: GET and PATCH /account/locale return account-level preference.
+- [X] T208 [US4] [Backend] Wire library and repositories routes into backend/gradsync/urls.py (AC: contracts/openapi.yaml); self-check: route names resolve for papers, imports, code artifacts, version upload, and downloads.
+- [X] T209 [US4] [Backend] Include paper imports, code uploads, downloads, and locale changes in audit/activity services in backend/apps/audit/services.py and backend/apps/projects/views.py (AC: FR-010, FR-018, FR-027); self-check: project activity shows only authorized project asset events.
+- [X] T210 [US4] [Backend] Extend demo and performance seed commands with papers, code artifacts, duplicate cases, download events, and locale preferences in backend/apps/accounts/management/commands/seed_demo_research_ops.py and backend/apps/projects/management/commands/seed_performance_research_ops.py (AC: quickstart, PERF-006, PERF-007); self-check: seeded data supports US4 e2e and performance tests.
+- [X] T211 [P] [US4] [Frontend] Implement typed API clients and TanStack Query hooks for papers, imports, code artifacts, downloads, and locale in frontend/src/features/library/api.ts, frontend/src/features/repositories/api.ts, frontend/src/features/i18n/api.ts, and frontend/src/shared/api/downloads.ts (AC: contracts/openapi.yaml); self-check: hooks expose loading/error states and invalidate project-scoped queries after mutations.
+- [X] T212 [P] [US4] [Frontend] Implement Chinese/English typed message catalogs, i18n provider, fallback behavior, and localized validation helpers in frontend/src/features/i18n/messages.en.ts, frontend/src/features/i18n/messages.zh.ts, frontend/src/features/i18n/I18nProvider.tsx, and frontend/src/features/i18n/validation.ts (AC: FR-026, UX-007); self-check: missing application strings fall back to English and are covered by component tests.
+- [X] T213 [US4] [Frontend] Add authenticated workspace language switcher and account preference persistence to frontend/src/app/Layout.tsx and frontend/src/features/i18n/LanguageSwitcher.tsx (AC: FR-026, UX-007); self-check: switching locale preserves current route, selected project, keyboard focus, and unsaved-form warning.
+- [X] T214 [US4] [Frontend] Implement paper library route with searchable dense list, filters, project context, and filtered-empty states in frontend/src/features/library/PaperLibraryPage.tsx and frontend/src/features/library/PaperFilters.tsx (AC: FR-021, FR-023, UX-006); self-check: unrelated project papers are not rendered from API results.
+- [X] T215 [US4] [Frontend] Implement paper import panel with file/DOI/BibTeX metadata input, upload progress, duplicate review, and partial failure states in frontend/src/features/library/PaperImportPanel.tsx and frontend/src/features/library/DuplicateReviewPanel.tsx (AC: FR-022, FR-028, UX-006); self-check: duplicate reasons distinguish checksum, DOI/external ID, and title-author-year.
+- [X] T216 [US4] [Frontend] Implement paper detail panel with metadata editing, attachments, tags, notes, download action, and recent download audit summary in frontend/src/features/library/PaperDetailPanel.tsx (AC: FR-021, FR-027, UX-006); self-check: unauthorized or archived-project downloads render disabled controls with explanation.
+- [X] T217 [US4] [Frontend] Implement code repository route with searchable artifact list, filters, latest version summary, and project context in frontend/src/features/repositories/CodeRepositoryPage.tsx and frontend/src/features/repositories/CodeArtifactFilters.tsx (AC: FR-024, UX-006); self-check: unrelated project code artifacts are not visible or searchable.
+- [X] T218 [US4] [Frontend] Implement code artifact upload, version detail, supersede/archive confirmation, conflict feedback, and download controls in frontend/src/features/repositories/CodeArtifactUploadForm.tsx, frontend/src/features/repositories/CodeArtifactVersionPanel.tsx, and frontend/src/features/repositories/CodeArtifactActions.tsx (AC: FR-024, FR-025, FR-027, FR-028); self-check: duplicate checksum/version conflicts show the existing version and next action.
+- [X] T219 [US4] [Frontend] Add paper library, code repository, and locale-aware navigation routes to frontend/src/routes/index.tsx and frontend/src/app/Layout.tsx (AC: UX-002, UX-007); self-check: advisor/student navigation exposes authorized asset routes with localized labels.
+- [X] T220 [US4] [Frontend] Add reusable upload progress, download status, duplicate alert, and localized validation state components in frontend/src/shared/ui/UploadProgress.tsx, frontend/src/shared/ui/DownloadStatus.tsx, frontend/src/shared/ui/DuplicateAlert.tsx, and frontend/src/shared/ui/LocalizedValidation.tsx (AC: UX-003, UX-006, UX-007); self-check: states use accessible live regions and do not resize fixed controls.
+- [X] T221 [US4] [Test] Add backend performance tests for paper/code search and paper duplicate batch detection in backend/tests/integration/test_research_asset_performance.py (AC: PERF-006, PERF-007); self-check: 1,000 papers, 250 code artifacts, and 100 import records meet spec thresholds.
+- [X] T222 [US4] [Test] Add accessibility and responsive layout checks for paper library, code repository, and language switching in frontend/tests/e2e/research-assets-locale.spec.ts and frontend/tests/e2e/production-ui.spec.ts (AC: UX-004, UX-006, UX-007); self-check: desktop, tablet, and mobile layouts have no overlapping text or controls.
+- [X] T223 [US4] [CI] Update OpenAPI drift, generated-artifact, and CI e2e guards for library/repository/i18n routes in scripts/check-openapi-contract.sh, scripts/check-generated-artifacts.sh, .github/workflows/release.yml, and frontend/playwright.config.ts (AC: CI/CD Gate Rules); self-check: CI fails on contract drift, generated runtime artifacts, or missing US4 e2e coverage.
+- [X] T224 [US4] [Docs] Update quickstart Scenario 8 for paper import, code artifact upload/download, and language switching in specs/001-research-group-ops/quickstart.md and README.md (AC: quickstart); self-check: scenario commands and expected UI/API outcomes are runnable from a clean local environment.
+- [X] T225 [US4] [Docs] Update data model and frontend UI contracts after implementation details are finalized in specs/001-research-group-ops/data-model.md and specs/001-research-group-ops/contracts/frontend-ui.md (AC: Documentation Rules); self-check: model fields, UI states, and unsupported capabilities match code and spec.
+- [X] T226 [US4] [Test] Run US4 validation suite and record outcomes in specs/001-research-group-ops/quickstart-results.md (AC: US4/AC1..AC4, PERF-006, PERF-007); self-check: backend contract/unit/integration tests, frontend component tests, full-stack Playwright, build, lint, and generated-artifact checks pass or failures are documented with owners.
+
+**Checkpoint**: User Story 4 is independently functional and testable without weakening project isolation, download authorization, upload safety, or account-level locale behavior.
+
+### Phase 15 Dependencies
+
+- Phase 15 depends on Phase 14 specification governance tasks and completed Phase 13 frontend foundation.
+- T185 through T193 must be created before implementation tasks and should fail until US4 behavior exists.
+- T194 through T198 establish backend app/model foundations before services and endpoints.
+- T199 through T203 block serializer/view implementation for their respective domains.
+- T204 through T208 expose backend contracts before frontend API hooks in T211.
+- T211 and T212 block frontend workspace tasks T213 through T220.
+- T214 through T218 can proceed in parallel after T211 when separate developers own paper and code workflows.
+- T221 through T226 are final validation, CI, and documentation tasks after the workflow is functional.
+
+### Phase 15 Parallel Examples
+
+```bash
+Task: "T185 [P] [US4] [Test] Add contract tests for project paper list/create/import/commit/download endpoints in backend/tests/contract/test_papers_api.py"
+Task: "T186 [P] [US4] [Test] Add contract tests for project code artifact create/version upload/download endpoints in backend/tests/contract/test_code_artifacts_api.py"
+Task: "T187 [P] [US4] [Test] Add contract tests for account locale get/update endpoints in backend/tests/contract/test_locale_api.py"
+Task: "T192 [P] [US4] [Test] Add frontend component tests for paper library import/search/detail, code artifact upload/version detail, download states, and language switcher behavior in frontend/tests/component/research-assets-locale.test.tsx"
+```
+
+```bash
+Task: "T195 [P] [US4] [Backend] Implement PaperRecord, PaperAttachment, and PaperImportBatch models in backend/apps/library/models.py"
+Task: "T196 [P] [US4] [Backend] Implement CodeArtifact and CodeArtifactVersion models in backend/apps/repositories/models.py"
+Task: "T197 [P] [US4] [Backend] Implement DownloadEvent persistence and audit mirroring in backend/apps/audit/models.py and backend/apps/audit/services.py"
+Task: "T211 [P] [US4] [Frontend] Implement typed API clients and TanStack Query hooks for papers, imports, code artifacts, downloads, and locale in frontend/src/features/library/api.ts, frontend/src/features/repositories/api.ts, frontend/src/features/i18n/api.ts, and frontend/src/shared/api/downloads.ts"
+```
+
+### Updated Incremental Delivery
+
+1. Keep US1 as the baseline MVP for project identity, membership, task hierarchy, and isolation.
+2. Keep US2 and US3 independently releasable after US1.
+3. Deliver US4 after Phase 14 and Phase 13 because research asset workflows require the production workspace shell, upload/download primitives, and locale-aware navigation.
+4. Treat paper/code download authorization and project isolation as release blockers for US4.

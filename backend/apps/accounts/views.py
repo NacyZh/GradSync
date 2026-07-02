@@ -13,9 +13,11 @@ from .models import User
 from .serializers import (
     AccountCreateSerializer,
     AccountUpdateSerializer,
+    LocalePreferenceSerializer,
     LoginSerializer,
     UserSerializer,
 )
+from .locale_services import get_locale, set_locale
 from .services import AccountsService
 
 
@@ -50,6 +52,22 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class LocalePreferenceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"locale": get_locale(request.user), "updatedAt": request.user.date_joined})
+
+    def put(self, request):
+        serializer = LocalePreferenceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            locale = set_locale(request.user, serializer.validated_data["locale"])
+        except ValidationError as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"locale": locale, "updatedAt": request.user.date_joined})
 
 
 # ── Admin account management ──

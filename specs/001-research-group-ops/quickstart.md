@@ -151,6 +151,81 @@ with consistent layout, accessible controls, stable project context,
 recoverable feedback, route-level workspace bundles, ignored generated
 artifacts, and no demo-only placeholder surfaces.
 
+### Scenario 8: Paper Library Import, Deduplication, Search, and Download
+
+1. Sign in as an advisor or project member for Project A.
+2. Open Project A's paper library.
+3. Import a batch containing one new paper and one duplicate represented by the
+   same DOI or normalized title, first author, and publication year.
+4. Confirm the import preview shows accepted, duplicate, and error counts with a
+   clear duplicate match reason.
+5. Commit the accepted item and search by title, author, venue, year, tag, and
+   DOI.
+6. Download the authorized paper attachment and inspect the project activity or
+   audit trail.
+7. Sign in as a member of unrelated Project B and confirm Project A papers and
+   downloads are not visible or searchable.
+8. Run the focused automated validation:
+
+   ```bash
+   cd backend
+   ../.venv/bin/python -m pytest tests/contract/test_papers_api.py tests/unit/test_paper_duplicate_rules.py tests/integration/test_research_assets_project_scope.py
+   ```
+
+**Expected outcome**: Paper imports reject duplicates with explainable matches,
+paper search is project-scoped, downloads require current authorization, and
+download activity is audit-visible.
+
+### Scenario 9: Project Code Artifact Upload, Versioning, Search, and Download
+
+1. Sign in as a Project A member.
+2. Open Project A's code repository workspace.
+3. Create a code artifact with tags and upload an archive with version label or
+   commit reference, checksum, description, and release notes.
+4. Attempt to upload another active version with a duplicate checksum or version
+   label.
+5. Search/filter by name, tag, uploader, version label, and commit reference.
+6. Download the authorized version and inspect the project activity or audit
+   trail.
+7. Sign in as a member of unrelated Project B and confirm Project A code
+   artifacts and downloads are not visible or searchable.
+8. Run the focused automated validation:
+
+   ```bash
+   cd backend
+   ../.venv/bin/python -m pytest tests/contract/test_code_artifacts_api.py tests/unit/test_code_artifact_rules.py
+   ```
+
+**Expected outcome**: Code artifacts remain project-scoped, duplicate
+version/checksum conflicts are explained, versions can be searched and
+downloaded by authorized members, and downloads are audit-visible.
+
+### Scenario 10: Chinese and English Language Switching
+
+1. Sign in and open the authenticated workspace shell.
+2. Switch the language from English to Chinese.
+3. Confirm navigation, project context, form labels, validation messages, empty
+   states, confirmations, paper library labels, code library labels, and status
+   feedback render in Chinese while user-generated research content remains
+   unchanged.
+4. Navigate to a project route, start filling a form, and switch back to English.
+5. Confirm the route, selected project context, focus order, unsaved-form
+   warning, and authorization state are preserved.
+6. Sign out and sign in again; confirm the selected language preference persists.
+7. Run the focused automated validation:
+
+   ```bash
+   cd backend
+   ../.venv/bin/python -m pytest tests/contract/test_locale_api.py
+   cd ../frontend
+   npm test -- --run tests/component/research-assets-locale.test.tsx
+   npm run test:e2e -- research-assets-locale.spec.ts
+   ```
+
+**Expected outcome**: The interface can switch between Chinese and English
+without losing workflow context, changing stored research content, or weakening
+authorization.
+
 ## Contract References
 
 - API contract: [contracts/openapi.yaml](./contracts/openapi.yaml)
@@ -164,5 +239,9 @@ Seed a project with 500 active records and confirm:
 
 - Project dashboard opens within 3 seconds.
 - Project-scoped search/filter completes within 2 seconds.
+- Paper/code library search/filter completes within 2 seconds for up to 1,000
+  papers and 250 code artifacts in one project.
+- Duplicate detection for 100 imported paper metadata records completes within
+  10 seconds before commit.
 - Common record updates show visible confirmation within 2 seconds.
 - Eligible reminder notifications create visible records within 5 minutes.

@@ -4,7 +4,9 @@
 
 **Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
-**Note**: This template is filled in by the `/speckit-plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
+**Note**: This template is filled in by the `/speckit-plan` command. The
+feature specification MUST exist first. Technology stack, frameworks,
+middleware, and database choices are defined here for this feature.
 
 ## Summary
 
@@ -40,37 +42,45 @@
 
 **Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
+**Deployment/Monitoring/Degradation**: [deployment topology, health/readiness,
+metrics, alerts, fallback/degradation behavior for new dependencies, or N/A]
+
+**Data Migration & Rollback**: [schema/data migration, rollback approach,
+backup/restore impact, or N/A]
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- **Production-Grade Code Quality**: Identify affected modules, ownership
-  boundaries, documentation needs, linting/formatting/type expectations,
-  migration needs, configuration validation, and any new abstraction with its
-  justification.
-- **Tests Prove Releasability**: Define required automated tests by level (unit,
-  contract, integration, end-to-end, readiness/smoke) and map them to user
-  stories, service contracts, edge cases, security boundaries, data changes, or
-  operational checks. Document any test gap with reason, owner, expiry date, and
-  release risk.
-- **Operable User Experience**: For user-facing work, record existing UX
-  patterns to preserve, responsive behavior, accessibility checks, required
-  loading/empty/success/error states, and recoverable feedback for persistence,
-  permission, notification, or background-job failures.
-- **Measured Performance and Reliability**: Define measurable targets and
-  validation methods for affected journeys, including latency, throughput,
-  memory, bundle size, rendering metrics, queue timing, health/readiness,
-  recovery objectives, or availability signals where relevant.
-- **Secure, Observable, Maintainable Architecture**: Confirm the design uses
-  existing project patterns and shared concerns for validation, authorization,
-  project isolation, logging, error handling, configuration, secret management,
-  health checks, metrics, backups, migrations, and rollback. Record any added
-  service, framework, state store, persistence pattern, or cross-cutting
-  deviation in Complexity Tracking.
-- **Production Deployment Readiness**: Record deployment topology impact,
-  environment variables/secrets, data migration and rollback plan, monitoring
-  and alert signals, backup/restore implications, release checks, and any manual
-  operator steps needed before real production use.
+- **SDD Order**: Confirm `spec.md` exists, includes the five mandatory modules,
+  records included and excluded scope, and has no unresolved clarification that
+  blocks planning.
+- **Review Readiness**: Confirm product, testing, and development review status
+  is recorded in the specification, or record a release-blocking risk.
+- **Required Plan Artifacts**: Confirm this plan will produce/update
+  `plan.md`, `research.md`, `data-model.md`, and `contracts/openapi.yaml` or
+  `.json` when interfaces exist.
+- **Technology Governance**: List each new framework, middleware, database,
+  storage service, queue, or external integration and identify the
+  `research.md` comparison that justifies it. Heavy dependencies without
+  rationale fail this gate.
+- **Layering and Code Baselines**: Identify access, business, data, and shared
+  core layer ownership. Confirm naming, configuration, validation, documentation
+  comments, reuse, and backward-compatible change expectations.
+- **TDD/Test Plan**: Define tests that must be written before implementation by
+  level (unit, contract, integration, end-to-end, readiness/smoke) and map them
+  to AC IDs, edge cases, security boundaries, data changes, concurrency, or
+  operations. Any test gap must include reason, owner, expiry date, and release
+  risk.
+- **Security Gate**: Confirm authentication, authorization, injection/XSS
+  protection, sensitive data handling, log masking, upload validation,
+  rate-limiting, circuit-breaking, degradation, and audit needs.
+- **Performance Gate**: Confirm pagination, batch limits, cache strategy,
+  indexing, long-transaction avoidance, and measurable thresholds.
+- **Deployment/Operations Gate**: Record deployment topology impact, new
+  environment variables/secrets, monitoring and alert signals, backup/restore
+  impact, migration and rollback plan, release checks, and manual operator
+  steps.
 
 ## Project Structure
 
@@ -83,6 +93,7 @@ specs/[###-feature]/
 ├── data-model.md        # Phase 1 output (/speckit-plan command)
 ├── quickstart.md        # Phase 1 output (/speckit-plan command)
 ├── contracts/           # Phase 1 output (/speckit-plan command)
+│   └── openapi.yaml     # Required when frontend/backend or service APIs exist
 └── tasks.md             # Phase 2 output (/speckit-tasks command - NOT created by /speckit-plan)
 ```
 
@@ -132,6 +143,16 @@ ios/ or android/
 
 **Structure Decision**: [Document the selected structure and reference the real
 directories captured above]
+
+## Required Design Artifact Checklist
+
+- [ ] `research.md` records dependency research, performance/security risk
+  assessment, and technology choice comparisons.
+- [ ] `data-model.md` records entities, fields, constraints, indexes,
+  relationships, and migration approach.
+- [ ] `contracts/openapi.yaml` or `.json` records external API contracts when
+  interfaces exist.
+- [ ] `quickstart.md` records runnable validation scenarios aligned to AC IDs.
 
 ## Complexity Tracking
 

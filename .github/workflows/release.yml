@@ -53,6 +53,11 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: gradsync.settings.test
         run: python manage.py makemigrations --check --dry-run
+      - name: Check OpenAPI contract drift
+        env:
+          PYTHON: python
+          DJANGO_SETTINGS_MODULE: gradsync.settings.test
+        run: bash scripts/check-openapi-contract.sh
       - name: Run backend tests
         working-directory: backend
         env:
@@ -97,6 +102,12 @@ jobs:
           GRADSYNC_E2E_MODE: fullstack
           GRADSYNC_BACKEND_PYTHON: ../.venv/bin/python
         run: npm run test:e2e
+      - name: Run US4 research assets and locale e2e
+        working-directory: frontend
+        env:
+          GRADSYNC_E2E_MODE: fullstack
+          GRADSYNC_BACKEND_PYTHON: ../.venv/bin/python
+        run: npm run test:e2e -- research-assets-locale.spec.ts
       - name: Run production UI layout checks
         working-directory: frontend
         env:

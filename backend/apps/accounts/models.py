@@ -23,6 +23,7 @@ class User(AbstractUser):
         max_length=20, choices=GlobalRole.choices, default=GlobalRole.STUDENT
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    locale = models.CharField(max_length=5, default="en")
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["name"]

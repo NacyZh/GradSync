@@ -15,6 +15,8 @@ export const routeWorkspaceBundles = {
   weeklyReport: () => import('../features/submissions/WeeklyReportPage'),
   reviewQueue: () => import('../features/submissions/ReviewQueuePage'),
   resources: () => import('../features/resources/ResourceListPage'),
+  paperLibrary: () => import('../features/library/PaperLibraryPage'),
+  codeRepository: () => import('../features/repositories/CodeRepositoryPage'),
 } as const;
 
 const AccountAdminPage = lazy(async () => ({ default: (await routeWorkspaceBundles.accountAdmin()).AccountAdminPage }));
@@ -24,6 +26,8 @@ const DraftSubmissionPage = lazy(async () => ({ default: (await routeWorkspaceBu
 const WeeklyReportPage = lazy(async () => ({ default: (await routeWorkspaceBundles.weeklyReport()).WeeklyReportPage }));
 const ReviewQueuePage = lazy(async () => ({ default: (await routeWorkspaceBundles.reviewQueue()).ReviewQueuePage }));
 const ResourceListPage = lazy(async () => ({ default: (await routeWorkspaceBundles.resources()).ResourceListPage }));
+const PaperLibraryPage = lazy(async () => ({ default: (await routeWorkspaceBundles.paperLibrary()).PaperLibraryPage }));
+const CodeRepositoryPage = lazy(async () => ({ default: (await routeWorkspaceBundles.codeRepository()).CodeRepositoryPage }));
 
 function routeContent(page: ReactElement) {
   return (
@@ -91,6 +95,14 @@ export const router = createBrowserRouter([
   {
     path: '/projects/:projectId/resources',
     element: protectedPage(<ResourceListPage />),
+  },
+  {
+    path: '/projects/:projectId/papers',
+    element: protectedPage(<PaperLibraryPage />),
+  },
+  {
+    path: '/projects/:projectId/code',
+    element: protectedPage(<CodeRepositoryPage />),
   },
   {
     path: '/resources',

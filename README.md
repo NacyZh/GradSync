@@ -37,6 +37,18 @@ Seeded demo accounts:
 
 ## Validation
 
+## Development Governance
+
+GradSync follows Spec-Kit SDD. Business changes must update `specs/` first,
+then plan/design artifacts, then test-first implementation tasks. The governing
+rules are in `.specify/memory/constitution.md`.
+
+Every feature PR should include the relevant `spec.md`, `plan.md`,
+`research.md`, `data-model.md`, contracts, tasks, code, and tests. Business
+code without a matching specification change is not releasable.
+
+## Validation
+
 ```bash
 docker compose exec backend pytest
 docker compose exec frontend npm test
@@ -53,12 +65,17 @@ npm run lint
 npm test
 GRADSYNC_E2E_MODE=fullstack npm run test:e2e
 npm run test:e2e -- production-ui.spec.ts
+npm run test:e2e -- research-assets-locale.spec.ts
 npm run build
 ```
 
 Run `sh scripts/check-generated-artifacts.sh` from the repository root before
 reviewing a branch. Playwright screenshots and traces are written to `/tmp` by
 the test config and must not be committed.
+
+US4 research asset validation is covered by backend paper/code/locale contract
+and unit tests, `frontend/tests/component/research-assets-locale.test.tsx`, and
+`frontend/tests/e2e/research-assets-locale.spec.ts`.
 
 See `specs/001-research-group-ops/quickstart.md` for scenario validation.
 

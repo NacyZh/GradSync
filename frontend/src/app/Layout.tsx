@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { Bell, BriefcaseBusiness, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, Users } from 'lucide-react';
+import { Bell, BookOpen, BriefcaseBusiness, Code2, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, Users } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import { useAuth } from '../features/auth/AuthProvider';
+import { LanguageSwitcher } from '../features/i18n/LanguageSwitcher';
 import { ProjectContextBanner } from '../features/projects/ProjectContextBanner';
 import { useAppFeedback } from '../shared/ui/AppFeedback';
 
@@ -30,6 +31,8 @@ export function Layout({ children }: PropsWithChildren) {
         { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'advisor', 'student'] },
         { to: '/projects/new', label: 'Projects', icon: BriefcaseBusiness, roles: ['admin', 'advisor'] },
         { to: '/resources', label: 'Resources', icon: Settings, roles: ['admin', 'advisor', 'student'] },
+        { to: '/projects/1/papers', label: 'Papers', icon: BookOpen, roles: ['admin', 'advisor', 'student'] },
+        { to: '/projects/1/code', label: 'Code', icon: Code2, roles: ['admin', 'advisor', 'student'] },
         { to: '/admin/accounts', label: 'Team', icon: Users, roles: ['admin'] },
       ].filter((link) => link.roles.includes(user.global_role))
     : [];
@@ -69,6 +72,7 @@ export function Layout({ children }: PropsWithChildren) {
               </TooltipTrigger>
               <TooltipContent>{theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}</TooltipContent>
             </Tooltip>
+            <LanguageSwitcher />
             <div className="hidden min-w-0 text-right sm:block">
               <span className="topbar-user block truncate">{user.name}</span>
               <span className="topbar-role mt-1">{user.global_role}</span>

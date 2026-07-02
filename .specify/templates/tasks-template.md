@@ -14,14 +14,21 @@ lowest useful test level for each story, plus integration or end-to-end coverage
 when behavior crosses modules, persistence, network boundaries, authorization,
 background jobs, operational checks, or UI workflows. If a test gap is approved
 in plan.md, include the documented reason, owner, expiry date, and release risk.
+Tests MUST be written before business implementation tasks and should fail first
+for the missing behavior unless an approved plan exception exists.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
-## Format: `[ID] [P?] [Story] Description`
+## Format: `[ID] [P?] [Story] [Area] Description (AC: AC-###)`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
+- **[Area]**: Ownership area such as Backend, Frontend, Test, Docs, Ops, CI
+- **AC**: Specification acceptance criterion or plan gate the task proves
 - Include exact file paths in descriptions
+- Keep each task small enough to complete in 8 hours or less; split larger work
+- Include a concrete self-check expectation in each task description or
+  sub-bullet
 
 ## Path Conventions
 
@@ -37,6 +44,7 @@ in plan.md, include the documented reason, owner, expiry date, and release risk.
   The /speckit-tasks command MUST replace these with actual tasks based on:
   - User stories from spec.md (with their priorities P1, P2, P3...)
   - Feature requirements from plan.md
+  - Acceptance criteria from spec.md
   - Constitution Check gates from plan.md
   - Entities from data-model.md
   - Endpoints from contracts/
@@ -57,6 +65,8 @@ in plan.md, include the documented reason, owner, expiry date, and release risk.
 - [ ] T001 Create project structure per implementation plan
 - [ ] T002 Initialize [language] project with [framework] dependencies
 - [ ] T003 [P] Configure linting and formatting tools
+- [ ] T004 [P] Document local environment and test commands in README or docs
+  self-check: command snippets are runnable and match plan.md
 
 ---
 
@@ -68,14 +78,15 @@ in plan.md, include the documented reason, owner, expiry date, and release risk.
 
 Examples of foundational tasks (adjust based on your project):
 
-- [ ] T004 Setup database schema and migrations framework
-- [ ] T005 [P] Implement authentication/authorization framework
-- [ ] T006 [P] Setup API routing and middleware structure
-- [ ] T007 Create base models/entities that all stories depend on
-- [ ] T008 Configure structured error handling, request IDs, and logging infrastructure
-- [ ] T009 Setup environment configuration, secret validation, and unsafe-default checks
-- [ ] T010 [P] Configure health/readiness checks and metrics/alert signal foundations
-- [ ] T011 [P] Establish migration, backup/restore, rollback, and release-smoke scaffolding as needed
+- [ ] T005 Setup database schema and migrations framework (AC: foundational)
+- [ ] T006 [P] Implement authentication/authorization framework (AC: security)
+- [ ] T007 [P] Setup API routing and middleware structure (AC: contracts)
+- [ ] T008 Create base models/entities that all stories depend on (AC: data-model)
+- [ ] T009 Configure structured error handling, request IDs, and logging infrastructure (AC: ops)
+- [ ] T010 Setup environment configuration, secret validation, and unsafe-default checks (AC: security)
+- [ ] T011 [P] Configure health/readiness checks and metrics/alert signal foundations (AC: ops)
+- [ ] T012 [P] Establish migration, backup/restore, rollback, and release-smoke scaffolding as needed (AC: ops)
+- [ ] T013 [P] Configure generated-artifact and spec/plan/tasks structure CI guard (AC: CI)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -91,21 +102,25 @@ Examples of foundational tasks (adjust based on your project):
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T012 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T013 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
-- [ ] T014 [P] [US1] Security/isolation test for [boundary] in tests/integration/test_[name].py
+- [ ] T014 [P] [US1] [Test] Contract test for [endpoint] in tests/contract/test_[name].py (AC: AC-###)
+  self-check: fails before endpoint implementation
+- [ ] T015 [P] [US1] [Test] Integration test for [user journey] in tests/integration/test_[name].py (AC: AC-###)
+  self-check: covers normal, exception, and boundary paths
+- [ ] T016 [P] [US1] [Test] Security/isolation test for [boundary] in tests/integration/test_[name].py (AC: SEC-###)
+  self-check: proves unauthorized access is rejected
 
 ### Implementation for User Story 1
 
-- [ ] T015 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T016 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T017 [US1] Implement [Service] in src/services/[service].py (depends on T015, T016)
-- [ ] T018 [US1] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T019 [US1] Add validation, authorization, and error handling
-- [ ] T020 [US1] Add structured logging/audit signal for user story 1 operations
-- [ ] T021 [US1] Validate UX consistency/accessibility for [changed flow] (if user-facing)
-- [ ] T022 [US1] Validate performance and reliability target for [journey/action]
-- [ ] T023 [US1] Update release/readiness checks for [deployment-impacting behavior] if applicable
+- [ ] T017 [P] [US1] [Backend] Create [Entity1] model in src/models/[entity1].py (AC: AC-###)
+- [ ] T018 [P] [US1] [Backend] Create [Entity2] model in src/models/[entity2].py (AC: AC-###)
+- [ ] T019 [US1] [Backend] Implement business service in src/services/[service].py (depends on T017, T018) (AC: AC-###)
+- [ ] T020 [US1] [Backend] Implement endpoint/feature in src/[location]/[file].py (AC: AC-###)
+- [ ] T021 [US1] [Backend] Add input validation, authorization, and error handling (AC: SEC-###)
+- [ ] T022 [US1] [Ops] Add structured logging/audit signal for user story 1 operations (AC: OPS-###)
+- [ ] T023 [US1] [Frontend] Validate UX consistency/accessibility for [changed flow] if user-facing (AC: UX-###)
+- [ ] T024 [US1] [Test] Validate performance and reliability target for [journey/action] (AC: PERF-###)
+- [ ] T025 [US1] [Ops] Update release/readiness checks for deployment-impacting behavior if applicable (AC: OPS-###)
+- [ ] T026 [US1] [Docs] Update relevant docs/contracts for implemented behavior (AC: docs)
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -119,20 +134,20 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T024 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T025 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
-- [ ] T026 [P] [US2] Security/isolation test for [boundary] in tests/integration/test_[name].py
+- [ ] T027 [P] [US2] [Test] Contract test for [endpoint] in tests/contract/test_[name].py (AC: AC-###)
+- [ ] T028 [P] [US2] [Test] Integration test for [user journey] in tests/integration/test_[name].py (AC: AC-###)
+- [ ] T029 [P] [US2] [Test] Security/isolation test for [boundary] in tests/integration/test_[name].py (AC: SEC-###)
 
 ### Implementation for User Story 2
 
-- [ ] T027 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T028 [US2] Implement [Service] in src/services/[service].py
-- [ ] T029 [US2] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T030 [US2] Integrate with User Story 1 components (if needed)
-- [ ] T031 [US2] Add structured logging/audit signal for user story 2 operations
-- [ ] T032 [US2] Validate UX consistency/accessibility for [changed flow] (if user-facing)
-- [ ] T033 [US2] Validate performance and reliability target for [journey/action]
-- [ ] T034 [US2] Update release/readiness checks for [deployment-impacting behavior] if applicable
+- [ ] T030 [P] [US2] [Backend] Create [Entity] model in src/models/[entity].py (AC: AC-###)
+- [ ] T031 [US2] [Backend] Implement [Service] in src/services/[service].py (AC: AC-###)
+- [ ] T032 [US2] [Backend] Implement [endpoint/feature] in src/[location]/[file].py (AC: AC-###)
+- [ ] T033 [US2] [Backend] Integrate with User Story 1 components if needed (AC: AC-###)
+- [ ] T034 [US2] [Ops] Add structured logging/audit signal for user story 2 operations (AC: OPS-###)
+- [ ] T035 [US2] [Frontend] Validate UX consistency/accessibility for [changed flow] if user-facing (AC: UX-###)
+- [ ] T036 [US2] [Test] Validate performance and reliability target for [journey/action] (AC: PERF-###)
+- [ ] T037 [US2] [Ops] Update release/readiness checks for deployment-impacting behavior if applicable (AC: OPS-###)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -146,19 +161,19 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T035 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T036 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
-- [ ] T037 [P] [US3] Security/isolation test for [boundary] in tests/integration/test_[name].py
+- [ ] T038 [P] [US3] [Test] Contract test for [endpoint] in tests/contract/test_[name].py (AC: AC-###)
+- [ ] T039 [P] [US3] [Test] Integration test for [user journey] in tests/integration/test_[name].py (AC: AC-###)
+- [ ] T040 [P] [US3] [Test] Security/isolation test for [boundary] in tests/integration/test_[name].py (AC: SEC-###)
 
 ### Implementation for User Story 3
 
-- [ ] T038 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T039 [US3] Implement [Service] in src/services/[service].py
-- [ ] T040 [US3] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T041 [US3] Add structured logging/audit signal for user story 3 operations
-- [ ] T042 [US3] Validate UX consistency/accessibility for [changed flow] (if user-facing)
-- [ ] T043 [US3] Validate performance and reliability target for [journey/action]
-- [ ] T044 [US3] Update release/readiness checks for [deployment-impacting behavior] if applicable
+- [ ] T041 [P] [US3] [Backend] Create [Entity] model in src/models/[entity].py (AC: AC-###)
+- [ ] T042 [US3] [Backend] Implement [Service] in src/services/[service].py (AC: AC-###)
+- [ ] T043 [US3] [Backend] Implement [endpoint/feature] in src/[location]/[file].py (AC: AC-###)
+- [ ] T044 [US3] [Ops] Add structured logging/audit signal for user story 3 operations (AC: OPS-###)
+- [ ] T045 [US3] [Frontend] Validate UX consistency/accessibility for [changed flow] if user-facing (AC: UX-###)
+- [ ] T046 [US3] [Test] Validate performance and reliability target for [journey/action] (AC: PERF-###)
+- [ ] T047 [US3] [Ops] Update release/readiness checks for deployment-impacting behavior if applicable (AC: OPS-###)
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -174,12 +189,15 @@ Examples of foundational tasks (adjust based on your project):
 
 - [ ] TXXX [P] Documentation updates in docs/
 - [ ] TXXX Code cleanup and refactoring
+- [ ] TXXX Verify every task maps to spec AC and has self-check notes
 - [ ] TXXX Performance and reliability validation across all stories
 - [ ] TXXX [P] Additional unit tests in tests/unit/
 - [ ] TXXX UX consistency and accessibility verification
 - [ ] TXXX Security hardening and authorization/isolation review
 - [ ] TXXX Observability review: structured logs, request IDs, metrics, alerts, and background job visibility
 - [ ] TXXX Migration, backup/restore, rollback, and release-smoke validation
+- [ ] TXXX Verify README, API contracts, data model docs, and third-party integration docs are current
+- [ ] TXXX Run CI-equivalent checks, including spec structure, lint/format, tests, and generated-artifact guard
 - [ ] TXXX Run quickstart.md validation
 
 ---
@@ -205,6 +223,8 @@ Examples of foundational tasks (adjust based on your project):
 
 - Tests MUST be written and FAIL before implementation unless plan.md records
   an approved test gap with reason and owner
+- Each task MUST be 8 hours or less; split any task that exceeds this
+- Each task MUST include area ownership and AC or gate traceability
 - Models before services
 - Services before endpoints
 - Core implementation before integration

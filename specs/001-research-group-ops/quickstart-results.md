@@ -1,6 +1,6 @@
 # Quickstart Validation Results: Research Group Operations
 
-**Date**: 2026-06-25
+**Date**: 2026-07-02
 
 ## Summary
 
@@ -23,6 +23,13 @@ passed in containers.
 | `docker compose exec frontend npm test` | PASS | 3 files passed, 6 tests passed. |
 | `docker compose exec frontend npm run test:e2e` | PASS | 5 Playwright Chromium tests passed. |
 | `docker compose ps -a` | PASS | Backend, frontend, database, Redis, worker, scheduler, and Mailpit were running. |
+| `../.venv/bin/python -m pytest tests/contract/test_papers_api.py tests/contract/test_code_artifacts_api.py tests/contract/test_locale_api.py tests/unit/test_paper_duplicate_rules.py tests/unit/test_asset_upload_policy.py tests/unit/test_code_artifact_rules.py tests/integration/test_research_assets_project_scope.py` | PASS | 11 US4 backend contract/unit/integration tests passed. |
+| `../.venv/bin/python -m pytest tests/integration/test_research_asset_performance.py tests/integration/test_research_assets_project_scope.py` | PASS | Research asset search and duplicate detection performance checks passed. |
+| `npm test -- --run tests/component/research-assets-locale.test.tsx` | PASS | 4 component tests passed for paper/code/locale UI states. |
+| `npm run test:e2e -- research-assets-locale.spec.ts` | PASS | Focused paper import, code download, and locale workflow passed in Playwright mock mode. |
+| `npm run lint && npm run build` | PASS | Frontend lint and production build passed with US4 route chunks. |
+| `sh scripts/check-generated-artifacts.sh` | PASS | Generated artifact guard passed after cleaning local runtime/build artifacts. |
+| `PYTHON=.venv/bin/python bash scripts/check-openapi-contract.sh` | PASS | 28 contract operations covered by generated schema. |
 
 ## Validation Notes
 
@@ -30,8 +37,13 @@ passed in containers.
 - Playwright initially discovered Vitest component tests because no dedicated Playwright configuration existed. `frontend/playwright.config.ts` now restricts e2e discovery to `tests/e2e`.
 - The frontend Docker image initially lacked Playwright browser binaries. `docker/frontend.Dockerfile` now installs Chromium and its dependencies so `docker compose exec frontend npm run test:e2e` is reproducible.
 - E2e tests initially used an ambiguous `GradSync` text locator. They now target the unique page heading.
+- US4 validation added paper duplicate handling, code artifact version conflict,
+  authorized download audit, account locale persistence, focused component
+  tests, and a Playwright workflow for paper/code/locale routes.
 
 ## Residual Risks
 
 - Docker image build output reported 5 npm audit vulnerabilities from installed frontend dependencies. These were not remediated during quickstart validation because the quickstart task was scoped to build/test validation and `npm audit fix --force` may introduce breaking dependency changes.
-- The e2e suite validates shell reachability/accessibility coverage for the generated flows; deeper browser-level workflow assertions remain an implementation hardening opportunity beyond this quickstart pass.
+- Full-stack Playwright coverage for the new US4 route currently depends on the
+  broader seeded e2e environment; the focused US4 Playwright flow passed in mock
+  mode, while backend contract/integration tests validate the real Django API.

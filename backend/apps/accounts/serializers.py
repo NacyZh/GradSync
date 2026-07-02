@@ -7,7 +7,7 @@ from .models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "name", "global_role", "status"]
+        fields = ["id", "email", "name", "global_role", "status", "locale"]
 
 
 class LoginSerializer(serializers.Serializer):
@@ -53,3 +53,8 @@ class AccountUpdateSerializer(serializers.Serializer):
         if not attrs:
             raise serializers.ValidationError("At least one field must be provided.")
         return attrs
+
+
+class LocalePreferenceSerializer(serializers.Serializer):
+    locale = serializers.ChoiceField(choices=["en", "zh"])
+    updatedAt = serializers.DateTimeField(source="updated_at", read_only=True, required=False)

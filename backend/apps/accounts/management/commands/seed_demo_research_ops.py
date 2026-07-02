@@ -5,6 +5,8 @@ from django.utils import timezone
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.resources.models import Booking, LabResource
+from apps.library.models import PaperAttachment, PaperRecord
+from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
 
@@ -53,7 +55,9 @@ class Command(BaseCommand):
                 },
             )
             user.set_password(acct["password"])
-            user.save(update_fields=["password"])
+            if acct["email"] == "student@example.com":
+                user.locale = "zh"
+            user.save(update_fields=["password", "locale"])
             created_users[acct["email"]] = user
             verb = "Created" if created else "Updated"
             self.stdout.write(
@@ -142,6 +146,48 @@ class Command(BaseCommand):
                 "subject": "Demo report ready for review",
                 "action_path": f"/projects/{project.id}/reports/{report.id}",
                 "eligible_at": timezone.now(),
+            },
+        )
+        paper, _ = PaperRecord.objects.get_or_create(
+            project=project,
+            title="Demo Graph Neural Methods",
+            defaults={
+                "authors": ["Lin Chen"],
+                "publication_year": 2026,
+                "doi": "10.1000/demo",
+                "tags": ["demo", "graph"],
+                "created_by": student,
+            },
+        )
+        PaperAttachment.objects.get_or_create(
+            paper=paper,
+            project=project,
+            checksum_sha256="d" * 64,
+            defaults={
+                "storage_key": "demo/graph.pdf",
+                "filename": "graph.pdf",
+                "content_type": "application/pdf",
+                "size_bytes": 1024,
+                "uploaded_by": student,
+            },
+        )
+        artifact, _ = CodeArtifact.objects.get_or_create(
+            project=project,
+            name="Demo simulator",
+            defaults={"description": "Seeded code artifact", "tags": ["demo"], "created_by": student},
+        )
+        CodeArtifactVersion.objects.get_or_create(
+            artifact=artifact,
+            project=project,
+            version_label="v1",
+            defaults={
+                "commit_reference": "demo-ref",
+                "filename": "simulator.zip",
+                "storage_key": "demo/simulator.zip",
+                "content_type": "application/zip",
+                "size_bytes": 2048,
+                "checksum_sha256": "e" * 64,
+                "uploaded_by": student,
             },
         )
         self.stdout.write(self.style.SUCCESS(f"Seeded quickstart project {project.id}"))

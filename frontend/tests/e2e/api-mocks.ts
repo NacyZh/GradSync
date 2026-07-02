@@ -50,6 +50,9 @@ export async function mockLogin(page: Page, user = currentUser) {
   await page.route('**/api/accounts/logout/', async (route) => {
     await route.fulfill({ status: 204 });
   });
+  await page.route('**/api/accounts/locale/', async (route) => {
+    await route.fulfill({ json: { locale: 'en' } });
+  });
   // After login, /api/accounts/me/ returns the authenticated user.
   await page.route('**/api/accounts/me/', async (route) => {
     await route.fulfill({ json: user });
