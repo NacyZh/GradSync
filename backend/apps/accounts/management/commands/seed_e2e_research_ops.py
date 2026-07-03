@@ -15,7 +15,16 @@ from apps.tasks.models import Task
 class Command(BaseCommand):
     help = "Reset and seed deterministic data for full-stack Playwright tests."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--skip-migrate",
+            action="store_true",
+            help="Skip the pre-seed migration step. Intended only for tests.",
+        )
+
     def handle(self, *args, **options):
+        if not options["skip_migrate"]:
+            call_command("migrate", interactive=False, verbosity=options["verbosity"])
         call_command("flush", interactive=False, verbosity=0)
         user_model = get_user_model()
 
