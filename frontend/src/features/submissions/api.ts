@@ -1,4 +1,7 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
 import { apiRequest } from '../../shared/api/client';
+import type { DownloadDescriptor } from '../../shared/api/downloads';
 
 export type DraftVersion = {
   id: number;
@@ -28,6 +31,41 @@ export type InlineComment = {
   anchor: string;
   body: string;
   status: string;
+};
+
+export type TeacherFeedback = {
+  id: string;
+  writingVersionId: string;
+  reviewerId: string;
+  comments?: string;
+  status: 'draft' | 'submitted' | 'notification_pending' | 'notification_sent' | 'notification_failed';
+  annotatedFileId?: string;
+  annotatedFileName?: string;
+  notificationStatus?: string;
+};
+
+export type WritingVersion = {
+  id: string;
+  writingProjectId: string;
+  versionNumber: number;
+  submittedById?: string;
+  draftFileId?: string;
+  draftFileName?: string;
+  fileKind?: 'word' | 'latex_source' | 'latex_archive';
+  summary?: string;
+  status: 'submitted' | 'under_review' | 'feedback_available' | 'closed';
+  submittedAt?: string;
+  feedback?: TeacherFeedback[];
+};
+
+export type WritingProject = {
+  id: string;
+  projectId: string;
+  studentId: string;
+  title: string;
+  writingType: 'thesis' | 'manuscript' | 'paper' | 'other';
+  status: 'active' | 'closed' | 'archived';
+  versions: WritingVersion[];
 };
 
 export function listDrafts(projectId: number) {
@@ -92,5 +130,75 @@ export function updateCommentStatus(projectId: number, commentId: number, status
   return apiRequest<InlineComment>(`/api/projects/${projectId}/comments/${commentId}/status/`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+}
+
+export function listWritingProjects(projectId: number, query = '') {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest<{ results: WritingProject[] }>(`/api/projects/${projectId}/writing-projects/${suffix}`);
+}
+
+export function createWritingProject(projectId: number, payload: { title: string; writingType: WritingProject['writingType'] }) {
+  return apiRequest<WritingProject>(`/api/projects/${projectId}/writing-projects/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function uploadWritingVersion(writingProjectId: string, payload: { file: File; summary?: string }) {
+  const formData = new FormData();
+  formData.append('file', payload.file);
+  if (payload.summary) formData.append('summary', payload.summary);
+  return apiRequest<WritingVersion>(`/api/writing-projects/${writingProjectId}/versions`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function submitTeacherFeedback(writingVersionId: string, payload: { annotatedFile: File; comments?: string }) {
+  const formData = new FormData();
+  formData.append('annotatedFile', payload.annotatedFile);
+  if (payload.comments) formData.append('comments', payload.comments);
+  return apiRequest<TeacherFeedback>(`/api/writing-versions/${writingVersionId}/feedback`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function downloadTeacherFeedback(feedbackId: string) {
+  return apiRequest<DownloadDescriptor>(`/api/teacher-feedback/${feedbackId}/download`);
+}
+
+export function useWritingProjects(projectId: number, query = '') {
+  return useQuery({
+    queryKey: ['writingProjects', projectId, query],
+    queryFn: () => listWritingProjects(projectId, query),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useCreateWritingProject(projectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { title: string; writingType: WritingProject['writingType'] }) => createWritingProject(projectId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId] }),
+  });
+}
+
+export function useUploadWritingVersion(projectId: number, writingProjectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { file: File; summary?: string }) => uploadWritingVersion(writingProjectId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId] }),
+  });
+}
+
+export function useSubmitTeacherFeedback(projectId: number, writingVersionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { annotatedFile: File; comments?: string }) => submitTeacherFeedback(writingVersionId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId] }),
   });
 }

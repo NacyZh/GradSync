@@ -8,6 +8,7 @@ class Notification(models.Model):
         PENDING_REVIEW = "pending_review", "Pending review"
         APPROACHING_DEADLINE = "approaching_deadline", "Approaching deadline"
         BOOKING_CHANGED = "booking_changed", "Booking changed"
+        TEACHER_FEEDBACK = "teacher_feedback", "Teacher feedback"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
