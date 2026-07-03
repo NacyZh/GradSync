@@ -8,6 +8,7 @@ import type { ProjectMembership } from './api';
 import { addProjectMember } from './api';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
+import { StudentSelector } from './StudentSelector';
 
 export function ProjectMembersPanel({ projectId, members = [], disabled = false }: { projectId: number; members?: ProjectMembership[]; disabled?: boolean }) {
   const mutation = useMutation({ mutationFn: (payload: { user_id: number; role: ProjectMembership['role'] }) => addProjectMember(projectId, payload) });
@@ -49,6 +50,7 @@ export function ProjectMembersPanel({ projectId, members = [], disabled = false 
         </CardHeader>
         <CardContent className="p-4 pt-0">
           <form aria-label="Add project member" onSubmit={onSubmit} className="grid gap-3">
+            <StudentSelector onSelect={(student) => mutation.mutate({ user_id: student.id, role: 'student' })} disabled={disabled || mutation.isPending} />
             <FormField id="member-user-id" name="userId" label="User ID" type="number" required disabled={disabled || mutation.isPending} />
             <label className="grid gap-1.5 text-sm font-bold text-muted-foreground">
               Role

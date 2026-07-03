@@ -59,3 +59,63 @@ def test_research_asset_search_and_duplicate_detection_performance(api_client):
             publication_year=2020 + (index % 5),
         )
     assert time.monotonic() - start < 10
+
+
+@pytest.mark.django_db
+def test_paper_search_under_seeded_scale_uses_pagination(api_client):
+    user = UserFactory()
+    project = ResearchProject.objects.create(title="Paper Scale", advisor=user)
+    ProjectMembership.objects.create(project=project, user=user, role="advisor")
+    PaperRecord.objects.bulk_create(
+        [
+            PaperRecord(
+                project=project,
+                title=f"Collaboration Paper {index}",
+                authors=[f"Researcher {index % 20}"],
+                publication_year=2020 + (index % 5),
+                tags=["collaboration", f"topic-{index % 25}"],
+                visibility="project_members",
+                fingerprint=f"collaboration paper {index}|researcher {index % 20}|{2020 + (index % 5)}",
+                created_by=user,
+            )
+            for index in range(1000)
+        ]
+    )
+
+    client = authenticate(api_client, user)
+    start = time.monotonic()
+    response = client.get(f"/api/projects/{project.id}/papers/?q=Collaboration&page_size=50")
+    elapsed = time.monotonic() - start
+
+    assert response.status_code == 200
+    assert len(response.data["results"]) == 50
+    assert elapsed < 2
+
+
+@pytest.mark.django_db
+def test_code_artifact_search_under_seeded_scale_uses_pagination(api_client):
+    user = UserFactory()
+    project = ResearchProject.objects.create(title="Code Scale", advisor=user)
+    ProjectMembership.objects.create(project=project, user=user, role="advisor")
+    CodeArtifact.objects.bulk_create(
+        [
+            CodeArtifact(
+                project=project,
+                name=f"Archive {index}",
+                description=f"Searchable archive for simulation workflow {index}",
+                tags=["simulation", f"topic-{index % 25}"],
+                visibility="project_members",
+                created_by=user,
+            )
+            for index in range(250)
+        ]
+    )
+
+    client = authenticate(api_client, user)
+    start = time.monotonic()
+    response = client.get(f"/api/projects/{project.id}/code-artifacts/?q=Archive&page_size=50")
+    elapsed = time.monotonic() - start
+
+    assert response.status_code == 200
+    assert len(response.data["results"]) == 50
+    assert elapsed < 2

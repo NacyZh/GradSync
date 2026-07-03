@@ -30,6 +30,9 @@ class PaperRecordSerializer(serializers.ModelSerializer):
     externalIds = serializers.JSONField(source="external_ids", required=False)
     importSource = serializers.CharField(source="import_source", read_only=True)
     sourcePathLabel = serializers.CharField(source="source_path_label", read_only=True)
+    checksumSha256 = serializers.CharField(source="checksum_sha256", read_only=True)
+    uploadedFileId = serializers.CharField(source="uploaded_file_id", read_only=True)
+    keywords = serializers.JSONField(source="tags", read_only=True)
     attachments = PaperAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
@@ -46,6 +49,10 @@ class PaperRecordSerializer(serializers.ModelSerializer):
             "abstract",
             "notes",
             "tags",
+            "keywords",
+            "visibility",
+            "checksumSha256",
+            "uploadedFileId",
             "importSource",
             "sourcePathLabel",
             "status",
@@ -64,12 +71,49 @@ class PaperRecordCreateSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
     tags = serializers.ListField(child=serializers.CharField(), required=False)
     sourcePathLabel = serializers.CharField(required=False, allow_blank=True)
+    visibility = serializers.ChoiceField(choices=PaperRecord.Visibility.values, required=False)
 
     def to_internal_value(self, data):
         attrs = super().to_internal_value(data)
         attrs["publication_year"] = attrs.pop("publicationYear", None)
         attrs["external_ids"] = attrs.pop("externalIds", {})
         attrs["source_path_label"] = attrs.pop("sourcePathLabel", "")
+        return attrs
+
+
+def _split_string_list(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in str(value).split(",") if item.strip()]
+
+
+class PaperUploadSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    title = serializers.CharField(max_length=500)
+    authors = serializers.CharField(required=False, allow_blank=True)
+    venue = serializers.CharField(required=False, allow_blank=True)
+    publicationYear = serializers.IntegerField(required=False, allow_null=True)
+    doi = serializers.CharField(required=False, allow_blank=True)
+    abstract = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    tags = serializers.CharField(required=False, allow_blank=True)
+    keywords = serializers.CharField(required=False, allow_blank=True)
+    visibility = serializers.ChoiceField(
+        choices=PaperRecord.Visibility.values,
+        required=False,
+        default=PaperRecord.Visibility.PROJECT_MEMBERS,
+    )
+
+    def to_internal_value(self, data):
+        attrs = super().to_internal_value(data)
+        attrs["upload"] = attrs.pop("file")
+        attrs["authors"] = _split_string_list(attrs.get("authors")) or ["Unknown"]
+        keyword_value = attrs.pop("keywords", "") or attrs.pop("tags", "")
+        attrs["tags"] = _split_string_list(keyword_value)
+        attrs["publication_year"] = attrs.pop("publicationYear", None)
+        attrs["external_ids"] = {}
         return attrs
 
 

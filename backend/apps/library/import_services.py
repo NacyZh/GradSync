@@ -2,7 +2,8 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.audit.services import record_event
+from apps.audit.services import record_event, record_upload
+from apps.common.file_services import checksum_sha256, store_uploaded_file
 from apps.projects.archive_services import ensure_project_writable
 
 from .duplicate_services import find_duplicate, normalize_doi, title_author_year_fingerprint
@@ -20,6 +21,14 @@ def _duplicate_inputs(data: dict) -> dict:
     }
 
 
+def _can_share_group_wide(user) -> bool:
+    return bool(
+        getattr(user, "is_superuser", False)
+        or getattr(user, "is_administrator", False)
+        or getattr(user, "is_advisor", False)
+    )
+
+
 class PaperImportService:
     def __init__(self, user, project):
         self.user = user
@@ -33,6 +42,9 @@ class PaperImportService:
     def create_paper(self, **data) -> PaperRecord:
         self._require_member()
         ensure_project_writable(self.project)
+        visibility = data.get("visibility") or PaperRecord.Visibility.PROJECT_MEMBERS
+        if visibility == PaperRecord.Visibility.GROUP_WIDE and not _can_share_group_wide(self.user):
+            raise PermissionError("Only teachers and administrators can share papers group-wide")
         match = find_duplicate(self.project, **_duplicate_inputs(data))
         if match:
             raise ValidationError(
@@ -53,6 +65,9 @@ class PaperImportService:
             abstract=data.get("abstract", ""),
             notes=data.get("notes", ""),
             tags=data.get("tags", []),
+            visibility=visibility,
+            visibility_changed_by=self.user,
+            visibility_changed_at=timezone.now(),
             import_source=data.get("import_source", PaperRecord.ImportSource.MANUAL),
             source_path_label=data.get("source_path_label", ""),
             fingerprint=title_author_year_fingerprint(
@@ -63,6 +78,56 @@ class PaperImportService:
             created_by=self.user,
         )
         record_event(self.project, self.user, "paper.created", f"Created paper {paper.id}", paper)
+        return paper
+
+    @transaction.atomic
+    def upload_paper(self, *, upload, **data) -> PaperRecord:
+        self._require_member()
+        ensure_project_writable(self.project)
+        visibility = data.get("visibility") or PaperRecord.Visibility.PROJECT_MEMBERS
+        if visibility == PaperRecord.Visibility.GROUP_WIDE and not _can_share_group_wide(self.user):
+            raise PermissionError("Only teachers and administrators can share papers group-wide")
+
+        checksum = checksum_sha256(upload)
+        duplicate_inputs = _duplicate_inputs(data)
+        duplicate_inputs["checksum_sha256"] = checksum
+        match = find_duplicate(self.project, **duplicate_inputs)
+        if match:
+            raise ValidationError(
+                {
+                    "message": "Duplicate paper detected",
+                    "duplicateOfPaperId": str(match.paper.id),
+                    "duplicateReason": match.reason,
+                }
+            )
+
+        uploaded_file = store_uploaded_file(upload=upload, category="paper", owner=self.user)
+        paper = PaperRecord.objects.create(
+            project=self.project,
+            title=data["title"],
+            authors=data.get("authors", []),
+            venue=data.get("venue", ""),
+            publication_year=data.get("publication_year"),
+            doi=normalize_doi(data.get("doi")),
+            external_ids=data.get("external_ids", {}),
+            abstract=data.get("abstract", ""),
+            notes=data.get("notes", ""),
+            tags=data.get("tags", []),
+            visibility=visibility,
+            visibility_changed_by=self.user,
+            visibility_changed_at=timezone.now(),
+            uploaded_file=uploaded_file,
+            checksum_sha256=uploaded_file.checksum_sha256,
+            import_source=PaperRecord.ImportSource.LOCAL_FILE,
+            source_path_label=uploaded_file.original_filename,
+            fingerprint=title_author_year_fingerprint(
+                title=data.get("title"),
+                authors=data.get("authors", []),
+                publication_year=data.get("publication_year"),
+            ),
+            created_by=self.user,
+        )
+        record_upload(self.project, self.user, paper, "paper")
         return paper
 
     @transaction.atomic

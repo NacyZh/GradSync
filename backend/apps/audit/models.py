@@ -4,7 +4,11 @@ from django.db import models
 
 class AuditEvent(models.Model):
     project = models.ForeignKey(
-        "projects.ResearchProject", on_delete=models.CASCADE, related_name="audit_events"
+        "projects.ResearchProject",
+        on_delete=models.CASCADE,
+        related_name="audit_events",
+        null=True,
+        blank=True,
     )
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True

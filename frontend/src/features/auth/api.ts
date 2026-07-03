@@ -22,3 +22,32 @@ export function logout(): Promise<void> {
 export function fetchCurrentUser(): Promise<CurrentUser> {
   return apiRequest<CurrentUser>('/api/accounts/me/');
 }
+
+export type RegisterPayload = {
+  email: string;
+  password: string;
+  nickname: string;
+  requestedRole: 'student' | 'teacher' | 'administrator';
+  degreeType?: 'masters' | 'doctoral' | '';
+};
+
+export function register(payload: RegisterPayload): Promise<{ email: string; status: string; requestedRole: string }> {
+  return apiRequest('/api/accounts/register/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function verifyEmail(payload: { email: string; code: string }): Promise<CurrentUser> {
+  return apiRequest<CurrentUser>('/api/accounts/verify-email/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateNickname(nickname: string): Promise<CurrentUser> {
+  return apiRequest<CurrentUser>('/api/accounts/me/', {
+    method: 'PATCH',
+    body: JSON.stringify({ nickname }),
+  });
+}

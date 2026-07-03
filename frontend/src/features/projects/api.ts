@@ -58,3 +58,15 @@ export function addProjectMember(projectId: number, payload: { user_id: number; 
     body: JSON.stringify(payload),
   });
 }
+
+export type StudentOption = {
+  id: number;
+  nickname: string;
+  email: string;
+  degreeType: 'masters' | 'doctoral';
+  label: string;
+};
+
+export function searchStudents(query: string) {
+  return apiRequest<StudentOption[]>(`/api/accounts/students/?q=${encodeURIComponent(query)}`);
+}

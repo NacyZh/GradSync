@@ -78,7 +78,7 @@ def test_paper_create_import_duplicate_and_authorized_download(api_client):
     outsider_response = authenticate(api_client, outsider).post(
         f"/api/projects/{project.id}/papers/{paper.id}/download/"
     )
-    assert outsider_response.status_code == 404
+    assert outsider_response.status_code == 403
 
 
 @pytest.mark.django_db

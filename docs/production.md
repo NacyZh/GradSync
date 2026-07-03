@@ -8,6 +8,13 @@
 - Run the production frontend gate: `npm run lint`, `npm test`, full-stack
   Playwright workflows, `npm run test:e2e -- production-ui.spec.ts`, and
   `npm run build` from `frontend/`.
+- For the research collaboration platform release gate, run the feature
+  quickstart command set and contract guard:
+  `docker compose exec backend pytest`,
+  `docker compose exec frontend npm test`,
+  `docker compose exec frontend npm run lint`,
+  `docker compose exec frontend npm run test:e2e`, and
+  `sh scripts/check-openapi-contract.sh specs/003-research-collab-platform/contracts/openapi.yaml`.
 - Run `sh scripts/check-generated-artifacts.sh` before frontend build artifacts
   are produced and before opening the release review.
 - Copy `.env.production.example` to `.env.production` and replace every

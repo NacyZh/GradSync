@@ -12,11 +12,17 @@ const statusVariant: Record<string, BadgeProps['variant']> = {
   completed: 'success',
   reviewed: 'success',
   delivered: 'success',
+  sent: 'success',
+  approved: 'success',
   blocked: 'warning',
   archived: 'warning',
   unavailable: 'warning',
   needs_revision: 'warning',
+  pending: 'warning',
+  pending_role_activation: 'warning',
+  pending_email_verification: 'warning',
   failed: 'destructive',
+  rejected: 'destructive',
   cancelled: 'destructive',
 };
 

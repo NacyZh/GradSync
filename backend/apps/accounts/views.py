@@ -1,5 +1,6 @@
 from django.contrib.auth import login, logout
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.middleware.csrf import get_token
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -14,11 +15,24 @@ from .models import User
 from .serializers import (
     AccountCreateSerializer,
     AccountUpdateSerializer,
+    EmailVerificationSerializer,
     LocalePreferenceSerializer,
     LoginSerializer,
+    NicknameUpdateSerializer,
+    RegistrationSerializer,
+    RoleActivationSerializer,
+    RoleActivationUpdateSerializer,
+    StudentOptionSerializer,
     UserSerializer,
 )
-from .services import AccountsService
+from .models import RoleActivationRequest
+from .services import (
+    AccountsService,
+    decide_role_activation,
+    register_account,
+    update_nickname,
+    verify_email,
+)
 
 
 class LoginView(APIView):
@@ -52,6 +66,98 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = NicknameUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            user = update_nickname(user=request.user, nickname=serializer.validated_data["nickname"])
+        except ValidationError as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(UserSerializer(user).data)
+
+
+class RegistrationView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegistrationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            user, _code = register_account(
+                email=serializer.validated_data["email"],
+                password=serializer.validated_data["password"],
+                nickname=serializer.validated_data["nickname"],
+                requested_role=serializer.validated_data["requestedRole"],
+                degree_type=serializer.validated_data.get("degreeType"),
+            )
+        except ValidationError as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"email": user.email, "status": user.status, "requestedRole": user.requested_role},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class EmailVerificationView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = EmailVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            user = verify_email(
+                email=serializer.validated_data["email"],
+                code=serializer.validated_data["code"],
+            )
+        except (ValidationError, User.DoesNotExist) as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(UserSerializer(user).data)
+
+
+class RoleActivationListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsAdministrator]
+    serializer_class = RoleActivationSerializer
+
+    def get_queryset(self):
+        return RoleActivationRequest.objects.select_related("user").order_by("-created_at")
+
+
+class RoleActivationDetailView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated, IsAdministrator]
+    queryset = RoleActivationRequest.objects.select_related("user")
+    serializer_class = RoleActivationSerializer
+    lookup_url_kwarg = "pk"
+
+    def patch(self, request, *args, **kwargs):
+        serializer = RoleActivationUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            activation = decide_role_activation(
+                activation=self.get_object(),
+                reviewer=request.user,
+                action=serializer.validated_data["action"],
+            )
+        except ValidationError as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(RoleActivationSerializer(activation).data)
+
+
+class StudentSearchView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = StudentOptionSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        query = self.request.query_params.get("q", "").strip()
+        queryset = User.objects.filter(
+            global_role=User.GlobalRole.STUDENT,
+            status=User.Status.ACTIVE,
+            active_role="student",
+        ).select_related("student_profile")
+        if query:
+            queryset = queryset.filter(Q(nickname__icontains=query) | Q(email__icontains=query))
+        return queryset.order_by("nickname", "email")[:25]
 
 
 class LocalePreferenceView(APIView):

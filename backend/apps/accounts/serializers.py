@@ -1,13 +1,30 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-from .models import User
+from .models import RoleActivationRequest, StudentProfile, User
 
 
 class UserSerializer(serializers.ModelSerializer):
+    degreeType = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ["id", "email", "name", "global_role", "status", "locale"]
+        fields = [
+            "id",
+            "email",
+            "name",
+            "nickname",
+            "global_role",
+            "requested_role",
+            "active_role",
+            "status",
+            "locale",
+            "degreeType",
+        ]
+
+    def get_degreeType(self, obj):
+        profile = getattr(obj, "student_profile", None)
+        return profile.degree_type if profile else None
 
 
 class LoginSerializer(serializers.Serializer):
@@ -58,3 +75,57 @@ class AccountUpdateSerializer(serializers.Serializer):
 class LocalePreferenceSerializer(serializers.Serializer):
     locale = serializers.ChoiceField(choices=["en", "zh"])
     updatedAt = serializers.DateTimeField(source="updated_at", read_only=True, required=False)
+
+
+class RegistrationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    nickname = serializers.CharField(max_length=80)
+    requestedRole = serializers.ChoiceField(choices=["student", "teacher", "administrator"])
+    degreeType = serializers.ChoiceField(choices=["masters", "doctoral"], required=False, allow_null=True, allow_blank=True)
+
+
+class EmailVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=12)
+
+
+class NicknameUpdateSerializer(serializers.Serializer):
+    nickname = serializers.CharField(max_length=80)
+
+
+class RoleActivationSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    requestedRole = serializers.CharField(source="requested_role", read_only=True)
+    activationSource = serializers.CharField(source="activation_source", read_only=True)
+    reviewedAt = serializers.DateTimeField(source="reviewed_at", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = RoleActivationRequest
+        fields = [
+            "id",
+            "user",
+            "requestedRole",
+            "activationSource",
+            "status",
+            "reviewedAt",
+            "createdAt",
+        ]
+
+
+class RoleActivationUpdateSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["approve", "reject", "revoke", "expire"])
+
+
+class StudentOptionSerializer(serializers.ModelSerializer):
+    degreeType = serializers.CharField(source="student_profile.degree_type")
+    label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "nickname", "email", "degreeType", "label"]
+
+    def get_label(self, obj):
+        nickname = obj.nickname or obj.name
+        return f"{nickname} <{obj.email}>"

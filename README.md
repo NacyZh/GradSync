@@ -77,7 +77,20 @@ US4 research asset validation is covered by backend paper/code/locale contract
 and unit tests, `frontend/tests/component/research-assets-locale.test.tsx`, and
 `frontend/tests/e2e/research-assets-locale.spec.ts`.
 
-See `specs/001-research-group-ops/quickstart.md` for scenario validation.
+For the research collaboration platform feature, run the command set in
+`specs/003-research-collab-platform/quickstart.md`:
+
+```bash
+docker compose exec backend pytest
+docker compose exec frontend npm test
+docker compose exec frontend npm run lint
+docker compose exec frontend npm run test:e2e
+sh scripts/check-generated-artifacts.sh
+sh scripts/check-openapi-contract.sh specs/003-research-collab-platform/contracts/openapi.yaml
+```
+
+See `specs/001-research-group-ops/quickstart.md` and
+`specs/003-research-collab-platform/quickstart.md` for scenario validation.
 
 ## Production Deployment
 

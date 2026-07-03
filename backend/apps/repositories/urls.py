@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import CodeArtifactViewSet
+from .views import CodeArtifactDownloadView, CodeArtifactViewSet
 
 router = DefaultRouter(trailing_slash=True)
 router.register(
@@ -10,4 +10,7 @@ router.register(
     basename="project-code-artifacts",
 )
 
-urlpatterns = [path("", include(router.urls))]
+urlpatterns = [
+    path("code-artifacts/<int:artifact_id>/download", CodeArtifactDownloadView.as_view(), name="code-artifact-download"),
+    path("", include(router.urls)),
+]

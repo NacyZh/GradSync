@@ -164,6 +164,18 @@ EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@gradsync.local")
 
+COLLABORATION_UPLOAD_LIMITS = {
+    "paper": int(os.getenv("UPLOAD_LIMIT_PAPER_BYTES", str(25 * 1024 * 1024))),
+    "code": int(os.getenv("UPLOAD_LIMIT_CODE_BYTES", str(100 * 1024 * 1024))),
+    "document": int(os.getenv("UPLOAD_LIMIT_DOCUMENT_BYTES", str(50 * 1024 * 1024))),
+    "writing": int(os.getenv("UPLOAD_LIMIT_WRITING_BYTES", str(50 * 1024 * 1024))),
+    "feedback": int(os.getenv("UPLOAD_LIMIT_FEEDBACK_BYTES", str(50 * 1024 * 1024))),
+}
+EMAIL_VERIFICATION_CODE_TTL_MINUTES = int(
+    os.getenv("EMAIL_VERIFICATION_CODE_TTL_MINUTES", "30")
+)
+ROLE_ACTIVATION_TTL_DAYS = int(os.getenv("ROLE_ACTIVATION_TTL_DAYS", "14"))
+
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOGGING = {
     "version": 1,

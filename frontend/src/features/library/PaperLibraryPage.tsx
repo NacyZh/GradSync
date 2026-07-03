@@ -11,16 +11,17 @@ import { usePapers, type PaperRecord } from './api';
 export function PaperLibraryPage() {
   const projectId = Number(useParams().projectId ?? 0);
   const [query, setQuery] = useState('');
+  const [visibility, setVisibility] = useState('');
   const [selected, setSelected] = useState<PaperRecord | undefined>();
-  const papersQuery = usePapers(projectId, query);
+  const papersQuery = usePapers(projectId, query, visibility);
   const papers = papersQuery.data?.results ?? [];
 
   return (
-    <PageShell title="Paper library" description="Import, search, inspect, and download project-scoped papers.">
+    <PageShell title="Paper library" description="Upload, search, inspect, and download project-scoped papers.">
       <div className="grid gap-4 xl:grid-cols-[minmax(22rem,1fr)_minmax(20rem,0.8fr)]">
         <section className="panel" aria-label="Paper records">
           <div className="mb-4 grid gap-3">
-            <PaperFilters value={query} onChange={setQuery} />
+            <PaperFilters value={query} visibility={visibility} onChange={setQuery} onVisibilityChange={setVisibility} />
             <PaperImportPanel projectId={projectId} />
           </div>
           {papersQuery.isLoading ? <DataState state="loading" title="Loading papers" message="Loading project papers." /> : null}
@@ -30,7 +31,10 @@ export function PaperLibraryPage() {
             {papers.map((paper) => (
               <li key={paper.id}>
                 <button type="button" className="w-full rounded-md border p-3 text-left hover:bg-muted" onClick={() => setSelected(paper)}>
-                  <strong>{paper.title}</strong>
+                  <span className="flex flex-wrap items-start justify-between gap-2">
+                    <strong>{paper.title}</strong>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">{paper.visibility.replaceAll('_', ' ')}</span>
+                  </span>
                   <span className="block text-sm text-muted-foreground">{paper.authors.join(', ')} · {paper.publicationYear ?? 'No year'}</span>
                 </button>
               </li>

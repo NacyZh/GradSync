@@ -45,6 +45,13 @@ def find_duplicate(
     publication_year: int | None = None,
 ) -> DuplicateMatch | None:
     if checksum_sha256:
+        paper = PaperRecord.objects.filter(
+            project=project,
+            checksum_sha256=checksum_sha256,
+            status=PaperRecord.Status.ACTIVE,
+        ).first()
+        if paper:
+            return DuplicateMatch(paper, "checksum")
         attachment = (
             PaperAttachment.objects.select_related("paper")
             .filter(

@@ -16,6 +16,10 @@ class PaperRecord(models.Model):
         DUPLICATE_BLOCKED = "duplicate_blocked", "Duplicate blocked"
         ARCHIVED = "archived", "Archived"
 
+    class Visibility(models.TextChoices):
+        PROJECT_MEMBERS = "project_members", "Project members"
+        GROUP_WIDE = "group_wide", "Group-wide"
+
     project = models.ForeignKey(
         "projects.ResearchProject", on_delete=models.CASCADE, related_name="paper_records"
     )
@@ -28,6 +32,25 @@ class PaperRecord(models.Model):
     abstract = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     tags = models.JSONField(default=list, blank=True)
+    visibility = models.CharField(
+        max_length=30, choices=Visibility.choices, default=Visibility.PROJECT_MEMBERS
+    )
+    visibility_changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="paper_visibility_changes",
+    )
+    visibility_changed_at = models.DateTimeField(null=True, blank=True)
+    uploaded_file = models.ForeignKey(
+        "common.UploadedFile",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="paper_records",
+    )
+    checksum_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
     import_source = models.CharField(
         max_length=30, choices=ImportSource.choices, default=ImportSource.MANUAL
     )
@@ -41,6 +64,12 @@ class PaperRecord(models.Model):
 
     class Meta:
         ordering = ["title"]
+        indexes = [
+            models.Index(fields=["project", "visibility", "status"], name="library_paper_scope_idx"),
+            models.Index(fields=["project", "publication_year"], name="library_paper_year_idx"),
+            models.Index(fields=["project", "title"], name="library_paper_title_idx"),
+            models.Index(fields=["created_by", "created_at"], name="library_paper_uploader_idx"),
+        ]
 
 
 class PaperAttachment(models.Model):

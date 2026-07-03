@@ -4,11 +4,14 @@ import { createBrowserRouter } from 'react-router-dom';
 import { HomePage } from '../app/HomePage';
 import { Layout } from '../app/Layout';
 import { LoginPage } from '../features/auth/LoginPage';
+import { RegisterPage } from '../features/auth/RegisterPage';
 import { DataState } from '../shared/ui/DataState';
 import { ProtectedRoute, RoleRoute } from './ProtectedRoute';
 
 export const routeWorkspaceBundles = {
   accountAdmin: () => import('../features/admin/AccountAdminPage'),
+  roleActivation: () => import('../features/admin/RoleActivationPage'),
+  profile: () => import('../features/auth/ProfilePage'),
   projectCreate: () => import('../features/projects/ProjectCreatePage'),
   projectDashboard: () => import('../features/projects/ProjectDashboardPage'),
   draftSubmission: () => import('../features/submissions/DraftSubmissionPage'),
@@ -20,6 +23,8 @@ export const routeWorkspaceBundles = {
 } as const;
 
 const AccountAdminPage = lazy(async () => ({ default: (await routeWorkspaceBundles.accountAdmin()).AccountAdminPage }));
+const RoleActivationPage = lazy(async () => ({ default: (await routeWorkspaceBundles.roleActivation()).RoleActivationPage }));
+const ProfilePage = lazy(async () => ({ default: (await routeWorkspaceBundles.profile()).ProfilePage }));
 const ProjectCreatePage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectCreate()).ProjectCreatePage }));
 const ProjectDashboardPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectDashboard()).ProjectDashboardPage }));
 const DraftSubmissionPage = lazy(async () => ({ default: (await routeWorkspaceBundles.draftSubmission()).DraftSubmissionPage }));
@@ -65,10 +70,22 @@ export const router = createBrowserRouter([
     path: '/login',
     element: <LoginPage />,
   },
+  {
+    path: '/register',
+    element: <RegisterPage />,
+  },
+  {
+    path: '/profile',
+    element: protectedPage(<ProfilePage />),
+  },
   // Admin-only: account management.
   {
     path: '/admin/accounts',
     element: rolePage(<AccountAdminPage />, 'admin'),
+  },
+  {
+    path: '/admin/role-activations',
+    element: rolePage(<RoleActivationPage />, 'admin'),
   },
   // Advisor + Admin: create and manage projects.
   {

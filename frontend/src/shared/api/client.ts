@@ -43,15 +43,17 @@ function apiUrl(path: string): string {
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = init.method ?? 'GET';
+  const isFormData = init.body instanceof FormData;
+  const headers = {
+    ...(isFormData ? {} : defaultHeaders),
+    ...addCsrfHeader(init.headers ?? {}, method),
+  };
 
   const response = await fetch(apiUrl(path), {
     credentials: 'include',
     ...init,
     method,
-    headers: {
-      ...defaultHeaders,
-      ...addCsrfHeader(init.headers ?? {}, method),
-    },
+    headers,
   });
 
   if (response.status === 401) {

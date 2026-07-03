@@ -4,24 +4,29 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 import { DownloadStatus } from '../../shared/ui/DownloadStatus';
-import { downloadCodeVersion, type CodeArtifact } from './api';
+import { downloadCodeArtifact, type CodeArtifact } from './api';
 
 export function CodeArtifactActions({ projectId, artifact }: { projectId: number; artifact: CodeArtifact }) {
   const [descriptor, setDescriptor] = useState<{ filename: string; deliveryMode: 'direct_response' | 'signed_url' } | undefined>();
-  const version = artifact.latestVersion;
+  const [error, setError] = useState<string | undefined>();
+  const canDownload = Boolean(artifact.archiveFileId || artifact.latestVersion);
 
   async function onDownload() {
-    if (!version) return;
-    setDescriptor(await downloadCodeVersion(projectId, artifact.id, version.id));
+    setError(undefined);
+    try {
+      setDescriptor(await downloadCodeArtifact(projectId, artifact));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download unavailable');
+    }
   }
 
   return (
     <div className="grid gap-2">
-      <Button type="button" onClick={onDownload} disabled={!version}>
+      <Button type="button" onClick={onDownload} disabled={!canDownload}>
         <Download className="h-4 w-4" aria-hidden="true" />
         Download
       </Button>
-      <DownloadStatus descriptor={descriptor} />
+      <DownloadStatus descriptor={descriptor} error={error} />
     </div>
   );
 }

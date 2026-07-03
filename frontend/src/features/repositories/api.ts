@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '../../shared/api/client';
-import { downloadDescriptor } from '../../shared/api/downloads';
+import { downloadDescriptor, type DownloadDescriptor } from '../../shared/api/downloads';
 
 export type CodeArtifactVersion = {
   id: string;
@@ -24,6 +24,9 @@ export type CodeArtifact = {
   description?: string;
   tags?: string[];
   sourcePathLabel?: string;
+  visibility: 'project_members' | 'group_wide';
+  checksumSha256?: string;
+  archiveFileId?: string;
   status: string;
   latestVersion?: CodeArtifactVersion | null;
 };
@@ -33,6 +36,15 @@ export type CodeArtifactPayload = {
   description?: string;
   tags?: string[];
   sourcePathLabel?: string;
+  visibility?: 'project_members' | 'group_wide';
+};
+
+export type CodeArtifactUploadPayload = {
+  archive: File;
+  name: string;
+  description: string;
+  tags?: string;
+  visibility: 'project_members' | 'group_wide';
 };
 
 export type CodeVersionPayload = {
@@ -49,9 +61,10 @@ export type CodeVersionPayload = {
   checksumSha256: string;
 };
 
-export function listCodeArtifacts(projectId: number, query = '') {
+export function listCodeArtifacts(projectId: number, query = '', visibility = '') {
   const params = new URLSearchParams();
   if (query) params.set('q', query);
+  if (visibility) params.set('visibility', visibility);
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<{ results: CodeArtifact[] }>(`/api/projects/${projectId}/code-artifacts/${suffix}`);
 }
@@ -60,6 +73,19 @@ export function createCodeArtifact(projectId: number, payload: CodeArtifactPaylo
   return apiRequest<CodeArtifact>(`/api/projects/${projectId}/code-artifacts/`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export function uploadCodeArtifact(projectId: number, payload: CodeArtifactUploadPayload) {
+  const formData = new FormData();
+  formData.append('archive', payload.archive);
+  formData.append('name', payload.name);
+  formData.append('description', payload.description);
+  formData.append('visibility', payload.visibility);
+  if (payload.tags) formData.append('tags', payload.tags);
+  return apiRequest<CodeArtifact>(`/api/projects/${projectId}/code-artifacts/`, {
+    method: 'POST',
+    body: formData,
   });
 }
 
@@ -74,10 +100,20 @@ export function downloadCodeVersion(projectId: number, artifactId: string, versi
   return downloadDescriptor(`/api/projects/${projectId}/code-artifacts/${artifactId}/versions/${versionId}/download/`);
 }
 
-export function useCodeArtifacts(projectId: number, query: string) {
+export function downloadCodeArtifact(projectId: number, artifact: CodeArtifact): Promise<DownloadDescriptor> {
+  if (artifact.archiveFileId) {
+    return apiRequest<DownloadDescriptor>(`/api/code-artifacts/${artifact.id}/download`);
+  }
+  if (artifact.latestVersion) {
+    return downloadCodeVersion(projectId, artifact.id, artifact.latestVersion.id);
+  }
+  return Promise.reject(new Error('No archive is available for this code artifact'));
+}
+
+export function useCodeArtifacts(projectId: number, query: string, visibility = '') {
   return useQuery({
-    queryKey: ['codeArtifacts', projectId, query],
-    queryFn: () => listCodeArtifacts(projectId, query),
+    queryKey: ['codeArtifacts', projectId, query, visibility],
+    queryFn: () => listCodeArtifacts(projectId, query, visibility),
     enabled: Boolean(projectId),
   });
 }
@@ -86,6 +122,14 @@ export function useCreateCodeArtifact(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CodeArtifactPayload) => createCodeArtifact(projectId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] }),
+  });
+}
+
+export function useCodeArtifactUpload(projectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CodeArtifactUploadPayload) => uploadCodeArtifact(projectId, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] }),
   });
 }

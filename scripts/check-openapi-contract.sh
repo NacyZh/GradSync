@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONTRACT="specs/001-research-group-ops/contracts/openapi.yaml"
+CONTRACT="${1:-specs/001-research-group-ops/contracts/openapi.yaml}"
 GENERATED="$(mktemp)"
 DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-gradsync.settings.test}"
 PYTHON="${PYTHON:-}"

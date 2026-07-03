@@ -59,8 +59,19 @@ def test_research_asset_search_download_isolation_and_audit(api_client):
     assert DownloadEvent.objects.filter(project=project).count() == 2
 
     outsider_client = authenticate(api_client, outsider)
-    assert outsider_client.get(f"/api/projects/{project.id}/papers/?q=Private").status_code == 404
+    outsider_papers = outsider_client.get(f"/api/projects/{project.id}/papers/?q=Private")
+    assert outsider_papers.status_code == 200
+    assert outsider_papers.data["results"] == []
     assert (
         outsider_client.post(f"/api/projects/{project.id}/papers/{paper.id}/download/").status_code
-        == 404
+        == 403
+    )
+    outsider_code = outsider_client.get(f"/api/projects/{project.id}/code-artifacts/?q=Private")
+    assert outsider_code.status_code == 200
+    assert outsider_code.data["results"] == []
+    assert (
+        outsider_client.post(
+            f"/api/projects/{project.id}/code-artifacts/{artifact.id}/versions/{version.id}/download/"
+        ).status_code
+        == 403
     )

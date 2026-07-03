@@ -37,3 +37,17 @@ backup path operators will use during an incident.
   notifications, and audit records.
 - Evidence includes backup name, restore target, start/end times, operator,
   validation commands, and result.
+# Research Collaboration Upload Restore Expectations
+
+For `specs/003-research-collab-platform`, database backups and media backups
+must be treated as a matched restore unit. `common.UploadedFile` rows store the
+category, original filename, stored object key, checksum, content type, owner,
+and byte size for papers, code archives, documents, writing drafts, and
+feedback files.
+
+Before applying collaboration migrations, take a PostgreSQL backup and preserve
+the current media volume. Rollback may deploy earlier application images, but
+must not delete uploaded media or metadata until an administrator has confirmed
+that no business records reference those files. Restore validation must include
+at least one metadata query, one checksum comparison, and one authorized
+download path that writes an audit event.

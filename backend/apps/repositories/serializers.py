@@ -36,6 +36,8 @@ class CodeArtifactVersionSerializer(serializers.ModelSerializer):
 class CodeArtifactSerializer(serializers.ModelSerializer):
     projectId = serializers.CharField(source="project_id", read_only=True)
     sourcePathLabel = serializers.CharField(source="source_path_label", read_only=True)
+    checksumSha256 = serializers.CharField(source="checksum_sha256", read_only=True)
+    archiveFileId = serializers.CharField(source="archive_file_id", read_only=True)
     latestVersion = serializers.SerializerMethodField()
 
     class Meta:
@@ -47,6 +49,9 @@ class CodeArtifactSerializer(serializers.ModelSerializer):
             "description",
             "tags",
             "sourcePathLabel",
+            "visibility",
+            "checksumSha256",
+            "archiveFileId",
             "status",
             "latestVersion",
         ]
@@ -61,10 +66,37 @@ class CodeArtifactCreateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     tags = serializers.ListField(child=serializers.CharField(), required=False)
     sourcePathLabel = serializers.CharField(required=False, allow_blank=True)
+    visibility = serializers.ChoiceField(choices=CodeArtifact.Visibility.values, required=False)
 
     def to_internal_value(self, data):
         attrs = super().to_internal_value(data)
         attrs["source_path_label"] = attrs.pop("sourcePathLabel", "")
+        return attrs
+
+
+def _split_string_list(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in str(value).split(",") if item.strip()]
+
+
+class CodeArtifactUploadSerializer(serializers.Serializer):
+    archive = serializers.FileField()
+    name = serializers.CharField(max_length=255)
+    description = serializers.CharField(allow_blank=False, trim_whitespace=True)
+    tags = serializers.CharField(required=False, allow_blank=True)
+    visibility = serializers.ChoiceField(
+        choices=CodeArtifact.Visibility.values,
+        required=False,
+        default=CodeArtifact.Visibility.PROJECT_MEMBERS,
+    )
+
+    def to_internal_value(self, data):
+        attrs = super().to_internal_value(data)
+        attrs["upload"] = attrs.pop("archive")
+        attrs["tags"] = _split_string_list(attrs.get("tags"))
         return attrs
 
 

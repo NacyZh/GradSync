@@ -43,3 +43,24 @@ export function accountAction(
     body: JSON.stringify({ action }),
   });
 }
+
+export type RoleActivation = {
+  id: number;
+  user: CurrentUser;
+  requestedRole: 'teacher' | 'administrator';
+  activationSource: string;
+  status: 'pending' | 'approved' | 'rejected' | 'expired' | 'revoked';
+  createdAt: string;
+  reviewedAt?: string | null;
+};
+
+export function listRoleActivations(): Promise<RoleActivation[]> {
+  return apiRequest<RoleActivation[]>('/api/accounts/admin/role-activations/');
+}
+
+export function decideRoleActivation(id: number, action: 'approve' | 'reject' | 'revoke' | 'expire') {
+  return apiRequest<RoleActivation>(`/api/accounts/admin/role-activations/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action }),
+  });
+}

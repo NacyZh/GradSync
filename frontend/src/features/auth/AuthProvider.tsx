@@ -7,8 +7,12 @@ export type CurrentUser = {
   id: number;
   email: string;
   name: string;
+  nickname?: string;
   global_role: 'advisor' | 'student' | 'admin';
-  status: 'active' | 'suspended' | 'archived';
+  requested_role?: 'student' | 'teacher' | 'administrator' | 'pending';
+  active_role?: 'student' | 'teacher' | 'administrator' | 'pending';
+  status: 'active' | 'suspended' | 'archived' | 'invited' | 'pending_email_verification' | 'pending_role_activation';
+  degreeType?: 'masters' | 'doctoral' | null;
 };
 
 type AuthContextValue = {
