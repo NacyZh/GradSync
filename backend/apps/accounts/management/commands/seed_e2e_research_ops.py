@@ -96,7 +96,14 @@ class Command(BaseCommand):
 
         microscope_type = ResourceType.objects.create(
             name="Microscope",
-            field_schema=[{"key": "room", "label": "Room", "fieldType": "text", "required": False}],
+            field_schema=[
+                {
+                    "key": "room",
+                    "label": "Room",
+                    "fieldType": "text",
+                    "required": False,
+                }
+            ],
         )
         resource = ResourceItem.objects.create(
             resource_type=microscope_type,
@@ -105,7 +112,11 @@ class Command(BaseCommand):
             field_values={"room": "Room 2"},
         )
         bench_type = ResourceType.objects.create(name="Bench", field_schema=[])
-        ResourceItem.objects.create(resource_type=bench_type, name="Open bench", location="Room 3")
+        ResourceItem.objects.create(
+            resource_type=bench_type,
+            name="Open bench",
+            location="Room 3",
+        )
         Booking.objects.create(
             project=project,
             resource_item=resource,
@@ -131,6 +142,8 @@ class Command(BaseCommand):
             title="Graph Neural Methods",
             authors=["Lin Chen"],
             tags=["graph"],
+            import_source=PaperRecord.ImportSource.LOCAL_FOLDER,
+            source_path_label="team-library/papers",
             fingerprint="graph neural methods|lin chen|",
             created_by=advisor,
         )
@@ -142,6 +155,7 @@ class Command(BaseCommand):
             content_type="application/pdf",
             size_bytes=1024,
             checksum_sha256="a" * 64,
+            relative_path="papers/graph.pdf",
             imported_by=advisor,
         )
         artifact = CodeArtifact.objects.create(
@@ -149,6 +163,7 @@ class Command(BaseCommand):
             name="Simulator",
             description="Seeded simulator artifact for full-stack download checks.",
             tags=["simulation"],
+            source_path_label="team-library/code/simulator",
             created_by=advisor,
         )
         CodeArtifactVersion.objects.create(
@@ -160,6 +175,8 @@ class Command(BaseCommand):
             content_type="application/zip",
             size_bytes=2048,
             checksum_sha256="b" * 64,
+            description="Local folder import for the deterministic e2e simulator.",
+            relative_path_manifest=["README.md", "src/simulator.py"],
             imported_by=advisor,
         )
 

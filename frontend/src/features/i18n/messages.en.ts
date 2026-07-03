@@ -18,6 +18,8 @@ export const messagesEn = {
   loginSubtitle: 'Sign in to your research group account',
   email: 'Email',
   password: 'Password',
+  showPassword: 'Show password',
+  hidePassword: 'Hide password',
   signIn: 'Sign in',
   signingIn: 'Signing in',
 } as const;

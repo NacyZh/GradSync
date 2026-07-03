@@ -22,6 +22,12 @@
 - Q: How should language switching behave? → A: Chinese/English switching updates the visible interface immediately without a full reload while persisting the account preference.
 - Q: What production readiness corrections are required? → A: Remove prototype descriptions and placeholder behavior, provide a centered login screen with a real background, and support email delivery plus delivery-status records.
 
+### Session 2026-07-03
+
+- Q: What login page corrections are required before implementation continues? → A: Replace the unsuitable background with a production-appropriate, repository-owned visual that fills the browser viewport on desktop and mobile; keep the form centered; align email/password controls; add an accessible password visibility toggle; and preserve clear loading/error states.
+- Q: How should the end-to-end seed command behave? → A: `docker compose exec backend python manage.py seed_e2e_research_ops` must run successfully after migrations in the Docker Compose backend container, create deterministic full-stack test data, and fail with actionable messages rather than model-field or migration errors.
+- Q: How should UI layout reasonableness be checked? → A: Core routes must pass desktop, tablet, and mobile layout checks for no overlapping text or controls, stable action placement, readable hierarchy, appropriate density, and usable keyboard/focus order.
+
 ## Constitution II Specification Modules
 
 ### Business Background, User Roles, and Core Goals
@@ -277,6 +283,14 @@ the active route and project context.
   that affects existing reservations.
 - Email delivery credentials are missing, the SMTP provider fails, or a
   recipient is no longer eligible at send time.
+- The login background asset fails to load, the viewport uses a short mobile
+  browser height, or the form content is taller than the visible viewport.
+- A user needs to reveal or hide the password while signing in using keyboard,
+  pointer, or screen-reader controls.
+- The e2e seed command is run after migrations in a clean Docker Compose
+  environment or after a previous e2e seed run.
+- A route is opened on mobile, tablet, and desktop widths with long Chinese or
+  English labels, validation messages, or empty-state text.
 
 ## Requirements *(mandatory)*
 
@@ -386,15 +400,23 @@ the active route and project context.
   archived, and MUST reject executable-risk or unsupported files in folder
   imports according to project policy. All rejected imports MUST explain the
   violated size or format rule before any file is stored.
-- **FR-030**: The login page MUST render as a production screen with a real
-  background visual, centered authentication form, accessible labels, loading
-  and error states, and no sample-account instructions or placeholder behavior.
+- **FR-030**: The login page MUST render as a production screen with a
+  production-appropriate, repository-owned background visual that fills the
+  browser viewport on desktop and mobile, a centered authentication form,
+  aligned email/password controls, an accessible password visibility toggle,
+  accessible labels, loading and error states, and no sample-account
+  instructions or placeholder behavior.
 - **FR-031**: The codebase, UI copy, seed data commands, and validation guides
   MUST remove prototype descriptions and placeholder implementations from production
   flows; test fixtures may exist only under test scope.
 - **FR-032**: The email system MUST support configurable SMTP or development
   email-capture delivery, retry failed sends when safe, mask secrets in logs,
   and expose delivery status for authorized project records.
+- **FR-033**: The full-stack e2e seed command `seed_e2e_research_ops` MUST run
+  successfully inside the Docker Compose backend container after migrations,
+  reset only the intended local/e2e database state, create deterministic
+  advisor/student/admin/project/resource/paper/code/notification records, and
+  remain aligned with current model fields and migrations.
 
 ### User Experience Requirements *(include for user-facing work)*
 
@@ -422,8 +444,14 @@ the active route and project context.
   labels immediately, and preserve keyboard focus and current workflow context
   when changed.
 - **UX-008**: The unauthenticated login page MUST keep the form visually centered
-  on desktop and mobile and use a production background visual that does not
-  interfere with labels, validation errors, or keyboard focus.
+  on desktop and mobile, use a production background visual that covers the full
+  viewport without distortion or remote hotlinking, align labels and fields in a
+  consistent grid, provide a password show/hide control, and preserve label,
+  validation-error, and keyboard-focus contrast.
+- **UX-009**: Core workspace routes MUST pass layout reasonableness checks on
+  desktop, tablet, and mobile: no incoherent overlap, no clipped action text,
+  no controls shifting when content loads, clear page hierarchy, appropriate
+  data density for operations work, and visible primary actions.
 
 ### Performance Requirements *(mandatory when user journeys can be measured)*
 
@@ -523,11 +551,20 @@ the active route and project context.
   signed-in session on another device or browser without changing the current
   route authorization or stored research content.
 - **SC-013**: The login page passes desktop and mobile visual/layout checks with
-  a centered form, background visual, accessible fields, production error
+  a centered form, full-viewport production background visual, aligned
+  email/password fields, accessible password visibility toggle, production error
   handling, and no sample account copy.
 - **SC-014**: Automated checks confirm no production UI copy, management command,
   or business flow refers to placeholder behavior, while test fixtures remain isolated
   to test scope.
+- **SC-015**: Running `docker compose exec backend python manage.py seed_e2e_research_ops`
+  after migrations succeeds in local Docker Compose validation and produces the
+  deterministic data required by full-stack Playwright tests without model-field
+  or migration errors.
+- **SC-016**: Automated component and Playwright layout checks cover the login
+  screen and core workspace routes at desktop, tablet, and mobile viewport
+  sizes, and fail on overlapping labels, clipped controls, blank background
+  media, or unreadable password/error states.
 
 ## Assumptions
 
@@ -582,7 +619,9 @@ the active route and project context.
   and notification delivery model is sufficient for these planned workflows.
 - The frontend implementation must be production-grade React/Vite application
   architecture using Tailwind CSS and shadcn/ui as the design-system foundation,
-  including a centered background login screen and no sample-facing product copy.
+  including a centered full-viewport background login screen, aligned
+  authentication controls, password visibility affordance, and no sample-facing
+  product copy.
   TanStack Query remains the server-state layer for Django REST contracts; Redux
   Toolkit and RTK Query remain out of scope unless a future feature identifies
   complex client-only state that TanStack Query and local component state cannot

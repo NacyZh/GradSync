@@ -68,6 +68,56 @@ test.describe('authentication', () => {
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   });
 
+  test('login layout is centered, full-viewport, aligned, and password toggle is stable', async ({ page }) => {
+    await page.route('**/api/accounts/me/', async (route) => {
+      await fulfillJson(route, { message: 'Authentication required' }, 401);
+    });
+
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 900, height: 950 },
+      { width: 1440, height: 950 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/login');
+
+      const screen = page.locator('.login-screen');
+      const card = page.locator('.login-card');
+      const email = page.getByLabel('Email');
+      const password = page.getByLabel('Password');
+      const toggle = page.getByRole('button', { name: 'Show password' });
+      const submit = page.getByRole('button', { name: 'Sign in' });
+
+      await expect(screen).toBeVisible();
+      await expect(card).toBeVisible();
+      await expect(toggle).toBeVisible();
+      await expect(submit).toBeVisible();
+      await expect(screen).not.toHaveCSS('background-image', /images\.unsplash\.com/);
+
+      const screenBox = await screen.boundingBox();
+      const cardBox = await card.boundingBox();
+      const emailBox = await email.boundingBox();
+      const passwordBox = await password.boundingBox();
+      const submitBefore = await submit.boundingBox();
+
+      expect(screenBox?.width).toBeGreaterThanOrEqual(viewport.width - 1);
+      expect(screenBox?.height).toBeGreaterThanOrEqual(viewport.height - 1);
+      expect(cardBox).not.toBeNull();
+      expect(emailBox).not.toBeNull();
+      expect(passwordBox).not.toBeNull();
+      expect(Math.abs((emailBox?.x ?? 0) - (passwordBox?.x ?? 0))).toBeLessThanOrEqual(2);
+      expect(Math.abs((emailBox?.width ?? 0) - (passwordBox?.width ?? 0))).toBeLessThanOrEqual(2);
+
+      const cardCenter = (cardBox?.x ?? 0) + (cardBox?.width ?? 0) / 2;
+      expect(Math.abs(cardCenter - viewport.width / 2)).toBeLessThanOrEqual(24);
+
+      await toggle.click();
+      await expect(page.getByLabel('Password')).toHaveAttribute('type', 'text');
+      const submitAfter = await submit.boundingBox();
+      expect(Math.abs((submitBefore?.y ?? 0) - (submitAfter?.y ?? 0))).toBeLessThanOrEqual(1);
+    }
+  });
+
   test('login fails with generic error on invalid credentials', async ({ page }) => {
     await page.route('**/api/accounts/me/', async (route) => {
       await fulfillJson(route, { message: 'Authentication required' }, 401);

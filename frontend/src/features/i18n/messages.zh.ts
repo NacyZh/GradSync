@@ -18,6 +18,8 @@ export const messagesZh = {
   loginSubtitle: '登录您的课题组研究协作账号',
   email: '邮箱',
   password: '密码',
+  showPassword: '显示密码',
+  hidePassword: '隐藏密码',
   signIn: '登录',
   signingIn: '正在登录',
 } as const;

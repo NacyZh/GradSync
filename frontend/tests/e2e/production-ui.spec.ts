@@ -38,6 +38,21 @@ const workspaceCases: ViewportCase[] = [
   },
 ];
 
+const routeCases = [
+  { path: '/projects/1', label: 'project dashboard' },
+  { path: '/projects/1/resources', label: 'resource booking' },
+  { path: '/projects/1/papers', label: 'paper library' },
+  { path: '/projects/1/code', label: 'code repository' },
+  { path: '/', label: 'notifications dashboard' },
+  { path: '/admin/accounts', label: 'account administration' },
+];
+
+const viewportSizes = [
+  { width: 1440, height: 950 },
+  { width: 900, height: 950 },
+  { width: 390, height: 900 },
+];
+
 test.describe('production workspace layout', () => {
   for (const viewport of workspaceCases) {
     test(`${viewport.name} keeps shell regions visible without overlap`, async ({ page }, testInfo) => {
@@ -69,6 +84,25 @@ test.describe('production workspace layout', () => {
         fullPage: true,
       });
     });
+  }
+
+  for (const routeCase of routeCases) {
+    for (const viewport of viewportSizes) {
+      test(`${routeCase.label} has no clipped primary layout at ${viewport.width}px`, async ({ page }) => {
+        await mockAuthenticatedApi(page);
+        if (fullStackE2E) {
+          await loginAs(page);
+        }
+
+        await page.setViewportSize(viewport);
+        await page.goto(routeCase.path);
+        await expect(page.getByRole('banner')).toBeVisible();
+        await expect(page.getByRole('main')).toBeVisible();
+
+        await expectPrimaryControlsStayInsideViewport(page);
+        await expectNoVisibleTextOverlap(page);
+      });
+    }
   }
 });
 
@@ -104,6 +138,44 @@ async function expectVisibleLandmarksDoNotOverlap(page: Page, locators: Locator[
       const overlapX = Math.max(0, Math.min(boxes[leftIndex].x + boxes[leftIndex].width, boxes[rightIndex].x + boxes[rightIndex].width) - Math.max(boxes[leftIndex].x, boxes[rightIndex].x));
       const overlapY = Math.max(0, Math.min(boxes[leftIndex].y + boxes[leftIndex].height, boxes[rightIndex].y + boxes[rightIndex].height) - Math.max(boxes[leftIndex].y, boxes[rightIndex].y));
       expect(overlapX * overlapY).toBe(0);
+    }
+  }
+}
+
+async function expectPrimaryControlsStayInsideViewport(page: Page) {
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  const controls = page.locator(
+    'main button:visible, main a:visible, header button:visible, aside a:visible',
+  );
+  const count = await controls.count();
+  expect(count).toBeGreaterThan(0);
+  for (let index = 0; index < Math.min(count, 30); index += 1) {
+    const box = await controls.nth(index).boundingBox();
+    if (!box) continue;
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.height).toBeGreaterThan(0);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual((viewport?.width ?? 0) + 1);
+  }
+}
+
+async function expectNoVisibleTextOverlap(page: Page) {
+  const textNodes = page.locator('main h1:visible, main h2:visible, main p:visible, main label:visible');
+  const boxes = [];
+  const count = await textNodes.count();
+  for (let index = 0; index < Math.min(count, 24); index += 1) {
+    const box = await textNodes.nth(index).boundingBox();
+    if (box && box.width > 0 && box.height > 0) {
+      boxes.push(box);
+    }
+  }
+  for (let leftIndex = 0; leftIndex < boxes.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < boxes.length; rightIndex += 1) {
+      const overlapX = Math.max(0, Math.min(boxes[leftIndex].x + boxes[leftIndex].width, boxes[rightIndex].x + boxes[rightIndex].width) - Math.max(boxes[leftIndex].x, boxes[rightIndex].x));
+      const overlapY = Math.max(0, Math.min(boxes[leftIndex].y + boxes[leftIndex].height, boxes[rightIndex].y + boxes[rightIndex].height) - Math.max(boxes[leftIndex].y, boxes[rightIndex].y));
+      const overlapArea = overlapX * overlapY;
+      expect(overlapArea).toBeLessThanOrEqual(1);
     }
   }
 }

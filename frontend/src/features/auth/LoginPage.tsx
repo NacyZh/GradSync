@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 import { useAuth } from './AuthProvider';
@@ -28,6 +29,7 @@ function LoginContent({
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   if (isLoading) {
     return <AsyncState state="loading" message="Loading account" />;
@@ -65,9 +67,11 @@ function LoginContent({
           </div>
 
           <form aria-label={t('signIn')} onSubmit={onSubmit} className="login-form">
-            <label>
-              {t('email')}
+            <div className="login-field">
+              <label htmlFor="login-email">{t('email')}</label>
               <input
+                id="login-email"
+                className="login-input"
                 name="email"
                 type="email"
                 autoComplete="email"
@@ -76,19 +80,37 @@ function LoginContent({
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoggingIn}
               />
-            </label>
-            <label>
-              {t('password')}
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoggingIn}
-              />
-            </label>
+            </div>
+            <div className="login-field">
+              <label htmlFor="login-password">{t('password')}</label>
+              <span className="login-password-row">
+                <input
+                  id="login-password"
+                  className="login-input"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoggingIn}
+                />
+                <button
+                  className="login-password-toggle"
+                  type="button"
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((current) => !current)}
+                  disabled={isLoggingIn}
+                >
+                  <span className="sr-only">{showPassword ? t('hidePassword') : t('showPassword')}</span>
+                  {showPassword ? (
+                    <EyeOff aria-hidden="true" size={18} />
+                  ) : (
+                    <Eye aria-hidden="true" size={18} />
+                  )}
+                </button>
+              </span>
+            </div>
             <button
               className="button primary login-button"
               type="submit"

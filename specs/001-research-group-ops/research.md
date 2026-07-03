@@ -63,6 +63,44 @@ workflow logic. Duplicating shadcn/ui components inside each feature was
 rejected because variant drift would undermine visual consistency and
 accessibility review.
 
+## Decision: Repository-owned full-viewport login visual with explicit layout QA
+
+**Rationale**: The login route is the first production surface and must not
+depend on remote hotlinked imagery, stretched backgrounds, or ad hoc form
+alignment. The implementation should use a repository-owned or generated bitmap
+visual that matches research operations, a CSS fallback background, `100svh`
+viewport sizing, responsive focal-point rules, and a contrast overlay that keeps
+labels, errors, and focus rings readable. Email and password fields should share
+one grid system and stable dimensions, and the password field must include an
+accessible show/hide control using a recognizable icon and text alternative.
+Playwright screenshot checks at mobile, tablet, and desktop sizes should verify
+the background is nonblank, the form is centered, controls are aligned, and no
+text overlaps or clips.
+
+**Alternatives considered**: Continuing with a generic remote background image
+was rejected because it can fail, crop poorly, or look unrelated to the product.
+Using only a gradient was rejected because the product requirement calls for a
+real background visual. Keeping the password as a plain masked field was
+rejected because users explicitly need a visibility option and it is a standard
+production authentication affordance.
+
+## Decision: Docker e2e seed command as a first-class validation contract
+
+**Rationale**: Full-stack Playwright and local Docker validation depend on
+deterministic data. `seed_e2e_research_ops` must run after migrations in the
+backend container, reset only the intended local/e2e database, create users,
+memberships, configurable resources, bookings, papers, code artifacts, and
+notifications using current model fields, and exit with actionable errors if
+prerequisites are missing. The command should be covered by a management-command
+test or Docker smoke scenario so model renames and migration drift fail before
+manual validation.
+
+**Alternatives considered**: Relying only on mock Playwright data was rejected
+because it misses real Django model and migration drift. Reusing production
+validation seed data for e2e was rejected because e2e tests require destructive
+reset semantics and deterministic identifiers that should remain isolated from
+normal local validation data.
+
 ## Decision: TanStack Query remains the server-state boundary
 
 **Rationale**: Project, task, submission, booking, notification, and account

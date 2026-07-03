@@ -539,3 +539,55 @@ Task: "T211 [P] [US4] [Frontend] Implement typed API clients and TanStack Query 
 - [X] T231 MEDIUM: Ensure real-time Chinese/English switching covers the production login screen, resource type/item labels, local paper/code import labels, validation messages, and unsaved-form preservation with focused component/e2e coverage in frontend/src/features/i18n/*, frontend/src/app/*, frontend/src/features/auth/*, frontend/src/features/resources/*, frontend/src/features/library/*, frontend/src/features/repositories/*, and frontend/tests/**/*locale* per FR-027, UX-007, UX-008, US4/AC4..AC5, and contracts/frontend-ui.md (partial)
 - [X] T232 HIGH: Verify and harden configurable email delivery and notification status against the updated production requirements, including SMTP/email-capture configuration, retry-safe failure states, secret masking, membership re-check before send, and quickstart Scenario 11 coverage in backend/apps/notifications/*, backend/gradsync/settings/*, backend/tests/**/*notification*, frontend/src/features/notifications/*, frontend/tests/**/*notification*, and docs/ops/email-provider.md per FR-014, FR-015, FR-016, FR-032, Scenario 11, and plan: configurable email delivery (partial)
 - [X] T233 MEDIUM: Run and document the updated validation suite after T227-T232, including backend contract/unit/integration tests, frontend component tests, full-stack Playwright scenarios for resources/assets/locale/login/email, OpenAPI drift, generated-artifact checks, and quickstart-results evidence in specs/001-research-group-ops/quickstart-results.md per SC-009..SC-014, quickstart.md, and Constitution II (partial)
+
+## Phase 17: Convergence
+
+**Purpose**: Convert the 2026-07-03 production feedback into executable work for login visual quality, password visibility, Docker e2e seed reliability, and responsive UI layout checks.
+
+### Tests for Production Login, E2E Seeding, and Layout Audit
+
+- [X] T234 [P] [US4] [Test] Add backend management-command test for deterministic full-stack e2e seeding in backend/tests/integration/test_seed_e2e_research_ops.py (AC: FR-033, SC-015); self-check: `call_command("seed_e2e_research_ops")` succeeds after migrations, creates admin/advisor/student/project/resource/booking/paper/code/notification records, and can run twice without stale model-field errors.
+- [X] T235 [P] [US4] [Test] Add login component coverage for aligned email/password fields, accessible password show/hide toggle, localized labels, loading state, and failed-sign-in feedback in frontend/tests/component/login.test.tsx (AC: FR-030, UX-008, SC-013); self-check: tests fail if the password toggle is missing, lacks an accessible name, or changes form layout state incorrectly.
+- [X] T236 [P] [US4] [Test] Add Playwright login layout screenshot/assertion coverage for mobile, tablet, and desktop viewport sizes in frontend/tests/e2e/auth-login.spec.ts and frontend/tests/e2e/production-ui.spec.ts (AC: FR-030, UX-008, SC-016); self-check: verifies the background is nonblank/full-viewport, form center is within tolerance, fields align, password toggle works, and labels/errors remain readable.
+- [X] T237 [P] [US4] [Test] Add core workspace layout reasonableness checks for dashboard, resources, paper library, code repository, notifications, and account administration in frontend/tests/e2e/production-ui.spec.ts (AC: UX-009, SC-016); self-check: desktop/tablet/mobile assertions fail on overlapping text or controls, clipped action labels, hidden primary actions, or major layout shift after loading.
+
+### Implementation for Production Login, E2E Seeding, and Layout Audit
+
+- [X] T238 [US4] [Frontend] Replace the remote login background with a repository-owned production visual and CSS fallback in frontend/src/assets/auth/ and frontend/src/app/styles.css (AC: FR-030, UX-008); self-check: build output references local assets, the login background uses full viewport coverage without distortion, and no runtime remote image URL remains.
+- [X] T239 [US4] [Frontend] Rebuild the login form grid with aligned labels, email/password controls, stable validation placement, and responsive centering in frontend/src/features/auth/LoginPage.tsx and frontend/src/app/styles.css (AC: FR-030, UX-008, SC-013); self-check: email and password rows share width/height/border treatment on desktop and mobile.
+- [X] T240 [US4] [Frontend] Add an accessible password visibility toggle using lucide-react icons in frontend/src/features/auth/LoginPage.tsx and frontend/src/features/i18n/messages.en.ts and frontend/src/features/i18n/messages.zh.ts (AC: FR-030, UX-008); self-check: toggle updates input type without moving the submit action and exposes localized accessible labels.
+- [X] T241 [US4] [Backend] Fix `seed_e2e_research_ops` to use current ResourceType/ResourceItem, PaperAttachment.imported_by, CodeArtifactVersion.imported_by/imported_at, validation-safe local import metadata, and idempotent reset semantics in backend/apps/accounts/management/commands/seed_e2e_research_ops.py (AC: FR-033, SC-015); self-check: `docker compose exec backend python manage.py seed_e2e_research_ops` succeeds after migrations and aligns with full-stack Playwright data expectations.
+- [X] T242 [US4] [Frontend] Normalize responsive layout constraints for core workspace routes in frontend/src/app/Layout.tsx, frontend/src/app/styles.css, frontend/src/shared/ui/PageShell.tsx, frontend/src/features/projects/ProjectDashboardPage.tsx, frontend/src/features/resources/ResourceListPage.tsx, frontend/src/features/library/PaperLibraryPage.tsx, frontend/src/features/repositories/CodeRepositoryPage.tsx, frontend/src/features/notifications/NotificationList.tsx, and frontend/src/features/admin/AccountAdminPage.tsx (AC: UX-009, SC-016); self-check: primary actions stay visible, text does not overlap, and dense operation screens remain scannable on mobile, tablet, and desktop.
+- [X] T243 [US4] [Docs] Update quickstart results with the seed command, login layout, password visibility, and layout audit validation outcomes in specs/001-research-group-ops/quickstart-results.md (AC: SC-015, SC-016); self-check: recorded commands and outcomes match the validation actually run.
+- [X] T244 [US4] [Test] Run the updated validation suite for backend seed command, frontend login component tests, Playwright login/layout checks, frontend lint/build, backend lint, generated-artifact guard, and OpenAPI guard in specs/001-research-group-ops/quickstart-results.md (AC: SC-013, SC-015, SC-016, Constitution II); self-check: failures are fixed or documented with owner and release risk before marking this task complete.
+
+**Checkpoint**: Production login visual quality, password visibility, e2e seed reliability, and responsive layout checks are independently testable without weakening existing US1-US4 behavior.
+
+### Phase 17 Dependencies
+
+- T234 through T237 must be added before implementation tasks and should fail for the current missing or broken behavior.
+- T238 through T240 depend on T235 and T236 because the login UI must be driven by component and layout tests.
+- T241 depends on T234 because management-command behavior must be proven by a backend test before implementation.
+- T242 depends on T237 because responsive workspace layout changes need screenshot/layout assertions.
+- T243 and T244 run after T238 through T242.
+
+### Phase 17 Parallel Examples
+
+```bash
+Task: "T234 [P] [US4] [Test] Add backend management-command test for deterministic full-stack e2e seeding in backend/tests/integration/test_seed_e2e_research_ops.py"
+Task: "T235 [P] [US4] [Test] Add login component coverage for aligned email/password fields, accessible password show/hide toggle, localized labels, loading state, and failed-sign-in feedback in frontend/tests/component/login.test.tsx"
+Task: "T236 [P] [US4] [Test] Add Playwright login layout screenshot/assertion coverage for mobile, tablet, and desktop viewport sizes in frontend/tests/e2e/auth-login.spec.ts and frontend/tests/e2e/production-ui.spec.ts"
+Task: "T237 [P] [US4] [Test] Add core workspace layout reasonableness checks for dashboard, resources, paper library, code repository, notifications, and account administration in frontend/tests/e2e/production-ui.spec.ts"
+```
+
+```bash
+Task: "T238 [US4] [Frontend] Replace the remote login background with a repository-owned production visual and CSS fallback in frontend/src/assets/auth/ and frontend/src/app/styles.css"
+Task: "T241 [US4] [Backend] Fix seed_e2e_research_ops to use current model fields in backend/apps/accounts/management/commands/seed_e2e_research_ops.py"
+Task: "T242 [US4] [Frontend] Normalize responsive layout constraints for core workspace routes in frontend/src/app/Layout.tsx, frontend/src/app/styles.css, and frontend/src/features/*"
+```
+
+### Updated Incremental Delivery
+
+1. Keep US1 through US4 as the already-delivered functional baseline.
+2. Complete Phase 17 before another production validation pass because login quality and Docker e2e seed reliability now block release confidence.
+3. Treat full-stack seed reliability and no-overlap responsive layout checks as release blockers for the production UI acceptance path.

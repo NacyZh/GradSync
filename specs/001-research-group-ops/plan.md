@@ -13,8 +13,10 @@ inline comments, project records remain strictly isolated by project membership,
 custom discipline-specific resources are booked without conflicts, paper and
 code assets are imported from local folders into project-scoped team public
 libraries, the interface can switch between Chinese and English immediately,
-the login screen is production-ready, and email reminders cover pending reviews,
-approaching deadlines, booking changes, and new submissions.
+the login screen is production-ready with a full-viewport appropriate visual,
+aligned controls, and password visibility support, Docker e2e seeding is
+reliable, and email reminders cover pending reviews, approaching deadlines,
+booking changes, and new submissions.
 
 The implementation uses Django for backend domain logic and project-scoped
 authorization, React with TypeScript and Vite for the web application,
@@ -37,7 +39,9 @@ lightweight BibTeX/text metadata parsing implemented in the backend service
 layer unless a later task selects a vetted parser; React i18n message catalog
 support implemented with local typed dictionaries before adding a larger
 translation framework; configurable SMTP or development email-capture backend
-for notification delivery.
+for notification delivery; repository-owned responsive login background asset
+or equivalent generated bitmap visual with CSS fallback for authentication
+screens.
 
 **Frontend Architecture Decision**: This feature must deliver a production-grade
 React/Vite architecture. Tailwind CSS and shadcn/ui provide the design-system
@@ -45,10 +49,11 @@ foundation, Radix UI primitives provide accessible component behavior,
 lucide-react provides iconography, TanStack Query remains the server-state layer
 for Django REST contracts, and React Hook Form/Zod remain the form validation
 layer. The unauthenticated login route uses a centered form over a real
-background visual with production error/loading states. Redux Toolkit and RTK
-Query are not introduced unless a later feature proves complex client-only state
-that cannot be handled by route state, local component state, and TanStack
-Query.
+background visual that fills the viewport without remote hotlinking, uses
+aligned input controls, exposes an accessible password show/hide action, and
+supports production error/loading states. Redux Toolkit and RTK Query are not
+introduced unless a later feature proves complex client-only state that cannot
+be handled by route state, local component state, and TanStack Query.
 
 **Storage**: PostgreSQL for users, projects, memberships, tasks, draft versions,
 reports, inline comments, configurable resource types/items, bookings, paper
@@ -63,8 +68,9 @@ tests; Vitest and React Testing Library for frontend unit/component tests;
 Playwright for end-to-end project isolation, submission review, booking, paper
 library local-folder import, code library local-folder import with descriptions,
 download authorization, real-time language-switching flows, centered login
-layout, and email delivery/status flows; contract tests against
-`contracts/openapi.yaml`
+layout with password visibility, responsive layout reasonableness checks,
+Docker `seed_e2e_research_ops` smoke validation, and email delivery/status
+flows; contract tests against `contracts/openapi.yaml`
 
 **Target Platform**: Docker Compose-managed web deployment with backend API,
 frontend web app, PostgreSQL, Redis, and worker services
@@ -93,7 +99,10 @@ default automatic external search; paper import must reject duplicates with an
 explainable match; downloads must re-check authorization and write audit events;
 archived projects are read-only unless reopened; user locale changes must update
 visible UI immediately without altering authorization or stored research
-content; production flows must not include prototype-only copy or behavior; all
+content; production login assets must be owned by the repository or build
+pipeline and must fill the viewport without distorting form layout; Docker e2e
+seed data must stay aligned with current migrations and model fields;
+production flows must not include prototype-only copy or behavior; all
 behavioral changes require automated tests
 
 **Scale/Scope**: At least 50 active projects, 500 total project members, and
@@ -120,15 +129,18 @@ library lookup, downloads, and language switching.
   must live in `shared/ui`, be generated or adapted from shadcn/ui, and expose
   stable variants instead of one-off CSS. Non-obvious isolation, duplicate
   detection, local folder import, download authorization, immediate locale
-  switching, email delivery fallback, configurable resource validation, and
-  booking conflict rules will be documented in domain services.
+  switching, production login composition, Docker e2e seed reliability, email
+  delivery fallback, configurable resource validation, and booking conflict
+  rules will be documented in domain services.
 - **Testing**: PASS. Required coverage includes backend unit tests for hierarchy
   and state rules, contract tests for every public API operation, integration
   tests for project isolation, library duplicate detection, download
   authorization, immediate language switching, email delivery status, custom
-  resource configuration, local folder import, and booking conflicts, frontend
-  component tests for critical forms and states, and Playwright flows for
-  advisor/student end-to-end journeys. No test gaps are approved.
+  resource configuration, local folder import, Docker e2e seed command
+  execution, and booking conflicts, frontend component tests for critical forms
+  and states, and Playwright flows for advisor/student end-to-end journeys,
+  login layout, and responsive workspace layout checks. No test gaps are
+  approved.
 - **User Experience**: PASS. Project context must remain visible on every
   project-scoped route. The web app will include advisor project management,
   student assigned work, review queues, and booking views with consistent
@@ -138,11 +150,13 @@ library lookup, downloads, and language switching.
   and filtered empty states. Resource management screens must support custom
   type and field configuration. The authenticated shell must expose a
   keyboard-accessible Chinese/English language switcher that updates visible UI
-  text immediately. The login screen must be centered over a real background
-  visual and expose production authentication feedback.
+  text immediately. The login screen must be centered over a full-viewport,
+  production-appropriate background visual, align authentication controls, offer
+  password visibility, and expose production authentication feedback.
   Tailwind CSS tokens and shadcn/ui components must provide a coherent,
   production-ready operations interface rather than prototype cards or placeholder
-  layouts.
+  layouts. Core routes must be checked for overlap, clipped controls, unstable
+  action placement, and poor responsive density.
 - **Performance**: PASS. Performance requirements from the spec are carried into
   backend query design, frontend data loading, file metadata indexing, duplicate
   detection, and quickstart validation. Search, dashboard, library, and locale
@@ -158,8 +172,9 @@ plus project foreign keys on every research record. Booking conflict prevention,
 custom resource schemas, paper duplicate detection, code artifact versioning,
 local folder import, download authorization, immediate locale preference
 behavior, email notification delivery, production login/workspace shell
-behavior, design-system composition, and accessibility expectations are captured
-as contracts and validation scenarios.
+behavior, Docker e2e seed reliability, design-system composition, responsive UI
+layout checks, and accessibility expectations are captured as contracts and
+validation scenarios.
 
 ## Stakeholder Review and Release Risk
 
@@ -253,7 +268,8 @@ paper duplicate detection, code artifact versioning, local import staging,
 download authorization, locale preference persistence, and email notification
 scheduling in backend domain services, while the frontend owns workflow
 presentation, local file/folder selection, client-side validation, immediate
-language message selection, and production-grade login/workspace composition.
+language message selection, production-grade login/workspace composition,
+responsive layout behavior, and password visibility interaction.
 The frontend uses Tailwind CSS for tokens/layout utilities, shadcn/ui generated
 components in
 `frontend/src/components/ui`, workflow-specific compositions in

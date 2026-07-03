@@ -148,11 +148,11 @@
   }
 
   .workspace {
-    @apply grid min-h-[calc(100vh-var(--density-header))] grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)];
+    @apply grid min-h-[calc(100vh-var(--density-header))] min-w-0 grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)];
   }
 
   .sidebar {
-    @apply border-b bg-card p-4 lg:border-b-0 lg:border-r lg:p-5;
+    @apply min-w-0 overflow-x-auto border-b bg-card p-4 lg:overflow-visible lg:border-b-0 lg:border-r lg:p-5;
   }
 
   .sidebar-nav {
@@ -181,7 +181,7 @@
   }
 
   .content-shell {
-    @apply min-w-0;
+    @apply min-w-0 overflow-x-clip;
   }
 
   main {
@@ -197,7 +197,7 @@
   }
 
   .page-heading {
-    @apply mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between;
+    @apply mb-6 flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between;
   }
 
   .page-heading h1 {
@@ -219,7 +219,7 @@
 
   .panel,
   .metric-card {
-    @apply rounded-lg border bg-card p-5 text-card-foreground;
+    @apply min-w-0 rounded-lg border bg-card p-5 text-card-foreground;
   }
 
   .panel h2,
@@ -301,7 +301,7 @@
   input,
   select,
   textarea {
-    @apply min-h-10 rounded-md border bg-background px-3 py-2 text-foreground;
+    @apply min-h-10 max-w-full rounded-md border bg-background px-3 py-2 text-foreground;
   }
 
   textarea {
@@ -315,7 +315,7 @@
   .button,
   .icon-button,
   button {
-    @apply inline-flex min-h-10 items-center justify-center rounded-md border bg-card px-3.5 text-sm font-bold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-55;
+    @apply inline-flex min-h-10 max-w-full items-center justify-center rounded-md border bg-card px-3.5 text-sm font-bold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-55;
   }
 
   .button.primary {
@@ -428,25 +428,62 @@
   }
 
   .login-container {
-    @apply flex min-h-screen items-center justify-center px-4 py-10;
+    @apply flex min-h-screen items-center justify-center px-4 py-8 sm:px-6;
+    min-height: 100svh;
   }
 
   .login-screen {
-    @apply min-h-screen bg-cover bg-center text-foreground;
+    @apply min-h-screen w-full max-w-none bg-cover bg-center p-0 text-foreground;
+    margin: 0;
+    min-height: 100svh;
+    background-color: hsl(211 55% 16%);
     background-image:
-      linear-gradient(135deg, hsl(211 55% 16% / 0.86), hsl(165 34% 22% / 0.7)),
-      url('https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1800&q=80');
+      linear-gradient(135deg, hsl(211 55% 13% / 0.86), hsl(173 42% 22% / 0.7)),
+      url('../assets/auth/research-workspace.svg');
+    background-position: center;
   }
 
   .login-card {
-    @apply w-full max-w-md rounded-lg border bg-card/95 p-8 text-card-foreground shadow-workspace backdrop-blur;
+    @apply w-full max-w-md rounded-lg border bg-card/95 p-6 text-card-foreground shadow-workspace backdrop-blur sm:p-8;
   }
 
   .login-header {
     @apply mb-6 flex items-start justify-between gap-4;
   }
 
+  .login-header h1 {
+    @apply text-3xl font-extrabold leading-tight;
+  }
+
+  .login-subtitle {
+    @apply mt-1 text-sm text-muted-foreground;
+  }
+
   .login-form {
     @apply grid gap-4;
+  }
+
+  .login-field {
+    @apply grid gap-1.5 text-sm font-bold text-muted-foreground;
+  }
+
+  .login-input {
+    @apply h-11 w-full rounded-md border bg-background px-3 py-2 text-base font-normal text-foreground;
+  }
+
+  .login-password-row {
+    @apply relative block w-full;
+  }
+
+  .login-password-row .login-input {
+    @apply pr-12;
+  }
+
+  .login-password-toggle {
+    @apply absolute right-1.5 top-1/2 h-8 min-h-8 w-8 -translate-y-1/2 border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted hover:text-foreground;
+  }
+
+  .login-button {
+    @apply h-11 w-full;
   }
 }

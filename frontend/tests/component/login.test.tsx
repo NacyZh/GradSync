@@ -47,7 +47,29 @@ describe('login page', () => {
     expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'email');
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
     expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('keeps authentication fields aligned and toggles password visibility accessibly', async () => {
+    renderLogin();
+    await screen.findByRole('heading', { name: 'GradSync' });
+
+    const email = screen.getByLabelText('Email');
+    const password = screen.getByLabelText('Password');
+    expect(email).toHaveClass('login-input');
+    expect(password).toHaveClass('login-input');
+    expect(email.closest('.login-field')).toBeInTheDocument();
+    expect(password.closest('.login-field')).toBeInTheDocument();
+
+    const toggle = screen.getByRole('button', { name: 'Show password' });
+    expect(password).toHaveAttribute('type', 'password');
+    await userEvent.click(toggle);
+    expect(password).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('keeps submit disabled when only one field is filled', async () => {

@@ -42,7 +42,17 @@ Local validation accounts:
    resource types, and email-capture settings. It must not create sample copy or
    placeholder behavior in production routes.
 
-3. Run automated checks:
+3. For full-stack e2e validation, reset and seed deterministic test data:
+
+   ```bash
+   docker compose exec backend python manage.py seed_e2e_research_ops
+   ```
+
+   This command is destructive for the local/e2e database only. It must run
+   successfully after migrations and stay aligned with the current Django models
+   used by Playwright full-stack tests.
+
+4. Run automated checks:
 
    ```bash
    docker compose exec backend pytest
@@ -129,31 +139,42 @@ until reopened.
 
 1. Start the local stack and open the unauthenticated login route on desktop and
    mobile.
-2. Confirm the sign-in form is centered over a real background visual, all
-   labels/errors are accessible, loading and failed-sign-in states are visible,
-   and no sample account copy is shown.
-3. Sign in as admin, advisor, student, and reviewer.
-4. Navigate through the authenticated workspace shell on desktop, tablet, and
+2. Confirm the sign-in form is centered over a full-viewport,
+   production-appropriate background visual with no blank margins, distortion,
+   unrelated cropping, or remote hotlinked runtime dependency.
+3. Confirm email and password input rows are aligned, have equal field widths,
+   and keep validation messages and focus rings readable.
+4. Confirm the password visibility toggle works by keyboard and pointer, exposes
+   an accessible label, and does not resize the input row or move the submit
+   action.
+5. Confirm all labels/errors are accessible, loading and failed-sign-in states
+   are visible, and no sample account copy is shown.
+6. Sign in as admin, advisor, student, and reviewer.
+7. Navigate through the authenticated workspace shell on desktop, tablet, and
    mobile viewport widths.
-5. Confirm role-aware navigation, selected-project context, notification entry,
+8. Confirm role-aware navigation, selected-project context, notification entry,
    theme toggle, loading states, empty states, validation errors, and destructive
    confirmation dialogs use Tailwind CSS tokens and shadcn/ui components rather
    than ad hoc prototype controls.
-6. Confirm the admin account workspace can filter accounts by role/status and
+9. Confirm the admin account workspace can filter accounts by role/status and
    expose suspend, reactivate, and archive controls without leaking those routes
    to advisor or student users.
-7. Confirm project dashboard, review queue, booking workspace, notification
+10. Confirm project dashboard, review queue, booking workspace, notification
    center, and account administration routes load through route-level bundles
    and preserve selected-project context before create, submit, review, comment,
    book, cancel, archive, or reopen actions.
-8. Complete project creation, task update, draft/report submission, review
+11. Confirm core routes have no overlapping text or controls, clipped action
+   labels, unstable layout shifts during loading, or inaccessible primary
+   actions at desktop, tablet, and mobile widths.
+12. Complete project creation, task update, draft/report submission, review
    status update, inline comment creation, booking creation, booking
    cancellation, archive, and reopen workflows using keyboard navigation only.
-9. Run component, accessibility, build, full-stack Playwright, and production UI
+13. Run component, accessibility, build, full-stack Playwright, and production UI
    screenshot/layout checks:
 
    ```bash
    sh scripts/check-generated-artifacts.sh
+   docker compose exec backend python manage.py seed_e2e_research_ops
    cd frontend
    npm run lint
    npm test
@@ -261,6 +282,28 @@ authorization.
 **Expected outcome**: Email notifications are queued, sent, failed, or skipped
 with visible status records, retryable failures can be retried safely, and
 project membership is re-checked before send.
+
+### Scenario 12: Full-Stack Seed Command and Layout Audit
+
+1. Start Docker Compose services and apply migrations.
+2. Run:
+
+   ```bash
+   docker compose exec backend python manage.py seed_e2e_research_ops
+   ```
+
+3. Confirm the command exits successfully and creates the deterministic admin,
+   advisor, student, project, resource, booking, paper, code, and notification
+   data expected by full-stack Playwright tests.
+4. Run login and core workspace layout checks at mobile, tablet, and desktop
+   sizes.
+5. Inspect screenshots or automated assertions for full-page login background
+   coverage, aligned auth fields, password visibility behavior, non-overlapping
+   workspace controls, and readable Chinese/English labels.
+
+**Expected outcome**: The e2e seed command is reliable in Docker Compose, and
+layout checks fail before release if authentication or workspace UI becomes
+visually broken, misaligned, clipped, or overlapped.
 
 ## Contract References
 
