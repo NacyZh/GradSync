@@ -2,18 +2,28 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.search import apply_text_search
 from apps.projects.services import projects_visible_to
 
-from .models import Booking, ResourceItem, ResourceType
-from .serializers import BookingSerializer, ResourceItemSerializer, ResourceTypeSerializer
-from .services import BookingService
+from .models import Booking, ResourceItem, ResourceType, ResourceUseSubmission
+from .serializers import (
+    BookingSerializer,
+    LaboratoryResourceSerializer,
+    ResourceCreateSerializer,
+    ResourceItemSerializer,
+    ResourceTypeSerializer,
+    ResourceUpdateSerializer,
+    ResourceUseSubmissionCreateSerializer,
+    ResourceUseSubmissionSerializer,
+    ResourceUseSubmissionUpdateSerializer,
+)
+from .services import BookingService, ResourceInventoryService, resource_status_from_contract
 
 
 class ResourceTypeViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -148,3 +158,125 @@ class BookingViewSet(
         except DjangoValidationError as exc:
             raise ValidationError(exc.messages) from exc
         return Response(BookingSerializer(booking).data)
+
+
+class LaboratoryResourceViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    permission_classes = [IsAuthenticated]
+    queryset = ResourceItem.objects.select_related("resource_type", "manager").prefetch_related(
+        "use_submissions", "use_submissions__student"
+    )
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return ResourceCreateSerializer
+        if self.action in {"partial_update", "update"}:
+            return ResourceUpdateSerializer
+        if self.action == "use_submissions":
+            return ResourceUseSubmissionCreateSerializer
+        return LaboratoryResourceSerializer
+
+    def get_queryset(self):
+        queryset = self.queryset
+        queryset = apply_text_search(
+            queryset,
+            self.request.query_params.get("search"),
+            ["name", "description", "resource_type__name", "use_instructions"],
+        )
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            try:
+                queryset = queryset.filter(status=resource_status_from_contract(status_filter))
+            except DjangoValidationError as exc:
+                raise ValidationError(exc.messages) from exc
+        elif self.action != "use_submissions":
+            queryset = queryset.exclude(status=ResourceItem.Status.RETIRED)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            resource = ResourceInventoryService(request.user).create_resource(
+                name=serializer.validated_data["name"],
+                resource_type=serializer.validated_data["resourceType"],
+                description=serializer.validated_data.get("description", ""),
+                use_instructions=serializer.validated_data.get("useInstructions", ""),
+            )
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
+        return Response(LaboratoryResourceSerializer(resource).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        resource = self.get_object()
+        serializer = self.get_serializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        attrs = dict(serializer.validated_data)
+        attrs["resource_type"] = attrs.pop("resourceType", None)
+        attrs["use_instructions"] = attrs.pop("useInstructions", None)
+        try:
+            resource = ResourceInventoryService(request.user).update_resource(resource, **attrs)
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
+        return Response(LaboratoryResourceSerializer(resource).data)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            ResourceInventoryService(request.user).retire_resource(self.get_object())
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="use-submissions")
+    def use_submissions(self, request, pk=None):
+        resource = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            submission = ResourceInventoryService(request.user).create_use_submission(
+                resource,
+                submission_type=serializer.validated_data["submissionType"],
+                details=serializer.validated_data["details"],
+            )
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
+        return Response(
+            ResourceUseSubmissionSerializer(submission).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ResourceUseSubmissionViewSet(
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = ResourceUseSubmissionUpdateSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = ResourceUseSubmission.objects.select_related("resource_item", "student", "reviewer")
+
+    def partial_update(self, request, *args, **kwargs):
+        submission = self.get_object()
+        serializer = self.get_serializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            submission = ResourceInventoryService(request.user).decide_use_submission(
+                submission,
+                status=serializer.validated_data["status"],
+                decision_note=serializer.validated_data.get("decisionNote", ""),
+            )
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
+        return Response(ResourceUseSubmissionSerializer(submission).data)

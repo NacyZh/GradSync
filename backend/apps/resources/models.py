@@ -55,6 +55,14 @@ class ResourceItem(models.Model):
     location = models.CharField(max_length=255, blank=True)
     field_values = models.JSONField(default=dict, blank=True)
     availability_policy = models.JSONField(default=dict, blank=True)
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_resources",
+    )
+    use_instructions = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AVAILABLE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -73,6 +81,44 @@ class ResourceItem(models.Model):
         if unsupported:
             unsupported_fields = ", ".join(sorted(unsupported))
             raise ValidationError(f"Unsupported resource field values: {unsupported_fields}")
+
+
+class ResourceUseSubmission(models.Model):
+    class SubmissionType(models.TextChoices):
+        REQUEST = "request", "Request"
+        USE_RECORD = "use_record", "Use record"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        CONFIRMED = "confirmed", "Confirmed"
+        REJECTED = "rejected", "Rejected"
+
+    resource_item = models.ForeignKey(
+        ResourceItem, on_delete=models.PROTECT, related_name="use_submissions"
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="resource_use_submissions"
+    )
+    submission_type = models.CharField(max_length=20, choices=SubmissionType.choices)
+    details = models.TextField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_resource_use_submissions",
+    )
+    decision_note = models.TextField(blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-submitted_at"]
+        indexes = [
+            models.Index(fields=["resource_item", "status"]),
+            models.Index(fields=["student", "status"]),
+        ]
 
 
 class Booking(models.Model):

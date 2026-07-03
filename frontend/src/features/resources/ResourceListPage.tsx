@@ -1,32 +1,42 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { CalendarDays, Search, SlidersHorizontal, Wrench } from 'lucide-react';
+import { CalendarDays, PlusCircle, Search, SlidersHorizontal, Wrench } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '../auth/AuthProvider';
 import { DataState } from '../../shared/ui/DataState';
+import { FormStatus } from '../../shared/ui/FormStatus';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { NotificationList } from '../notifications/NotificationList';
 import { BookingActions } from './BookingActions';
 import { BookingCalendar } from './BookingCalendar';
 import { BookingForm } from './BookingForm';
-import type { Booking, ResourceItem, ResourceType } from './api';
-import { listBookings, listResources, listResourceTypes } from './api';
+import type { Booking, LaboratoryResource, ResourceItem, ResourceType } from './api';
+import { createLaboratoryResource, listBookings, listLaboratoryResources, listResources, listResourceTypes } from './api';
+import { ResourceUseSubmissionPanel } from './ResourceUseSubmissionPanel';
 
 export function ResourceListPage() {
   const projectId = Number(useParams().projectId ?? 0);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canManageResources = user?.global_role === 'advisor' || user?.global_role === 'admin';
   const [query, setQuery] = useState('');
   const [resourceType, setResourceType] = useState('all');
   const [resourceStatus, setResourceStatus] = useState('bookable');
   const [availabilityWindow, setAvailabilityWindow] = useState({ startsAt: '', endsAt: '', hasValidWindow: true });
   const resourceTypesQuery = useQuery({ queryKey: ['resource-types'], queryFn: listResourceTypes });
   const resourcesQuery = useQuery({ queryKey: ['resources'], queryFn: listResources });
+  const laboratoryResourcesQuery = useQuery({ queryKey: ['laboratory-resources'], queryFn: listLaboratoryResources });
   const bookingsQuery = useQuery({ queryKey: ['bookings', projectId], queryFn: () => listBookings(projectId), enabled: Boolean(projectId) });
   const resources = useMemo(() => resourcesQuery.data?.results ?? [], [resourcesQuery.data?.results]);
+  const laboratoryResources = useMemo(() => laboratoryResourcesQuery.data?.results ?? [], [laboratoryResourcesQuery.data?.results]);
   const resourceTypes = useMemo(() => resourceTypesQuery.data?.results ?? [], [resourceTypesQuery.data?.results]);
   const bookings = useMemo(() => bookingsQuery.data?.results ?? [], [bookingsQuery.data?.results]);
   const resourceById = useMemo(() => new Map(resources.map((resource) => [resource.id, resource])), [resources]);
@@ -52,6 +62,33 @@ export function ResourceListPage() {
   }, [bookings]);
   const startedBookings = upcomingBookings.filter((booking) => new Date(booking.starts_at).getTime() <= Date.now());
   const activeFilterCount = [query ? 'query' : '', resourceType !== 'all' ? resourceType : '', resourceStatus !== 'bookable' ? resourceStatus : ''].filter(Boolean).length;
+  const createResourceMutation = useMutation({
+    mutationFn: createLaboratoryResource,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['laboratory-resources'] }),
+  });
+  const filteredLaboratoryResources = useMemo(
+    () => laboratoryResources.filter((resource) => {
+      const searchable = `${resource.name} ${resource.resourceType} ${resource.description ?? ''}`.toLowerCase();
+      const matchesQuery = searchable.includes(query.toLowerCase());
+      const matchesType = resourceType === 'all' || resource.resourceType === resourceType;
+      const matchesStatus = resourceStatus === 'all'
+        || (resourceStatus === 'bookable' ? resource.status !== 'retired' && resource.status !== 'unavailable' : resource.status === resourceStatus);
+      return matchesQuery && matchesType && matchesStatus;
+    }),
+    [laboratoryResources, query, resourceStatus, resourceType],
+  );
+  const laboratoryResourceTypes = Array.from(new Set(laboratoryResources.map((resource) => resource.resourceType))).sort();
+
+  function onCreateResource(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    createResourceMutation.mutate({
+      name: String(form.get('name') ?? ''),
+      resourceType: String(form.get('resourceType') ?? ''),
+      description: String(form.get('description') ?? ''),
+      useInstructions: String(form.get('useInstructions') ?? ''),
+    });
+  }
 
   return (
     <PageShell
@@ -59,7 +96,7 @@ export function ResourceListPage() {
       description="Search configurable resource items, reserve eligible resources, and manage project-scoped bookings without overlaps."
       actions={
         <>
-          <Badge variant="secondary">{filteredResources.length} visible</Badge>
+          <Badge variant="secondary">{filteredLaboratoryResources.length || filteredResources.length} visible</Badge>
           <Badge variant={startedBookings.length ? 'warning' : 'muted'}>{startedBookings.length} immutable started</Badge>
         </>
       }
@@ -93,12 +130,16 @@ export function ResourceListPage() {
           <label className="grid gap-1.5 text-sm font-bold">
             Type
             <Select value={resourceType} onValueChange={setResourceType}>
-              <SelectTrigger aria-label="Resource type">
+              <SelectTrigger aria-label="Resource type filter">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All types</SelectItem>
-                {resourceTypes.map((type) => (
+                {laboratoryResourceTypes.length ? laboratoryResourceTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                )) : resourceTypes.map((type) => (
                   <SelectItem key={type.id} value={String(type.id)}>
                     {type.name}
                   </SelectItem>
@@ -114,7 +155,7 @@ export function ResourceListPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="bookable">Bookable</SelectItem>
-                <SelectItem value="available">Available</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="unavailable">Unavailable</SelectItem>
                 <SelectItem value="retired">Retired</SelectItem>
                 <SelectItem value="all">All statuses</SelectItem>
@@ -143,20 +184,59 @@ export function ResourceListPage() {
             </div>
             <Badge variant="secondary">{resources.length} total</Badge>
           </div>
-          {resourcesQuery.isLoading || resourceTypesQuery.isLoading ? <DataState state="loading" message="Loading resources." /> : null}
-          {resourcesQuery.error ? <DataState state="error" title="Resources unavailable" message={resourcesQuery.error.message} /> : null}
+          {laboratoryResourcesQuery.isLoading || resourcesQuery.isLoading || resourceTypesQuery.isLoading ? <DataState state="loading" message="Loading resources." /> : null}
+          {laboratoryResourcesQuery.error ? <DataState state="error" title="Resources unavailable" message={laboratoryResourcesQuery.error.message} /> : null}
+          {resourcesQuery.error ? <DataState state="error" title="Booking resources unavailable" message={resourcesQuery.error.message} /> : null}
           {resourceTypesQuery.error ? <DataState state="error" title="Resource types unavailable" message={resourceTypesQuery.error.message} /> : null}
-          {filteredResources.length === 0 && !resourcesQuery.isLoading && !resourcesQuery.error ? (
+          {filteredLaboratoryResources.length === 0 && !laboratoryResourcesQuery.isLoading && !laboratoryResourcesQuery.error ? (
             <DataState state={query || resourceType !== 'all' || resourceStatus !== 'bookable' ? 'filtered-empty' : 'empty'} title="No resources" message="No resources match the current search and filter criteria." />
           ) : null}
           <ul className="resource-list">
-            {filteredResources.map((resource) => (
-              <ResourceRow key={resource.id} resource={resource} resourceType={resourceTypeById.get(resource.resourceTypeId)} />
+            {filteredLaboratoryResources.map((resource) => (
+              <LaboratoryResourceRow key={resource.id} resource={resource} />
             ))}
+            {filteredLaboratoryResources.length === 0 && !laboratoryResourcesQuery.data ? filteredResources.map((resource) => (
+              <ResourceRow key={resource.id} resource={resource} resourceType={resourceTypeById.get(resource.resourceTypeId)} />
+            )) : null}
           </ul>
         </section>
         <BookingCalendar onWindowChange={setAvailabilityWindow} />
       </div>
+      {canManageResources ? (
+        <form className="panel grid gap-4" aria-label="Manage resource inventory" onSubmit={onCreateResource}>
+          <div>
+            <h2 className="flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" aria-hidden="true" />
+              Manage inventory
+            </h2>
+            <p className="text-sm text-muted-foreground">Teacher and administrator controls for resource records.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="resourceName">Resource name</Label>
+              <Input id="resourceName" name="name" required placeholder="Confocal microscope" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="resourceTypeName">Resource type</Label>
+              <Input id="resourceTypeName" name="resourceType" required placeholder="Microscope" />
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="resourceDescription">Description</Label>
+            <Textarea id="resourceDescription" name="description" placeholder="Inventory notes, location, or capabilities" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="resourceUseInstructions">Use instructions</Label>
+            <Textarea id="resourceUseInstructions" name="useInstructions" placeholder="Rules students should follow before or after use" />
+          </div>
+          <Button type="submit" disabled={createResourceMutation.isPending}>
+            <PlusCircle className="h-4 w-4" aria-hidden="true" />
+            Create resource
+          </Button>
+          <FormStatus error={createResourceMutation.error?.message} success={createResourceMutation.isSuccess ? 'Resource created' : undefined} />
+        </form>
+      ) : null}
+      <ResourceUseSubmissionPanel resources={filteredLaboratoryResources} canManage={canManageResources} />
       {projectId ? (
         <BookingForm
           projectId={projectId}
@@ -195,6 +275,20 @@ export function ResourceListPage() {
       ) : null}
       {projectId ? <NotificationList projectId={projectId} /> : null}
     </PageShell>
+  );
+}
+
+function LaboratoryResourceRow({ resource }: { resource: LaboratoryResource }) {
+  return (
+    <li>
+      <div className="min-w-0">
+        <strong>{resource.name}</strong>
+        <p>
+          {resource.resourceType} · {resource.useInstructions || resource.description || 'No use instructions'}
+        </p>
+      </div>
+      <StatusBadge status={resource.status} />
+    </li>
   );
 }
 

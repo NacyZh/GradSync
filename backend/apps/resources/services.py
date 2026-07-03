@@ -8,7 +8,177 @@ from apps.common.project_scope import ProjectScopedService
 from apps.notifications.models import Notification
 from apps.projects.archive_services import ensure_project_writable
 
-from .models import Booking
+from .models import Booking, ResourceItem, ResourceType, ResourceUseSubmission
+
+
+def _is_resource_manager(user) -> bool:
+    return (
+        getattr(user, "is_authenticated", False)
+        and getattr(user, "status", "") == "active"
+        and getattr(user, "global_role", "") in {"advisor", "admin"}
+    )
+
+
+def _is_active_student(user) -> bool:
+    return (
+        getattr(user, "is_authenticated", False)
+        and getattr(user, "status", "") == "active"
+        and getattr(user, "global_role", "") == "student"
+    )
+
+
+def resource_status_to_contract(status: str) -> str:
+    if status == ResourceItem.Status.AVAILABLE:
+        return "active"
+    return status
+
+
+def resource_status_from_contract(status: str) -> str:
+    if status == "active":
+        return ResourceItem.Status.AVAILABLE
+    if status in {ResourceItem.Status.UNAVAILABLE, ResourceItem.Status.RETIRED}:
+        return status
+    raise ValidationError("Unsupported resource status")
+
+
+class ResourceInventoryService:
+    def __init__(self, user):
+        self.user = user
+
+    def require_manager(self) -> None:
+        if not _is_resource_manager(self.user):
+            raise PermissionError("Only teachers and administrators can manage resources")
+
+    def require_student(self) -> None:
+        if not _is_active_student(self.user):
+            raise PermissionError("Only active students can submit resource use")
+
+    @transaction.atomic
+    def create_resource(
+        self,
+        *,
+        name: str,
+        resource_type: str,
+        description: str = "",
+        use_instructions: str = "",
+    ) -> ResourceItem:
+        self.require_manager()
+        if not name.strip() or not resource_type.strip():
+            raise ValidationError("Resource name and type are required")
+        resource_type_obj, _ = ResourceType.objects.get_or_create(
+            name=resource_type.strip(),
+            defaults={"field_schema": []},
+        )
+        resource = ResourceItem.objects.create(
+            resource_type=resource_type_obj,
+            name=name.strip(),
+            description=description.strip(),
+            use_instructions=use_instructions.strip(),
+            manager=self.user,
+        )
+        record_event(
+            None, self.user, "resource.created", f"Created resource {resource.id}", resource
+        )
+        return resource
+
+    @transaction.atomic
+    def update_resource(self, resource: ResourceItem, **attrs) -> ResourceItem:
+        self.require_manager()
+        if "name" in attrs and attrs["name"] is not None:
+            if not attrs["name"].strip():
+                raise ValidationError("Resource name is required")
+            resource.name = attrs["name"].strip()
+        if "resource_type" in attrs and attrs["resource_type"] is not None:
+            if not attrs["resource_type"].strip():
+                raise ValidationError("Resource type is required")
+            resource.resource_type, _ = ResourceType.objects.get_or_create(
+                name=attrs["resource_type"].strip(),
+                defaults={"field_schema": []},
+            )
+        if "description" in attrs and attrs["description"] is not None:
+            resource.description = attrs["description"].strip()
+        if "use_instructions" in attrs and attrs["use_instructions"] is not None:
+            resource.use_instructions = attrs["use_instructions"].strip()
+        if "status" in attrs and attrs["status"] is not None:
+            resource.status = resource_status_from_contract(attrs["status"])
+        resource.manager = resource.manager or self.user
+        resource.full_clean()
+        resource.save()
+        record_event(
+            None, self.user, "resource.updated", f"Updated resource {resource.id}", resource
+        )
+        return resource
+
+    @transaction.atomic
+    def retire_resource(self, resource: ResourceItem) -> ResourceItem:
+        self.require_manager()
+        resource.status = ResourceItem.Status.RETIRED
+        resource.save(update_fields=["status", "updated_at"])
+        record_event(
+            None, self.user, "resource.retired", f"Retired resource {resource.id}", resource
+        )
+        return resource
+
+    @transaction.atomic
+    def create_use_submission(
+        self,
+        resource: ResourceItem,
+        *,
+        submission_type: str,
+        details: str,
+    ) -> ResourceUseSubmission:
+        self.require_student()
+        if resource.status == ResourceItem.Status.RETIRED:
+            raise ValidationError("Retired resources cannot receive new use submissions")
+        if submission_type not in ResourceUseSubmission.SubmissionType.values:
+            raise ValidationError("Unsupported resource use submission type")
+        if not details.strip():
+            raise ValidationError("Use submission details are required")
+        submission = ResourceUseSubmission.objects.create(
+            resource_item=resource,
+            student=self.user,
+            submission_type=submission_type,
+            details=details.strip(),
+        )
+        record_event(
+            None,
+            self.user,
+            "resource.use_submitted",
+            f"Submitted resource use {submission.id}",
+            submission,
+        )
+        return submission
+
+    @transaction.atomic
+    def decide_use_submission(
+        self,
+        submission: ResourceUseSubmission,
+        *,
+        status: str,
+        decision_note: str = "",
+    ) -> ResourceUseSubmission:
+        self.require_manager()
+        if submission.status != ResourceUseSubmission.Status.PENDING:
+            raise ValidationError("Only pending resource use submissions can be decided")
+        if status not in {
+            ResourceUseSubmission.Status.CONFIRMED,
+            ResourceUseSubmission.Status.REJECTED,
+        }:
+            raise ValidationError("Resource use decision must be confirmed or rejected")
+        submission.status = status
+        submission.reviewer = self.user
+        submission.decision_note = decision_note.strip()
+        submission.decided_at = timezone.now()
+        submission.save(
+            update_fields=["status", "reviewer", "decision_note", "decided_at"]
+        )
+        action = (
+            "use_confirmed"
+            if status == ResourceUseSubmission.Status.CONFIRMED
+            else "use_rejected"
+        )
+        record_event(None, self.user, f"resource.{action}", f"Resource {action}", submission)
+        return submission
 
 
 class BookingService(ProjectScopedService):
