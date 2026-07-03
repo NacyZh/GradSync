@@ -106,7 +106,11 @@ class Command(BaseCommand):
                 "description": "Configurable equipment resources for validation",
                 "field_schema": [
                     {"key": "room", "label": "Room", "fieldType": "text", "required": True},
-                    {"key": "operatorRequired", "label": "Operator required", "fieldType": "boolean"},
+                    {
+                        "key": "operatorRequired",
+                        "label": "Operator required",
+                        "fieldType": "boolean",
+                    },
                 ],
             },
         )

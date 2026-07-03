@@ -12,7 +12,8 @@ def test_booking_list_handles_project_scoped_records(api_client):
     student = UserFactory(global_role="student")
     project = ResearchProject.objects.create(title="Performance", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
+    resource_type = ResourceType.objects.create(name="seat", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Seat")
     Booking.objects.bulk_create(
         [
             Booking(

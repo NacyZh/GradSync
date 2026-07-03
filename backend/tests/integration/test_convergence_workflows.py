@@ -110,7 +110,8 @@ def test_review_status_comments_booking_cancel_and_notification_delivery(api_cli
     )
     assert resolved.status_code == 200
 
-    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
+    resource_type = ResourceType.objects.create(name="seat", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Seat")
     booking = BookingService(student, project).create_booking(
         resource_item=resource,
         starts_at=timezone.now() + timezone.timedelta(days=1),

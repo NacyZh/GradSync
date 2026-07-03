@@ -104,7 +104,12 @@ class BookingViewSet(
         queryset = apply_text_search(
             queryset,
             self.request.query_params.get("search"),
-            ["purpose", "resource_item__name", "resource_item__location", "resource_item__resource_type__name"],
+            [
+                "purpose",
+                "resource_item__name",
+                "resource_item__location",
+                "resource_item__resource_type__name",
+            ],
         )
         status_filter = self.request.query_params.get("status")
         if status_filter:

@@ -14,7 +14,14 @@ def test_resource_list_and_booking_create(api_client):
     ProjectMembership.objects.create(project=project, user=student, role="student")
     resource_type = ResourceType.objects.create(
         name="Lab seat",
-        field_schema=[{"key": "capacity", "label": "Capacity", "fieldType": "number", "required": False}],
+        field_schema=[
+            {
+                "key": "capacity",
+                "label": "Capacity",
+                "fieldType": "number",
+                "required": False,
+            }
+        ],
     )
     resource = ResourceItem.objects.create(
         resource_type=resource_type,

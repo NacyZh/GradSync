@@ -13,7 +13,8 @@ def test_booking_end_must_be_after_start():
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
+    resource_type = ResourceType.objects.create(name="seat", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Seat")
 
     with pytest.raises(ValidationError):
         BookingService(student, project).create_booking(
@@ -29,7 +30,8 @@ def test_started_booking_cannot_be_changed_or_cancelled():
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
+    resource_type = ResourceType.objects.create(name="seat", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Seat")
     booking = Booking.objects.create(
         project=project,
         resource_item=resource,

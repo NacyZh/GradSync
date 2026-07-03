@@ -14,7 +14,8 @@ def test_overlapping_booking_is_rejected():
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
+    resource_type = ResourceType.objects.create(name="seat", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Seat")
     Booking.objects.create(
         project=project,
         resource_item=resource,

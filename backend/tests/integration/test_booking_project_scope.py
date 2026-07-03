@@ -14,7 +14,8 @@ def test_booking_list_is_project_scoped(api_client):
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="A", advisor=advisor)
     hidden = ResearchProject.objects.create(title="B", advisor=advisor)
-    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
+    resource_type = ResourceType.objects.create(name="seat", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Seat")
     ProjectMembership.objects.create(project=project, user=student, role="student")
     ProjectMembership.objects.create(project=hidden, user=other, role="student")
     Booking.objects.create(
@@ -44,7 +45,8 @@ def test_started_booking_cancel_returns_validation_error(api_client):
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
+    resource_type = ResourceType.objects.create(name="seat", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Seat")
     booking = Booking.objects.create(
         project=project,
         resource_item=resource,

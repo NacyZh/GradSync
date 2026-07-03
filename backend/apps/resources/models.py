@@ -71,7 +71,9 @@ class ResourceItem(models.Model):
                 raise ValidationError(f"Resource field '{key}' is required")
         unsupported = set(values) - set(schema_by_key)
         if unsupported:
-            raise ValidationError(f"Unsupported resource field values: {', '.join(sorted(unsupported))}")
+            unsupported_fields = ", ".join(sorted(unsupported))
+            raise ValidationError(f"Unsupported resource field values: {unsupported_fields}")
+
 
 class Booking(models.Model):
     class Status(models.TextChoices):
