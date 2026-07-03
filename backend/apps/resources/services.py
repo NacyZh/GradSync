@@ -26,7 +26,7 @@ class BookingService(ProjectScopedService):
             raise ValidationError("Bookings can only be changed before the reservation starts")
 
     @transaction.atomic
-    def create_booking(self, *, resource, starts_at, ends_at, purpose: str = "") -> Booking:
+    def create_booking(self, *, resource_item, starts_at, ends_at, purpose: str = "") -> Booking:
         self.require_project_member(self.project)
         ensure_project_writable(self.project)
         starts_at = parse_datetime(starts_at) if isinstance(starts_at, str) else starts_at
@@ -34,7 +34,7 @@ class BookingService(ProjectScopedService):
         if not starts_at or not ends_at or ends_at <= starts_at:
             raise ValidationError("Booking end time must be after start time")
         conflict = Booking.objects.select_for_update().filter(
-            resource=resource,
+            resource_item=resource_item,
             status=Booking.Status.RESERVED,
             starts_at__lt=ends_at,
             ends_at__gt=starts_at,
@@ -43,7 +43,7 @@ class BookingService(ProjectScopedService):
             raise ValidationError("Resource is unavailable for the selected time")
         booking = Booking.objects.create(
             project=self.project,
-            resource=resource,
+            resource_item=resource_item,
             requested_by=self.user,
             starts_at=starts_at,
             ends_at=ends_at,
@@ -82,7 +82,7 @@ class BookingService(ProjectScopedService):
         conflict = (
             Booking.objects.select_for_update()
             .filter(
-                resource=booking.resource,
+                resource_item=booking.resource_item,
                 status=Booking.Status.RESERVED,
                 starts_at__lt=ends_at,
                 ends_at__gt=starts_at,

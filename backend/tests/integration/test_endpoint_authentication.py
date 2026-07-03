@@ -4,7 +4,7 @@ import pytest
 # anonymous access now that DRF defaults to IsAuthenticated globally.
 ANONYMOUS_REJECTED_ENDPOINTS = [
     "/api/projects/",
-    "/api/resources/",
+    "/api/resource-items/",
     "/api/projects/1/tasks/",
     "/api/projects/1/drafts/",
     "/api/projects/1/reports/",

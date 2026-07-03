@@ -32,7 +32,7 @@ def test_paper_duplicate_precedence_checksum_then_doi_then_title_author_year():
         storage_key="p.pdf",
         filename="p.pdf",
         checksum_sha256="d" * 64,
-        uploaded_by=user,
+        imported_by=user,
     )
     doi_paper = PaperRecord.objects.create(
         project=project,

@@ -54,6 +54,7 @@ class PaperImportService:
             notes=data.get("notes", ""),
             tags=data.get("tags", []),
             import_source=data.get("import_source", PaperRecord.ImportSource.MANUAL),
+            source_path_label=data.get("source_path_label", ""),
             fingerprint=title_author_year_fingerprint(
                 title=data.get("title"),
                 authors=data.get("authors", []),
@@ -65,7 +66,9 @@ class PaperImportService:
         return paper
 
     @transaction.atomic
-    def stage_import(self, *, source_type: str, items: list[dict]) -> PaperImportBatch:
+    def stage_import(
+        self, *, source_type: str, items: list[dict], source_path_label: str = ""
+    ) -> PaperImportBatch:
         self._require_member()
         ensure_project_writable(self.project)
         results = []
@@ -93,6 +96,7 @@ class PaperImportService:
             project=self.project,
             requested_by=self.user,
             source_type=source_type,
+            source_path_label=source_path_label,
             total_items=len(items),
             accepted_count=accepted_count,
             duplicate_count=duplicate_count,
@@ -115,6 +119,7 @@ class PaperImportService:
                     **{
                         **paper_data,
                         "import_source": PaperRecord.ImportSource.BATCH,
+                        "source_path_label": batch.source_path_label,
                     }
                 )
                 result["paper"] = {"id": str(paper.id), "title": paper.title}

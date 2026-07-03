@@ -35,15 +35,17 @@ class Migration(migrations.Migration):
                     models.CharField(
                         choices=[
                             ("manual", "Manual"),
-                            ("doi", "DOI"),
+                            ("local_folder", "Local folder"),
+                            ("local_file", "Local file"),
                             ("bibtex", "BibTeX"),
-                            ("file_metadata", "File metadata"),
+                            ("text_metadata", "Text metadata"),
                             ("batch", "Batch"),
                         ],
                         default="manual",
                         max_length=30,
                     ),
                 ),
+                ("source_path_label", models.CharField(blank=True, max_length=500)),
                 ("fingerprint", models.CharField(blank=True, max_length=600)),
                 (
                     "status",
@@ -90,14 +92,16 @@ class Migration(migrations.Migration):
                     "source_type",
                     models.CharField(
                         choices=[
-                            ("file", "File"),
-                            ("doi", "DOI"),
-                            ("bibtex", "BibTeX"),
-                            ("mixed", "Mixed"),
+                            ("local_folder", "Local folder"),
+                            ("local_file", "Local file"),
+                            ("bibtex_file", "BibTeX file"),
+                            ("text_metadata_file", "Text metadata file"),
+                            ("mixed_local", "Mixed local"),
                         ],
                         max_length=20,
                     ),
                 ),
+                ("source_path_label", models.CharField(blank=True, max_length=500)),
                 (
                     "status",
                     models.CharField(
@@ -146,6 +150,7 @@ class Migration(migrations.Migration):
                 ),
                 ("storage_key", models.CharField(max_length=500)),
                 ("filename", models.CharField(max_length=255)),
+                ("relative_path", models.CharField(blank=True, max_length=500)),
                 ("content_type", models.CharField(blank=True, max_length=120)),
                 ("size_bytes", models.PositiveBigIntegerField(default=0)),
                 ("checksum_sha256", models.CharField(max_length=64)),
@@ -179,7 +184,7 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "uploaded_by",
+                    "imported_by",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL
                     ),

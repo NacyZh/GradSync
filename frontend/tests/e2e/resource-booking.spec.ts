@@ -15,13 +15,16 @@ test.beforeEach(async ({ page }) => {
   if (fullStackE2E) {
     return;
   }
-  await page.route('**/api/resources/', async (route) => {
-    await fulfillJson(route, { results: [{ id: 41, name: 'Confocal microscope', resource_type: 'equipment', location: 'Room 2', status: 'available' }] });
+  await page.route('**/api/resource-types/', async (route) => {
+    await fulfillJson(route, { results: [{ id: 7, name: 'Microscope', scope: 'global', fieldSchema: [], status: 'active' }] });
   });
-  await page.route('**/api/resources/availability/?**', async (route) => {
+  await page.route('**/api/resource-items/', async (route) => {
+    await fulfillJson(route, { results: [{ id: 41, resourceTypeId: 7, name: 'Confocal microscope', location: 'Room 2', status: 'available' }] });
+  });
+  await page.route('**/api/resource-items/availability/?**', async (route) => {
     await fulfillJson(route, [
-      { id: 41, name: 'Confocal microscope', resource_type: 'equipment', location: 'Room 2', status: 'available', available: false, conflicting_booking_count: 1 },
-      { id: 42, name: 'Open bench', resource_type: 'seat', location: 'Room 3', status: 'available', available: true, conflicting_booking_count: 0 },
+      { id: 41, resourceTypeId: 7, name: 'Confocal microscope', location: 'Room 2', status: 'available', available: false, conflictingBookingCount: 1 },
+      { id: 42, resourceTypeId: 7, name: 'Open bench', location: 'Room 3', status: 'available', available: true, conflictingBookingCount: 0 },
     ]);
   });
   await page.route('**/api/projects/1/bookings/', async (route) => {
@@ -30,7 +33,7 @@ test.beforeEach(async ({ page }) => {
         results: [{
           id: 81,
           project_id: 1,
-          resource_id: 41,
+          resourceItemId: 41,
           starts_at: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
           ends_at: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
           status: 'reserved',
@@ -44,7 +47,7 @@ test.beforeEach(async ({ page }) => {
     await fulfillJson(route, {
       id: 81,
       project_id: 1,
-      resource_id: 41,
+      resourceItemId: 41,
       starts_at: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
       ends_at: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
       status: 'cancelled',
@@ -64,7 +67,7 @@ test('resource booking shows availability and handles conflict before success', 
           results: [{
             id: 81,
             project_id: 1,
-            resource_id: 41,
+            resourceItemId: 41,
             starts_at: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
             ends_at: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
             status: 'reserved',
@@ -80,7 +83,7 @@ test('resource booking shows availability and handles conflict before success', 
       await fulfillJson(route, {
         id: 81,
         project_id: 1,
-        resource_id: 41,
+        resourceItemId: 41,
         starts_at: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
         ends_at: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
         status: 'reserved',

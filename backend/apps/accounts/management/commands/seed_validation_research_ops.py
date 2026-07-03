@@ -6,32 +6,32 @@ from apps.library.models import PaperAttachment, PaperRecord
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
-from apps.resources.models import Booking, LabResource
+from apps.resources.models import Booking, ResourceItem, ResourceType
 from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
 
-DEMO_ACCOUNTS = [
+VALIDATION_ACCOUNTS = [
     {
         "email": "admin@gradsync.local",
-        "name": "Admin Demo",
+        "name": "System Administrator",
         "global_role": "admin",
         "password": "admin123",
     },
     {
         "email": "advisor@example.com",
-        "name": "Advisor Demo",
+        "name": "Research Advisor",
         "global_role": "advisor",
         "password": "advisor123",
     },
     {
         "email": "student@example.com",
-        "name": "Student Demo",
+        "name": "Graduate Researcher",
         "global_role": "student",
         "password": "student123",
     },
     {
         "email": "reviewer@example.com",
-        "name": "Reviewer Demo",
+        "name": "Faculty Reviewer",
         "global_role": "advisor",
         "password": "reviewer123",
     },
@@ -39,13 +39,13 @@ DEMO_ACCOUNTS = [
 
 
 class Command(BaseCommand):
-    help = "Seed demo advisor and student accounts for research operations validation."
+    help = "Seed production-shaped validation data for research operations."
 
     def handle(self, *args, **options):
         user_model = get_user_model()
 
         created_users = {}
-        for acct in DEMO_ACCOUNTS:
+        for acct in VALIDATION_ACCOUNTS:
             user, created = user_model.objects.get_or_create(
                 email=acct["email"],
                 defaults={
@@ -68,12 +68,12 @@ class Command(BaseCommand):
         student = created_users["student@example.com"]
         reviewer = created_users["reviewer@example.com"]
         project, _ = ResearchProject.objects.get_or_create(
-            title="Demo Research Project",
+            title="Graphene Methods Validation",
             defaults={
-                "description": "Quickstart validation project",
+                "description": "Production-shaped validation project for research operations",
                 "advisor": advisor,
                 "starts_on": timezone.localdate(),
-                "ends_on": timezone.localdate() + timezone.timedelta(days=7),
+                "ends_on": timezone.localdate() + timezone.timedelta(days=30),
             },
         )
         for user, role in [(advisor, "advisor"), (student, "student"), (reviewer, "reviewer")]:
@@ -82,16 +82,16 @@ class Command(BaseCommand):
             )
         parent, _ = Task.objects.get_or_create(
             project=project,
-            title="Write thesis chapter",
+            title="Prepare manuscript methods section",
             defaults={
                 "created_by": advisor,
                 "assignee": student,
                 "deadline_at": timezone.now() + timezone.timedelta(days=7),
             },
         )
-        child, _ = Task.objects.get_or_create(
+        Task.objects.get_or_create(
             project=project,
-            title="Prepare related work",
+            title="Summarize related work",
             defaults={
                 "created_by": advisor,
                 "assignee": student,
@@ -99,23 +99,43 @@ class Command(BaseCommand):
                 "deadline_at": timezone.now() + timezone.timedelta(days=1),
             },
         )
-        resource, _ = LabResource.objects.get_or_create(
-            name="Demo lab seat", defaults={"resource_type": "seat", "location": "Room 101"}
+
+        equipment_type, _ = ResourceType.objects.get_or_create(
+            name="Shared Instrument",
+            defaults={
+                "description": "Configurable equipment resources for validation",
+                "field_schema": [
+                    {"key": "room", "label": "Room", "fieldType": "text", "required": True},
+                    {"key": "operatorRequired", "label": "Operator required", "fieldType": "boolean"},
+                ],
+            },
+        )
+        resource, _ = ResourceItem.objects.get_or_create(
+            resource_type=equipment_type,
+            name="Confocal Microscope",
+            defaults={
+                "description": "Shared imaging instrument",
+                "location": "Room 101",
+                "field_values": {"room": "Room 101", "operatorRequired": True},
+            },
         )
         Booking.objects.get_or_create(
             project=project,
-            resource=resource,
+            resource_item=resource,
             requested_by=student,
             starts_at=timezone.now() + timezone.timedelta(days=1),
             ends_at=timezone.now() + timezone.timedelta(days=1, hours=1),
-            defaults={"purpose": "Quickstart booking"},
+            defaults={"purpose": "Microscopy validation session"},
         )
-        draft, _ = Draft.objects.get_or_create(project=project, student=student, title="Demo paper")
+
+        draft, _ = Draft.objects.get_or_create(
+            project=project, student=student, title="Graphene manuscript"
+        )
         version, _ = DraftVersion.objects.get_or_create(
             draft=draft,
             project=project,
             version_number=1,
-            defaults={"submitted_by": student, "content_reference": "demo-paper-v1"},
+            defaults={"submitted_by": student, "content_reference": "manuscript-v1.pdf"},
         )
         report, _ = WeeklyProgressReport.objects.get_or_create(
             project=project,
@@ -124,7 +144,7 @@ class Command(BaseCommand):
             defaults={
                 "completed_work": "Completed experiment setup",
                 "blockers": "",
-                "next_steps": "Analyze results",
+                "next_steps": "Analyze validation results",
             },
         )
         InlineComment.objects.get_or_create(
@@ -133,7 +153,7 @@ class Command(BaseCommand):
             target_id=version.id,
             author=advisor,
             anchor="abstract",
-            defaults={"body": "Clarify contribution"},
+            defaults={"body": "Clarify the primary contribution."},
         )
         Notification.objects.get_or_create(
             project=project,
@@ -143,20 +163,21 @@ class Command(BaseCommand):
             target_type="WeeklyProgressReport",
             target_id=str(report.id),
             defaults={
-                "subject": "Demo report ready for review",
+                "subject": "Weekly report ready for review",
                 "action_path": f"/projects/{project.id}/reports/{report.id}",
                 "eligible_at": timezone.now(),
             },
         )
         paper, _ = PaperRecord.objects.get_or_create(
             project=project,
-            title="Demo Graph Neural Methods",
+            title="Graph Neural Methods for Materials Research",
             defaults={
                 "authors": ["Lin Chen"],
                 "publication_year": 2026,
-                "doi": "10.1000/demo",
-                "tags": ["demo", "graph"],
+                "tags": ["graph", "materials"],
                 "created_by": student,
+                "import_source": PaperRecord.ImportSource.LOCAL_FOLDER,
+                "source_path_label": "team-library/materials-gnn",
             },
         )
         PaperAttachment.objects.get_or_create(
@@ -164,19 +185,21 @@ class Command(BaseCommand):
             project=project,
             checksum_sha256="d" * 64,
             defaults={
-                "storage_key": "demo/graph.pdf",
-                "filename": "graph.pdf",
+                "storage_key": "validation/papers/materials-gnn.pdf",
+                "filename": "materials-gnn.pdf",
+                "relative_path": "papers/materials-gnn.pdf",
                 "content_type": "application/pdf",
                 "size_bytes": 1024,
-                "uploaded_by": student,
+                "imported_by": student,
             },
         )
         artifact, _ = CodeArtifact.objects.get_or_create(
             project=project,
-            name="Demo simulator",
+            name="Materials simulator",
             defaults={
-                "description": "Seeded code artifact",
-                "tags": ["demo"],
+                "description": "Shared team code library artifact",
+                "tags": ["simulation"],
+                "source_path_label": "team-code/materials-simulator",
                 "created_by": student,
             },
         )
@@ -185,19 +208,21 @@ class Command(BaseCommand):
             project=project,
             version_label="v1",
             defaults={
-                "commit_reference": "demo-ref",
-                "filename": "simulator.zip",
-                "storage_key": "demo/simulator.zip",
+                "commit_reference": "validation-ref-001",
+                "description": "Initial validated local import",
+                "filename": "materials-simulator.zip",
+                "storage_key": "validation/code/materials-simulator.zip",
+                "relative_path_manifest": ["src/model.py", "README.md"],
                 "content_type": "application/zip",
                 "size_bytes": 2048,
                 "checksum_sha256": "e" * 64,
-                "uploaded_by": student,
+                "imported_by": student,
             },
         )
-        self.stdout.write(self.style.SUCCESS(f"Seeded quickstart project {project.id}"))
+        self.stdout.write(self.style.SUCCESS(f"Seeded validation project {project.id}"))
         self.stdout.write("")
-        self.stdout.write(self.style.SUCCESS("Demo login credentials:"))
-        for acct in DEMO_ACCOUNTS:
+        self.stdout.write(self.style.SUCCESS("Validation login credentials:"))
+        for acct in VALIDATION_ACCOUNTS:
             self.stdout.write(
                 f"  {acct['global_role']:10s} {acct['email']:30s} / {acct['password']}"
             )

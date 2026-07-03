@@ -39,7 +39,7 @@ def test_paper_create_import_duplicate_and_authorized_download(api_client):
         content_type="application/pdf",
         size_bytes=1024,
         checksum_sha256="a" * 64,
-        uploaded_by=student,
+        imported_by=student,
     )
 
     duplicate_response = client.post(
@@ -58,7 +58,7 @@ def test_paper_create_import_duplicate_and_authorized_download(api_client):
     import_response = client.post(
         f"/api/projects/{project.id}/papers/imports/",
         {
-            "sourceType": "mixed",
+            "sourceType": "mixed_local", "sourcePathLabel": "local-library",
             "items": [
                 {"title": "New Paper", "authors": ["Mei Wang"], "publicationYear": 2025},
                 {"title": "Graph Neural Methods", "authors": ["Lin Chen"], "publicationYear": 2026},
@@ -82,17 +82,17 @@ def test_paper_create_import_duplicate_and_authorized_download(api_client):
 
 
 @pytest.mark.django_db
-def test_paper_upload_rejection_is_enforced_by_policy():
+def test_paper_import_rejection_is_enforced_by_policy():
     from django.core.exceptions import ValidationError
 
-    from apps.library.upload_policy import validate_paper_upload
+    from apps.library.upload_policy import validate_paper_import
 
     with pytest.raises(ValidationError):
-        validate_paper_upload(
+        validate_paper_import(
             filename="too-large.pdf",
             content_type="application/pdf",
             size_bytes=51 * 1024 * 1024,
         )
 
     with pytest.raises(ValidationError):
-        validate_paper_upload(filename="paper.exe", content_type="application/octet-stream")
+        validate_paper_import(filename="paper.exe", content_type="application/octet-stream")

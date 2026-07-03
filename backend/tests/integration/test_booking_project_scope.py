@@ -2,7 +2,7 @@ import pytest
 from django.utils import timezone
 
 from apps.projects.models import ProjectMembership, ResearchProject
-from apps.resources.models import Booking, LabResource
+from apps.resources.models import Booking, ResourceItem, ResourceType
 from tests.factories.accounts import UserFactory
 from tests.helpers import authenticate
 
@@ -14,19 +14,19 @@ def test_booking_list_is_project_scoped(api_client):
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="A", advisor=advisor)
     hidden = ResearchProject.objects.create(title="B", advisor=advisor)
-    resource = LabResource.objects.create(name="Seat", resource_type="seat")
+    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
     ProjectMembership.objects.create(project=project, user=student, role="student")
     ProjectMembership.objects.create(project=hidden, user=other, role="student")
     Booking.objects.create(
         project=project,
-        resource=resource,
+        resource_item=resource,
         requested_by=student,
         starts_at="2026-06-26T10:00:00Z",
         ends_at="2026-06-26T11:00:00Z",
     )
     Booking.objects.create(
         project=hidden,
-        resource=resource,
+        resource_item=resource,
         requested_by=other,
         starts_at="2026-06-26T12:00:00Z",
         ends_at="2026-06-26T13:00:00Z",
@@ -44,10 +44,10 @@ def test_started_booking_cancel_returns_validation_error(api_client):
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    resource = LabResource.objects.create(name="Seat", resource_type="seat")
+    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
     booking = Booking.objects.create(
         project=project,
-        resource=resource,
+        resource_item=resource,
         requested_by=student,
         starts_at=timezone.now() - timezone.timedelta(minutes=5),
         ends_at=timezone.now() + timezone.timedelta(minutes=55),

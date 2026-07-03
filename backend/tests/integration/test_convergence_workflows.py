@@ -9,7 +9,7 @@ from apps.notifications.tasks import (
     deliver_due_notifications,
 )
 from apps.projects.models import ProjectMembership, ResearchProject
-from apps.resources.models import LabResource
+from apps.resources.models import ResourceItem, ResourceType
 from apps.resources.services import BookingService
 from apps.submissions.comment_services import InlineCommentService
 from apps.submissions.draft_services import DraftService
@@ -110,9 +110,9 @@ def test_review_status_comments_booking_cancel_and_notification_delivery(api_cli
     )
     assert resolved.status_code == 200
 
-    resource = LabResource.objects.create(name="Seat", resource_type="seat")
+    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
     booking = BookingService(student, project).create_booking(
-        resource=resource,
+        resource_item=resource,
         starts_at=timezone.now() + timezone.timedelta(days=1),
         ends_at=timezone.now() + timezone.timedelta(days=1, hours=1),
     )
@@ -135,6 +135,36 @@ def test_review_status_comments_booking_cancel_and_notification_delivery(api_cli
     )
     assert deliver_due_notifications() >= 1
     assert len(mail.outbox) >= 1
+
+
+@pytest.mark.django_db
+def test_notification_delivery_skips_recipient_after_membership_removal(settings):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    advisor = UserFactory(global_role="advisor", email="advisor-skip@example.com")
+    student = UserFactory(global_role="student", email="student-skip@example.com")
+    project = ResearchProject.objects.create(title="Delivery Scope", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    membership = ProjectMembership.objects.create(project=project, user=student, role="student")
+    notification = Notification.objects.create(
+        project=project,
+        recipient=student,
+        sender=advisor,
+        event_type=Notification.EventType.BOOKING_CHANGED,
+        target_type="Booking",
+        target_id="1",
+        subject="Booking changed",
+        action_path=f"/projects/{project.id}/resources",
+        eligible_at=timezone.now(),
+    )
+
+    membership.status = "removed"
+    membership.save(update_fields=["status"])
+
+    assert deliver_due_notifications() == 0
+    notification.refresh_from_db()
+    assert notification.status == Notification.Status.SKIPPED
+    assert "no longer an active project member" in notification.failure_reason
+    assert len(mail.outbox) == 0
 
 
 @pytest.mark.django_db
@@ -216,14 +246,22 @@ def test_project_scoped_search_filters_and_resource_availability(api_client):
         anchor="microscopy",
         body="Add quantified search target",
     )
-    resource = LabResource.objects.create(
-        name="Confocal microscope", resource_type="equipment", location="Room 2"
+    microscope_type = ResourceType.objects.create(
+        name="Microscope",
+        field_schema=[{"key": "room", "label": "Room", "fieldType": "text", "required": False}],
     )
-    open_resource = LabResource.objects.create(
-        name="Open bench", resource_type="seat", location="Room 3"
+    resource = ResourceItem.objects.create(
+        resource_type=microscope_type,
+        name="Confocal microscope",
+        location="Room 2",
+        field_values={"room": "Room 2"},
+    )
+    bench_type = ResourceType.objects.create(name="Bench", field_schema=[])
+    open_resource = ResourceItem.objects.create(
+        resource_type=bench_type, name="Open bench", location="Room 3"
     )
     BookingService(student, project).create_booking(
-        resource=resource,
+        resource_item=resource,
         starts_at=timezone.now() + timezone.timedelta(days=2),
         ends_at=timezone.now() + timezone.timedelta(days=2, hours=1),
         purpose="Microscopy search target",
@@ -238,10 +276,10 @@ def test_project_scoped_search_filters_and_resource_availability(api_client):
     )
     comments = api_client.get(f"/api/projects/{project.id}/comments/?search=quantified&status=open")
     bookings = api_client.get(
-        f"/api/projects/{project.id}/bookings/?search=microscopy&status=reserved&resource_id={resource.id}"
+        f"/api/projects/{project.id}/bookings/?search=microscopy&status=reserved&resourceItemId={resource.id}"
     )
     availability = api_client.get(
-        "/api/resources/availability/",
+        "/api/resource-items/availability/",
         {
             "starts_at": (timezone.now() + timezone.timedelta(days=2, minutes=5)).isoformat(),
             "ends_at": (timezone.now() + timezone.timedelta(days=2, minutes=55)).isoformat(),
@@ -261,7 +299,7 @@ def test_project_scoped_search_filters_and_resource_availability(api_client):
     assert availability.status_code == 200
     availability_by_id = {item["id"]: item for item in availability.json()}
     assert availability_by_id[resource.id]["available"] is False
-    assert availability_by_id[resource.id]["conflicting_booking_count"] == 1
+    assert availability_by_id[resource.id]["conflictingBookingCount"] == 1
     assert availability_by_id[open_resource.id]["available"] is True
 
 

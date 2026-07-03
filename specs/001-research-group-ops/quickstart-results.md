@@ -7,9 +7,9 @@
 Result: PASS
 
 The Docker Compose quickstart was executed with backend, frontend, PostgreSQL,
-Redis, worker, scheduler, and Mailpit services. Migrations and demo seed data
-completed successfully. Backend, frontend component, and Playwright e2e checks
-passed in containers.
+Redis, worker, scheduler, and Mailpit services. Migrations and validation seed
+data completed successfully. Backend, frontend component, and Playwright e2e
+checks passed in containers.
 
 ## Commands Run
 
@@ -17,7 +17,7 @@ passed in containers.
 |---------|--------|-------|
 | `docker compose up --build -d` | PASS | Built and started the full stack. |
 | `docker compose exec backend python manage.py migrate` | PASS | Applied app, Django, Celery Beat, and Celery Results migrations. |
-| `docker compose exec backend python manage.py seed_demo_research_ops` | PASS | Seeded `advisor@example.com` and `student@example.com`. |
+| `docker compose exec backend python manage.py seed_validation_research_ops` | PASS | Seeded `advisor@example.com` and `student@example.com`. |
 | `docker compose restart scheduler` | PASS | Required after migrations because the initial scheduler start happened before Celery Beat tables existed. |
 | `docker compose exec backend pytest` | PASS | 28 passed, 5 warnings. |
 | `docker compose exec frontend npm test` | PASS | 3 files passed, 6 tests passed. |
@@ -30,6 +30,9 @@ passed in containers.
 | `npm run lint && npm run build` | PASS | Frontend lint and production build passed with US4 route chunks. |
 | `sh scripts/check-generated-artifacts.sh` | PASS | Generated artifact guard passed after cleaning local runtime/build artifacts. |
 | `PYTHON=.venv/bin/python bash scripts/check-openapi-contract.sh` | PASS | 28 contract operations covered by generated schema. |
+| `../.venv/bin/python -m pytest tests/contract/test_papers_api.py tests/contract/test_code_artifacts_api.py tests/contract/test_locale_api.py tests/contract/test_resources_bookings_api.py tests/unit/test_asset_upload_policy.py tests/unit/test_code_artifact_rules.py tests/unit/test_paper_duplicate_rules.py tests/unit/test_booking_rules.py tests/integration/test_research_assets_project_scope.py tests/integration/test_booking_conflicts.py tests/integration/test_booking_project_scope.py tests/integration/test_convergence_workflows.py tests/integration/test_production_readiness.py` | PASS | 37 updated convergence backend tests passed for configurable resources, local imports, email delivery status, and production readiness. |
+| `npm test -- --run tests/component/login.test.tsx tests/component/research-assets-locale.test.tsx tests/component/resource-booking.test.tsx tests/component/role-navigation.test.tsx` | PASS | 22 component tests passed for production login, locale-aware assets, resources, and workspace navigation. |
+| `npm run test:e2e -- auth-login.spec.ts resource-booking.spec.ts research-assets-locale.spec.ts` | PASS | 7 Playwright Chromium tests passed for login, resource booking, paper/code assets, and locale workflow reachability. |
 
 ## Validation Notes
 
@@ -40,6 +43,11 @@ passed in containers.
 - US4 validation added paper duplicate handling, code artifact version conflict,
   authorized download audit, account locale persistence, focused component
   tests, and a Playwright workflow for paper/code/locale routes.
+- 2026-07-02 convergence validation replaced fixed lab resources with
+  configurable resource types/items, replaced production-facing demo seeding with
+  validation seeding, verified local paper/code import semantics, confirmed
+  immediate locale provider updates, checked centered production login behavior,
+  and added an explicit email delivery membership re-check test.
 
 ## Residual Risks
 

@@ -428,11 +428,22 @@
   }
 
   .login-container {
-    @apply flex min-h-[calc(100vh-8.5rem)] items-center justify-center;
+    @apply flex min-h-screen items-center justify-center px-4 py-10;
+  }
+
+  .login-screen {
+    @apply min-h-screen bg-cover bg-center text-foreground;
+    background-image:
+      linear-gradient(135deg, hsl(211 55% 16% / 0.86), hsl(165 34% 22% / 0.7)),
+      url('https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1800&q=80');
   }
 
   .login-card {
-    @apply w-full max-w-md rounded-lg border bg-card p-8 text-card-foreground;
+    @apply w-full max-w-md rounded-lg border bg-card/95 p-8 text-card-foreground shadow-workspace backdrop-blur;
+  }
+
+  .login-header {
+    @apply mb-6 flex items-start justify-between gap-4;
   }
 
   .login-form {

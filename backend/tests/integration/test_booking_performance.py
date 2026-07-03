@@ -1,7 +1,7 @@
 import pytest
 
 from apps.projects.models import ProjectMembership, ResearchProject
-from apps.resources.models import Booking, LabResource
+from apps.resources.models import Booking, ResourceItem, ResourceType
 from tests.factories.accounts import UserFactory
 from tests.helpers import authenticate
 
@@ -12,12 +12,12 @@ def test_booking_list_handles_project_scoped_records(api_client):
     student = UserFactory(global_role="student")
     project = ResearchProject.objects.create(title="Performance", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    resource = LabResource.objects.create(name="Seat", resource_type="seat")
+    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
     Booking.objects.bulk_create(
         [
             Booking(
                 project=project,
-                resource=resource,
+                resource_item=resource,
                 requested_by=student,
                 starts_at=f"2026-06-26T{index % 24:02d}:00:00Z",
                 ends_at=f"2026-06-26T{index % 24:02d}:30:00Z",

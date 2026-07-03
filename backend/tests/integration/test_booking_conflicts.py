@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils.dateparse import parse_datetime
 
 from apps.projects.models import ProjectMembership, ResearchProject
-from apps.resources.models import Booking, LabResource
+from apps.resources.models import Booking, ResourceItem, ResourceType
 from apps.resources.services import BookingService
 from tests.factories.accounts import UserFactory
 
@@ -14,10 +14,10 @@ def test_overlapping_booking_is_rejected():
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    resource = LabResource.objects.create(name="Seat", resource_type="seat")
+    resource = ResourceItem.objects.create(resource_type=ResourceType.objects.create(name="seat", field_schema=[]), name="Seat")
     Booking.objects.create(
         project=project,
-        resource=resource,
+        resource_item=resource,
         requested_by=student,
         starts_at=parse_datetime("2026-06-26T10:00:00Z"),
         ends_at=parse_datetime("2026-06-26T11:00:00Z"),
@@ -25,7 +25,7 @@ def test_overlapping_booking_is_rejected():
 
     with pytest.raises(ValidationError):
         BookingService(student, project).create_booking(
-            resource=resource,
+            resource_item=resource,
             starts_at=parse_datetime("2026-06-26T10:30:00Z"),
             ends_at=parse_datetime("2026-06-26T11:30:00Z"),
         )

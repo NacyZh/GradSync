@@ -19,14 +19,14 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The local backend container runs migrations and seeds demo accounts on startup.
-To refresh the seeded demo data manually, run:
+The local backend container runs migrations and seeds validation accounts on startup.
+To refresh the seeded validation data manually, run:
 
 ```bash
-docker compose exec backend python manage.py seed_demo_research_ops
+docker compose exec backend python manage.py seed_validation_research_ops
 ```
 
-Seeded demo accounts:
+Seeded validation accounts:
 
 | Role | Email | Password |
 |------|-------|----------|

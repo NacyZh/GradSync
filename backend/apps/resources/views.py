@@ -11,25 +11,54 @@ from rest_framework.response import Response
 from apps.common.search import apply_text_search
 from apps.projects.services import projects_visible_to
 
-from .models import Booking, LabResource
-from .serializers import BookingSerializer, LabResourceSerializer
+from .models import Booking, ResourceItem, ResourceType
+from .serializers import BookingSerializer, ResourceItemSerializer, ResourceTypeSerializer
 from .services import BookingService
 
 
-class LabResourceViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    serializer_class = LabResourceSerializer
+class ResourceTypeViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+    serializer_class = ResourceTypeSerializer
     permission_classes = [IsAuthenticated]
-    queryset = LabResource.objects.all()
+    queryset = ResourceType.objects.all()
 
     def get_queryset(self):
-        queryset = LabResource.objects.all()
+        queryset = ResourceType.objects.all()
         queryset = apply_text_search(
-            queryset, self.request.query_params.get("search"), ["name", "location"]
+            queryset, self.request.query_params.get("search"), ["name", "description"]
         )
         status_filter = self.request.query_params.get("status")
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         return queryset
+
+    def perform_create(self, serializer):
+        resource_type = serializer.save()
+        resource_type.full_clean()
+
+
+class ResourceItemViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+    serializer_class = ResourceItemSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = ResourceItem.objects.select_related("resource_type")
+
+    def get_queryset(self):
+        queryset = ResourceItem.objects.select_related("resource_type")
+        queryset = apply_text_search(
+            queryset,
+            self.request.query_params.get("search"),
+            ["name", "description", "location", "resource_type__name"],
+        )
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        type_filter = self.request.query_params.get("resource_type_id")
+        if type_filter:
+            queryset = queryset.filter(resource_type_id=type_filter)
+        return queryset
+
+    def perform_create(self, serializer):
+        resource_item = serializer.save()
+        resource_item.full_clean()
 
     @action(detail=False, methods=["get"], url_path="availability")
     def availability(self, request):
@@ -51,10 +80,10 @@ class LabResourceViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         resources = list(queryset)
         for resource in resources:
             resource.available = (
-                resource.status == LabResource.Status.AVAILABLE
+                resource.status == ResourceItem.Status.AVAILABLE
                 and resource.conflicting_booking_count == 0
             )
-        return Response(LabResourceSerializer(resources, many=True).data)
+        return Response(ResourceItemSerializer(resources, many=True).data)
 
 
 class BookingViewSet(
@@ -69,25 +98,29 @@ class BookingViewSet(
         )
 
     def get_queryset(self):
-        queryset = Booking.objects.filter(project=self.get_project()).select_related("resource")
+        queryset = Booking.objects.filter(project=self.get_project()).select_related(
+            "resource_item", "resource_item__resource_type"
+        )
         queryset = apply_text_search(
             queryset,
             self.request.query_params.get("search"),
-            ["purpose", "resource__name", "resource__location"],
+            ["purpose", "resource_item__name", "resource_item__location", "resource_item__resource_type__name"],
         )
         status_filter = self.request.query_params.get("status")
         if status_filter:
             queryset = queryset.filter(status=status_filter)
-        resource_id = self.request.query_params.get("resource_id")
-        if resource_id:
-            queryset = queryset.filter(resource_id=resource_id)
+        resource_item_id = self.request.query_params.get("resource_item_id")
+        if resource_item_id:
+            queryset = queryset.filter(resource_item_id=resource_item_id)
         return queryset
 
     def perform_create(self, serializer):
-        resource = get_object_or_404(LabResource, pk=serializer.validated_data.pop("resource_id"))
+        resource_item = get_object_or_404(
+            ResourceItem, pk=serializer.validated_data.pop("resource_item_id")
+        )
         try:
             booking = BookingService(self.request.user, self.get_project()).create_booking(
-                resource=resource, **serializer.validated_data
+                resource_item=resource_item, **serializer.validated_data
             )
             serializer.instance = booking
         except DjangoValidationError as exc:

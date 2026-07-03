@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 
 import { apiRequest } from '../../shared/api/client';
 
@@ -15,14 +15,33 @@ export function updateLocalePreference(locale: Locale) {
   });
 }
 
-export function useLocalePreference() {
-  return useQuery({ queryKey: ['localePreference'], queryFn: getLocalePreference });
+export function useLocalePreference(
+  options: Pick<UseQueryOptions<{ locale: Locale; updatedAt?: string }>, 'enabled'> = {},
+) {
+  return useQuery({
+    queryKey: ['localePreference'],
+    queryFn: getLocalePreference,
+    enabled: options.enabled ?? true,
+  });
 }
 
 export function useUpdateLocalePreference() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateLocalePreference,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['localePreference'] }),
+    onMutate: async (locale) => {
+      await queryClient.cancelQueries({ queryKey: ['localePreference'] });
+      const previous = queryClient.getQueryData<{ locale: Locale; updatedAt?: string }>([
+        'localePreference',
+      ]);
+      queryClient.setQueryData(['localePreference'], { ...(previous ?? {}), locale });
+      return { previous };
+    },
+    onError: (_error, _locale, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['localePreference'], context.previous);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['localePreference'] }),
   });
 }

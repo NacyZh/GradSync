@@ -9,7 +9,10 @@ export type CodeArtifactVersion = {
   projectId: string;
   versionLabel?: string;
   commitReference?: string;
+  releaseNotes?: string;
+  description?: string;
   filename: string;
+  relativePathManifest?: string[];
   checksumSha256: string;
   status: string;
 };
@@ -20,6 +23,7 @@ export type CodeArtifact = {
   name: string;
   description?: string;
   tags?: string[];
+  sourcePathLabel?: string;
   status: string;
   latestVersion?: CodeArtifactVersion | null;
 };
@@ -28,12 +32,17 @@ export type CodeArtifactPayload = {
   name: string;
   description?: string;
   tags?: string[];
+  sourcePathLabel?: string;
 };
 
 export type CodeVersionPayload = {
   versionLabel?: string;
   commitReference?: string;
   releaseNotes?: string;
+  description?: string;
+  sourceType?: 'local_folder' | 'local_archive';
+  sourcePathLabel?: string;
+  relativePathManifest?: string[];
   filename: string;
   contentType?: string;
   sizeBytes?: number;
@@ -54,7 +63,7 @@ export function createCodeArtifact(projectId: number, payload: CodeArtifactPaylo
   });
 }
 
-export function uploadCodeVersion(projectId: number, artifactId: string, payload: CodeVersionPayload) {
+export function importCodeVersion(projectId: number, artifactId: string, payload: CodeVersionPayload) {
   return apiRequest<CodeArtifactVersion>(`/api/projects/${projectId}/code-artifacts/${artifactId}/versions/`, {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -81,10 +90,10 @@ export function useCreateCodeArtifact(projectId: number) {
   });
 }
 
-export function useUploadCodeVersion(projectId: number, artifactId: string) {
+export function useImportCodeVersion(projectId: number, artifactId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CodeVersionPayload) => uploadCodeVersion(projectId, artifactId, payload),
+    mutationFn: (payload: CodeVersionPayload) => importCodeVersion(projectId, artifactId, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] }),
   });
 }

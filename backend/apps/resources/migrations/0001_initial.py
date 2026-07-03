@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name="LabResource",
+            name="ResourceType",
             fields=[
                 (
                     "id",
@@ -22,13 +22,45 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True)),
                 (
-                    "resource_type",
+                    "scope",
                     models.CharField(
-                        choices=[("equipment", "Equipment"), ("seat", "Seat")], max_length=20
+                        choices=[("global", "Global"), ("project", "Project")],
+                        default="global",
+                        max_length=20,
                     ),
                 ),
+                ("field_schema", models.JSONField(blank=True, default=list)),
+                ("eligibility_policy", models.JSONField(blank=True, default=dict)),
+                ("booking_policy", models.JSONField(blank=True, default=dict)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[("active", "Active"), ("archived", "Archived")],
+                        default="active",
+                        max_length=20,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+            ],
+            options={"ordering": ["name"]},
+        ),
+        migrations.CreateModel(
+            name="ResourceItem",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True)),
                 ("location", models.CharField(blank=True, max_length=255)),
+                ("field_values", models.JSONField(blank=True, default=dict)),
+                ("availability_policy", models.JSONField(blank=True, default=dict)),
                 (
                     "status",
                     models.CharField(
@@ -41,10 +73,18 @@ class Migration(migrations.Migration):
                         max_length=20,
                     ),
                 ),
-                ("booking_policy", models.JSONField(blank=True, default=dict)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "resource_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="items",
+                        to="resources.resourcetype",
+                    ),
+                ),
             ],
+            options={"ordering": ["name"]},
         ),
         migrations.CreateModel(
             name="Booking",
@@ -84,15 +124,16 @@ class Migration(migrations.Migration):
                 (
                     "requested_by",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
                     ),
                 ),
                 (
-                    "resource",
+                    "resource_item",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT,
                         related_name="bookings",
-                        to="resources.labresource",
+                        to="resources.resourceitem",
                     ),
                 ),
             ],

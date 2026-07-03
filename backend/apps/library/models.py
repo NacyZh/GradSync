@@ -5,9 +5,10 @@ from django.db import models
 class PaperRecord(models.Model):
     class ImportSource(models.TextChoices):
         MANUAL = "manual", "Manual"
-        DOI = "doi", "DOI"
+        LOCAL_FOLDER = "local_folder", "Local folder"
+        LOCAL_FILE = "local_file", "Local file"
         BIBTEX = "bibtex", "BibTeX"
-        FILE_METADATA = "file_metadata", "File metadata"
+        TEXT_METADATA = "text_metadata", "Text metadata"
         BATCH = "batch", "Batch"
 
     class Status(models.TextChoices):
@@ -30,6 +31,7 @@ class PaperRecord(models.Model):
     import_source = models.CharField(
         max_length=30, choices=ImportSource.choices, default=ImportSource.MANUAL
     )
+    source_path_label = models.CharField(max_length=500, blank=True)
     fingerprint = models.CharField(max_length=600, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.ACTIVE)
@@ -53,10 +55,11 @@ class PaperAttachment(models.Model):
     )
     storage_key = models.CharField(max_length=500)
     filename = models.CharField(max_length=255)
+    relative_path = models.CharField(max_length=500, blank=True)
     content_type = models.CharField(max_length=120, blank=True)
     size_bytes = models.PositiveBigIntegerField(default=0)
     checksum_sha256 = models.CharField(max_length=64)
-    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -66,10 +69,11 @@ class PaperAttachment(models.Model):
 
 class PaperImportBatch(models.Model):
     class SourceType(models.TextChoices):
-        FILE = "file", "File"
-        DOI = "doi", "DOI"
-        BIBTEX = "bibtex", "BibTeX"
-        MIXED = "mixed", "Mixed"
+        LOCAL_FOLDER = "local_folder", "Local folder"
+        LOCAL_FILE = "local_file", "Local file"
+        BIBTEX_FILE = "bibtex_file", "BibTeX file"
+        TEXT_METADATA_FILE = "text_metadata_file", "Text metadata file"
+        MIXED_LOCAL = "mixed_local", "Mixed local"
 
     class Status(models.TextChoices):
         STAGED = "staged", "Staged"
@@ -82,6 +86,7 @@ class PaperImportBatch(models.Model):
     )
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     source_type = models.CharField(max_length=20, choices=SourceType.choices)
+    source_path_label = models.CharField(max_length=500, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.STAGED)
     total_items = models.PositiveIntegerField(default=0)
     accepted_count = models.PositiveIntegerField(default=0)

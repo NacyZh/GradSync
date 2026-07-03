@@ -66,7 +66,7 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
         serializer = CodeArtifactVersionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            version = CodeArtifactService(request.user, self.get_project()).upload_version(
+            version = CodeArtifactService(request.user, self.get_project()).import_version(
                 artifact, **serializer.validated_data
             )
         except DjangoValidationError as exc:

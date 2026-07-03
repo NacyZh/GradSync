@@ -7,7 +7,7 @@ from apps.library.models import PaperAttachment, PaperRecord
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
-from apps.resources.models import Booking, LabResource
+from apps.resources.models import Booking, ResourceItem, ResourceType
 from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
 
@@ -94,15 +94,21 @@ class Command(BaseCommand):
             author=advisor,
         )
 
-        resource = LabResource.objects.create(
-            name="Confocal microscope",
-            resource_type="equipment",
-            location="Room 2",
+        microscope_type = ResourceType.objects.create(
+            name="Microscope",
+            field_schema=[{"key": "room", "label": "Room", "fieldType": "text", "required": False}],
         )
-        LabResource.objects.create(name="Open bench", resource_type="seat", location="Room 3")
+        resource = ResourceItem.objects.create(
+            resource_type=microscope_type,
+            name="Confocal microscope",
+            location="Room 2",
+            field_values={"room": "Room 2"},
+        )
+        bench_type = ResourceType.objects.create(name="Bench", field_schema=[])
+        ResourceItem.objects.create(resource_type=bench_type, name="Open bench", location="Room 3")
         Booking.objects.create(
             project=project,
-            resource=resource,
+            resource_item=resource,
             requested_by=student,
             starts_at=timezone.now() + timezone.timedelta(days=2),
             ends_at=timezone.now() + timezone.timedelta(days=2, hours=1),
@@ -136,7 +142,7 @@ class Command(BaseCommand):
             content_type="application/pdf",
             size_bytes=1024,
             checksum_sha256="a" * 64,
-            uploaded_by=advisor,
+            imported_by=advisor,
         )
         artifact = CodeArtifact.objects.create(
             project=project,
@@ -154,7 +160,7 @@ class Command(BaseCommand):
             content_type="application/zip",
             size_bytes=2048,
             checksum_sha256="b" * 64,
-            uploaded_by=advisor,
+            imported_by=advisor,
         )
 
         self.stdout.write(

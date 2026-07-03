@@ -24,6 +24,7 @@ class Migration(migrations.Migration):
                 ("name", models.CharField(max_length=255)),
                 ("description", models.TextField(blank=True)),
                 ("tags", models.JSONField(blank=True, default=list)),
+                ("source_path_label", models.CharField(blank=True, max_length=500)),
                 (
                     "status",
                     models.CharField(
@@ -68,12 +69,14 @@ class Migration(migrations.Migration):
                 ("version_label", models.CharField(blank=True, max_length=120)),
                 ("commit_reference", models.CharField(blank=True, max_length=255)),
                 ("release_notes", models.TextField(blank=True)),
+                ("description", models.TextField(blank=True)),
                 ("storage_key", models.CharField(max_length=500)),
                 ("filename", models.CharField(max_length=255)),
+                ("relative_path_manifest", models.JSONField(blank=True, default=list)),
                 ("content_type", models.CharField(blank=True, max_length=120)),
                 ("size_bytes", models.PositiveBigIntegerField(default=0)),
                 ("checksum_sha256", models.CharField(max_length=64)),
-                ("uploaded_at", models.DateTimeField(auto_now_add=True)),
+                ("imported_at", models.DateTimeField(auto_now_add=True)),
                 (
                     "status",
                     models.CharField(
@@ -103,12 +106,12 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "uploaded_by",
+                    "imported_by",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL
                     ),
                 ),
             ],
-            options={"ordering": ["-uploaded_at"]},
+            options={"ordering": ["-imported_at"]},
         ),
     ]

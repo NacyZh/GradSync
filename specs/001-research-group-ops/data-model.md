@@ -13,8 +13,9 @@ User
 │       │       └── InlineComment
 │       ├── WeeklyProgressReport
 │       │   └── InlineComment
-│       ├── Booking
-│       │   └── LabResource
+│       ├── ResourceType
+│       │   └── ResourceItem
+│       │       └── Booking
 │       ├── PaperRecord
 │       │   └── PaperAttachment
 │       ├── PaperImportBatch
@@ -72,8 +73,8 @@ Defines the strict boundary for research records and membership.
 
 **Relationships**
 - Has many memberships, tasks, drafts, weekly reports, bookings, notifications,
-  paper records, paper import batches, code artifacts, download events, and audit
-  events
+  resource types, resource items, paper records, local import batches, code
+  artifacts, download events, and audit events
 - Belongs to one advisor owner
 
 **Validation Rules**
@@ -260,34 +261,69 @@ Advisor feedback anchored to a draft version or progress report.
 - open -> resolved
 - resolved -> open
 
-## LabResource
+## ResourceType
 
-An equipment item or seat that can be reserved.
+A configurable professional resource template used to support different
+discipline-specific resource catalogs.
 
 **Fields**
 - `id`
 - `name`
-- `resource_type`: equipment, seat
-- `location`
-- `status`: available, unavailable, retired
+- `description`
+- `scope`: global, project
+- `field_schema`: typed custom fields with labels, required flags, option lists,
+  and validation rules
+- `eligibility_policy`
 - `booking_policy`
+- `status`: active, archived
 - `created_at`, `updated_at`
 
 **Relationships**
+- Has many `ResourceItem` records
+- May be managed by administrators or authorized advisors
+
+**Validation Rules**
+- Field schema must use supported field types and stable keys
+- Archived types cannot receive new resource items
+- Fields used by active bookings cannot be removed without migration or
+  archival handling
+
+**State Transitions**
+- active -> archived
+- archived -> active
+
+## ResourceItem
+
+A bookable instance of a configured resource type.
+
+**Fields**
+- `id`
+- `resource_type_id`
+- `name`
+- `description`
+- `location`
+- `field_values`: values that conform to the resource type schema
+- `availability_policy`
+- `status`: available, unavailable, retired
+- `created_at`, `updated_at`
+
+**Relationships**
+- Belongs to one `ResourceType`
 - Has many bookings
 
 **Validation Rules**
+- Field values must satisfy the parent resource type schema
 - Retired resources cannot receive new bookings
 - Booking policy defines maximum duration and eligible users if restricted
 
 ## Booking
 
-A project-scoped reservation for a lab resource.
+A project-scoped reservation for a resource item.
 
 **Fields**
 - `id`
 - `project_id`
-- `resource_id`
+- `resource_item_id`
 - `requested_by_id`
 - `starts_at`
 - `ends_at`
@@ -297,14 +333,14 @@ A project-scoped reservation for a lab resource.
 
 **Relationships**
 - Belongs to one project
-- Belongs to one lab resource
+- Belongs to one resource item
 - Belongs to one requester who must be a project member
 - Has notifications and audit events
 
 **Validation Rules**
 - End time must be after start time
 - Requester must be an active project member
-- Active reservations for the same resource cannot overlap
+- Active reservations for the same resource item cannot overlap
 - Archived projects cannot create or change active bookings
 
 **State Transitions**
@@ -360,11 +396,14 @@ asset.
 - `publication_year`
 - `doi`
 - `external_ids`: source-specific identifiers such as arXiv, PubMed, Semantic
-  Scholar, or imported catalog IDs
+  Scholar, or imported catalog IDs supplied by local metadata
 - `abstract`
 - `notes`
 - `tags`
-- `import_source`: manual, doi, bibtex, file_metadata, batch
+- `import_source`: manual, local_folder, local_file, bibtex, text_metadata,
+  batch
+- `source_path_label`: browser-provided relative path or user-visible source
+  label for the local import
 - `fingerprint`: normalized deduplication fingerprint
 - `created_by_id`
 - `created_at`, `updated_at`, `archived_at`
@@ -378,7 +417,8 @@ asset.
 
 **Validation Rules**
 - Project must be active for new imports or metadata edits
-- DOI and external identifiers must be normalized before matching
+- Supplied DOI and external identifiers must be normalized before matching
+- Import must not run default automatic external search or DOI lookup
 - Active paper records in the same project cannot share the same file checksum,
   DOI/external identifier, or normalized title-first-author-year fingerprint
 - Tags must be project-scoped and user-visible before filtering
@@ -390,7 +430,7 @@ asset.
 
 ## PaperAttachment
 
-File metadata for a paper record.
+File metadata for a locally imported paper record.
 
 **Fields**
 - `id`
@@ -398,10 +438,11 @@ File metadata for a paper record.
 - `project_id`
 - `storage_key`
 - `filename`
+- `relative_path`
 - `content_type`
 - `size_bytes`
 - `checksum_sha256`
-- `uploaded_by_id`
+- `imported_by_id`
 - `created_at`
 - `status`: active, replaced, archived
 
@@ -419,13 +460,15 @@ File metadata for a paper record.
 
 ## PaperImportBatch
 
-Staging and result record for a paper import operation.
+Staging and result record for a local paper folder/file import operation.
 
 **Fields**
 - `id`
 - `project_id`
 - `requested_by_id`
-- `source_type`: file, doi, bibtex, mixed
+- `source_type`: local_folder, local_file, bibtex_file, text_metadata_file,
+  mixed_local
+- `source_path_label`
 - `status`: staged, committed, failed, cancelled
 - `total_items`
 - `accepted_count`
@@ -441,6 +484,8 @@ Staging and result record for a paper import operation.
 
 **Validation Rules**
 - Batch items must be validated and duplicate-checked before commit
+- Batch import must only use user-selected local files/folders and supplied
+  metadata; it must not perform background external search
 - Duplicate results must include the matched paper ID and match reason
 - Archived projects cannot commit new imports
 
@@ -449,7 +494,8 @@ Staging and result record for a paper import operation.
 
 ## CodeArtifact
 
-A project-scoped code package, source archive, or repository snapshot.
+A project-scoped team-library code folder, source archive, or repository
+snapshot imported from a local source.
 
 **Fields**
 - `id`
@@ -457,6 +503,7 @@ A project-scoped code package, source archive, or repository snapshot.
 - `name`
 - `description`
 - `tags`
+- `source_path_label`
 - `status`: active, superseded, archived
 - `created_by_id`
 - `created_at`, `updated_at`, `archived_at`
@@ -468,7 +515,7 @@ A project-scoped code package, source archive, or repository snapshot.
 
 **Validation Rules**
 - Name must be unique among active code artifacts in the same project
-- Archived projects cannot create or upload code versions
+- Archived projects cannot create or import code versions
 - Search and download visibility is limited to current project members
 
 **State Transitions**
@@ -477,7 +524,7 @@ A project-scoped code package, source archive, or repository snapshot.
 
 ## CodeArtifactVersion
 
-Immutable uploaded version of a code artifact.
+Immutable locally imported version of a code artifact.
 
 **Fields**
 - `id`
@@ -486,13 +533,15 @@ Immutable uploaded version of a code artifact.
 - `version_label`
 - `commit_reference`
 - `release_notes`
+- `description`
 - `storage_key`
 - `filename`
+- `relative_path_manifest`
 - `content_type`
 - `size_bytes`
 - `checksum_sha256`
-- `uploaded_by_id`
-- `uploaded_at`
+- `imported_by_id`
+- `imported_at`
 - `status`: active, superseded, archived
 
 **Relationships**
@@ -501,9 +550,13 @@ Immutable uploaded version of a code artifact.
 
 **Validation Rules**
 - Version label or commit reference must be present
-- Version label and checksum cannot duplicate an active version in the same
-  artifact unless explicitly superseding
+- Version label or commit reference cannot duplicate any active, archived, or
+  superseded code artifact version in the same project
+- Checksum cannot duplicate an active version in the same artifact unless
+  explicitly superseding
 - File type and size must satisfy project policy
+- Folder imports must reject executable-risk or unsupported files according to
+  project policy before storage
 - Download requires current project membership
 
 **State Transitions**
@@ -625,6 +678,8 @@ Role-aware application shell used on authenticated routes.
   preference endpoints
 - Owns top-level navigation, project switcher, notification entry point, theme
   control, and language switcher
+- Unauthenticated shell owns the centered login layout, production background
+  visual, authentication form state, and sign-in error feedback
 
 **Validation Rules**
 - Advisor-only and administrator-only destinations must be hidden or disabled
@@ -680,36 +735,43 @@ View state for draft and weekly report review.
 
 ## BookingWorkspaceState
 
-View state for resource availability and booking management.
+View state for configurable resource availability and booking management.
 
 **Fields**
 - `availability_window`
+- `resource_type_filters`
 - `resource_filters`
-- `selected_resource_id`
+- `selected_resource_type_id`
+- `selected_resource_item_id`
+- `resource_schema_editor_state`
 - `booking_form_state`
 - `conflict_explanation`
 - `cancel_confirmation_state`
 
 **Relationships**
-- Composes `LabResource`, `Booking`, project membership, and notification
+- Composes `ResourceType`, `ResourceItem`, `Booking`, project membership, and notification
   records
 
 **Validation Rules**
+- Resource type editing must validate custom field keys, supported field types,
+  and effects on active bookings
 - Start and end time controls must prevent invalid ranges before submit
 - Started bookings must render as immutable with a clear explanation
 - Destructive cancellation must use a confirmation dialog with focus trapping
 
 ## LibraryWorkspaceState
 
-View state for project paper library import, search, detail, and download.
+View state for project paper team-library local import, search, detail, and
+download.
 
 **Fields**
 - `paper_search_query`
-- `paper_filters`: author, venue, year, tag, DOI, import source, uploader
+- `paper_filters`: author, venue, year, tag, DOI, import source, source path
+  label, uploader
 - `selected_paper_id`
 - `import_batch_state`
 - `duplicate_review_state`
-- `upload_progress`
+- `local_import_progress`
 - `download_status`
 
 **Relationships**
@@ -718,20 +780,22 @@ View state for project paper library import, search, detail, and download.
 
 **Validation Rules**
 - Selected project context must be visible before import, edit, or download
+- Import controls must require explicit local folder/file selection and must not
+  trigger default external search
 - Duplicate matches must show match reason and existing paper reference
 - Download controls must be disabled with explanation when unauthorized
 
 ## CodeRepositoryWorkspaceState
 
-View state for project code artifact upload, search, version detail, and
-download.
+View state for project code team-library local import, search, version detail,
+and download.
 
 **Fields**
 - `code_search_query`
 - `code_filters`: tag, status, uploader, version label, commit reference
 - `selected_artifact_id`
 - `selected_version_id`
-- `upload_progress`
+- `local_import_progress`
 - `supersede_confirmation_state`
 - `download_status`
 
@@ -740,8 +804,9 @@ download.
   for one project
 
 **Validation Rules**
-- Project context must be visible before upload, archive, supersede, or download
-- Upload form must validate archive type, size, and version/reference metadata
+- Project context must be visible before import, archive, supersede, or download
+- Import form must validate folder/archive type, size, description, and
+  version/reference metadata
 - Download controls must be disabled with explanation when unauthorized
 
 ## LocaleState
@@ -761,5 +826,7 @@ Client-side view state for Chinese/English language switching.
 
 **Validation Rules**
 - Locale switch must preserve current route, project context, and focus order
+- Locale switch must update visible application labels immediately without a
+  full page reload
 - Missing localized strings must fall back deterministically to English
 - Validation and error states must remain semantically equivalent across locales

@@ -17,7 +17,7 @@ def _extension(filename: str) -> str:
     return "." + filename.rsplit(".", 1)[-1] if "." in filename else ""
 
 
-def validate_paper_upload(*, filename: str, content_type: str = "", size_bytes: int = 0) -> None:
+def validate_paper_import(*, filename: str, content_type: str = "", size_bytes: int = 0) -> None:
     if size_bytes > PAPER_MAX_BYTES:
         raise ValidationError("Paper attachments must be 50 MB or smaller")
     if _extension(filename) not in ALLOWED_PAPER_EXTENSIONS:

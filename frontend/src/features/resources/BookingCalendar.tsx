@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DataState } from '../../shared/ui/DataState';
 import { BookingConflictAlert } from './BookingConflictAlert';
-import type { LabResource } from './api';
+import type { ResourceItem } from './api';
 import { listResourceAvailability } from './api';
 
 function toDateTimeLocal(date: Date) {
@@ -123,8 +123,8 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
   );
 }
 
-function AvailabilityRow({ resource }: { resource: LabResource }) {
-  const conflicts = resource.conflicting_booking_count ?? 0;
+function AvailabilityRow({ resource }: { resource: ResourceItem }) {
+  const conflicts = resource.conflictingBookingCount ?? 0;
   const statusLabel = resource.available ? 'Available' : 'Unavailable';
 
   return (
@@ -132,7 +132,7 @@ function AvailabilityRow({ resource }: { resource: LabResource }) {
       <div className="min-w-0">
         <strong>{resource.name}</strong>
         <p>
-          {resource.resource_type} · {resource.location ?? 'No location'}
+          Type #{resource.resourceTypeId} · {resource.location ?? 'No location'}
         </p>
         {conflicts ? <small className="text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'}</small> : null}
       </div>

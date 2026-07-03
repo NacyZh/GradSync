@@ -30,7 +30,7 @@ def test_research_asset_search_download_isolation_and_audit(api_client):
         storage_key="private.pdf",
         filename="private.pdf",
         checksum_sha256="1" * 64,
-        uploaded_by=member,
+        imported_by=member,
     )
     artifact = CodeArtifact.objects.create(project=project, name="Private Code", created_by=member)
     version = CodeArtifactVersion.objects.create(
@@ -40,7 +40,7 @@ def test_research_asset_search_download_isolation_and_audit(api_client):
         filename="private.zip",
         storage_key="private.zip",
         checksum_sha256="2" * 64,
-        uploaded_by=member,
+        imported_by=member,
     )
 
     member_client = authenticate(api_client, member)

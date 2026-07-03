@@ -4,9 +4,9 @@ info:
   version: 0.1.0
   description: >
     Project-scoped API contract for research projects, hierarchical tasks,
-    versioned drafts, weekly reports, inline advisor comments, lab resource
-    bookings, paper libraries, code artifacts, locale preferences, downloads,
-    and email notification records.
+    versioned drafts, weekly reports, inline advisor comments, configurable
+    resource bookings, paper team libraries, code team libraries, locale
+    preferences, downloads, and email notification records.
 servers:
   - url: /api
 security:
@@ -268,20 +268,68 @@ paths:
                 $ref: "#/components/schemas/InlineComment"
         "422":
           $ref: "#/components/responses/ValidationError"
-  /resources:
+  /resource-types:
     get:
-      summary: List lab resources
-      operationId: listLabResources
+      summary: List configurable resource types
+      operationId: listResourceTypes
       tags: [Resources]
       responses:
         "200":
-          description: Available and unavailable resources
+          description: Resource type templates
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LabResource"
+                  $ref: "#/components/schemas/ResourceType"
+    post:
+      summary: Create a configurable resource type
+      operationId: createResourceType
+      tags: [Resources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResourceTypeCreate"
+      responses:
+        "201":
+          description: Resource type created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceType"
+  /resource-items:
+    get:
+      summary: List resource items
+      operationId: listResourceItems
+      tags: [Resources]
+      responses:
+        "200":
+          description: Available and unavailable resource items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResourceItem"
+    post:
+      summary: Create a resource item
+      operationId: createResourceItem
+      tags: [Resources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResourceItemCreate"
+      responses:
+        "201":
+          description: Resource item created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceItem"
   /projects/{projectId}/bookings:
     get:
       summary: List project bookings
@@ -299,7 +347,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/Booking"
     post:
-      summary: Reserve lab equipment or a seat
+      summary: Reserve a configured resource item
       operationId: createBooking
       tags: [Bookings]
       parameters:
@@ -394,7 +442,7 @@ paths:
                 $ref: "#/components/schemas/DuplicatePaperError"
   /projects/{projectId}/papers/imports:
     post:
-      summary: Stage a paper import batch with duplicate detection
+      summary: Stage a local paper import batch with duplicate detection
       operationId: stagePaperImport
       tags: [Papers]
       parameters:
@@ -500,8 +548,8 @@ paths:
                 $ref: "#/components/schemas/CodeArtifact"
   /projects/{projectId}/code-artifacts/{artifactId}/versions:
     post:
-      summary: Upload a code artifact version
-      operationId: uploadCodeArtifactVersion
+      summary: Import a code artifact version from a local folder or archive
+      operationId: importCodeArtifactVersion
       tags: [CodeArtifacts]
       parameters:
         - $ref: "#/components/parameters/ProjectId"
@@ -521,7 +569,7 @@ paths:
               $ref: "#/components/schemas/CodeArtifactVersionUploadRequest"
       responses:
         "201":
-          description: Code artifact version uploaded
+          description: Code artifact version imported
           content:
             application/json:
               schema:
@@ -898,31 +946,120 @@ components:
           type: string
         body:
           type: string
-    LabResource:
+    ResourceType:
       type: object
-      required: [id, name, resourceType, status]
+      required: [id, name, fieldSchema, bookingPolicy, status]
       properties:
         id:
           type: string
         name:
           type: string
-        resourceType:
+        description:
           type: string
-          enum: [equipment, seat]
+        scope:
+          type: string
+          enum: [global, project]
+        fieldSchema:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceField"
+        eligibilityPolicy:
+          type: object
+          additionalProperties: true
+        bookingPolicy:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [active, archived]
+    ResourceTypeCreate:
+      type: object
+      required: [name, fieldSchema]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        scope:
+          type: string
+          enum: [global, project]
+        fieldSchema:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceField"
+        eligibilityPolicy:
+          type: object
+          additionalProperties: true
+        bookingPolicy:
+          type: object
+          additionalProperties: true
+    ResourceField:
+      type: object
+      required: [key, label, fieldType, required]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        fieldType:
+          type: string
+          enum: [text, number, boolean, select, multi_select, date]
+        required:
+          type: boolean
+        options:
+          type: array
+          items:
+            type: string
+    ResourceItem:
+      type: object
+      required: [id, resourceTypeId, name, status]
+      properties:
+        id:
+          type: string
+        resourceTypeId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
         location:
           type: string
+        fieldValues:
+          type: object
+          additionalProperties: true
+        availabilityPolicy:
+          type: object
+          additionalProperties: true
         status:
           type: string
           enum: [available, unavailable, retired]
+    ResourceItemCreate:
+      type: object
+      required: [resourceTypeId, name]
+      properties:
+        resourceTypeId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        fieldValues:
+          type: object
+          additionalProperties: true
+        availabilityPolicy:
+          type: object
+          additionalProperties: true
     Booking:
       type: object
-      required: [id, projectId, resourceId, requestedById, startsAt, endsAt, status]
+      required: [id, projectId, resourceItemId, requestedById, startsAt, endsAt, status]
       properties:
         id:
           type: string
         projectId:
           type: string
-        resourceId:
+        resourceItemId:
           type: string
         requestedById:
           type: string
@@ -939,9 +1076,9 @@ components:
           type: string
     BookingCreate:
       type: object
-      required: [resourceId, startsAt, endsAt]
+      required: [resourceItemId, startsAt, endsAt]
       properties:
-        resourceId:
+        resourceItemId:
           type: string
         startsAt:
           type: string
@@ -1008,7 +1145,9 @@ components:
             type: string
         importSource:
           type: string
-          enum: [manual, doi, bibtex, file_metadata, batch]
+          enum: [manual, local_folder, local_file, bibtex, text_metadata, batch]
+        sourcePathLabel:
+          type: string
         status:
           type: string
           enum: [active, duplicate_blocked, archived]
@@ -1044,6 +1183,8 @@ components:
           type: array
           items:
             type: string
+        sourcePathLabel:
+          type: string
     PaperAttachment:
       type: object
       required: [id, paperId, filename, checksumSha256, status]
@@ -1053,6 +1194,8 @@ components:
         paperId:
           type: string
         filename:
+          type: string
+        relativePath:
           type: string
         contentType:
           type: string
@@ -1069,7 +1212,9 @@ components:
       properties:
         sourceType:
           type: string
-          enum: [file, doi, bibtex, mixed]
+          enum: [local_folder, local_file, bibtex_file, text_metadata_file, mixed_local]
+        sourcePathLabel:
+          type: string
         items:
           type: array
           items:
@@ -1080,10 +1225,12 @@ components:
       properties:
         sourceType:
           type: string
-          enum: [file, doi, bibtex, mixed]
+          enum: [local_folder, local_file, bibtex_file, text_metadata_file, mixed_local]
+        sourcePathLabel:
+          type: string
         metadata:
           type: string
-          description: JSON or BibTeX metadata payload submitted with files.
+          description: JSON, BibTeX, or text metadata payload submitted from local files.
         files:
           type: array
           items:
@@ -1155,6 +1302,8 @@ components:
           type: array
           items:
             type: string
+        sourcePathLabel:
+          type: string
         status:
           type: string
           enum: [active, superseded, archived]
@@ -1188,8 +1337,14 @@ components:
           type: string
         releaseNotes:
           type: string
+        description:
+          type: string
         filename:
           type: string
+        relativePathManifest:
+          type: array
+          items:
+            type: string
         contentType:
           type: string
         sizeBytes:
@@ -1209,6 +1364,8 @@ components:
           type: string
         releaseNotes:
           type: string
+        description:
+          type: string
         filename:
           type: string
         contentType:
@@ -1226,6 +1383,13 @@ components:
         commitReference:
           type: string
         releaseNotes:
+          type: string
+        description:
+          type: string
+        sourceType:
+          type: string
+          enum: [local_folder, local_archive]
+        sourcePathLabel:
           type: string
         file:
           type: string

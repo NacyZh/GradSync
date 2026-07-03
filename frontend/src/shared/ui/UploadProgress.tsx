@@ -11,3 +11,5 @@ export function UploadProgress({ label, value = 0 }: { label: string; value?: nu
     </div>
   );
 }
+
+export const LocalImportProgress = UploadProgress;

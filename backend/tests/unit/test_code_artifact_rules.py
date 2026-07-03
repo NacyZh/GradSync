@@ -21,13 +21,13 @@ def test_code_artifact_version_reference_uniqueness_across_statuses():
         filename="repo.zip",
         storage_key="repo.zip",
         checksum_sha256="e" * 64,
-        uploaded_by=user,
+        imported_by=user,
         status=CodeArtifactVersion.Status.ARCHIVED,
     )
 
     service = CodeArtifactService(user, project)
     with pytest.raises(ValidationError):
-        service.upload_version(
+        service.import_version(
             artifact,
             version_label="v1",
             filename="repo2.zip",
@@ -37,7 +37,7 @@ def test_code_artifact_version_reference_uniqueness_across_statuses():
         )
 
     with pytest.raises(ValidationError):
-        service.upload_version(
+        service.import_version(
             artifact,
             commit_reference="abc",
             filename="repo3.zip",

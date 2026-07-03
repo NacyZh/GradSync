@@ -2,22 +2,35 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
 import { useAuth } from './AuthProvider';
-import { Layout } from '../../app/Layout';
+import { I18nProvider, type Locale, useI18n } from '../i18n/I18nProvider';
 import { AsyncState } from '../../shared/ui/AsyncState';
 import { FormStatus } from '../../shared/ui/FormStatus';
 
 export function LoginPage() {
+  const [locale, setLocale] = useState<Locale>('en');
+
+  return (
+    <I18nProvider locale={locale}>
+      <LoginContent locale={locale} onLocaleChange={setLocale} />
+    </I18nProvider>
+  );
+}
+
+function LoginContent({
+  locale,
+  onLocaleChange,
+}: {
+  locale: Locale;
+  onLocaleChange: (locale: Locale) => void;
+}) {
   const { user, isLoading, login, isLoggingIn, loginError } = useAuth();
+  const { t } = useI18n();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   if (isLoading) {
-    return (
-      <Layout>
-        <AsyncState state="loading" message="Loading account" />
-      </Layout>
-    );
+    return <AsyncState state="loading" message="Loading account" />;
   }
 
   if (user) {
@@ -33,15 +46,27 @@ export function LoginPage() {
   }
 
   return (
-    <Layout>
-      <section className="login-container">
+    <main className="login-screen">
+      <section className="login-container" aria-label="Authentication">
         <div className="login-card">
-          <h1>GradSync</h1>
-          <p className="login-subtitle">Sign in to your research group account</p>
+          <div className="login-header">
+            <div>
+              <h1>GradSync</h1>
+              <p className="login-subtitle">{t('loginSubtitle')}</p>
+            </div>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => onLocaleChange(locale === 'zh' ? 'en' : 'zh')}
+              aria-label={`${t('language')}: ${locale === 'zh' ? t('chinese') : t('english')}`}
+            >
+              {locale === 'zh' ? '中文' : 'EN'}
+            </button>
+          </div>
 
-          <form aria-label="Sign in" onSubmit={onSubmit} className="login-form">
+          <form aria-label={t('signIn')} onSubmit={onSubmit} className="login-form">
             <label>
-              Email
+              {t('email')}
               <input
                 name="email"
                 type="email"
@@ -53,7 +78,7 @@ export function LoginPage() {
               />
             </label>
             <label>
-              Password
+              {t('password')}
               <input
                 name="password"
                 type="password"
@@ -69,12 +94,12 @@ export function LoginPage() {
               type="submit"
               disabled={isLoggingIn || !email.trim() || !password}
             >
-              {isLoggingIn ? 'Signing in…' : 'Sign in'}
+              {isLoggingIn ? `${t('signingIn')}...` : t('signIn')}
             </button>
             <FormStatus error={loginError ?? undefined} />
           </form>
         </div>
       </section>
-    </Layout>
+    </main>
   );
 }

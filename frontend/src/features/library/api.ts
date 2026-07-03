@@ -12,14 +12,16 @@ export type PaperRecord = {
   publicationYear?: number;
   doi?: string;
   tags?: string[];
+  sourcePathLabel?: string;
   status: string;
-  attachments?: { id: string; filename: string; checksumSha256: string; status: string }[];
+  attachments?: { id: string; filename: string; relativePath?: string; checksumSha256: string; status: string }[];
 };
 
 export type PaperImportBatch = {
   id: string;
   projectId: string;
   status: string;
+  sourcePathLabel?: string;
   totalItems: number;
   acceptedCount: number;
   duplicateCount: number;
@@ -34,6 +36,7 @@ export type PaperCreatePayload = {
   publicationYear?: number;
   doi?: string;
   tags?: string[];
+  sourcePathLabel?: string;
 };
 
 export function listPapers(projectId: number, query = '') {
@@ -50,10 +53,15 @@ export function createPaper(projectId: number, payload: PaperCreatePayload) {
   });
 }
 
-export function stagePaperImport(projectId: number, items: PaperCreatePayload[]) {
+export type PaperImportPayload = {
+  items: PaperCreatePayload[];
+  sourcePathLabel: string;
+};
+
+export function stagePaperImport(projectId: number, items: PaperCreatePayload[], sourcePathLabel = 'local-library') {
   return apiRequest<PaperImportBatch>(`/api/projects/${projectId}/papers/imports/`, {
     method: 'POST',
-    body: JSON.stringify({ sourceType: 'mixed', items }),
+    body: JSON.stringify({ sourceType: 'mixed_local', sourcePathLabel, items }),
   });
 }
 
@@ -80,7 +88,8 @@ export function useCreatePaper(projectId: number) {
 export function usePaperImport(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (items: PaperCreatePayload[]) => stagePaperImport(projectId, items),
+    mutationFn: ({ items, sourcePathLabel }: PaperImportPayload) =>
+      stagePaperImport(projectId, items, sourcePathLabel),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['papers', projectId] }),
   });
 }

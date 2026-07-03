@@ -5,6 +5,7 @@ from .models import PaperAttachment, PaperImportBatch, PaperRecord
 
 class PaperAttachmentSerializer(serializers.ModelSerializer):
     paperId = serializers.CharField(source="paper_id", read_only=True)
+    relativePath = serializers.CharField(source="relative_path", read_only=True)
     contentType = serializers.CharField(source="content_type", read_only=True)
     sizeBytes = serializers.IntegerField(source="size_bytes", read_only=True)
     checksumSha256 = serializers.CharField(source="checksum_sha256", read_only=True)
@@ -15,6 +16,7 @@ class PaperAttachmentSerializer(serializers.ModelSerializer):
             "id",
             "paperId",
             "filename",
+            "relativePath",
             "contentType",
             "sizeBytes",
             "checksumSha256",
@@ -27,6 +29,7 @@ class PaperRecordSerializer(serializers.ModelSerializer):
     publicationYear = serializers.IntegerField(source="publication_year", required=False)
     externalIds = serializers.JSONField(source="external_ids", required=False)
     importSource = serializers.CharField(source="import_source", read_only=True)
+    sourcePathLabel = serializers.CharField(source="source_path_label", read_only=True)
     attachments = PaperAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
@@ -44,6 +47,7 @@ class PaperRecordSerializer(serializers.ModelSerializer):
             "notes",
             "tags",
             "importSource",
+            "sourcePathLabel",
             "status",
             "attachments",
         ]
@@ -59,21 +63,25 @@ class PaperRecordCreateSerializer(serializers.Serializer):
     abstract = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     tags = serializers.ListField(child=serializers.CharField(), required=False)
+    sourcePathLabel = serializers.CharField(required=False, allow_blank=True)
 
     def to_internal_value(self, data):
         attrs = super().to_internal_value(data)
         attrs["publication_year"] = attrs.pop("publicationYear", None)
         attrs["external_ids"] = attrs.pop("externalIds", {})
+        attrs["source_path_label"] = attrs.pop("sourcePathLabel", "")
         return attrs
 
 
 class PaperImportSerializer(serializers.Serializer):
     sourceType = serializers.ChoiceField(choices=PaperImportBatch.SourceType.values)
+    sourcePathLabel = serializers.CharField(required=False, allow_blank=True)
     items = PaperRecordCreateSerializer(many=True)
 
     def to_internal_value(self, data):
         attrs = super().to_internal_value(data)
         attrs["source_type"] = attrs.pop("sourceType")
+        attrs["source_path_label"] = attrs.pop("sourcePathLabel", "")
         return attrs
 
 
@@ -84,6 +92,7 @@ class PaperImportBatchSerializer(serializers.ModelSerializer):
     duplicateCount = serializers.IntegerField(source="duplicate_count", read_only=True)
     errorCount = serializers.IntegerField(source="error_count", read_only=True)
     results = serializers.JSONField(source="result_summary", read_only=True)
+    sourcePathLabel = serializers.CharField(source="source_path_label", read_only=True)
 
     class Meta:
         model = PaperImportBatch
@@ -91,6 +100,7 @@ class PaperImportBatchSerializer(serializers.ModelSerializer):
             "id",
             "projectId",
             "status",
+            "sourcePathLabel",
             "totalItems",
             "acceptedCount",
             "duplicateCount",

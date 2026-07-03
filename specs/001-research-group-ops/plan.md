@@ -10,10 +10,11 @@ Build GradSync as a web application for graduate research group operations.
 Advisors manage project membership and hierarchical task plans, students submit
 versioned drafts and weekly progress reports, advisors review submissions with
 inline comments, project records remain strictly isolated by project membership,
-lab resources are booked without conflicts, paper and code assets are managed in
-project-scoped libraries, the interface can switch between Chinese and English,
-and email reminders cover pending reviews, approaching deadlines, and new
-submissions.
+custom discipline-specific resources are booked without conflicts, paper and
+code assets are imported from local folders into project-scoped team public
+libraries, the interface can switch between Chinese and English immediately,
+the login screen is production-ready, and email reminders cover pending reviews,
+approaching deadlines, booking changes, and new submissions.
 
 The implementation uses Django for backend domain logic and project-scoped
 authorization, React with TypeScript and Vite for the web application,
@@ -30,32 +31,40 @@ django-celery-results, Redis client, PostgreSQL driver, React 18, Vite 5,
 React Router, TanStack Query, React Hook Form, Zod, Tailwind CSS,
 shadcn/ui, Radix UI primitives, class-variance-authority, lucide-react,
 Vitest, Playwright, pytest, pytest-django; Django file storage abstraction for
-paper/code attachments; lightweight BibTeX/metadata parsing implemented in the
-backend service layer unless a later task selects a vetted parser; React i18n
-message catalog support implemented with local typed dictionaries before adding
-a larger translation framework.
+paper/code attachments; local browser file/folder import handling in the
+frontend backed by server-side import staging and checksum validation;
+lightweight BibTeX/text metadata parsing implemented in the backend service
+layer unless a later task selects a vetted parser; React i18n message catalog
+support implemented with local typed dictionaries before adding a larger
+translation framework; configurable SMTP or development email-capture backend
+for notification delivery.
 
-**Frontend Architecture Decision**: This feature must replace demo-level
-frontend screens with a production-grade React/Vite architecture. Tailwind CSS
-and shadcn/ui provide the design-system foundation, Radix UI primitives provide
-accessible component behavior, lucide-react provides iconography, TanStack Query
-remains the server-state layer for Django REST contracts, and React Hook
-Form/Zod remain the form validation layer. Redux Toolkit and RTK Query are not
-introduced unless a later feature proves complex client-only state that cannot
-be handled by route state, local component state, and TanStack Query.
+**Frontend Architecture Decision**: This feature must deliver a production-grade
+React/Vite architecture. Tailwind CSS and shadcn/ui provide the design-system
+foundation, Radix UI primitives provide accessible component behavior,
+lucide-react provides iconography, TanStack Query remains the server-state layer
+for Django REST contracts, and React Hook Form/Zod remain the form validation
+layer. The unauthenticated login route uses a centered form over a real
+background visual with production error/loading states. Redux Toolkit and RTK
+Query are not introduced unless a later feature proves complex client-only state
+that cannot be handled by route state, local component state, and TanStack
+Query.
 
 **Storage**: PostgreSQL for users, projects, memberships, tasks, draft versions,
-reports, inline comments, bookings, paper metadata, code artifact metadata,
-locale preferences, notifications, and audit records; managed Django file
-storage or object-storage-compatible references for uploaded paper/code files;
-Redis for Celery broker, reminder scheduling coordination, cache, and
-short-lived locks
+reports, inline comments, configurable resource types/items, bookings, paper
+metadata, code artifact metadata, local import batch records, locale
+preferences, email notifications, and audit records; managed Django file storage
+or object-storage-compatible references for locally imported paper/code files;
+Redis for Celery broker, reminder scheduling coordination, cache, retry
+coordination, and short-lived locks
 
 **Testing**: pytest and pytest-django for backend unit, contract, and integration
 tests; Vitest and React Testing Library for frontend unit/component tests;
 Playwright for end-to-end project isolation, submission review, booking, paper
-library, code library, download authorization, and language-switching flows;
-contract tests against `contracts/openapi.yaml`
+library local-folder import, code library local-folder import with descriptions,
+download authorization, real-time language-switching flows, centered login
+layout, and email delivery/status flows; contract tests against
+`contracts/openapi.yaml`
 
 **Target Platform**: Docker Compose-managed web deployment with backend API,
 frontend web app, PostgreSQL, Redis, and worker services
@@ -66,7 +75,8 @@ frontend web app, PostgreSQL, Redis, and worker services
 with up to 500 active records; project-scoped search/filter completes within 2
 seconds; paper/code library search completes within 2 seconds for up to 1,000
 paper records and 250 code artifacts per project; duplicate detection for up to
-100 imported paper metadata records completes within 10 seconds before commit;
+100 locally imported paper metadata records completes within 10 seconds before
+commit;
 visible confirmation for common record updates appears within 2 seconds;
 eligible reminder emails are queued or recorded within 5 minutes; the production
 frontend shell must avoid avoidable layout shift, keep route-level code split
@@ -76,11 +86,15 @@ content scanning plus shadcn/ui components actually used by the app.
 **Constraints**: Strict project isolation for all tasks, drafts, reports,
 comments, bookings, papers, code artifacts, downloads, notifications, and
 activity; no cross-project record linking except through explicit membership in
-each project; overlapping lab resource bookings must be prevented; paper import
-must reject duplicates with an explainable match; downloads must re-check
-authorization and write audit events; archived projects are read-only unless
-reopened; user locale changes must not alter authorization or stored research
-content; all behavioral changes require automated tests
+each project; overlapping custom resource bookings must be prevented; resource
+types and fields must be configurable per professional context; paper/code
+imports must come from explicit local file/folder selection and must not run
+default automatic external search; paper import must reject duplicates with an
+explainable match; downloads must re-check authorization and write audit events;
+archived projects are read-only unless reopened; user locale changes must update
+visible UI immediately without altering authorization or stored research
+content; production flows must not include prototype-only copy or behavior; all
+behavioral changes require automated tests
 
 **Scale/Scope**: At least 50 active projects, 500 total project members, and
 500 active operational records per project for the specified user journeys, plus
@@ -96,32 +110,38 @@ library lookup, downloads, and language switching.
 - **Code Quality**: PASS. Backend modules will be separated by domain
   responsibility (`projects`, `tasks`, `submissions`, `resources`, `library`,
   `repositories`, `notifications`, `audit`) with shared project-scope
-  permission helpers, file attachment services, checksum utilities, and download
-  audit helpers.
+  permission helpers, configurable resource schema services, local import
+  staging services, file attachment services, checksum utilities, email
+  delivery services, and download audit helpers.
   Frontend modules will mirror user workflows (`project dashboard`, `task tree`,
   `draft review`, `weekly reports`, `resource booking`, `paper library`, `code
   library`, `notifications`, `locale preferences`) and use typed contracts
   generated or checked from the OpenAPI document. Shared frontend primitives
   must live in `shared/ui`, be generated or adapted from shadcn/ui, and expose
   stable variants instead of one-off CSS. Non-obvious isolation, duplicate
-  detection, download authorization, locale fallback, and booking conflict rules
-  will be documented in domain services.
+  detection, local folder import, download authorization, immediate locale
+  switching, email delivery fallback, configurable resource validation, and
+  booking conflict rules will be documented in domain services.
 - **Testing**: PASS. Required coverage includes backend unit tests for hierarchy
   and state rules, contract tests for every public API operation, integration
   tests for project isolation, library duplicate detection, download
-  authorization, language switching, and booking conflicts, frontend component
-  tests for critical forms and states, and Playwright flows for advisor/student
-  end-to-end journeys. No test gaps are approved.
+  authorization, immediate language switching, email delivery status, custom
+  resource configuration, local folder import, and booking conflicts, frontend
+  component tests for critical forms and states, and Playwright flows for
+  advisor/student end-to-end journeys. No test gaps are approved.
 - **User Experience**: PASS. Project context must remain visible on every
   project-scoped route. The web app will include advisor project management,
   student assigned work, review queues, and booking views with consistent
   navigation, keyboard support, labels, and loading/empty/error states. Paper
-  and code library screens must support dense scanning, upload/import progress,
-  duplicate explanations, metadata detail panels, download actions, and filtered
-  empty states. The authenticated shell must expose a keyboard-accessible
-  Chinese/English language switcher.
+  and code library screens must support dense scanning, local folder/file import
+  progress, duplicate explanations, metadata detail panels, download actions,
+  and filtered empty states. Resource management screens must support custom
+  type and field configuration. The authenticated shell must expose a
+  keyboard-accessible Chinese/English language switcher that updates visible UI
+  text immediately. The login screen must be centered over a real background
+  visual and expose production authentication feedback.
   Tailwind CSS tokens and shadcn/ui components must provide a coherent,
-  production-ready operations interface rather than demo cards or placeholder
+  production-ready operations interface rather than prototype cards or placeholder
   layouts.
 - **Performance**: PASS. Performance requirements from the spec are carried into
   backend query design, frontend data loading, file metadata indexing, duplicate
@@ -135,8 +155,9 @@ library lookup, downloads, and language switching.
 `contracts/openapi.yaml`, `contracts/frontend-ui.md`, and `quickstart.md`
 preserve the same gates. Project isolation is modeled as explicit membership
 plus project foreign keys on every research record. Booking conflict prevention,
-paper duplicate detection, code artifact versioning, download authorization,
-locale preference behavior, notification delivery, production frontend shell
+custom resource schemas, paper duplicate detection, code artifact versioning,
+local folder import, download authorization, immediate locale preference
+behavior, email notification delivery, production login/workspace shell
 behavior, design-system composition, and accessibility expectations are captured
 as contracts and validation scenarios.
 
@@ -227,19 +248,22 @@ docker-compose.yml
 
 **Structure Decision**: Use a two-application web structure with a Django
 backend and React/Vite frontend. Keep domain rules that protect project
-isolation, version history, booking conflicts, paper duplicate detection, code
-artifact versioning, download authorization, locale preference persistence, and
-notification scheduling in backend domain services, while the frontend owns
-workflow presentation, client-side validation, language message selection, and
-production-grade workspace composition. The frontend uses Tailwind CSS for
-tokens/layout utilities, shadcn/ui generated components in
+isolation, version history, configurable resource schemas, booking conflicts,
+paper duplicate detection, code artifact versioning, local import staging,
+download authorization, locale preference persistence, and email notification
+scheduling in backend domain services, while the frontend owns workflow
+presentation, local file/folder selection, client-side validation, immediate
+language message selection, and production-grade login/workspace composition.
+The frontend uses Tailwind CSS for tokens/layout utilities, shadcn/ui generated
+components in
 `frontend/src/components/ui`, workflow-specific compositions in
 `frontend/src/features/*`, and shared GradSync UI adapters in
 `frontend/src/shared/ui`. Docker Compose defines backend, frontend, PostgreSQL,
-Redis, worker, scheduler, file/media storage, and email-capture services.
+Redis, worker, scheduler, file/media storage, SMTP/development email-capture,
+and production-like static/media serving services.
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Tailwind CSS + shadcn/ui added to existing React/Vite stack | Required to replace demo-level UI with a production-grade, accessible, token-driven operations interface while preserving React Router and TanStack Query architecture | Continuing ad hoc CSS and hand-rolled controls would keep the frontend in demo form, duplicate interaction patterns, and weaken accessibility consistency |
+| Tailwind CSS + shadcn/ui added to existing React/Vite stack | Required to deliver a production-grade, accessible, token-driven operations interface while preserving React Router and TanStack Query architecture | Continuing ad hoc CSS and hand-rolled controls would preserve prototype interaction patterns, duplicate interaction behavior, and weaken accessibility consistency |

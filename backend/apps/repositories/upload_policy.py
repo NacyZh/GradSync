@@ -18,7 +18,7 @@ def _extension(filename: str) -> str:
     return "." + filename.rsplit(".", 1)[-1] if "." in filename else ""
 
 
-def validate_code_upload(*, filename: str, content_type: str = "", size_bytes: int = 0) -> None:
+def validate_code_import(*, filename: str, content_type: str = "", size_bytes: int = 0) -> None:
     if size_bytes > CODE_MAX_BYTES:
         raise ValidationError("Code artifacts must be 200 MB or smaller")
     if _extension(filename) not in ALLOWED_CODE_EXTENSIONS:

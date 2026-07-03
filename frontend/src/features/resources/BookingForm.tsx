@@ -16,18 +16,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { FormStatus } from '../../shared/ui/FormStatus';
-import type { LabResource } from './api';
+import type { ResourceItem, ResourceType } from './api';
 import { createBooking } from './api';
 
 type BookingFormProps = {
   projectId?: number;
-  resources?: LabResource[];
+  resources?: ResourceItem[];
+  resourceTypes?: ResourceType[];
   defaultStartsAt?: string;
   defaultEndsAt?: string;
   disabled?: boolean;
 };
 
-export function BookingForm({ projectId, resources = [], defaultStartsAt = '', defaultEndsAt = '', disabled = false }: BookingFormProps) {
+export function BookingForm({ projectId, resources = [], resourceTypes = [], defaultStartsAt = '', defaultEndsAt = '', disabled = false }: BookingFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const { notify } = useAppFeedback();
   const availableResources = useMemo(
@@ -35,6 +36,7 @@ export function BookingForm({ projectId, resources = [], defaultStartsAt = '', d
     [resources],
   );
   const [selectedResourceId, setSelectedResourceId] = useState('');
+  const resourceTypeById = useMemo(() => new Map(resourceTypes.map((type) => [type.id, type])), [resourceTypes]);
   useEffect(() => {
     if (availableResources.length === 0) {
       setSelectedResourceId('');
@@ -45,7 +47,7 @@ export function BookingForm({ projectId, resources = [], defaultStartsAt = '', d
     }
   }, [availableResources, selectedResourceId]);
   const mutation = useMutation({
-    mutationFn: (payload: { resource_id: number; starts_at: string; ends_at: string; purpose?: string }) => createBooking(projectId ?? 0, payload),
+    mutationFn: (payload: { resourceItemId: number; starts_at: string; ends_at: string; purpose?: string }) => createBooking(projectId ?? 0, payload),
     onSuccess: () => notify('Booking confirmed', 'success'),
     onError: (error) => notify(error.message, 'error'),
   });
@@ -70,7 +72,7 @@ export function BookingForm({ projectId, resources = [], defaultStartsAt = '', d
       return;
     }
     mutation.mutate({
-      resource_id: Number(form.get('resourceId')),
+      resourceItemId: Number(form.get('resourceId')),
       starts_at: startsAt,
       ends_at: endsAt,
       purpose: String(form.get('purpose') ?? ''),
@@ -104,7 +106,7 @@ export function BookingForm({ projectId, resources = [], defaultStartsAt = '', d
           <SelectContent>
             {availableResources.map((resource) => (
               <SelectItem key={resource.id} value={String(resource.id)}>
-                {resource.name} · {resource.resource_type}
+                {resource.name} · {resourceTypeById.get(resource.resourceTypeId)?.name ?? 'Resource'}
               </SelectItem>
             ))}
           </SelectContent>

@@ -54,7 +54,7 @@ class Command(BaseCommand):
                         filename=f"code-{artifact_index}.zip",
                         storage_key=f"performance/code-{artifact_index}.zip",
                         checksum_sha256=f"{artifact_index:064x}"[-64:],
-                        uploaded_by=advisor,
+                        imported_by=advisor,
                     )
         self.stdout.write(
             self.style.SUCCESS("Seeded 50 projects, 500 tasks, 1000 papers, and 250 code artifacts")

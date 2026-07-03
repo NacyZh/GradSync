@@ -14,8 +14,8 @@ import { NotificationList } from '../notifications/NotificationList';
 import { BookingActions } from './BookingActions';
 import { BookingCalendar } from './BookingCalendar';
 import { BookingForm } from './BookingForm';
-import type { Booking, LabResource } from './api';
-import { listBookings, listResources } from './api';
+import type { Booking, ResourceItem, ResourceType } from './api';
+import { listBookings, listResources, listResourceTypes } from './api';
 
 export function ResourceListPage() {
   const projectId = Number(useParams().projectId ?? 0);
@@ -23,22 +23,25 @@ export function ResourceListPage() {
   const [resourceType, setResourceType] = useState('all');
   const [resourceStatus, setResourceStatus] = useState('bookable');
   const [availabilityWindow, setAvailabilityWindow] = useState({ startsAt: '', endsAt: '', hasValidWindow: true });
+  const resourceTypesQuery = useQuery({ queryKey: ['resource-types'], queryFn: listResourceTypes });
   const resourcesQuery = useQuery({ queryKey: ['resources'], queryFn: listResources });
   const bookingsQuery = useQuery({ queryKey: ['bookings', projectId], queryFn: () => listBookings(projectId), enabled: Boolean(projectId) });
   const resources = useMemo(() => resourcesQuery.data?.results ?? [], [resourcesQuery.data?.results]);
+  const resourceTypes = useMemo(() => resourceTypesQuery.data?.results ?? [], [resourceTypesQuery.data?.results]);
   const bookings = useMemo(() => bookingsQuery.data?.results ?? [], [bookingsQuery.data?.results]);
   const resourceById = useMemo(() => new Map(resources.map((resource) => [resource.id, resource])), [resources]);
-  const resourceTypes = useMemo(() => Array.from(new Set(resources.map((resource) => resource.resource_type))).sort(), [resources]);
+  const resourceTypeById = useMemo(() => new Map(resourceTypes.map((type) => [type.id, type])), [resourceTypes]);
   const filteredResources = useMemo(
     () => resources.filter((resource) => {
-      const searchable = `${resource.name} ${resource.resource_type} ${resource.location ?? ''}`.toLowerCase();
+      const typeName = resourceTypeById.get(resource.resourceTypeId)?.name ?? '';
+      const searchable = `${resource.name} ${typeName} ${resource.location ?? ''}`.toLowerCase();
       const matchesQuery = searchable.includes(query.toLowerCase());
-      const matchesType = resourceType === 'all' || resource.resource_type === resourceType;
+      const matchesType = resourceType === 'all' || String(resource.resourceTypeId) === resourceType;
       const matchesStatus = resourceStatus === 'all'
         || (resourceStatus === 'bookable' ? resource.status !== 'retired' && resource.status !== 'unavailable' : resource.status === resourceStatus);
       return matchesQuery && matchesType && matchesStatus;
     }),
-    [query, resourceStatus, resourceType, resources],
+    [query, resourceStatus, resourceType, resourceTypeById, resources],
   );
   const upcomingBookings = useMemo(() => {
     const now = Date.now();
@@ -53,7 +56,7 @@ export function ResourceListPage() {
   return (
     <PageShell
       title="Lab resources"
-      description="Search availability, reserve equipment or seats, and manage project-scoped bookings without overlaps."
+      description="Search configurable resource items, reserve eligible resources, and manage project-scoped bookings without overlaps."
       actions={
         <>
           <Badge variant="secondary">{filteredResources.length} visible</Badge>
@@ -82,7 +85,7 @@ export function ResourceListPage() {
                 id="resourceSearch"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Equipment, seat, room"
+                placeholder="Resource name, type, location"
                 className="pl-9"
               />
             </span>
@@ -96,8 +99,8 @@ export function ResourceListPage() {
               <SelectContent>
                 <SelectItem value="all">All types</SelectItem>
                 {resourceTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
+                  <SelectItem key={type.id} value={String(type.id)}>
+                    {type.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -140,14 +143,15 @@ export function ResourceListPage() {
             </div>
             <Badge variant="secondary">{resources.length} total</Badge>
           </div>
-          {resourcesQuery.isLoading ? <DataState state="loading" message="Loading resources." /> : null}
+          {resourcesQuery.isLoading || resourceTypesQuery.isLoading ? <DataState state="loading" message="Loading resources." /> : null}
           {resourcesQuery.error ? <DataState state="error" title="Resources unavailable" message={resourcesQuery.error.message} /> : null}
+          {resourceTypesQuery.error ? <DataState state="error" title="Resource types unavailable" message={resourceTypesQuery.error.message} /> : null}
           {filteredResources.length === 0 && !resourcesQuery.isLoading && !resourcesQuery.error ? (
             <DataState state={query || resourceType !== 'all' || resourceStatus !== 'bookable' ? 'filtered-empty' : 'empty'} title="No resources" message="No resources match the current search and filter criteria." />
           ) : null}
           <ul className="resource-list">
             {filteredResources.map((resource) => (
-              <ResourceRow key={resource.id} resource={resource} />
+              <ResourceRow key={resource.id} resource={resource} resourceType={resourceTypeById.get(resource.resourceTypeId)} />
             ))}
           </ul>
         </section>
@@ -157,6 +161,7 @@ export function ResourceListPage() {
         <BookingForm
           projectId={projectId}
           resources={filteredResources}
+          resourceTypes={resourceTypes}
           defaultStartsAt={availabilityWindow.startsAt}
           defaultEndsAt={availabilityWindow.endsAt}
           disabled={!availabilityWindow.hasValidWindow}
@@ -183,7 +188,7 @@ export function ResourceListPage() {
           ) : null}
           <ul className="resource-list">
             {upcomingBookings.map((booking) => (
-              <BookingRow key={booking.id} booking={booking} resource={resourceById.get(booking.resource_id)} projectId={projectId} />
+              <BookingRow key={booking.id} booking={booking} resource={resourceById.get(booking.resourceItemId)} resourceType={resourceById.get(booking.resourceItemId) ? resourceTypeById.get(resourceById.get(booking.resourceItemId)!.resourceTypeId) : undefined} projectId={projectId} />
             ))}
           </ul>
         </section>
@@ -193,13 +198,13 @@ export function ResourceListPage() {
   );
 }
 
-function ResourceRow({ resource }: { resource: LabResource }) {
+function ResourceRow({ resource, resourceType }: { resource: ResourceItem; resourceType?: ResourceType }) {
   return (
     <li>
       <div className="min-w-0">
         <strong>{resource.name}</strong>
         <p>
-          {resource.resource_type} · {resource.location ?? 'No location'}
+          {resourceType?.name ?? 'Resource'} · {resource.location ?? 'No location'}
         </p>
       </div>
       <StatusBadge status={resource.status} />
@@ -207,13 +212,14 @@ function ResourceRow({ resource }: { resource: LabResource }) {
   );
 }
 
-function BookingRow({ booking, resource, projectId }: { booking: Booking; resource?: LabResource; projectId: number }) {
+function BookingRow({ booking, resource, resourceType, projectId }: { booking: Booking; resource?: ResourceItem; resourceType?: ResourceType; projectId: number }) {
   const hasStarted = new Date(booking.starts_at).getTime() <= Date.now();
 
   return (
     <li className="items-start">
       <div className="min-w-0">
-        <strong>{resource?.name ?? `Resource #${booking.resource_id}`}</strong>
+        <strong>{resource?.name ?? `Resource #${booking.resourceItemId}`}</strong>
+        {resourceType ? <p>{resourceType.name}</p> : null}
         <p>{formatDateTime(booking.starts_at)} to {formatDateTime(booking.ends_at)}</p>
         {booking.purpose ? <small className="text-muted-foreground">{booking.purpose}</small> : null}
         <div className="mt-2 flex flex-wrap gap-2">

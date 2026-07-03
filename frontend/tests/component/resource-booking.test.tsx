@@ -28,7 +28,11 @@ describe('resource booking UI', () => {
   it('shows client feedback when trying to submit a past booking', async () => {
     const { BookingForm } = await import('../../src/features/resources/BookingForm');
     renderWithClient(
-      <BookingForm projectId={1} resources={[{ id: 1, name: 'Seat', resource_type: 'seat', status: 'available' }]} />,
+      <BookingForm
+        projectId={1}
+        resources={[{ id: 1, resourceTypeId: 1, name: 'Seat', status: 'available' }]}
+        resourceTypes={[{ id: 1, name: 'Seat', scope: 'global', fieldSchema: [], status: 'active' }]}
+      />,
     );
 
     await userEvent.type(screen.getByLabelText('Start'), '2026-06-25T10:00');
@@ -41,7 +45,11 @@ describe('resource booking UI', () => {
   it('shows client feedback when booking end is not after start', async () => {
     const { BookingForm } = await import('../../src/features/resources/BookingForm');
     renderWithClient(
-      <BookingForm projectId={1} resources={[{ id: 1, name: 'Seat', resource_type: 'seat', status: 'available' }]} />,
+      <BookingForm
+        projectId={1}
+        resources={[{ id: 1, resourceTypeId: 1, name: 'Seat', status: 'available' }]}
+        resourceTypes={[{ id: 1, name: 'Seat', scope: 'global', fieldSchema: [], status: 'active' }]}
+      />,
     );
 
     await userEvent.type(screen.getByLabelText('Start'), '2099-06-25T11:00');
