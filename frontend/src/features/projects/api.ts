@@ -16,10 +16,17 @@ export type Project = {
 
 export type ProjectMembership = {
   id: number;
-  project_id: number;
-  user_id: number;
+  project_id?: number;
+  user_id?: number;
+  projectId?: number;
+  userId?: number;
+  nickname?: string;
+  name?: string;
+  email?: string;
   role: 'advisor' | 'student' | 'reviewer' | 'observer';
   status: 'active' | 'removed';
+  joinedAt?: string;
+  removedAt?: string | null;
 };
 
 export function listProjects() {
@@ -52,10 +59,16 @@ export function reopenProject(projectId: number) {
   return apiRequest<Project>(`/api/projects/${projectId}/reopen/`, { method: 'POST' });
 }
 
-export function addProjectMember(projectId: number, payload: { user_id: number; role: ProjectMembership['role'] }) {
+export function addProjectMember(projectId: number, payload: { studentId: number }) {
   return apiRequest<ProjectMembership>(`/api/projects/${projectId}/members/`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export function removeProjectMember(projectId: number, membershipId: number) {
+  return apiRequest<void>(`/api/projects/${projectId}/members/${membershipId}/`, {
+    method: 'DELETE',
   });
 }
 

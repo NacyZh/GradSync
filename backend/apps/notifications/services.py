@@ -2,7 +2,6 @@ from django.utils import timezone
 
 from .models import Notification
 
-
 RETRY_NEEDED_STATUSES = {Notification.Status.FAILED}
 
 

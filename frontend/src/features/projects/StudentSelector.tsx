@@ -24,6 +24,9 @@ export function StudentSelector({ onSelect, disabled = false }: { onSelect: (stu
         </span>
       </label>
       {isFetching ? <p className="text-sm text-muted-foreground">Searching students.</p> : null}
+      {query.trim().length > 0 && !isFetching && data.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No eligible students match this search.</p>
+      ) : null}
       {data.length > 0 ? (
         <ul className="grid max-h-56 gap-2 overflow-auto rounded-md border p-2">
           {data.map((student) => (

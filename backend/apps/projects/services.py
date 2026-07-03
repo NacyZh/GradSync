@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.audit.services import record_event
+from apps.audit.services import record_event, record_membership_change
+from apps.notifications.models import Notification
 
-from .archive_services import ensure_project_advisor
+from .archive_services import ensure_project_advisor, ensure_project_writable
 from .models import ProjectMembership, ResearchProject
 
 
@@ -83,29 +84,79 @@ class ProjectService:
 
     def add_member(self, project: ResearchProject, *, user_id: int, role: str) -> ProjectMembership:
         ensure_project_advisor(self.actor, project)
+        ensure_project_writable(project)
         membership, _ = ProjectMembership.objects.update_or_create(
             project=project,
             user_id=user_id,
             defaults={"role": role, "status": ProjectMembership.Status.ACTIVE, "removed_at": None},
         )
-        record_event(
-            project, self.actor, "membership.added", f"Added member {user_id} as {role}", membership
-        )
+        record_membership_change(project, self.actor, membership, "added")
+        self._notify_membership_change(membership, "Project membership added")
+        return membership
+
+    @transaction.atomic
+    def add_student_member(self, project: ResearchProject, *, student_id: int) -> ProjectMembership:
+        ensure_project_advisor(self.actor, project)
+        ensure_project_writable(project)
+        user_model = get_user_model()
+        try:
+            student = user_model.objects.get(pk=student_id)
+        except user_model.DoesNotExist as exc:
+            raise ValidationError("Selected student does not exist") from exc
+        if (
+            student.global_role != student.GlobalRole.STUDENT
+            or student.status != student.Status.ACTIVE
+            or student.active_role != student.RequestedRole.STUDENT
+        ):
+            raise ValidationError("Selected account is not an active student")
+        existing = ProjectMembership.objects.filter(project=project, user=student).first()
+        if existing and existing.status == ProjectMembership.Status.ACTIVE:
+            raise ValidationError("Student is already an active project member")
+        if existing:
+            existing.role = ProjectMembership.Role.STUDENT
+            existing.status = ProjectMembership.Status.ACTIVE
+            existing.removed_at = None
+            existing.save(update_fields=["role", "status", "removed_at"])
+            membership = existing
+        else:
+            membership = ProjectMembership.objects.create(
+                project=project,
+                user=student,
+                role=ProjectMembership.Role.STUDENT,
+            )
+        record_membership_change(project, self.actor, membership, "added")
+        self._notify_membership_change(membership, "Project membership added")
         return membership
 
     def remove_member(self, membership: ProjectMembership) -> ProjectMembership:
         ensure_project_advisor(self.actor, membership.project)
+        ensure_project_writable(membership.project)
+        if (
+            membership.role == ProjectMembership.Role.ADVISOR
+            and membership.user_id == self.actor.id
+        ):
+            raise ValidationError("Project advisors cannot remove their own membership")
+        if membership.status == ProjectMembership.Status.REMOVED:
+            return membership
         membership.status = ProjectMembership.Status.REMOVED
         membership.removed_at = timezone.now()
         membership.save(update_fields=["status", "removed_at"])
-        record_event(
-            membership.project,
-            self.actor,
-            "membership.removed",
-            f"Removed member {membership.user_id}",
-            membership,
-        )
+        record_membership_change(membership.project, self.actor, membership, "removed")
+        self._notify_membership_change(membership, "Project membership removed")
         return membership
+
+    def _notify_membership_change(self, membership: ProjectMembership, subject: str) -> None:
+        Notification.objects.create(
+            project=membership.project,
+            recipient=membership.user,
+            sender=self.actor,
+            event_type=Notification.EventType.MEMBERSHIP_CHANGED,
+            target_type="ProjectMembership",
+            target_id=str(membership.id),
+            subject=subject,
+            action_path=f"/projects/{membership.project_id}",
+            eligible_at=timezone.now(),
+        )
 
 
 def projects_visible_to(user):

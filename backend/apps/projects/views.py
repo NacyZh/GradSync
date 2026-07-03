@@ -1,10 +1,15 @@
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.shortcuts import get_object_or_404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import ProjectMembership
 from .serializers import (
+    MembershipCreateSerializer,
     ProjectCreateSerializer,
     ProjectDashboardSerializer,
     ProjectMembershipSerializer,
@@ -50,19 +55,56 @@ class ProjectViewSet(
     @action(detail=True, methods=["post"], url_path="members")
     def add_member(self, request, pk=None):
         project = self.get_object()
-        membership = ProjectService(request.user).add_member(
-            project, user_id=request.data["user_id"], role=request.data["role"]
-        )
+        if "studentId" in request.data:
+            serializer = MembershipCreateSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            try:
+                membership = ProjectService(request.user).add_student_member(
+                    project, student_id=serializer.validated_data["studentId"]
+                )
+            except DjangoPermissionDenied as exc:
+                raise PermissionDenied(str(exc)) from exc
+            except DjangoValidationError as exc:
+                raise ValidationError({"message": exc.messages[0]}) from exc
+        else:
+            membership = ProjectService(request.user).add_member(
+                project, user_id=request.data["user_id"], role=request.data["role"]
+            )
         return Response(
             ProjectMembershipSerializer(membership).data, status=status.HTTP_201_CREATED
         )
 
+    @add_member.mapping.get
+    def list_members(self, request, pk=None):
+        project = self.get_object()
+        memberships = project.memberships.select_related("user").order_by(
+            "status", "role", "user__email"
+        )
+        return Response(ProjectMembershipSerializer(memberships, many=True).data)
+
     @action(detail=True, methods=["post"], url_path="members/(?P<membership_id>[^/.]+)/remove")
     def remove_member(self, request, pk=None, membership_id=None):
         project = self.get_object()
-        membership = ProjectMembership.objects.get(project=project, pk=membership_id)
-        membership = ProjectService(request.user).remove_member(membership)
+        membership = get_object_or_404(ProjectMembership, project=project, pk=membership_id)
+        try:
+            membership = ProjectService(request.user).remove_member(membership)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
         return Response(ProjectMembershipSerializer(membership).data)
+
+    @action(detail=True, methods=["delete"], url_path="members/(?P<membership_id>[^/.]+)")
+    def delete_member(self, request, pk=None, membership_id=None):
+        project = self.get_object()
+        membership = get_object_or_404(ProjectMembership, project=project, pk=membership_id)
+        try:
+            ProjectService(request.user).remove_member(membership)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])
     def archive(self, request, pk=None):

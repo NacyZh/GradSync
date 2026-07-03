@@ -5,9 +5,36 @@ from .services import ProjectService
 
 
 class ProjectMembershipSerializer(serializers.ModelSerializer):
+    projectId = serializers.IntegerField(source="project_id", read_only=True)
+    userId = serializers.IntegerField(source="user_id", read_only=True)
+    nickname = serializers.CharField(source="user.nickname", read_only=True)
+    name = serializers.CharField(source="user.name", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    joinedAt = serializers.DateTimeField(source="joined_at", read_only=True)
+    removedAt = serializers.DateTimeField(source="removed_at", read_only=True)
+
     class Meta:
         model = ProjectMembership
-        fields = ["id", "project_id", "user_id", "role", "status", "joined_at", "removed_at"]
+        fields = [
+            "id",
+            "project_id",
+            "user_id",
+            "projectId",
+            "userId",
+            "nickname",
+            "name",
+            "email",
+            "role",
+            "status",
+            "joined_at",
+            "removed_at",
+            "joinedAt",
+            "removedAt",
+        ]
+
+
+class MembershipCreateSerializer(serializers.Serializer):
+    studentId = serializers.IntegerField()
 
 
 class ProjectCreateSerializer(serializers.Serializer):

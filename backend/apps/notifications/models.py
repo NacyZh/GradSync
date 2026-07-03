@@ -9,6 +9,7 @@ class Notification(models.Model):
         APPROACHING_DEADLINE = "approaching_deadline", "Approaching deadline"
         BOOKING_CHANGED = "booking_changed", "Booking changed"
         TEACHER_FEEDBACK = "teacher_feedback", "Teacher feedback"
+        MEMBERSHIP_CHANGED = "membership_changed", "Membership changed"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
