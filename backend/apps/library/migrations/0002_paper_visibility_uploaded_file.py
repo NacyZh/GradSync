@@ -63,7 +63,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="paperrecord",
-            index=models.Index(fields=["project", "publication_year"], name="library_paper_year_idx"),
+            index=models.Index(
+                fields=["project", "publication_year"],
+                name="library_paper_year_idx",
+            ),
         ),
         migrations.AddIndex(
             model_name="paperrecord",
@@ -71,6 +74,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="paperrecord",
-            index=models.Index(fields=["created_by", "created_at"], name="library_paper_uploader_idx"),
+            index=models.Index(
+                fields=["created_by", "created_at"],
+                name="library_paper_uploader_idx",
+            ),
         ),
     ]

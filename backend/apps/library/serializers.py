@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import PaperAttachment, PaperImportBatch, PaperRecord
+from .models import DocumentCategory, DocumentRecord, PaperAttachment, PaperImportBatch, PaperRecord
 
 
 class PaperAttachmentSerializer(serializers.ModelSerializer):
@@ -151,3 +151,61 @@ class PaperImportBatchSerializer(serializers.ModelSerializer):
             "errorCount",
             "results",
         ]
+
+
+class DocumentCategorySerializer(serializers.ModelSerializer):
+    createdById = serializers.CharField(source="created_by_id", read_only=True)
+
+    class Meta:
+        model = DocumentCategory
+        fields = ["id", "name", "description", "status", "createdById"]
+
+
+class DocumentCategoryCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=120)
+    description = serializers.CharField(required=False, allow_blank=True)
+
+
+class DocumentRecordSerializer(serializers.ModelSerializer):
+    projectId = serializers.CharField(source="project_id", read_only=True)
+    categoryId = serializers.CharField(source="category_id", read_only=True)
+    categoryName = serializers.CharField(source="category.name", read_only=True)
+    uploaderId = serializers.CharField(source="created_by_id", read_only=True)
+    documentFileId = serializers.CharField(source="document_file_id", read_only=True)
+    checksumSha256 = serializers.CharField(source="checksum_sha256", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = DocumentRecord
+        fields = [
+            "id",
+            "projectId",
+            "visibility",
+            "uploaderId",
+            "createdAt",
+            "categoryId",
+            "categoryName",
+            "title",
+            "description",
+            "documentFileId",
+            "checksumSha256",
+            "status",
+        ]
+
+
+class DocumentUploadSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    title = serializers.CharField(max_length=255)
+    categoryId = serializers.IntegerField()
+    description = serializers.CharField(required=False, allow_blank=True)
+    visibility = serializers.ChoiceField(
+        choices=DocumentRecord.Visibility.values,
+        required=False,
+        default=DocumentRecord.Visibility.PROJECT_MEMBERS,
+    )
+
+    def to_internal_value(self, data):
+        attrs = super().to_internal_value(data)
+        attrs["upload"] = attrs.pop("file")
+        attrs["category_id"] = attrs.pop("categoryId")
+        return attrs

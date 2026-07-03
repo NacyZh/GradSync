@@ -3,7 +3,7 @@ from django.utils import timezone
 from apps.audit.models import DownloadEvent
 from apps.audit.services import record_event
 from apps.common.project_scope import can_access_asset
-from apps.library.models import PaperAttachment, PaperRecord
+from apps.library.models import DocumentRecord, PaperAttachment, PaperRecord
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 
 
@@ -92,6 +92,16 @@ def describe_code_artifact_download(user, artifact: CodeArtifact) -> dict:
     if version is None:
         raise PermissionError("No active archive is available for this code artifact")
     return describe_code_download(user, version)
+
+
+def describe_document_download(user, document: DocumentRecord) -> dict:
+    return describe_uploaded_file_download(
+        user,
+        document.document_file,
+        project=document.project,
+        visibility=document.visibility,
+        asset_type="document",
+    )
 
 
 def describe_uploaded_file_download(

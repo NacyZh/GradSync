@@ -8,18 +8,23 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.common.downloads import describe_paper_download
+from apps.common.downloads import describe_document_download, describe_paper_download
 from apps.common.project_scope import visible_asset_q
 from apps.projects.models import ResearchProject
 
+from .document_services import DocumentCategoryService, DocumentService
 from .import_services import PaperImportService
-from .models import PaperImportBatch, PaperRecord
+from .models import DocumentCategory, DocumentRecord, PaperImportBatch, PaperRecord
 from .serializers import (
+    DocumentCategoryCreateSerializer,
+    DocumentCategorySerializer,
+    DocumentRecordSerializer,
+    DocumentUploadSerializer,
     PaperImportBatchSerializer,
     PaperImportSerializer,
-    PaperUploadSerializer,
     PaperRecordCreateSerializer,
     PaperRecordSerializer,
+    PaperUploadSerializer,
 )
 
 
@@ -138,8 +143,106 @@ class PaperDownloadView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, paper_id):
-        paper = get_object_or_404(PaperRecord.objects.select_related("project", "uploaded_file"), pk=paper_id)
+        paper = get_object_or_404(
+            PaperRecord.objects.select_related("project", "uploaded_file"),
+            pk=paper_id,
+        )
         try:
             return Response(describe_paper_download(request.user, paper))
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+
+
+def _error_message(exc: DjangoValidationError) -> str:
+    if hasattr(exc, "message_dict"):
+        first_value = next(iter(exc.message_dict.values()))
+        if isinstance(first_value, list):
+            return str(first_value[0])
+        return str(first_value)
+    return str(exc.messages[0] if exc.messages else exc)
+
+
+class DocumentCategoryView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        categories = DocumentCategory.objects.filter(status=DocumentCategory.Status.ACTIVE)
+        return Response(DocumentCategorySerializer(categories, many=True).data)
+
+    def post(self, request):
+        serializer = DocumentCategoryCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            category = DocumentCategoryService(request.user).create_category(
+                **serializer.validated_data
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(DocumentCategorySerializer(category).data, status=status.HTTP_201_CREATED)
+
+
+class DocumentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
+    serializer_class = DocumentRecordSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_project(self):
+        return get_object_or_404(ResearchProject.objects.all(), pk=self.kwargs["project_id"])
+
+    def get_queryset(self):
+        queryset = (
+            DocumentRecord.objects.filter(
+                project=self.get_project(),
+                status=DocumentRecord.Status.ACTIVE,
+            )
+            .filter(visible_asset_q(self.request.user))
+            .select_related("category", "document_file", "project")
+            .distinct()
+        )
+        query = self.request.query_params.get("q")
+        if query:
+            queryset = queryset.filter(
+                Q(title__icontains=query)
+                | Q(description__icontains=query)
+                | Q(category__name__icontains=query)
+            )
+        category_id = self.request.query_params.get("categoryId")
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+        visibility = self.request.query_params.get("visibility")
+        if visibility:
+            queryset = queryset.filter(visibility=visibility)
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return DocumentUploadSerializer
+        return DocumentRecordSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            document = DocumentService(request.user, self.get_project()).upload_document(
+                **serializer.validated_data
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(DocumentRecordSerializer(document).data, status=status.HTTP_201_CREATED)
+
+
+class DocumentDownloadView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, document_id):
+        document = get_object_or_404(
+            DocumentRecord.objects.select_related("project", "document_file"),
+            pk=document_id,
+        )
+        try:
+            return Response(describe_document_download(request.user, document))
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc

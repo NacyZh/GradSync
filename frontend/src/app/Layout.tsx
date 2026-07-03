@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { Bell, BookOpen, BriefcaseBusiness, Code2, FileText, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, UserCircle, Users } from 'lucide-react';
+import { Bell, BookOpen, BriefcaseBusiness, Code2, FileStack, FileText, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, UserCircle, Users } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ export function Layout({ children }: PropsWithChildren) {
         { to: '/resources', label: 'Resources', icon: Settings, roles: ['admin', 'advisor', 'student'] },
         { to: '/projects/1/papers', label: 'Papers', icon: BookOpen, roles: ['admin', 'advisor', 'student'] },
         { to: '/projects/1/code', label: 'Code', icon: Code2, roles: ['admin', 'advisor', 'student'] },
+        { to: '/projects/1/documents', label: 'Documents', icon: FileStack, roles: ['admin', 'advisor', 'student'] },
         { to: '/projects/1/writing', label: 'Writing', icon: FileText, roles: ['admin', 'advisor', 'student'] },
         { to: '/admin/accounts', label: 'Team', icon: Users, roles: ['admin'] },
         { to: '/admin/role-activations', label: 'Approvals', icon: UserCircle, roles: ['admin'] },
