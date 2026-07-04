@@ -96,11 +96,15 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "specs/001-research-group-ops/contracts/openapi.yaml" in workflow
     assert "specs/003-research-collab-platform/contracts/openapi.yaml" not in workflow
     assert "production-image:" in workflow
+    assert "frontend-e2e:" in workflow
     assert "docker compose -f docker-compose.prod.yml config --quiet" in workflow
     assert "docker build -f docker/backend.Dockerfile" in workflow
     assert "docker build -f docker/frontend.Dockerfile" in workflow
-    assert "needs: [backend, frontend, production-image]" in workflow
+    assert "needs: [backend, frontend, frontend-e2e]" in workflow
+    assert "needs: [backend, frontend, frontend-e2e, production-image]" in workflow
     assert "Check generated artifacts after frontend build" in workflow
+    assert "Clean generated full-stack e2e artifacts" in workflow
+    assert "NODE_OPTIONS: --max-old-space-size=1536" in workflow
     assert "Run US4 research assets and locale e2e" not in workflow
     assert "Run production UI layout checks" not in workflow
     assert "deploy-production" in workflow
