@@ -62,14 +62,23 @@ class ProjectViewSet(
         serializer.instance = project
 
     @extend_schema(
+        methods=["POST"],
         request=MembershipCreateSerializer,
         responses={
             201: ProjectMembershipSerializer,
             403: OpenApiResponse(description="Membership change forbidden"),
         },
     )
-    @action(detail=True, methods=["post"], url_path="members")
-    def add_member(self, request, pk=None):
+    @extend_schema(methods=["GET"], responses={200: ProjectMembershipSerializer(many=True)})
+    @action(detail=True, methods=["get", "post"], url_path="members")
+    def members(self, request, pk=None):
+        if request.method == "GET":
+            project = self.get_object()
+            memberships = project.memberships.select_related("user").order_by(
+                "status", "role", "user__email"
+            )
+            return Response(ProjectMembershipSerializer(memberships, many=True).data)
+
         project = self.get_object()
         if "studentId" in request.data:
             serializer = MembershipCreateSerializer(data=request.data)
@@ -89,15 +98,6 @@ class ProjectViewSet(
         return Response(
             ProjectMembershipSerializer(membership).data, status=status.HTTP_201_CREATED
         )
-
-    @extend_schema(responses={200: ProjectMembershipSerializer(many=True)})
-    @action(detail=True, methods=["get"], url_path="members")
-    def list_members(self, request, pk=None):
-        project = self.get_object()
-        memberships = project.memberships.select_related("user").order_by(
-            "status", "role", "user__email"
-        )
-        return Response(ProjectMembershipSerializer(memberships, many=True).data)
 
     @action(detail=True, methods=["post"], url_path="members/(?P<membership_id>[^/.]+)/remove")
     def remove_member(self, request, pk=None, membership_id=None):
