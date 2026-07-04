@@ -21,8 +21,12 @@ def test_cross_story_lists_return_within_release_thresholds(api_client):
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
     ProjectMembership.objects.create(project=project, user=student, role="student")
     category = DocumentCategory.objects.create(name="Protocols", created_by=advisor)
-    doc_file = UploadedFileFactory(owner=advisor, category="document", original_filename="protocol.pdf")
-    writing_file = UploadedFileFactory(owner=student, category="writing", original_filename="draft.docx")
+    doc_file = UploadedFileFactory(
+        owner=advisor, category="document", original_filename="protocol.pdf"
+    )
+    writing_file = UploadedFileFactory(
+        owner=student, category="writing", original_filename="draft.docx"
+    )
     resource_type = ResourceType.objects.create(name="Instrument")
     resource = ResourceItem.objects.create(resource_type=resource_type, name="Spectrometer")
 
@@ -116,7 +120,9 @@ def test_upload_feedback_and_permitted_download_paths_are_fast(api_client):
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
     ProjectMembership.objects.create(project=project, user=student, role="student")
     category = DocumentCategory.objects.create(name="Reports", created_by=advisor)
-    doc_file = UploadedFileFactory(owner=advisor, category="document", original_filename="report.pdf")
+    doc_file = UploadedFileFactory(
+        owner=advisor, category="document", original_filename="report.pdf"
+    )
     document = DocumentRecord.objects.create(
         project=project,
         category=category,

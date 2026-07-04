@@ -1,39 +1,27 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, mockAuthenticatedApi } from './api-mocks';
+import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
 test('code archive upload, search, and download flow is reachable', async ({ page }) => {
   await mockAuthenticatedApi(page);
   let uploaded = false;
 
-  await page.route('**/api/code-artifacts/*/download', async (route) => {
-    await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
-  });
-
-  await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
-    const request = route.request();
-    if (request.url().includes('/download')) {
+  if (!fullStackE2E) {
+    await page.route('**/api/code-artifacts/*/download', async (route) => {
       await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
-      return;
-    }
-    if (request.method() === 'POST') {
-      uploaded = true;
-      await fulfillJson(route, {
-        id: '5',
-        projectId: '1',
-        name: 'Uploaded Archive',
-        description: 'Searchable implementation archive',
-        tags: ['python'],
-        visibility: 'project_members',
-        checksumSha256: 'e'.repeat(64),
-        archiveFileId: '12',
-        status: 'active',
-      }, 201);
-      return;
-    }
-    await fulfillJson(route, {
-      results: uploaded
-        ? [{
+    });
+
+    await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
+      const request = route.request();
+      if (request.url().includes('/download')) {
+        await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
+        return;
+      }
+      if (request.method() === 'POST') {
+        uploaded = true;
+        await fulfillJson(
+          route,
+          {
             id: '5',
             projectId: '1',
             name: 'Uploaded Archive',
@@ -43,20 +31,52 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
             checksumSha256: 'e'.repeat(64),
             archiveFileId: '12',
             status: 'active',
-          }]
-        : [{
-            id: '3',
-            projectId: '1',
-            name: 'Group Code Archive',
-            description: 'Microscopy analysis archive',
-            tags: ['analysis'],
-            visibility: 'group_wide',
-            checksumSha256: 'c'.repeat(64),
-            archiveFileId: '9',
-            status: 'active',
-          }],
+          },
+          201,
+        );
+        return;
+      }
+      await fulfillJson(route, {
+        results: uploaded
+          ? [
+              {
+                id: '5',
+                projectId: '1',
+                name: 'Uploaded Archive',
+                description: 'Searchable implementation archive',
+                tags: ['python'],
+                visibility: 'project_members',
+                checksumSha256: 'e'.repeat(64),
+                archiveFileId: '12',
+                status: 'active',
+              },
+            ]
+          : [
+              {
+                id: '3',
+                projectId: '1',
+                name: 'Group Code Archive',
+                description: 'Microscopy analysis archive',
+                tags: ['analysis'],
+                visibility: 'group_wide',
+                checksumSha256: 'c'.repeat(64),
+                archiveFileId: '9',
+                status: 'active',
+              },
+            ],
+      });
     });
-  });
+  }
+
+  if (fullStackE2E) {
+    await loginAs(page);
+    await page.goto('/projects/1/code');
+    await expect(page.getByRole('heading', { name: 'Code repository' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Simulator' })).toBeVisible();
+    await page.getByRole('button', { name: 'Download', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('sim.zip');
+    return;
+  }
 
   await page.goto('/projects/1/code');
   await expect(page.getByRole('heading', { name: 'Group Code Archive' })).toBeVisible();
@@ -73,6 +93,6 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
   await page.getByRole('button', { name: 'Upload archive' }).click();
   await expect(page.getByText('Upload complete')).toBeVisible();
 
-  await page.getByRole('button', { name: /Download/ }).click();
+  await page.getByRole('button', { name: 'Download', exact: true }).click();
   await expect(page.getByText(/uploaded.zip/)).toBeVisible();
 });

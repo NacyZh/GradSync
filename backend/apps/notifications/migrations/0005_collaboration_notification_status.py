@@ -81,10 +81,14 @@ class Migration(migrations.Migration):
         migrations.RunPython(backfill_recipient_email, migrations.RunPython.noop),
         migrations.AddIndex(
             model_name="notification",
-            index=models.Index(fields=["recipient", "status"], name="notificatio_recipie_9b7c1f_idx"),
+            index=models.Index(
+                fields=["recipient", "status"], name="notificatio_recipie_9b7c1f_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="notification",
-            index=models.Index(fields=["status", "eligible_at"], name="notificatio_status_44aaf4_idx"),
+            index=models.Index(
+                fields=["status", "eligible_at"], name="notificatio_status_44aaf4_idx"
+            ),
         ),
     ]

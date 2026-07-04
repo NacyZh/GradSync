@@ -72,7 +72,9 @@ def test_paper_visibility_and_upload_validation_contract(api_client):
     invalid_response = student_client.post(
         f"/api/projects/{project.id}/papers/",
         {
-            "file": SimpleUploadedFile("paper.exe", b"bad", content_type="application/octet-stream"),
+            "file": SimpleUploadedFile(
+                "paper.exe", b"bad", content_type="application/octet-stream"
+            ),
             "title": "Bad Paper",
             "authors": "Student",
         },

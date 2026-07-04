@@ -75,7 +75,9 @@ def test_paper_search_under_seeded_scale_uses_pagination(api_client):
                 publication_year=2020 + (index % 5),
                 tags=["collaboration", f"topic-{index % 25}"],
                 visibility="project_members",
-                fingerprint=f"collaboration paper {index}|researcher {index % 20}|{2020 + (index % 5)}",
+                fingerprint=(
+                    f"collaboration paper {index}|researcher {index % 20}|{2020 + (index % 5)}"
+                ),
                 created_by=user,
             )
             for index in range(1000)

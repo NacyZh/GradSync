@@ -283,9 +283,9 @@ class WritingVersionUploadView(views.APIView):
         serializer = WritingVersionUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            version = WritingProjectService(
-                request.user, writing_project.project
-            ).upload_version(writing_project=writing_project, **serializer.validated_data)
+            version = WritingProjectService(request.user, writing_project.project).upload_version(
+                writing_project=writing_project, **serializer.validated_data
+            )
         except DjangoValidationError as exc:
             return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except DjangoPermissionDenied as exc:
@@ -341,9 +341,9 @@ class TeacherFeedbackDownloadView(views.APIView):
         )
         project = feedback.writing_version.writing_project.project
         try:
-            descriptor = TeacherFeedbackService(
-                request.user, project
-            ).describe_feedback_download(feedback)
+            descriptor = TeacherFeedbackService(request.user, project).describe_feedback_download(
+                feedback
+            )
         except DjangoPermissionDenied as exc:
             raise PermissionDenied(str(exc)) from exc
         return Response(descriptor)

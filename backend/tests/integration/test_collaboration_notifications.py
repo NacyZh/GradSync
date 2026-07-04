@@ -1,5 +1,4 @@
 import pytest
-from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.accounts.models import EmailVerificationCode
@@ -9,7 +8,7 @@ from apps.notifications.tasks import deliver_due_notifications
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.resources.models import ResourceItem, ResourceType, ResourceUseSubmission
 from apps.resources.services import ResourceInventoryService
-from apps.submissions.models import TeacherFeedback, WritingProject, WritingVersion
+from apps.submissions.models import TeacherFeedback, WritingProject
 from tests.factories.accounts import UserFactory
 from tests.helpers import authenticate
 

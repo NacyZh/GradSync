@@ -30,7 +30,12 @@ export function PaperLibraryPage() {
           <ul className="grid gap-2">
             {papers.map((paper) => (
               <li key={paper.id}>
-                <button type="button" className="w-full rounded-md border p-3 text-left hover:bg-muted" onClick={() => setSelected(paper)}>
+                <button
+                  type="button"
+                  aria-label={`Select paper ${paper.title}`}
+                  className="w-full rounded-md border p-3 text-left hover:bg-muted"
+                  onClick={() => setSelected(paper)}
+                >
                   <span className="flex flex-wrap items-start justify-between gap-2">
                     <strong>{paper.title}</strong>
                     <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">

@@ -170,13 +170,9 @@ class ResourceInventoryService:
         submission.reviewer = self.user
         submission.decision_note = decision_note.strip()
         submission.decided_at = timezone.now()
-        submission.save(
-            update_fields=["status", "reviewer", "decision_note", "decided_at"]
-        )
+        submission.save(update_fields=["status", "reviewer", "decision_note", "decided_at"])
         action = (
-            "use_confirmed"
-            if status == ResourceUseSubmission.Status.CONFIRMED
-            else "use_rejected"
+            "use_confirmed" if status == ResourceUseSubmission.Status.CONFIRMED else "use_rejected"
         )
         record_event(None, self.user, f"resource.{action}", f"Resource {action}", submission)
         enqueue_notification(

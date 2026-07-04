@@ -72,11 +72,7 @@ def test_writing_upload_validation_and_feedback_authorization_contract(api_clien
     )
     invalid = client.post(
         f"/api/writing-projects/{writing_project.data['id']}/versions",
-        {
-            "file": SimpleUploadedFile(
-                "draft.exe", b"bad", content_type="application/octet-stream"
-            )
-        },
+        {"file": SimpleUploadedFile("draft.exe", b"bad", content_type="application/octet-stream")},
         format="multipart",
     )
     valid = client.post(

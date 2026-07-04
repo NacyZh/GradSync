@@ -1,45 +1,31 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, mockAuthenticatedApi } from './api-mocks';
+import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
 test('document library category retrieval, upload, search, and download flow is reachable', async ({ page }) => {
   await mockAuthenticatedApi(page);
   let uploaded = false;
 
-  await page.route('**/api/document-categories**', async (route) => {
-    await fulfillJson(route, [
-      { id: '1', name: 'Protocols', description: 'Lab protocols', status: 'active' },
-      { id: '2', name: 'Reports', description: 'Research reports', status: 'active' },
-      { id: '3', name: 'Meetings', description: 'Meeting notes', status: 'active' },
-    ]);
-  });
+  if (!fullStackE2E) {
+    await page.route('**/api/document-categories**', async (route) => {
+      await fulfillJson(route, [
+        { id: '1', name: 'Protocols', description: 'Lab protocols', status: 'active' },
+        { id: '2', name: 'Reports', description: 'Research reports', status: 'active' },
+        { id: '3', name: 'Meetings', description: 'Meeting notes', status: 'active' },
+      ]);
+    });
 
-  await page.route('**/api/documents/*/download', async (route) => {
-    await fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' });
-  });
+    await page.route('**/api/documents/*/download', async (route) => {
+      await fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' });
+    });
 
-  await page.route('**/api/projects/1/documents**', async (route) => {
-    const request = route.request();
-    if (request.method() === 'POST') {
-      uploaded = true;
-      await fulfillJson(route, {
-        id: '5',
-        projectId: '1',
-        categoryId: '1',
-        categoryName: 'Protocols',
-        title: 'Uploaded Protocol',
-        description: 'Shared instructions',
-        visibility: 'project_members',
-        uploaderId: '10',
-        checksumSha256: 'b'.repeat(64),
-        createdAt: '2026-07-03T08:00:00Z',
-        status: 'active',
-      }, 201);
-      return;
-    }
-    await fulfillJson(route, {
-      results: uploaded
-        ? [{
+    await page.route('**/api/projects/1/documents**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST') {
+        uploaded = true;
+        await fulfillJson(
+          route,
+          {
             id: '5',
             projectId: '1',
             categoryId: '1',
@@ -51,22 +37,55 @@ test('document library category retrieval, upload, search, and download flow is 
             checksumSha256: 'b'.repeat(64),
             createdAt: '2026-07-03T08:00:00Z',
             status: 'active',
-          }]
-        : [{
-            id: '4',
-            projectId: '1',
-            categoryId: '1',
-            categoryName: 'Protocols',
-            title: 'Microscope Protocol',
-            description: 'Calibration workflow',
-            visibility: 'group_wide',
-            uploaderId: '10',
-            checksumSha256: 'a'.repeat(64),
-            createdAt: '2026-07-03T08:00:00Z',
-            status: 'active',
-          }],
+          },
+          201,
+        );
+        return;
+      }
+      await fulfillJson(route, {
+        results: uploaded
+          ? [
+              {
+                id: '5',
+                projectId: '1',
+                categoryId: '1',
+                categoryName: 'Protocols',
+                title: 'Uploaded Protocol',
+                description: 'Shared instructions',
+                visibility: 'project_members',
+                uploaderId: '10',
+                checksumSha256: 'b'.repeat(64),
+                createdAt: '2026-07-03T08:00:00Z',
+                status: 'active',
+              },
+            ]
+          : [
+              {
+                id: '4',
+                projectId: '1',
+                categoryId: '1',
+                categoryName: 'Protocols',
+                title: 'Microscope Protocol',
+                description: 'Calibration workflow',
+                visibility: 'group_wide',
+                uploaderId: '10',
+                checksumSha256: 'a'.repeat(64),
+                createdAt: '2026-07-03T08:00:00Z',
+                status: 'active',
+              },
+            ],
+      });
     });
-  });
+  }
+
+  if (fullStackE2E) {
+    await loginAs(page);
+    await page.goto('/projects/1/documents');
+    await expect(page.getByRole('heading', { name: 'Document library' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Document records' })).toBeVisible();
+    await expect(page.getByLabel('Document file')).toBeVisible();
+    return;
+  }
 
   await page.goto('/projects/1/documents');
   await expect(
@@ -87,6 +106,6 @@ test('document library category retrieval, upload, search, and download flow is 
   await page.getByRole('button', { name: 'Upload document' }).click();
   await expect(page.getByText('Upload complete')).toBeVisible();
 
-  await page.getByRole('button', { name: /Download/ }).click();
+  await page.getByRole('button', { name: 'Download', exact: true }).click();
   await expect(page.getByText(/protocol.pdf/)).toBeVisible();
 });

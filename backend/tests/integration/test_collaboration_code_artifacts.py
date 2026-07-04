@@ -9,7 +9,9 @@ from tests.helpers import authenticate
 
 
 def _archive(name: str, body: bytes | None = None):
-    return SimpleUploadedFile(name, body or f"PK\x03\x04{name}".encode(), content_type="application/zip")
+    return SimpleUploadedFile(
+        name, body or f"PK\x03\x04{name}".encode(), content_type="application/zip"
+    )
 
 
 @pytest.mark.django_db
@@ -46,7 +48,9 @@ def test_archive_upload_required_description_search_visibility_and_download_audi
 
     download_response = client.get(f"/api/code-artifacts/{artifact.id}/download")
     assert download_response.status_code == 200
-    assert DownloadEvent.objects.filter(actor=student, target_id=str(artifact.archive_file_id)).exists()
+    assert DownloadEvent.objects.filter(
+        actor=student, target_id=str(artifact.archive_file_id)
+    ).exists()
     assert AuditEvent.objects.filter(actor=student, event_type="code_artifact.downloaded").exists()
 
     hidden_response = authenticate(api_client, outsider).get(
@@ -104,12 +108,20 @@ def test_non_archive_missing_description_and_duplicate_checksum_are_rejected(api
 
     first = client.post(
         f"/api/projects/{project.id}/code-artifacts/",
-        {"archive": _archive("first.zip", b"same-archive"), "name": "First", "description": "First archive"},
+        {
+            "archive": _archive("first.zip", b"same-archive"),
+            "name": "First",
+            "description": "First archive",
+        },
         format="multipart",
     )
     duplicate = client.post(
         f"/api/projects/{project.id}/code-artifacts/",
-        {"archive": _archive("duplicate.zip", b"same-archive"), "name": "Duplicate", "description": "Duplicate archive"},
+        {
+            "archive": _archive("duplicate.zip", b"same-archive"),
+            "name": "Duplicate",
+            "description": "Duplicate archive",
+        },
         format="multipart",
     )
     missing_description = client.post(
@@ -119,7 +131,11 @@ def test_non_archive_missing_description_and_duplicate_checksum_are_rejected(api
     )
     invalid = client.post(
         f"/api/projects/{project.id}/code-artifacts/",
-        {"archive": SimpleUploadedFile("bad.py", b"print(1)", content_type="text/x-python"), "name": "Bad", "description": "Bad"},
+        {
+            "archive": SimpleUploadedFile("bad.py", b"print(1)", content_type="text/x-python"),
+            "name": "Bad",
+            "description": "Bad",
+        },
         format="multipart",
     )
 

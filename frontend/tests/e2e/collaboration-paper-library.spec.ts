@@ -1,34 +1,23 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, mockAuthenticatedApi } from './api-mocks';
+import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
 test('paper library visibility, upload, search, and download flow is reachable', async ({ page }) => {
   await mockAuthenticatedApi(page);
   let uploaded = false;
 
-  await page.route('**/api/projects/1/papers/**', async (route) => {
-    const request = route.request();
-    if (request.method() === 'POST' && request.url().endsWith('/download/')) {
-      await fulfillJson(route, { filename: 'graph.pdf', deliveryMode: 'direct_response' });
-      return;
-    }
-    if (request.method() === 'POST') {
-      uploaded = true;
-      await fulfillJson(route, {
-        id: '2',
-        projectId: '1',
-        title: 'Uploaded Graph Paper',
-        authors: ['Ada Lovelace'],
-        publicationYear: 2026,
-        visibility: 'project_members',
-        status: 'active',
-        attachments: [{ id: '12', filename: 'uploaded.pdf', checksumSha256: 'b'.repeat(64), status: 'active' }],
-      }, 201);
-      return;
-    }
-    await fulfillJson(route, {
-      results: uploaded
-        ? [{
+  if (!fullStackE2E) {
+    await page.route('**/api/projects/1/papers/**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST' && request.url().endsWith('/download/')) {
+        await fulfillJson(route, { filename: 'graph.pdf', deliveryMode: 'direct_response' });
+        return;
+      }
+      if (request.method() === 'POST') {
+        uploaded = true;
+        await fulfillJson(
+          route,
+          {
             id: '2',
             projectId: '1',
             title: 'Uploaded Graph Paper',
@@ -36,20 +25,62 @@ test('paper library visibility, upload, search, and download flow is reachable',
             publicationYear: 2026,
             visibility: 'project_members',
             status: 'active',
-            attachments: [{ id: '12', filename: 'uploaded.pdf', checksumSha256: 'b'.repeat(64), status: 'active' }],
-          }]
-        : [{
-            id: '1',
-            projectId: '1',
-            title: 'Group Wide Graph Paper',
-            authors: ['Lin Chen'],
-            publicationYear: 2025,
-            visibility: 'group_wide',
-            status: 'active',
-            attachments: [{ id: '11', filename: 'graph.pdf', checksumSha256: 'a'.repeat(64), status: 'active' }],
-          }],
+            attachments: [
+              { id: '12', filename: 'uploaded.pdf', checksumSha256: 'b'.repeat(64), status: 'active' },
+            ],
+          },
+          201,
+        );
+        return;
+      }
+      await fulfillJson(route, {
+        results: uploaded
+          ? [
+              {
+                id: '2',
+                projectId: '1',
+                title: 'Uploaded Graph Paper',
+                authors: ['Ada Lovelace'],
+                publicationYear: 2026,
+                visibility: 'project_members',
+                status: 'active',
+                attachments: [
+                  {
+                    id: '12',
+                    filename: 'uploaded.pdf',
+                    checksumSha256: 'b'.repeat(64),
+                    status: 'active',
+                  },
+                ],
+              },
+            ]
+          : [
+              {
+                id: '1',
+                projectId: '1',
+                title: 'Group Wide Graph Paper',
+                authors: ['Lin Chen'],
+                publicationYear: 2025,
+                visibility: 'group_wide',
+                status: 'active',
+                attachments: [
+                  { id: '11', filename: 'graph.pdf', checksumSha256: 'a'.repeat(64), status: 'active' },
+                ],
+              },
+            ],
+      });
     });
-  });
+  }
+
+  if (fullStackE2E) {
+    await loginAs(page);
+    await page.goto('/projects/1/papers');
+    await expect(page.getByRole('heading', { name: 'Paper library' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Graph Neural Methods' })).toBeVisible();
+    await page.getByRole('button', { name: 'Download', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('graph.pdf');
+    return;
+  }
 
   await page.goto('/projects/1/papers');
   await expect(page.getByRole('heading', { name: 'Group Wide Graph Paper' })).toBeVisible();
@@ -66,6 +97,6 @@ test('paper library visibility, upload, search, and download flow is reachable',
   await page.getByRole('button', { name: 'Upload paper' }).click();
   await expect(page.getByText('Upload complete')).toBeVisible();
 
-  await page.getByRole('button', { name: /Download/ }).click();
+  await page.getByRole('button', { name: 'Download', exact: true }).click();
   await expect(page.getByText(/uploaded.pdf|graph.pdf/)).toBeVisible();
 });

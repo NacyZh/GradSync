@@ -133,7 +133,9 @@ def _role_to_global_role(role: str) -> str:
 
 
 @transaction.atomic
-def register_account(*, email: str, password: str, nickname: str, requested_role: str, degree_type: str | None):
+def register_account(
+    *, email: str, password: str, nickname: str, requested_role: str, degree_type: str | None
+):
     if User.objects.filter(email=email).exists():
         raise ValidationError("An account with this email already exists.")
     if requested_role not in {"student", "teacher", "administrator"}:
@@ -166,7 +168,9 @@ def register_account(*, email: str, password: str, nickname: str, requested_role
 
 def create_verification_code(*, email: str) -> EmailVerificationCode:
     EmailVerificationCode.objects.filter(
-        email=email, purpose=EmailVerificationCode.Purpose.REGISTRATION, status=EmailVerificationCode.Status.PENDING
+        email=email,
+        purpose=EmailVerificationCode.Purpose.REGISTRATION,
+        status=EmailVerificationCode.Status.PENDING,
     ).update(status=EmailVerificationCode.Status.REVOKED)
     code = f"{secrets.randbelow(1000000):06d}"
     return EmailVerificationCode.objects.create(
@@ -212,7 +216,11 @@ def verify_email(*, email: str, code: str):
         .order_by("-created_at")
         .first()
     )
-    if verification is None or not verification.is_usable() or verification.code_hash != _hash_code(code):
+    if (
+        verification is None
+        or not verification.is_usable()
+        or verification.code_hash != _hash_code(code)
+    ):
         raise ValidationError("Invalid or expired verification code.")
     user = User.objects.select_for_update().get(email=email)
     user.email_verified_at = timezone.now()
@@ -227,7 +235,8 @@ def verify_email(*, email: str, code: str):
             status=RoleActivationRequest.Status.PENDING,
             defaults={
                 "requested_role": user.requested_role,
-                "expires_at": timezone.now() + timezone.timedelta(days=settings.ROLE_ACTIVATION_TTL_DAYS),
+                "expires_at": timezone.now()
+                + timezone.timedelta(days=settings.ROLE_ACTIVATION_TTL_DAYS),
             },
         )
     user.save(update_fields=["email_verified_at", "active_role", "status"])

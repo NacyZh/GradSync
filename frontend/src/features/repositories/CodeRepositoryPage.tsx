@@ -32,7 +32,12 @@ export function CodeRepositoryPage() {
           <ul className="grid gap-2">
             {artifacts.map((artifact) => (
               <li key={artifact.id}>
-                <button type="button" className="w-full rounded-md border p-3 text-left hover:bg-muted" onClick={() => setSelected(artifact)}>
+                <button
+                  type="button"
+                  aria-label={`Select code artifact ${artifact.name}`}
+                  className="w-full rounded-md border p-3 text-left hover:bg-muted"
+                  onClick={() => setSelected(artifact)}
+                >
                   <span className="mb-2 flex flex-wrap items-start justify-between gap-2">
                     <strong>{artifact.name}</strong>
                     <VisibilityBadge visibility={artifact.visibility} />

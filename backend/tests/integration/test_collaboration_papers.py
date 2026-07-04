@@ -50,7 +50,9 @@ def test_pdf_upload_search_visibility_and_download_audit(api_client):
 
     download_response = client.get(f"/api/papers/{paper.id}/download")
     assert download_response.status_code == 200
-    assert DownloadEvent.objects.filter(actor=student, target_id=str(paper.uploaded_file_id)).exists()
+    assert DownloadEvent.objects.filter(
+        actor=student, target_id=str(paper.uploaded_file_id)
+    ).exists()
     assert AuditEvent.objects.filter(actor=student, event_type="paper.downloaded").exists()
 
     outsider_client = authenticate(api_client, outsider)
@@ -107,17 +109,29 @@ def test_invalid_uploads_and_duplicates_are_rejected(api_client):
 
     first = client.post(
         f"/api/projects/{project.id}/papers/",
-        {"file": _pdf("duplicate.pdf", b"%PDF-1.4\nsame\n%%EOF"), "title": "Duplicate", "authors": "A"},
+        {
+            "file": _pdf("duplicate.pdf", b"%PDF-1.4\nsame\n%%EOF"),
+            "title": "Duplicate",
+            "authors": "A",
+        },
         format="multipart",
     )
     duplicate = client.post(
         f"/api/projects/{project.id}/papers/",
-        {"file": _pdf("duplicate-again.pdf", b"%PDF-1.4\nsame\n%%EOF"), "title": "Duplicate Again", "authors": "A"},
+        {
+            "file": _pdf("duplicate-again.pdf", b"%PDF-1.4\nsame\n%%EOF"),
+            "title": "Duplicate Again",
+            "authors": "A",
+        },
         format="multipart",
     )
     invalid = client.post(
         f"/api/projects/{project.id}/papers/",
-        {"file": SimpleUploadedFile("bad.txt", b"not pdf", content_type="text/plain"), "title": "Bad", "authors": "A"},
+        {
+            "file": SimpleUploadedFile("bad.txt", b"not pdf", content_type="text/plain"),
+            "title": "Bad",
+            "authors": "A",
+        },
         format="multipart",
     )
 

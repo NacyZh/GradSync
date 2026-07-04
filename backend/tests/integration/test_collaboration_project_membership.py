@@ -78,9 +78,7 @@ def test_removed_member_loses_project_scoped_access_but_group_wide_remains(api_c
 
     before_private = student_client.get(f"/api/projects/{project.id}/papers/?q=Private")
     before_group = student_client.get(f"/api/projects/{project.id}/documents?q=Group")
-    authenticate(api_client, teacher).delete(
-        f"/api/projects/{project.id}/members/{membership.id}/"
-    )
+    authenticate(api_client, teacher).delete(f"/api/projects/{project.id}/members/{membership.id}/")
     authenticate(api_client, student)
     after_private = student_client.get(f"/api/projects/{project.id}/papers/?q=Private")
     after_group = student_client.get(f"/api/projects/{project.id}/documents?q=Group")

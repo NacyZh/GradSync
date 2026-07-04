@@ -140,7 +140,12 @@ export function WritingProjectsPage() {
           <ul className="grid gap-2">
             {projects.map((project) => (
               <li key={project.id}>
-                <button type="button" className="w-full rounded-md border p-3 text-left hover:bg-muted" onClick={() => selectProject(project)}>
+                <button
+                  type="button"
+                  aria-label={`Select writing project ${project.title}`}
+                  className="w-full rounded-md border p-3 text-left hover:bg-muted"
+                  onClick={() => selectProject(project)}
+                >
                   <span className="mb-2 flex flex-wrap items-start justify-between gap-2">
                     <strong>{project.title}</strong>
                     <StatusBadge status={project.status} />

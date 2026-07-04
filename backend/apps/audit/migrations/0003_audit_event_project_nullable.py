@@ -1,5 +1,5 @@
-from django.db import migrations, models
 import django.db.models.deletion
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
@@ -11,6 +11,12 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="auditevent",
             name="project",
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name="audit_events", to="projects.researchproject"),
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="audit_events",
+                to="projects.researchproject",
+            ),
         ),
     ]

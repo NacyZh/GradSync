@@ -111,9 +111,7 @@ class CodeArtifactVersionCreateSerializer(serializers.Serializer):
         choices=["local_folder", "local_archive"], required=False, default="local_archive"
     )
     sourcePathLabel = serializers.CharField(required=False, allow_blank=True)
-    relativePathManifest = serializers.ListField(
-        child=serializers.CharField(), required=False
-    )
+    relativePathManifest = serializers.ListField(child=serializers.CharField(), required=False)
     filename = serializers.CharField(max_length=255)
     contentType = serializers.CharField(
         required=False, allow_blank=True, default="application/octet-stream"

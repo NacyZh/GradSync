@@ -49,9 +49,7 @@ class CodeArtifact(models.Model):
     class Meta:
         ordering = ["name"]
         indexes = [
-            models.Index(
-                fields=["project", "visibility", "status"], name="repo_code_scope_idx"
-            ),
+            models.Index(fields=["project", "visibility", "status"], name="repo_code_scope_idx"),
             models.Index(fields=["project", "name"], name="repo_code_name_idx"),
             models.Index(fields=["created_by", "created_at"], name="repo_code_uploader_idx"),
         ]

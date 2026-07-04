@@ -1,7 +1,6 @@
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 
-
 PROJECT_MEMBERS = "project_members"
 GROUP_WIDE = "group_wide"
 

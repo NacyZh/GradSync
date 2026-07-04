@@ -108,9 +108,7 @@ def test_category_validation_document_search_visibility_and_download_audit(api_c
     )
 
     assert category_response.status_code == 200
-    assert [item["title"] for item in category_response.data["results"]] == [
-        "Microscope Setup"
-    ]
+    assert [item["title"] for item in category_response.data["results"]] == ["Microscope Setup"]
     assert search_response.status_code == 200
     assert search_response.data["results"][0]["title"] == "Microscope Setup"
     assert outsider_response.status_code == 200

@@ -53,7 +53,9 @@ def test_upload_download_feedback_resource_notification_and_audit_security(api_c
     ProjectMembership.objects.create(project=project, user=teacher, role="advisor")
     ProjectMembership.objects.create(project=project, user=student, role="student")
     category = DocumentCategory.objects.create(name="Security", created_by=teacher)
-    document_file = UploadedFileFactory(owner=teacher, category="document", original_filename="secure.pdf")
+    document_file = UploadedFileFactory(
+        owner=teacher, category="document", original_filename="secure.pdf"
+    )
     document = DocumentRecord.objects.create(
         project=project,
         category=category,
@@ -79,14 +81,18 @@ def test_upload_download_feedback_resource_notification_and_audit_security(api_c
         writing_project=writing_project,
         version_number=1,
         submitted_by=student,
-        draft_file=UploadedFileFactory(owner=student, category="writing", original_filename="chapter.docx"),
+        draft_file=UploadedFileFactory(
+            owner=student, category="writing", original_filename="chapter.docx"
+        ),
         file_kind=WritingVersion.FileKind.WORD,
     )
     feedback = TeacherFeedback.objects.create(
         writing_version=version,
         reviewer=teacher,
         comments="Reviewed",
-        annotated_file=UploadedFileFactory(owner=teacher, category="feedback", original_filename="annotated.docx"),
+        annotated_file=UploadedFileFactory(
+            owner=teacher, category="feedback", original_filename="annotated.docx"
+        ),
     )
     resource_type = ResourceType.objects.create(name="Instrument")
     resource = ResourceItem.objects.create(resource_type=resource_type, name="Spectrometer")
@@ -117,11 +123,19 @@ def test_upload_download_feedback_resource_notification_and_audit_security(api_c
 
     invalid_upload = authenticate(api_client, student).post(
         f"/api/projects/{project.id}/papers/",
-        {"file": SimpleUploadedFile("malware.exe", b"bad", content_type="application/octet-stream")},
+        {
+            "file": SimpleUploadedFile(
+                "malware.exe", b"bad", content_type="application/octet-stream"
+            )
+        },
         format="multipart",
     )
-    blocked_download = authenticate(api_client, outsider).get(f"/api/documents/{document.id}/download")
-    blocked_feedback = authenticate(api_client, outsider).get(f"/api/teacher-feedback/{feedback.id}/download")
+    blocked_download = authenticate(api_client, outsider).get(
+        f"/api/documents/{document.id}/download"
+    )
+    blocked_feedback = authenticate(api_client, outsider).get(
+        f"/api/teacher-feedback/{feedback.id}/download"
+    )
     blocked_resource = authenticate(api_client, student).patch(
         f"/api/resource-use-submissions/{submission.id}/",
         {"status": "confirmed"},

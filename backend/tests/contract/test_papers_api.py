@@ -58,7 +58,8 @@ def test_paper_create_import_duplicate_and_authorized_download(api_client):
     import_response = client.post(
         f"/api/projects/{project.id}/papers/imports/",
         {
-            "sourceType": "mixed_local", "sourcePathLabel": "local-library",
+            "sourceType": "mixed_local",
+            "sourcePathLabel": "local-library",
             "items": [
                 {"title": "New Paper", "authors": ["Mei Wang"], "publicationYear": 2025},
                 {"title": "Graph Neural Methods", "authors": ["Lin Chen"], "publicationYear": 2026},

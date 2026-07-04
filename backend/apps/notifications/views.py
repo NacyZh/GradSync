@@ -4,7 +4,6 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.projects.services import projects_visible_to
 
-from .models import Notification
 from .serializers import NotificationSerializer
 from .services import notifications_visible_to
 

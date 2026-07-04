@@ -15,7 +15,9 @@ def record_event(project, actor, event_type: str, summary: str, target=None) -> 
 
 
 def record_role_activation(actor, target, action: str) -> AuditEvent:
-    return record_event(None, actor, f"role_activation.{action}", f"Role activation {action}", target)
+    return record_event(
+        None, actor, f"role_activation.{action}", f"Role activation {action}", target
+    )
 
 
 def record_upload(project, actor, target, asset_type: str) -> AuditEvent:
@@ -23,7 +25,9 @@ def record_upload(project, actor, target, asset_type: str) -> AuditEvent:
 
 
 def record_download(project, actor, target, asset_type: str) -> AuditEvent:
-    return record_event(project, actor, f"{asset_type}.downloaded", f"Downloaded {asset_type}", target)
+    return record_event(
+        project, actor, f"{asset_type}.downloaded", f"Downloaded {asset_type}", target
+    )
 
 
 def record_membership_change(project, actor, target, action: str) -> AuditEvent:

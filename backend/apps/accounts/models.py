@@ -65,14 +65,18 @@ class StudentProfile(models.Model):
         MASTERS = "masters", "Masters"
         DOCTORAL = "doctoral", "Doctoral"
 
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="student_profile")
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="student_profile"
+    )
     degree_type = models.CharField(max_length=20, choices=DegreeType.choices)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 
 class TeacherProfile(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="teacher_profile")
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="teacher_profile"
+    )
     approved_at = models.DateTimeField()
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -123,7 +127,9 @@ class RoleActivationRequest(models.Model):
         EXPIRED = "expired", "Expired"
         REVOKED = "revoked", "Revoked"
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="role_activation_requests")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="role_activation_requests"
+    )
     requested_role = models.CharField(max_length=30, choices=RequestedRole.choices)
     activation_source = models.CharField(
         max_length=40,

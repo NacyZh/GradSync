@@ -47,9 +47,7 @@ class ResourceItem(models.Model):
         UNAVAILABLE = "unavailable", "Unavailable"
         RETIRED = "retired", "Retired"
 
-    resource_type = models.ForeignKey(
-        ResourceType, on_delete=models.PROTECT, related_name="items"
-    )
+    resource_type = models.ForeignKey(ResourceType, on_delete=models.PROTECT, related_name="items")
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     location = models.CharField(max_length=255, blank=True)

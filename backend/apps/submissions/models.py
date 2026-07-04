@@ -158,9 +158,7 @@ class WritingVersion(models.Model):
     )
     file_kind = models.CharField(max_length=30, choices=FileKind.choices)
     summary = models.TextField(blank=True)
-    status = models.CharField(
-        max_length=30, choices=Status.choices, default=Status.SUBMITTED
-    )
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.SUBMITTED)
     submitted_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

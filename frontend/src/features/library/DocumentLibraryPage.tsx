@@ -209,7 +209,12 @@ export function DocumentLibraryPage() {
           <ul className="grid gap-2">
             {documents.map((document) => (
               <li key={document.id}>
-                <button type="button" className="w-full rounded-md border p-3 text-left hover:bg-muted" onClick={() => setSelected(document)}>
+                <button
+                  type="button"
+                  aria-label={`Select document ${document.title}`}
+                  className="w-full rounded-md border p-3 text-left hover:bg-muted"
+                  onClick={() => setSelected(document)}
+                >
                   <span className="mb-2 flex flex-wrap items-start justify-between gap-2">
                     <strong>{document.title}</strong>
                     <VisibilityBadge visibility={document.visibility} />

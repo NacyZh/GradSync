@@ -11,6 +11,10 @@ router.register(
 )
 
 urlpatterns = [
-    path("code-artifacts/<int:artifact_id>/download", CodeArtifactDownloadView.as_view(), name="code-artifact-download"),
+    path(
+        "code-artifacts/<int:artifact_id>/download",
+        CodeArtifactDownloadView.as_view(),
+        name="code-artifact-download",
+    ),
     path("", include(router.urls)),
 ]

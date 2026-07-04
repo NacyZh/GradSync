@@ -26,7 +26,17 @@ class UploadPolicyResult:
 ALLOWED_EXTENSIONS = {
     UploadCategory.PAPER: {".pdf"},
     UploadCategory.CODE: {".zip", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".7z"},
-    UploadCategory.DOCUMENT: {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".md"},
+    UploadCategory.DOCUMENT: {
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".txt",
+        ".md",
+    },
     UploadCategory.WRITING: {".doc", ".docx", ".tex", ".zip", ".tar", ".gz", ".tgz"},
     UploadCategory.FEEDBACK: {".pdf", ".doc", ".docx", ".txt", ".md"},
 }

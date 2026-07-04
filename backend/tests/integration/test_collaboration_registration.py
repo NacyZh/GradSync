@@ -45,7 +45,10 @@ def test_student_becomes_active_after_email_verification(api_client):
 
     assert response.status_code == 200
     assert response.json()["status"] == "active"
-    assert StudentProfile.objects.get(user__email="student-active@example.com").degree_type == "doctoral"
+    assert (
+        StudentProfile.objects.get(user__email="student-active@example.com").degree_type
+        == "doctoral"
+    )
 
 
 @pytest.mark.django_db
@@ -66,13 +69,17 @@ def test_teacher_remains_pending_until_admin_approval(api_client):
 
     assert verify_response.status_code == 200
     assert verify_response.json()["status"] == "pending_role_activation"
-    assert RoleActivationRequest.objects.filter(user__email="teacher@example.com", status="pending").exists()
+    assert RoleActivationRequest.objects.filter(
+        user__email="teacher@example.com", status="pending"
+    ).exists()
 
 
 @pytest.mark.django_db
 def test_admin_approval_activates_teacher(api_client):
     admin = UserFactory(global_role="admin", status="active")
-    register(api_client, email="teacher-approve@example.com", requestedRole="teacher", degreeType=None)
+    register(
+        api_client, email="teacher-approve@example.com", requestedRole="teacher", degreeType=None
+    )
     code = EmailVerificationCode.objects.get(email="teacher-approve@example.com").plain_code
     api_client.post(
         "/api/accounts/verify-email/",

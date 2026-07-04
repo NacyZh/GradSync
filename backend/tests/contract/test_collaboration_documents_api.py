@@ -58,10 +58,14 @@ def test_document_visibility_and_upload_validation_contract(api_client):
     project = ResearchProject.objects.create(title="Private Documents", advisor=teacher)
     ProjectMembership.objects.create(project=project, user=teacher, role="advisor")
     ProjectMembership.objects.create(project=project, user=student, role="student")
-    category = authenticate(api_client, teacher).post(
-        "/api/document-categories",
-        {"name": "Reports"},
-    ).data
+    category = (
+        authenticate(api_client, teacher)
+        .post(
+            "/api/document-categories",
+            {"name": "Reports"},
+        )
+        .data
+    )
 
     scoped_response = authenticate(api_client, student).post(
         f"/api/projects/{project.id}/documents",
@@ -101,9 +105,7 @@ def test_document_visibility_and_upload_validation_contract(api_client):
 
     outsider_client = authenticate(api_client, outsider)
     visible_response = outsider_client.get(f"/api/projects/{project.id}/documents?q=Report")
-    blocked_download = outsider_client.get(
-        f"/api/documents/{scoped_response.data['id']}/download"
-    )
+    blocked_download = outsider_client.get(f"/api/documents/{scoped_response.data['id']}/download")
 
     assert scoped_response.status_code == 201
     assert group_wide_response.status_code == 201

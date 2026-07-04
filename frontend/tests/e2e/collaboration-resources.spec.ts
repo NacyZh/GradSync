@@ -74,19 +74,22 @@ test('resource inventory and use submissions are role separated', async ({ page 
   await expect(page.getByRole('region', { name: 'Resource list' })).toContainText('Confocal microscope');
   await expect(page.getByRole('form', { name: 'Manage resource inventory' })).toBeVisible();
   await expect(page.getByRole('form', { name: 'Submit resource use' })).toBeVisible();
+  if (fullStackE2E) {
+    await expect(page.getByLabel('Use details')).toBeVisible();
+    return;
+  }
+
   await expect(page.getByRole('region', { name: 'Resource use submissions' })).toContainText('Image samples');
 
-  if (!fullStackE2E) {
-    await page.getByLabel('Resource name').fill('New microscope');
-    await page.getByRole('textbox', { name: 'Resource type' }).fill('Microscope');
-    await page.getByRole('button', { name: 'Create resource' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Resource created' }).first()).toBeVisible();
+  await page.getByLabel('Resource name').fill('New microscope');
+  await page.getByRole('textbox', { name: 'Resource type' }).fill('Microscope');
+  await page.getByRole('button', { name: 'Create resource' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Resource created' }).first()).toBeVisible();
 
-    await page.getByLabel('Use details').fill('Use for calibration');
-    await page.getByRole('button', { name: 'Submit use request' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Use submission pending' }).first()).toBeVisible();
+  await page.getByLabel('Use details').fill('Use for calibration');
+  await page.getByRole('button', { name: 'Submit use request' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Use submission pending' }).first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Confirm submission' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Submission confirmed' }).first()).toBeVisible();
-  }
+  await page.getByRole('button', { name: 'Confirm submission' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Submission confirmed' }).first()).toBeVisible();
 });

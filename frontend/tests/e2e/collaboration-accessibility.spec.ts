@@ -1,9 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { fulfillJson, mockAuthenticatedApi } from './api-mocks';
+import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
 async function mockCollaborationPages(page: Page) {
   await mockAuthenticatedApi(page);
+  if (fullStackE2E) {
+    return;
+  }
   await page.route('**/api/document-categories**', async (route) => fulfillJson(route, [{ id: '1', name: 'Protocols', description: 'Lab protocols', status: 'active' }]));
   await page.route('**/api/projects/1/papers/**', async (route) => fulfillJson(route, { results: [{ id: '1', projectId: '1', title: 'Group Wide Graph Paper', authors: ['Lin Chen'], publicationYear: 2025, visibility: 'group_wide', status: 'active', attachments: [{ id: '11', filename: 'graph.pdf', checksumSha256: 'a'.repeat(64), status: 'active' }] }] }));
   await page.route('**/api/projects/1/code-artifacts/**', async (route) => fulfillJson(route, { results: [{ id: '3', projectId: '1', name: 'Group Code Archive', description: 'Microscopy analysis archive', tags: ['analysis'], visibility: 'group_wide', checksumSha256: 'c'.repeat(64), archiveFileId: '9', status: 'active' }] }));
@@ -41,6 +44,9 @@ for (const viewport of [
   test(`collaboration pages keep landmarks and controls accessible on ${viewport.label}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await mockCollaborationPages(page);
+    if (fullStackE2E) {
+      await loginAs(page);
+    }
     for (const path of ['/projects/1', '/projects/1/papers', '/projects/1/code', '/projects/1/documents', '/projects/1/writing', '/projects/1/resources']) {
       await page.goto(path);
       await expect(page.getByRole('banner')).toBeVisible();

@@ -56,7 +56,9 @@ test('teacher manages project membership by student nickname', async ({ page }) 
 
   await page.goto('/projects/1');
   await expect(page.getByRole('heading', { name: 'Graphene Lab' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Project members' })).toContainText('student.one@example.edu');
+  await expect(page.getByRole('region', { name: 'Project members' })).toContainText(
+    fullStackE2E ? 'student@example.edu' : 'student.one@example.edu',
+  );
 
   if (!fullStackE2E) {
     await page.getByLabel('Student nickname').fill('Alex');

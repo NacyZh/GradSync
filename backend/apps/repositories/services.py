@@ -39,8 +39,12 @@ class CodeArtifactService:
     ) -> CodeArtifact:
         self._require_member()
         ensure_project_writable(self.project)
-        if visibility == CodeArtifact.Visibility.GROUP_WIDE and not _can_share_group_wide(self.user):
-            raise PermissionError("Only teachers and administrators can share code artifacts group-wide")
+        if visibility == CodeArtifact.Visibility.GROUP_WIDE and not _can_share_group_wide(
+            self.user
+        ):
+            raise PermissionError(
+                "Only teachers and administrators can share code artifacts group-wide"
+            )
         artifact = CodeArtifact.objects.create(
             project=self.project,
             name=name,
@@ -75,8 +79,12 @@ class CodeArtifactService:
         ensure_project_writable(self.project)
         if not description or not description.strip():
             raise ValidationError("Code artifact description is required")
-        if visibility == CodeArtifact.Visibility.GROUP_WIDE and not _can_share_group_wide(self.user):
-            raise PermissionError("Only teachers and administrators can share code artifacts group-wide")
+        if visibility == CodeArtifact.Visibility.GROUP_WIDE and not _can_share_group_wide(
+            self.user
+        ):
+            raise PermissionError(
+                "Only teachers and administrators can share code artifacts group-wide"
+            )
 
         checksum = checksum_sha256(upload)
         if CodeArtifact.objects.filter(
