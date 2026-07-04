@@ -90,6 +90,12 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "concurrency:" in workflow
     assert "timeout-minutes:" in workflow
     assert "persist-credentials: false" in workflow
+    assert "actions/checkout@v5" in workflow
+    assert "actions/setup-node@v5" in workflow
+    assert "actions/setup-python@v6" in workflow
+    assert "actions/checkout@v4" not in workflow
+    assert "actions/setup-node@v4" not in workflow
+    assert "actions/setup-python@v5" not in workflow
     assert "DJANGO_SETTINGS_MODULE: gradsync.settings.ci" in workflow
     assert "GRADSYNC_BACKEND_SETTINGS: ${{ env.DJANGO_SETTINGS_MODULE }}" in workflow
     assert 'OPENAPI_STRICT_SHAPES: "1"' in workflow
@@ -113,6 +119,8 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "PRODUCTION_ENV_FILE" in workflow
     assert "GRADSYNC_PRODUCTION_HOST" in workflow
     assert "GRADSYNC_DEPLOY_PATH" in workflow
+    assert "ServerAliveInterval=30" in workflow
+    assert "ServerAliveCountMax=6" in workflow
     assert "scripts/deploy-production.sh" in workflow
 
 

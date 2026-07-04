@@ -55,10 +55,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -88,10 +88,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -144,15 +144,15 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -187,7 +187,7 @@ jobs:
     timeout-minutes: 20
     needs: [backend, frontend, frontend-e2e]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
       - name: Validate production Compose configuration
@@ -217,7 +217,7 @@ jobs:
       PUBLIC_URL: ${{ vars.GRADSYNC_PUBLIC_URL || 'https://120021123.xyz' }}
       PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
       - name: Validate deployment inputs
@@ -250,15 +250,33 @@ jobs:
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "echo ssh-ok"
       - name: Sync production env file
+        timeout-minutes: 2
         run: |
           if [ -n "${PRODUCTION_ENV_FILE}" ]; then
-            printf '%s' "${PRODUCTION_ENV_FILE}" | ssh -i ~/.ssh/gradsync_github_deploy -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            printf '%s' "${PRODUCTION_ENV_FILE}" | ssh \
+              -o BatchMode=yes \
+              -o ConnectTimeout=20 \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              -o StrictHostKeyChecking=yes \
+              -i ~/.ssh/gradsync_github_deploy \
+              -p "${DEPLOY_PORT}" \
+              "${DEPLOY_USER}@${DEPLOY_HOST}" \
               "umask 077; cat > '${DEPLOY_PATH}/.env.production.tmp' && mv '${DEPLOY_PATH}/.env.production.tmp' '${DEPLOY_PATH}/.env.production'"
           else
             echo "PRODUCTION_ENV_FILE is empty; keeping existing server .env.production"
           fi
       - name: Deploy on production host
+        timeout-minutes: 25
         run: |
-          ssh -i ~/.ssh/gradsync_github_deploy -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+          ssh \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=6 \
+            -o StrictHostKeyChecking=yes \
+            -i ~/.ssh/gradsync_github_deploy \
+            -p "${DEPLOY_PORT}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' sh -s" \
             < scripts/deploy-production.sh
