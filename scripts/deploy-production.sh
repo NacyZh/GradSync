@@ -102,7 +102,7 @@ wait_for_service backend healthy
 
 echo "Running production readiness checks"
 compose exec -T backend python manage.py check --deploy
-compose exec -T backend python manage.py check_production_readiness --repo-root /app
+compose exec -T backend python manage.py check_production_readiness --skip-repo-files
 
 echo "Starting frontend"
 compose up -d --no-deps --remove-orphans frontend

@@ -13,7 +13,7 @@ STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 ./scripts/postgres-restore.sh "$BACKUP_PATH"
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-docker compose -f "$COMPOSE_FILE" exec -T backend python manage.py check_production_readiness --skip-database
+docker compose -f "$COMPOSE_FILE" exec -T backend python manage.py check_production_readiness --skip-database --skip-repo-files
 
 COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 cat > "$EVIDENCE_PATH" <<EOF
@@ -29,7 +29,7 @@ cat > "$EVIDENCE_PATH" <<EOF
 | Operator | ${USER:-unknown} |
 | RPO result | ${RESTORE_DRILL_RPO_RESULT:-recorded by operator} |
 | RTO result | ${RESTORE_DRILL_RTO_RESULT:-recorded by operator} |
-| Validation commands | postgres-restore.sh; check_production_readiness |
+| Validation commands | postgres-restore.sh; check_production_readiness --skip-database --skip-repo-files |
 | Outcome | ${RESTORE_DRILL_OUTCOME:-passed} |
 EOF
 

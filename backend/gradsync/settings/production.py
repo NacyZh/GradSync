@@ -77,6 +77,20 @@ EMAIL_HOST = _required_env("EMAIL_HOST")
 DEFAULT_FROM_EMAIL = _required_env("DEFAULT_FROM_EMAIL")
 EMAIL_SUBJECT_PREFIX = os.getenv("EMAIL_SUBJECT_PREFIX", "[GradSync] ")
 
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip()
+TLS_CERTIFICATE_PATH = os.getenv("TLS_CERTIFICATE_PATH", "").strip()
+TLS_PRIVATE_KEY_PATH = os.getenv("TLS_PRIVATE_KEY_PATH", "").strip()
+EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "").strip()
+EMAIL_PROVIDER_DOMAIN = os.getenv("EMAIL_PROVIDER_DOMAIN", "").strip()
+EMAIL_DKIM_SELECTOR = os.getenv("EMAIL_DKIM_SELECTOR", "").strip()
+ALERT_WEBHOOK_URL = os.getenv("ALERT_WEBHOOK_URL", "").strip()
+ALERT_ONCALL_TARGET = os.getenv("ALERT_ONCALL_TARGET", "").strip()
+REGISTRY_IMAGE_PREFIX = os.getenv("REGISTRY_IMAGE_PREFIX", "").strip()
+BACKEND_IMAGE = os.getenv("BACKEND_IMAGE", "").strip()
+FRONTEND_IMAGE = os.getenv("FRONTEND_IMAGE", "").strip()
+POSTGRES_BACKUP_OFFSITE_URI = os.getenv("POSTGRES_BACKUP_OFFSITE_URI", "").strip()
+BACKUP_RESTORE_DRILL_EVIDENCE = os.getenv("BACKUP_RESTORE_DRILL_EVIDENCE", "").strip()
+
 SPECTACULAR_SETTINGS["SERVERS"] = [  # noqa: F405
     {"url": os.getenv("PUBLIC_API_BASE_URL", "/api")}
 ]

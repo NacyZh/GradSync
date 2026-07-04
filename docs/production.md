@@ -69,7 +69,8 @@ The deploy script performs:
 7. Start PostgreSQL and Redis one at a time and wait for health checks.
 8. Run migrations.
 9. Start the backend, wait for health, and run `python manage.py check --deploy`
-   plus `check_production_readiness` inside the running backend container.
+   plus `check_production_readiness --skip-repo-files` inside the running
+   backend container.
 10. Start frontend, worker, and scheduler one at a time.
 11. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
 12. Watch backend logs, worker logs, queue depth, notification failures, and
@@ -177,8 +178,8 @@ policy.
   updating the provider first, then `.env.production`, then restarting affected
   services.
 - Never copy values from `.env.example` into production.
-- After rotation, run `check_production_readiness`, sign in, and send a test
-  notification.
+- After rotation, run `check_production_readiness --skip-repo-files` inside the
+  backend container, sign in, and send a test notification.
 
 ## Incident Response
 

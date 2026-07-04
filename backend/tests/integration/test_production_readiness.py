@@ -129,9 +129,10 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     assert "compose up -d --no-deps --remove-orphans backend" in script
     assert "compose exec -T backend python manage.py check --deploy" in script
     assert (
-        "compose exec -T backend python manage.py check_production_readiness --repo-root /app"
+        "compose exec -T backend python manage.py check_production_readiness --skip-repo-files"
         in script
     )
+    assert "--repo-root /app" not in script
     assert "run --rm backend python manage.py check --deploy" not in script
     assert "drop_caches" not in script
     assert "$PUBLIC_URL/healthz/" in script
@@ -163,12 +164,33 @@ def test_env_template_names_operational_launch_inputs():
         assert name in env_template
 
 
+def test_production_settings_expose_operational_readiness_env_names():
+    production_settings = (REPO_ROOT / "backend/gradsync/settings/production.py").read_text()
+
+    for name in [
+        "PUBLIC_BASE_URL",
+        "TLS_CERTIFICATE_PATH",
+        "TLS_PRIVATE_KEY_PATH",
+        "EMAIL_PROVIDER",
+        "EMAIL_PROVIDER_DOMAIN",
+        "EMAIL_DKIM_SELECTOR",
+        "ALERT_WEBHOOK_URL",
+        "ALERT_ONCALL_TARGET",
+        "REGISTRY_IMAGE_PREFIX",
+        "BACKEND_IMAGE",
+        "FRONTEND_IMAGE",
+        "POSTGRES_BACKUP_OFFSITE_URI",
+        "BACKUP_RESTORE_DRILL_EVIDENCE",
+    ]:
+        assert f'{name} = os.getenv("{name}", "").strip()' in production_settings
+
+
 def test_restore_drill_script_records_evidence_path():
     script = (REPO_ROOT / "scripts/postgres-restore-drill.sh").read_text()
 
     assert "BACKUP_RESTORE_DRILL_EVIDENCE" in script
     assert "postgres-restore.sh" in script
-    assert "check_production_readiness" in script
+    assert "check_production_readiness --skip-database --skip-repo-files" in script
 
 
 def test_production_readiness_rejects_placeholder_restore_drill(tmp_path):

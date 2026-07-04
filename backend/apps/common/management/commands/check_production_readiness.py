@@ -10,17 +10,20 @@ from apps.common.production_checks import collect_production_readiness_issues
 
 
 class Command(BaseCommand):
-    help = (
-        "Validate production settings, compose topology, migrations, static files, and SMTP path."
-    )
+    help = "Validate production settings, repo topology, migrations, static files, and SMTP path."
 
     def add_arguments(self, parser):
         parser.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[5]))
         parser.add_argument("--skip-database", action="store_true")
+        parser.add_argument(
+            "--skip-repo-files",
+            action="store_true",
+            help="Skip repository file checks when running inside a minimal runtime image.",
+        )
         parser.add_argument("--smtp-probe-to", default="")
 
     def handle(self, *args, **options):
-        repo_root = Path(options["repo_root"])
+        repo_root = None if options["skip_repo_files"] else Path(options["repo_root"])
         issues = collect_production_readiness_issues(settings, repo_root)
         if not options["skip_database"]:
             executor = MigrationExecutor(connections["default"])
