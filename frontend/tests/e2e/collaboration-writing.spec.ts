@@ -101,14 +101,14 @@ test('writing project feedback flow is reachable', async ({ page }) => {
   if (fullStackE2E) {
     await loginAs(page);
     await page.goto('/projects/1/writing');
-    await expect(page.getByRole('heading', { name: 'Writing projects' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Writing projects', exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Writing projects' })).toBeVisible();
     await expect(page.getByLabel('Search writing projects')).toBeVisible();
     return;
   }
 
   await page.goto('/projects/1/writing');
-  await expect(page.getByRole('heading', { name: 'Writing projects' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Writing projects', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Thesis Chapter' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Version 1/ })).toBeVisible();
 
