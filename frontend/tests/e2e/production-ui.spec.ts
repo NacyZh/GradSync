@@ -2,6 +2,13 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { loginAs, fullStackE2E, mockAuthenticatedApi } from './api-mocks';
 
+type LayoutBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 type ViewportCase = {
   name: string;
   width: number;
@@ -145,14 +152,13 @@ async function expectVisibleLandmarksDoNotOverlap(page: Page, locators: Locator[
 async function expectPrimaryControlsStayInsideViewport(page: Page) {
   const viewport = page.viewportSize();
   expect(viewport).not.toBeNull();
-  const controls = page.locator(
+  const boxes = await visibleElementBoxes(
+    page,
     'main button:visible, main a:visible, header button:visible, aside a:visible',
+    30,
   );
-  const count = await controls.count();
-  expect(count).toBeGreaterThan(0);
-  for (let index = 0; index < Math.min(count, 30); index += 1) {
-    const box = await controls.nth(index).boundingBox();
-    if (!box) continue;
+  expect(boxes.length).toBeGreaterThan(0);
+  for (const box of boxes) {
     expect(box.width).toBeGreaterThan(0);
     expect(box.height).toBeGreaterThan(0);
     expect(box.x).toBeGreaterThanOrEqual(0);
@@ -161,15 +167,11 @@ async function expectPrimaryControlsStayInsideViewport(page: Page) {
 }
 
 async function expectNoVisibleTextOverlap(page: Page) {
-  const textNodes = page.locator('main h1:visible, main h2:visible, main p:visible, main label:visible');
-  const boxes = [];
-  const count = await textNodes.count();
-  for (let index = 0; index < Math.min(count, 24); index += 1) {
-    const box = await textNodes.nth(index).boundingBox();
-    if (box && box.width > 0 && box.height > 0) {
-      boxes.push(box);
-    }
-  }
+  const boxes = await visibleElementBoxes(
+    page,
+    'main h1, main h2, main p, main label',
+    24,
+  );
   for (let leftIndex = 0; leftIndex < boxes.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < boxes.length; rightIndex += 1) {
       const overlapX = Math.max(0, Math.min(boxes[leftIndex].x + boxes[leftIndex].width, boxes[rightIndex].x + boxes[rightIndex].width) - Math.max(boxes[leftIndex].x, boxes[rightIndex].x));
@@ -178,4 +180,30 @@ async function expectNoVisibleTextOverlap(page: Page) {
       expect(overlapArea).toBeLessThanOrEqual(1);
     }
   }
+}
+
+async function visibleElementBoxes(page: Page, selector: string, limit: number): Promise<LayoutBox[]> {
+  return page.locator(selector).evaluateAll((elements, maxCount) => {
+    return elements
+      .filter((element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== 'hidden' &&
+          style.display !== 'none' &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      })
+      .slice(0, maxCount)
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+        };
+      });
+  }, limit);
 }
