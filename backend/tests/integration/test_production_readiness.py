@@ -59,6 +59,11 @@ def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
     assert "./frontend:" not in compose
     assert "${BACKEND_IMAGE" in compose
     assert "${FRONTEND_IMAGE" in compose
+    assert "--workers \"$${GRADSYNC_GUNICORN_WORKERS:-1}\"" in compose
+    assert "--concurrency=\"$${GRADSYNC_CELERY_CONCURRENCY:-1}\"" in compose
+    assert "mem_limit: ${GRADSYNC_BACKEND_MEM_LIMIT:-256m}" in compose
+    assert "mem_limit: ${GRADSYNC_WORKER_MEM_LIMIT:-256m}" in compose
+    assert "max_connections=${GRADSYNC_POSTGRES_MAX_CONNECTIONS:-40}" in compose
     assert "X-Forwarded-Proto':'https'" in compose
     assert "http://127.0.0.1:8080/healthz/" in compose
 
@@ -111,13 +116,24 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     script = (REPO_ROOT / "scripts/deploy-production.sh").read_text()
 
     assert "git pull --ff-only" in script
-    assert 'docker compose -f "$COMPOSE_FILE" stop backend frontend worker scheduler' in script
-    assert 'docker compose -f "$COMPOSE_FILE" rm -f backend frontend worker scheduler' in script
+    assert 'docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE"' in script
+    assert 'COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"' in script
+    assert "compose stop backend frontend worker scheduler" in script
+    assert "compose rm -f backend frontend worker scheduler" in script
     assert "docker builder prune -af" in script
-    assert 'docker compose -f "$COMPOSE_FILE" build --pull backend frontend' in script
-    assert 'docker compose -f "$COMPOSE_FILE" run --rm migrate' in script
-    assert "python manage.py check --deploy" in script
-    assert "python manage.py check_production_readiness --repo-root /app" in script
+    assert "docker image prune -f" in script
+    assert "compose build --pull backend" in script
+    assert "compose build --pull frontend" in script
+    assert "build --pull backend frontend" not in script
+    assert "compose run --rm migrate" in script
+    assert "compose up -d --no-deps --remove-orphans backend" in script
+    assert "compose exec -T backend python manage.py check --deploy" in script
+    assert (
+        "compose exec -T backend python manage.py check_production_readiness --repo-root /app"
+        in script
+    )
+    assert "run --rm backend python manage.py check --deploy" not in script
+    assert "drop_caches" not in script
     assert "$PUBLIC_URL/healthz/" in script
     assert "$PUBLIC_URL/readyz/" in script
     assert "$PUBLIC_URL/api/schema/" in script
@@ -131,6 +147,11 @@ def test_env_template_names_operational_launch_inputs():
         "TLS_PRIVATE_KEY_PATH",
         "POSTGRES_BACKUP_OFFSITE_URI",
         "BACKUP_RESTORE_DRILL_EVIDENCE",
+        "GRADSYNC_POSTGRES_MAX_CONNECTIONS",
+        "GRADSYNC_CELERY_CONCURRENCY",
+        "GRADSYNC_GUNICORN_WORKERS",
+        "GRADSYNC_BACKEND_MEM_LIMIT",
+        "GRADSYNC_WORKER_MEM_LIMIT",
         "EMAIL_PROVIDER",
         "EMAIL_DKIM_SELECTOR",
         "ALERT_WEBHOOK_URL",

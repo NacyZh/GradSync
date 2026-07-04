@@ -23,4 +23,4 @@ USER gradsync
 EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "gradsync.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-", "--error-logfile", "-"]
+CMD ["sh", "-c", "exec gunicorn gradsync.wsgi:application --bind 0.0.0.0:8000 --workers \"${GRADSYNC_GUNICORN_WORKERS:-1}\" --threads \"${GRADSYNC_GUNICORN_THREADS:-2}\" --access-logfile - --error-logfile -"]

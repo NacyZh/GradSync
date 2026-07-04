@@ -9,6 +9,7 @@ services:
       - path: .env.production
         required: false
     command: python manage.py migrate --noinput
+    mem_limit: ${GRADSYNC_MIGRATE_MEM_LIMIT:-256m}
     restart: "no"
     depends_on:
       db:
@@ -29,6 +30,17 @@ services:
         required: false
     environment:
       GRADSYNC_COLLECT_STATIC: "true"
+    command:
+      - sh
+      - -c
+      - >
+        exec gunicorn gradsync.wsgi:application
+        --bind 0.0.0.0:8000
+        --workers "$${GRADSYNC_GUNICORN_WORKERS:-1}"
+        --threads "$${GRADSYNC_GUNICORN_THREADS:-2}"
+        --access-logfile -
+        --error-logfile -
+    mem_limit: ${GRADSYNC_BACKEND_MEM_LIMIT:-256m}
     restart: unless-stopped
     depends_on:
       migrate:
@@ -58,6 +70,7 @@ services:
       dockerfile: docker/frontend.Dockerfile
     ports:
       - "8080:8080"
+    mem_limit: ${GRADSYNC_FRONTEND_MEM_LIMIT:-96m}
     restart: unless-stopped
     depends_on:
       backend:
@@ -80,7 +93,14 @@ services:
       - path: .env.production.example
       - path: .env.production
         required: false
-    command: celery -A gradsync worker -l info -Q default,notifications
+    command:
+      - sh
+      - -c
+      - >
+        exec celery -A gradsync worker -l info -Q default,notifications
+        --concurrency="$${GRADSYNC_CELERY_CONCURRENCY:-1}"
+        --prefetch-multiplier="$${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}"
+    mem_limit: ${GRADSYNC_WORKER_MEM_LIMIT:-256m}
     restart: unless-stopped
     depends_on:
       backend:
@@ -104,7 +124,16 @@ services:
       - path: .env.production.example
       - path: .env.production
         required: false
-    command: celery -A gradsync beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command:
+      - celery
+      - -A
+      - gradsync
+      - beat
+      - -l
+      - info
+      - --scheduler
+      - django_celery_beat.schedulers:DatabaseScheduler
+    mem_limit: ${GRADSYNC_SCHEDULER_MEM_LIMIT:-160m}
     restart: unless-stopped
     depends_on:
       backend:
@@ -123,6 +152,17 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - postgres_backups:/backups
+    command:
+      - postgres
+      - -c
+      - max_connections=${GRADSYNC_POSTGRES_MAX_CONNECTIONS:-40}
+      - -c
+      - shared_buffers=${GRADSYNC_POSTGRES_SHARED_BUFFERS:-64MB}
+      - -c
+      - work_mem=${GRADSYNC_POSTGRES_WORK_MEM:-2MB}
+      - -c
+      - maintenance_work_mem=${GRADSYNC_POSTGRES_MAINTENANCE_WORK_MEM:-32MB}
+    mem_limit: ${GRADSYNC_DB_MEM_LIMIT:-384m}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -137,6 +177,7 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    mem_limit: ${GRADSYNC_REDIS_MEM_LIMIT:-128m}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

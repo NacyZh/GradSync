@@ -9,17 +9,18 @@
   Playwright workflows, `npm run test:e2e -- production-ui.spec.ts`, and
   `npm run build` from `frontend/`.
 - For the research collaboration platform release gate, run the feature
-  quickstart command set and contract guard:
+  quickstart command set:
   `docker compose exec backend pytest`,
   `docker compose exec frontend npm test`,
   `docker compose exec frontend npm run lint`,
-  `docker compose exec frontend npm run test:e2e`, and
-  `sh scripts/check-openapi-contract.sh specs/003-research-collab-platform/contracts/openapi.yaml`.
+  and `docker compose exec frontend npm run test:e2e`.
 - Run `sh scripts/check-generated-artifacts.sh` before frontend build artifacts
   are produced and before opening the release review.
 - Copy `.env.production.example` to `.env.production` and replace every
   placeholder secret before starting the stack.
-- Start with `docker compose -f docker-compose.prod.yml up --build`.
+- Start with `scripts/deploy-production.sh` for production deploys. On
+  constrained hosts, do not run a blanket `docker compose up --build` because
+  it can build images and start services with too much parallelism.
 - Confirm `frontend`, `backend`, `worker`, `scheduler`, `db`, and `redis`
   report healthy or running.
 - Confirm `/healthz`, `/readyz`, `/metrics`, one authenticated API request, and
@@ -60,16 +61,23 @@ The deploy script performs:
 1. `git fetch` and `git pull --ff-only` on the server.
 2. Stop and remove backend, frontend, worker, and scheduler containers before
    image builds to reduce memory pressure on small hosts.
-3. Prune Docker builder cache when `GRADSYNC_PRUNE_BUILDER_CACHE=true`.
-4. `docker compose -f docker-compose.prod.yml build --pull backend frontend`.
-5. Start PostgreSQL and Redis.
-6. Run migrations.
-7. Recreate backend, frontend, worker, and scheduler.
-8. Wait for healthy services.
-9. Run `python manage.py check --deploy`.
-10. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
-11. Watch backend logs, worker logs, queue depth, notification failures, and
+3. Run Compose with `COMPOSE_PARALLEL_LIMIT=1` and `--env-file .env.production`.
+4. Prune Docker builder cache when `GRADSYNC_PRUNE_BUILDER_CACHE=true`.
+5. Build the backend and frontend images serially, pruning builder cache after
+   each image build to release build state on 1 GB hosts.
+6. Prune dangling images when `GRADSYNC_PRUNE_DANGLING_IMAGES=true`.
+7. Start PostgreSQL and Redis one at a time and wait for health checks.
+8. Run migrations.
+9. Start the backend, wait for health, and run `python manage.py check --deploy`
+   plus `check_production_readiness` inside the running backend container.
+10. Start frontend, worker, and scheduler one at a time.
+11. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
+12. Watch backend logs, worker logs, queue depth, notification failures, and
    request latency for at least one reminder cycle.
+
+The deployment script intentionally does not flush Linux page cache. Avoid
+`sync; echo 3 > /proc/sys/vm/drop_caches` during deploys; it removes useful
+filesystem cache and can increase I/O pressure on a small VPS.
 
 ## Host Nginx
 

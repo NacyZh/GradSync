@@ -5,8 +5,14 @@ set -eu
 
 BRANCH="${GRADSYNC_DEPLOY_BRANCH:-master}"
 COMPOSE_FILE="${GRADSYNC_COMPOSE_FILE:-docker-compose.prod.yml}"
+COMPOSE_ENV_FILE="${GRADSYNC_COMPOSE_ENV_FILE:-.env.production}"
 PUBLIC_URL="${GRADSYNC_PUBLIC_URL:-https://120021123.xyz}"
 PRUNE_BUILDER_CACHE="${GRADSYNC_PRUNE_BUILDER_CACHE:-true}"
+PRUNE_DANGLING_IMAGES="${GRADSYNC_PRUNE_DANGLING_IMAGES:-true}"
+
+COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
+DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-1}"
+export COMPOSE_PARALLEL_LIMIT DOCKER_BUILDKIT
 
 cd "$GRADSYNC_DEPLOY_PATH"
 
@@ -15,10 +21,14 @@ if [ ! -d .git ]; then
   exit 2
 fi
 
-if [ ! -f .env.production ]; then
-  echo ".env.production is missing on the production host" >&2
+if [ ! -f "$COMPOSE_ENV_FILE" ]; then
+  echo "$COMPOSE_ENV_FILE is missing on the production host" >&2
   exit 2
 fi
+
+compose() {
+  docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
 
 echo "Fetching ${BRANCH}"
 git fetch origin "$BRANCH"
@@ -26,30 +36,13 @@ git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH"
 
 echo "Stopping application services before image build to reduce memory pressure"
-docker compose -f "$COMPOSE_FILE" stop backend frontend worker scheduler || true
-docker compose -f "$COMPOSE_FILE" rm -f backend frontend worker scheduler || true
-
-if [ "$PRUNE_BUILDER_CACHE" = "true" ]; then
-  echo "Pruning Docker builder cache before image build"
-  docker builder prune -af || true
-fi
-
-echo "Building production images"
-docker compose -f "$COMPOSE_FILE" build --pull backend frontend
-
-echo "Starting data services"
-docker compose -f "$COMPOSE_FILE" up -d db redis
-
-echo "Running database migrations"
-docker compose -f "$COMPOSE_FILE" run --rm migrate
-
-echo "Starting application services"
-docker compose -f "$COMPOSE_FILE" up -d --remove-orphans backend frontend worker scheduler
+compose stop backend frontend worker scheduler || true
+compose rm -f backend frontend worker scheduler || true
 
 wait_for_service() {
   service="$1"
   expected="${2:-healthy}"
-  container_id="$(docker compose -f "$COMPOSE_FILE" ps -q "$service")"
+  container_id="$(compose ps -q "$service")"
   if [ -z "$container_id" ]; then
     echo "Service has no container: $service" >&2
     exit 1
@@ -65,20 +58,63 @@ wait_for_service() {
   done
 
   echo "$service did not reach ${expected}" >&2
-  docker compose -f "$COMPOSE_FILE" logs "$service" --tail=120 >&2
+  compose logs "$service" --tail=120 >&2
   exit 1
 }
 
+prune_builder_cache() {
+  label="$1"
+  if [ "$PRUNE_BUILDER_CACHE" = "true" ]; then
+    echo "Pruning Docker builder cache ${label}"
+    docker builder prune -af || true
+  fi
+}
+
+prune_builder_cache "before image build"
+
+echo "Building backend production image"
+compose build --pull backend
+prune_builder_cache "after backend image build"
+
+echo "Building frontend production image"
+compose build --pull frontend
+prune_builder_cache "after frontend image build"
+
+if [ "$PRUNE_DANGLING_IMAGES" = "true" ]; then
+  echo "Pruning dangling Docker images after image build"
+  docker image prune -f || true
+fi
+
+echo "Starting PostgreSQL"
+compose up -d db
 wait_for_service db healthy
+
+echo "Starting Redis"
+compose up -d redis
 wait_for_service redis healthy
+
+echo "Running database migrations"
+compose run --rm migrate
+
+echo "Starting backend"
+compose up -d --no-deps --remove-orphans backend
 wait_for_service backend healthy
-wait_for_service frontend healthy
-wait_for_service worker healthy
-wait_for_service scheduler running
 
 echo "Running production readiness checks"
-docker compose -f "$COMPOSE_FILE" run --rm backend python manage.py check --deploy
-docker compose -f "$COMPOSE_FILE" run --rm backend python manage.py check_production_readiness --repo-root /app
+compose exec -T backend python manage.py check --deploy
+compose exec -T backend python manage.py check_production_readiness --repo-root /app
+
+echo "Starting frontend"
+compose up -d --no-deps --remove-orphans frontend
+wait_for_service frontend healthy
+
+echo "Starting worker"
+compose up -d --no-deps --remove-orphans worker
+wait_for_service worker healthy
+
+echo "Starting scheduler"
+compose up -d --no-deps --remove-orphans scheduler
+wait_for_service scheduler running
 
 if command -v curl >/dev/null 2>&1; then
   curl -fsS "$PUBLIC_URL/" >/dev/null
@@ -87,5 +123,5 @@ if command -v curl >/dev/null 2>&1; then
   curl -fsS "$PUBLIC_URL/api/schema/" >/dev/null
 fi
 
-docker compose -f "$COMPOSE_FILE" ps
+compose ps
 echo "Deployment completed"
