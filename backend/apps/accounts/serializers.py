@@ -1,7 +1,8 @@
 from django.contrib.auth import authenticate
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import RoleActivationRequest, StudentProfile, User
+from .models import RoleActivationRequest, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -22,6 +23,7 @@ class UserSerializer(serializers.ModelSerializer):
             "degreeType",
         ]
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_degreeType(self, obj):
         profile = getattr(obj, "student_profile", None)
         return profile.degree_type if profile else None
@@ -82,7 +84,12 @@ class RegistrationSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     nickname = serializers.CharField(max_length=80)
     requestedRole = serializers.ChoiceField(choices=["student", "teacher", "administrator"])
-    degreeType = serializers.ChoiceField(choices=["masters", "doctoral"], required=False, allow_null=True, allow_blank=True)
+    degreeType = serializers.ChoiceField(
+        choices=["masters", "doctoral"],
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+    )
 
 
 class EmailVerificationSerializer(serializers.Serializer):
@@ -126,6 +133,7 @@ class StudentOptionSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "nickname", "email", "degreeType", "label"]
 
+    @extend_schema_field(serializers.CharField())
     def get_label(self, obj):
         nickname = obj.nickname or obj.name
         return f"{nickname} <{obj.email}>"

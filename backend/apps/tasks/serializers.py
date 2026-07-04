@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import Task
@@ -24,5 +25,6 @@ class TaskSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["project_id", "children"]
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_children(self, obj):
         return TaskSerializer(obj.children.all(), many=True).data

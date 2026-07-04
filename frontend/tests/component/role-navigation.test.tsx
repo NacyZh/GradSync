@@ -166,19 +166,25 @@ describe('role-aware navigation', () => {
   it('keeps large workspaces behind explicit route-level bundles', () => {
     expect(Object.keys(routeWorkspaceBundles)).toEqual([
       'accountAdmin',
+      'roleActivation',
+      'profile',
       'projectCreate',
       'projectDashboard',
       'draftSubmission',
       'weeklyReport',
       'reviewQueue',
+      'writingProjects',
       'resources',
       'paperLibrary',
+      'documentLibrary',
       'codeRepository',
     ]);
     expect(String(routeWorkspaceBundles.projectDashboard)).toMatch(/import\(|dynamic_import/);
     expect(String(routeWorkspaceBundles.reviewQueue)).toContain('/features/submissions/');
+    expect(String(routeWorkspaceBundles.writingProjects)).toContain('/features/submissions/');
     expect(String(routeWorkspaceBundles.resources)).toContain('/features/resources/');
     expect(String(routeWorkspaceBundles.paperLibrary)).toContain('/features/library/');
+    expect(String(routeWorkspaceBundles.documentLibrary)).toContain('/features/library/');
     expect(String(routeWorkspaceBundles.codeRepository)).toContain('/features/repositories/');
   });
 

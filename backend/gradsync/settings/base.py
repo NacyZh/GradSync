@@ -146,10 +146,9 @@ CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_DEFAULT_QUEUE = os.getenv("CELERY_TASK_DEFAULT_QUEUE", "default")
+CELERY_NOTIFICATION_QUEUE = os.getenv("CELERY_NOTIFICATION_QUEUE", "notifications")
 CELERY_TASK_ROUTES = {
-    "apps.notifications.tasks.*": {
-        "queue": os.getenv("CELERY_NOTIFICATION_QUEUE", "notifications")
-    },
+    "apps.notifications.tasks.*": {"queue": CELERY_NOTIFICATION_QUEUE},
 }
 CELERY_WORKER_PREFETCH_MULTIPLIER = int(os.getenv("CELERY_WORKER_PREFETCH_MULTIPLIER", "1"))
 CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "300"))

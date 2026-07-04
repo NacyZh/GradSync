@@ -2,6 +2,7 @@ from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import mixins, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -39,6 +40,19 @@ def _flatten_error_detail(detail):
 
 class PaperViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("tag", str, OpenApiParameter.QUERY),
+            OpenApiParameter("year", int, OpenApiParameter.QUERY),
+            OpenApiParameter("author", str, OpenApiParameter.QUERY),
+            OpenApiParameter("visibility", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: PaperRecordSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def get_project(self):
         return get_object_or_404(ResearchProject.objects.all(), pk=self.kwargs["project_id"])
@@ -83,6 +97,17 @@ class PaperViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.Gene
             return PaperRecordCreateSerializer
         return PaperRecordSerializer
 
+    @extend_schema(
+        request={
+            "application/json": PaperRecordCreateSerializer,
+            "multipart/form-data": PaperUploadSerializer,
+        },
+        responses={
+            201: PaperRecordSerializer,
+            409: OpenApiResponse(description="Duplicate paper"),
+            422: OpenApiResponse(description="Validation error"),
+        },
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -105,6 +130,10 @@ class PaperViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.Gene
             raise PermissionDenied(str(exc)) from exc
         return Response(PaperRecordSerializer(paper).data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(
+        request=PaperImportSerializer,
+        responses={201: PaperImportBatchSerializer},
+    )
     @action(detail=False, methods=["post"], url_path="imports")
     def imports(self, request, project_id=None):
         serializer = PaperImportSerializer(data=request.data)
@@ -130,6 +159,12 @@ class PaperViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.Gene
             raise ValidationError(exc.messages) from exc
         return Response(PaperImportBatchSerializer(batch).data)
 
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Download descriptor"),
+            403: OpenApiResponse(description="Download forbidden"),
+        }
+    )
     @action(detail=True, methods=["post"], url_path="download")
     def download(self, request, project_id=None, pk=None):
         paper = get_object_or_404(PaperRecord, project=self.get_project(), pk=pk)
@@ -142,6 +177,12 @@ class PaperViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.Gene
 class PaperDownloadView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Download descriptor"),
+            403: OpenApiResponse(description="Download forbidden"),
+        }
+    )
     def get(self, request, paper_id):
         paper = get_object_or_404(
             PaperRecord.objects.select_related("project", "uploaded_file"),
@@ -165,10 +206,15 @@ def _error_message(exc: DjangoValidationError) -> str:
 class DocumentCategoryView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: DocumentCategorySerializer(many=True)})
     def get(self, request):
         categories = DocumentCategory.objects.filter(status=DocumentCategory.Status.ACTIVE)
         return Response(DocumentCategorySerializer(categories, many=True).data)
 
+    @extend_schema(
+        request=DocumentCategoryCreateSerializer,
+        responses={201: DocumentCategorySerializer},
+    )
     def post(self, request):
         serializer = DocumentCategoryCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -186,6 +232,17 @@ class DocumentCategoryView(views.APIView):
 class DocumentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
     serializer_class = DocumentRecordSerializer
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("categoryId", int, OpenApiParameter.QUERY),
+            OpenApiParameter("visibility", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: DocumentRecordSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def get_project(self):
         return get_object_or_404(ResearchProject.objects.all(), pk=self.kwargs["project_id"])
@@ -220,6 +277,10 @@ class DocumentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.G
             return DocumentUploadSerializer
         return DocumentRecordSerializer
 
+    @extend_schema(
+        request={"multipart/form-data": DocumentUploadSerializer},
+        responses={201: DocumentRecordSerializer},
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -237,6 +298,12 @@ class DocumentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.G
 class DocumentDownloadView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Download descriptor"),
+            403: OpenApiResponse(description="Download forbidden"),
+        }
+    )
     def get(self, request, document_id):
         document = get_object_or_404(
             DocumentRecord.objects.select_related("project", "document_file"),

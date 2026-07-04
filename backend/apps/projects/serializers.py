@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import ProjectMembership, ResearchProject
@@ -99,6 +100,7 @@ class ProjectDashboardSerializer(ProjectSerializer):
             "upcoming_bookings",
         ]
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_current_tasks(self, obj):
         from apps.tasks.serializers import TaskSerializer
 
@@ -110,6 +112,7 @@ class ProjectDashboardSerializer(ProjectSerializer):
             many=True,
         ).data
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_pending_reviews(self, obj):
         pending = []
         for version in obj.draft_versions.filter(review_status="pending_review").order_by(
@@ -134,6 +137,7 @@ class ProjectDashboardSerializer(ProjectSerializer):
             )
         return sorted(pending, key=lambda item: item["submitted_at"], reverse=True)[:10]
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_upcoming_bookings(self, obj):
         from apps.resources.serializers import BookingSerializer
 

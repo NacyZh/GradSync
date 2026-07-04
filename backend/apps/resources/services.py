@@ -6,6 +6,7 @@ from django.utils.dateparse import parse_datetime
 from apps.audit.services import record_event
 from apps.common.project_scope import ProjectScopedService
 from apps.notifications.models import Notification
+from apps.notifications.services import enqueue_notification
 from apps.projects.archive_services import ensure_project_writable
 
 from .models import Booking, ResourceItem, ResourceType, ResourceUseSubmission
@@ -178,6 +179,15 @@ class ResourceInventoryService:
             else "use_rejected"
         )
         record_event(None, self.user, f"resource.{action}", f"Resource {action}", submission)
+        enqueue_notification(
+            recipient=submission.student,
+            sender=self.user,
+            event_type=Notification.EventType.RESOURCE_USE_DECISION,
+            target_type="ResourceUseSubmission",
+            target_id=str(submission.id),
+            subject=f"Resource use {status}",
+            action_path="/resources",
+        )
         return submission
 
 

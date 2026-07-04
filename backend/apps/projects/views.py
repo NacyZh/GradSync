@@ -1,6 +1,7 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -19,6 +20,14 @@ from .serializers import (
 from .services import ProjectService, projects_visible_to
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        responses={
+            200: ProjectDashboardSerializer,
+            403: OpenApiResponse(description="Project access forbidden"),
+        }
+    )
+)
 class ProjectViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -52,6 +61,13 @@ class ProjectViewSet(
         )
         serializer.instance = project
 
+    @extend_schema(
+        request=MembershipCreateSerializer,
+        responses={
+            201: ProjectMembershipSerializer,
+            403: OpenApiResponse(description="Membership change forbidden"),
+        },
+    )
     @action(detail=True, methods=["post"], url_path="members")
     def add_member(self, request, pk=None):
         project = self.get_object()
@@ -74,7 +90,8 @@ class ProjectViewSet(
             ProjectMembershipSerializer(membership).data, status=status.HTTP_201_CREATED
         )
 
-    @add_member.mapping.get
+    @extend_schema(responses={200: ProjectMembershipSerializer(many=True)})
+    @action(detail=True, methods=["get"], url_path="members")
     def list_members(self, request, pk=None):
         project = self.get_object()
         memberships = project.memberships.select_related("user").order_by(

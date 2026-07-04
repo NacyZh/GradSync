@@ -78,6 +78,7 @@ wait_for_service scheduler running
 
 echo "Running production readiness checks"
 docker compose -f "$COMPOSE_FILE" run --rm backend python manage.py check --deploy
+docker compose -f "$COMPOSE_FILE" run --rm backend python manage.py check_production_readiness --repo-root /app
 
 if command -v curl >/dev/null 2>&1; then
   curl -fsS "$PUBLIC_URL/" >/dev/null

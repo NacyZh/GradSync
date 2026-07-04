@@ -90,6 +90,14 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
         issues.append("DEFAULT_FROM_EMAIL must be configured")
     if not getattr(settings_obj, "CELERY_BROKER_URL", ""):
         issues.append("CELERY_BROKER_URL must be configured")
+    notification_queue = getattr(settings_obj, "CELERY_NOTIFICATION_QUEUE", "")
+    if _has_placeholder(str(notification_queue)):
+        issues.append("CELERY_NOTIFICATION_QUEUE must be configured")
+    notification_route = getattr(settings_obj, "CELERY_TASK_ROUTES", {}).get(
+        "apps.notifications.tasks.*", {}
+    )
+    if notification_route.get("queue") != notification_queue:
+        issues.append("Notification tasks must route to CELERY_NOTIFICATION_QUEUE")
     if getattr(settings_obj, "SENTRY_DSN", "") and not getattr(
         settings_obj, "ERROR_REPORTING_ENABLED", False
     ):
@@ -184,6 +192,8 @@ def production_ready_settings_stub(**overrides):
         "EMAIL_HOST": "smtp.example.edu",
         "DEFAULT_FROM_EMAIL": "no-reply@example.edu",
         "CELERY_BROKER_URL": "redis://redis:6379/0",
+        "CELERY_NOTIFICATION_QUEUE": "notifications",
+        "CELERY_TASK_ROUTES": {"apps.notifications.tasks.*": {"queue": "notifications"}},
         "PUBLIC_BASE_URL": "https://gradsync.edu",
         "TLS_CERTIFICATE_PATH": "/etc/letsencrypt/live/gradsync.edu/fullchain.pem",
         "TLS_PRIVATE_KEY_PATH": "/etc/letsencrypt/live/gradsync.edu/privkey.pem",

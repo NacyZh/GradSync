@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import Booking, ResourceItem, ResourceType, ResourceUseSubmission
@@ -131,6 +132,7 @@ class LaboratoryResourceSerializer(serializers.ModelSerializer):
             "useSubmissions",
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_status(self, obj):
         return resource_status_to_contract(obj.status)
 

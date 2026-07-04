@@ -9,6 +9,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit.services import record_role_activation
+from apps.notifications.models import Notification
+from apps.notifications.services import (
+    enqueue_notification,
+    mark_notification_attempt_failed,
+    mark_notification_status,
+)
 
 from .models import EmailVerificationCode, RoleActivationRequest, StudentProfile, TeacherProfile
 
@@ -154,7 +160,7 @@ def register_account(*, email: str, password: str, nickname: str, requested_role
     if requested_role == "student":
         StudentProfile.objects.create(user=user, degree_type=degree_type)
     code = create_verification_code(email=email)
-    send_verification_email(email=email, code=code.plain_code)
+    send_verification_email(email=email, code=code.plain_code, user=user, verification=code)
     return user, code
 
 
@@ -173,14 +179,29 @@ def create_verification_code(*, email: str) -> EmailVerificationCode:
     )
 
 
-def send_verification_email(*, email: str, code: str):
-    send_mail(
-        "Verify your GradSync email",
-        f"Your GradSync verification code is {code}.",
-        settings.DEFAULT_FROM_EMAIL,
-        [email],
-        fail_silently=True,
+def send_verification_email(*, email: str, code: str, user, verification: EmailVerificationCode):
+    notification = enqueue_notification(
+        recipient=user,
+        event_type=Notification.EventType.VERIFICATION_CODE,
+        target_type="EmailVerificationCode",
+        target_id=str(verification.id),
+        subject="Verify your GradSync email",
+        action_path="/verify-email",
     )
+    mark_notification_status(notification, Notification.Status.QUEUED)
+    try:
+        send_mail(
+            notification.subject,
+            f"Your GradSync verification code is {code}.",
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            fail_silently=False,
+        )
+    except Exception as exc:  # pragma: no cover - covered by integration failure tests
+        mark_notification_attempt_failed(notification, exc)
+        return notification
+    mark_notification_status(notification, Notification.Status.SENT)
+    return notification
 
 
 @transaction.atomic
@@ -242,6 +263,15 @@ def decide_role_activation(*, activation: RoleActivationRequest, reviewer, actio
         activation.status = RoleActivationRequest.Status.EXPIRED
     activation.save(update_fields=["status", "reviewer", "reviewed_at"])
     record_role_activation(reviewer, activation, action)
+    enqueue_notification(
+        recipient=activation.user,
+        sender=reviewer,
+        event_type=Notification.EventType.ROLE_ACTIVATION,
+        target_type="RoleActivationRequest",
+        target_id=str(activation.id),
+        subject=f"Role activation {activation.status}",
+        action_path="/profile",
+    )
     return activation
 
 

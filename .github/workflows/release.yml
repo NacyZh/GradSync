@@ -6,19 +6,38 @@ on:
     branches: [master]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  DJANGO_SETTINGS_MODULE: gradsync.settings.ci
+  POSTGRES_DB: gradsync
+  POSTGRES_USER: gradsync
+  POSTGRES_PASSWORD: gradsync
+  POSTGRES_HOST: localhost
+  REDIS_URL: redis://localhost:6379/0
 
 jobs:
   backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: gradsync
-          POSTGRES_USER: gradsync
-          POSTGRES_PASSWORD: gradsync
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
         ports:
           - 5432:5432
         options: >-
@@ -37,46 +56,78 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
       - name: Install backend
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
       - name: Check generated artifacts
         run: sh scripts/check-generated-artifacts.sh
       - name: Lint backend
         working-directory: backend
-        run: ruff check .
+        run: python -m ruff check .
       - name: Check migrations
         working-directory: backend
-        env:
-          DJANGO_SETTINGS_MODULE: gradsync.settings.test
         run: python manage.py makemigrations --check --dry-run
-      - name: Check OpenAPI contract drift
+      - name: Check legacy OpenAPI contract drift
         env:
           PYTHON: python
-          DJANGO_SETTINGS_MODULE: gradsync.settings.test
-        run: bash scripts/check-openapi-contract.sh
+          OPENAPI_STRICT_SHAPES: "1"
+        run: bash scripts/check-openapi-contract.sh specs/001-research-group-ops/contracts/openapi.yaml
+      - name: Check collaboration OpenAPI contract drift
+        env:
+          PYTHON: python
+          OPENAPI_STRICT_SHAPES: "1"
+        run: bash scripts/check-openapi-contract.sh specs/003-research-collab-platform/contracts/openapi.yaml
       - name: Run backend tests
         working-directory: backend
-        env:
-          POSTGRES_HOST: localhost
-          REDIS_URL: redis://localhost:6379/0
-        run: pytest
+        run: python -m pytest
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gradsync -d gradsync"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
       - name: Install frontend
         working-directory: frontend
         run: npm ci
@@ -86,7 +137,7 @@ jobs:
       - name: Install backend for full-stack e2e
         working-directory: backend
         run: |
-          python3 -m venv ../.venv
+          python -m venv ../.venv
           ../.venv/bin/python -m pip install -e ".[dev]"
       - name: Check generated artifacts before frontend gates
         run: sh scripts/check-generated-artifacts.sh
@@ -101,29 +152,41 @@ jobs:
         env:
           GRADSYNC_E2E_MODE: fullstack
           GRADSYNC_BACKEND_PYTHON: ../.venv/bin/python
+          GRADSYNC_BACKEND_SETTINGS: ${{ env.DJANGO_SETTINGS_MODULE }}
         run: npm run test:e2e
-      - name: Run US4 research assets and locale e2e
-        working-directory: frontend
-        env:
-          GRADSYNC_E2E_MODE: fullstack
-          GRADSYNC_BACKEND_PYTHON: ../.venv/bin/python
-        run: npm run test:e2e -- research-assets-locale.spec.ts
-      - name: Run production UI layout checks
-        working-directory: frontend
-        env:
-          GRADSYNC_E2E_MODE: fullstack
-          GRADSYNC_BACKEND_PYTHON: ../.venv/bin/python
-        run: npm run test:e2e -- production-ui.spec.ts
       - name: Check generated artifacts after frontend tests
         run: sh scripts/check-generated-artifacts.sh --clean
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+      - name: Clean generated frontend build artifacts
+        run: sh scripts/check-generated-artifacts.sh --clean
+      - name: Check generated artifacts after frontend build
+        run: sh scripts/check-generated-artifacts.sh
+
+  production-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate production Compose configuration
+        run: docker compose -f docker-compose.prod.yml config --quiet
+      - name: Build production backend image
+        run: docker build -f docker/backend.Dockerfile -t gradsync-backend:ci .
+      - name: Build production frontend image
+        run: docker build -f docker/frontend.Dockerfile -t gradsync-frontend:ci .
 
   deploy-production:
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    timeout-minutes: 30
+    needs: [backend, frontend, production-image]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    concurrency:
+      group: production
+      cancel-in-progress: false
     environment:
       name: production
       url: https://120021123.xyz
@@ -137,6 +200,8 @@ jobs:
       PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Validate deployment inputs
         run: |
           test -n "${DEPLOY_HOST}" || { echo "GRADSYNC_PRODUCTION_HOST variable is required"; exit 1; }

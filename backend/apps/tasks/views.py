@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import mixins, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -17,6 +18,27 @@ class ProjectTaskViewSet(
 ):
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=TaskSerializer,
+        responses={
+            201: TaskSerializer,
+            422: OpenApiResponse(description="Validation error"),
+        },
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @extend_schema(
+        request=TaskSerializer,
+        responses={
+            200: TaskSerializer,
+            403: OpenApiResponse(description="Task update forbidden"),
+            422: OpenApiResponse(description="Validation error"),
+        },
+    )
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
 
     def get_project(self):
         return get_object_or_404(

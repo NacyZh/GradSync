@@ -2,7 +2,11 @@ import { Globe2, LockKeyhole } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 
-export function VisibilityBadge({ visibility }: { visibility: 'project_members' | 'group_wide' | string }) {
+export function VisibilityBadge({
+  visibility = 'project_members',
+}: {
+  visibility?: 'project_members' | 'group_wide' | string;
+}) {
   const groupWide = visibility === 'group_wide';
   const Icon = groupWide ? Globe2 : LockKeyhole;
   return (

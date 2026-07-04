@@ -1,6 +1,7 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import mixins, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -63,6 +64,13 @@ class DraftViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.Gene
         )
         serializer.instance = draft
 
+    @extend_schema(
+        request=DraftVersionSerializer,
+        responses={
+            201: DraftVersionSerializer,
+            403: OpenApiResponse(description="Draft submission forbidden"),
+        },
+    )
     @action(detail=True, methods=["post"], url_path="versions")
     def submit_version(self, request, project_id=None, pk=None):
         project = self.get_project()
@@ -90,6 +98,16 @@ class DraftViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.Gene
 class WeeklyReportViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = WeeklyReportSerializer
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=WeeklyReportSerializer,
+        responses={
+            201: WeeklyReportSerializer,
+            409: OpenApiResponse(description="Duplicate weekly report"),
+        },
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
 
     def get_project(self):
         return get_object_or_404(
@@ -134,6 +152,16 @@ class InlineCommentViewSet(
 ):
     serializer_class = InlineCommentSerializer
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=InlineCommentSerializer,
+        responses={
+            201: InlineCommentSerializer,
+            422: OpenApiResponse(description="Validation error"),
+        },
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
 
     def get_project(self):
         return get_object_or_404(
@@ -242,6 +270,10 @@ class WritingProjectViewSet(
 class WritingVersionUploadView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request={"multipart/form-data": WritingVersionUploadSerializer},
+        responses={201: WritingVersionSerializer},
+    )
     def post(self, request, writing_project_id):
         writing_project = get_object_or_404(
             WritingProject.objects.select_related("project", "student"),
@@ -264,6 +296,10 @@ class WritingVersionUploadView(views.APIView):
 class TeacherFeedbackSubmitView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request={"multipart/form-data": TeacherFeedbackCreateSerializer},
+        responses={201: TeacherFeedbackSerializer},
+    )
     def post(self, request, writing_version_id):
         version = get_object_or_404(
             WritingVersion.objects.select_related(
@@ -288,6 +324,12 @@ class TeacherFeedbackSubmitView(views.APIView):
 class TeacherFeedbackDownloadView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Download descriptor"),
+            403: OpenApiResponse(description="Download forbidden"),
+        }
+    )
     def get(self, request, feedback_id):
         feedback = get_object_or_404(
             TeacherFeedback.objects.select_related(

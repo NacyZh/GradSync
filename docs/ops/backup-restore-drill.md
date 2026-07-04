@@ -51,3 +51,18 @@ must not delete uploaded media or metadata until an administrator has confirmed
 that no business records reference those files. Restore validation must include
 at least one metadata query, one checksum comparison, and one authorized
 download path that writes an audit event.
+
+## Research Collaboration 003 Release Validation Addendum
+
+Before releasing `specs/003-research-collab-platform`, operators must validate
+that collaboration migrations apply cleanly and that rollback notes preserve
+both database rows and uploaded media. The validation evidence should include a
+successful migration dry run, a restored `common.UploadedFile` metadata query,
+a checksum comparison against restored media, and an authorized download that
+creates an audit event.
+
+Notification failure records, writing feedback files, resource-use decisions,
+role activation records, and audit events are part of the restore acceptance
+set. If email delivery is unavailable during restore validation, the business
+records still pass only when notification status records show retry-needed or
+failed states with masked failure details.

@@ -2,6 +2,7 @@ from django.contrib.auth import login, logout
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.middleware.csrf import get_token
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 from apps.common.permissions import IsAdministrator
 
 from .locale_services import get_locale, set_locale
-from .models import User
+from .models import RoleActivationRequest, User
 from .serializers import (
     AccountCreateSerializer,
     AccountUpdateSerializer,
@@ -25,7 +26,6 @@ from .serializers import (
     StudentOptionSerializer,
     UserSerializer,
 )
-from .models import RoleActivationRequest
 from .services import (
     AccountsService,
     decide_role_activation,
@@ -42,6 +42,7 @@ class LoginView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
 
+    @extend_schema(request=LoginSerializer, responses={200: UserSerializer})
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -56,6 +57,7 @@ class LogoutView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=None, responses={204: OpenApiResponse(description="Logged out")})
     def post(self, request):
         logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -64,14 +66,19 @@ class LogoutView(APIView):
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: UserSerializer})
     def get(self, request):
         return Response(UserSerializer(request.user).data)
 
+    @extend_schema(request=NicknameUpdateSerializer, responses={200: UserSerializer})
     def patch(self, request):
         serializer = NicknameUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            user = update_nickname(user=request.user, nickname=serializer.validated_data["nickname"])
+            user = update_nickname(
+                user=request.user,
+                nickname=serializer.validated_data["nickname"],
+            )
         except ValidationError as exc:
             return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(UserSerializer(user).data)
@@ -80,6 +87,13 @@ class CurrentUserView(APIView):
 class RegistrationView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=RegistrationSerializer,
+        responses={
+            202: OpenApiResponse(description="Registration accepted"),
+            422: OpenApiResponse(description="Validation error"),
+        },
+    )
     def post(self, request):
         serializer = RegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -102,6 +116,10 @@ class RegistrationView(APIView):
 class EmailVerificationView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=EmailVerificationSerializer,
+        responses={200: UserSerializer, 422: OpenApiResponse(description="Validation error")},
+    )
     def post(self, request):
         serializer = EmailVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -148,6 +166,10 @@ class StudentSearchView(generics.ListAPIView):
     serializer_class = StudentOptionSerializer
     pagination_class = None
 
+    @extend_schema(parameters=[OpenApiParameter("q", str, OpenApiParameter.QUERY)])
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
         query = self.request.query_params.get("q", "").strip()
         queryset = User.objects.filter(
@@ -163,9 +185,11 @@ class StudentSearchView(generics.ListAPIView):
 class LocalePreferenceView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: LocalePreferenceSerializer})
     def get(self, request):
         return Response({"locale": get_locale(request.user), "updatedAt": request.user.date_joined})
 
+    @extend_schema(request=LocalePreferenceSerializer, responses={200: LocalePreferenceSerializer})
     def put(self, request):
         serializer = LocalePreferenceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

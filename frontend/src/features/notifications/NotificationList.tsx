@@ -6,17 +6,21 @@ import { Button } from '@/components/ui/button';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { NotificationRecord } from './api';
-import { listProjectNotifications } from './api';
+import { listNotifications, listProjectNotifications } from './api';
 
 export function NotificationList({ projectId }: { projectId?: number }) {
   const notificationsQuery = useQuery({
     queryKey: ['notifications', projectId],
-    queryFn: () => listProjectNotifications(projectId ?? 0),
-    enabled: Boolean(projectId),
+    queryFn: async () => {
+      if (projectId) return listProjectNotifications(projectId);
+      const response = await listNotifications();
+      return Array.isArray(response) ? { results: response } : response;
+    },
   });
   const notifications = notificationsQuery.data?.results ?? [];
-  const failedCount = notifications.filter((notification) => notification.status === 'failed').length;
+  const failedCount = notifications.filter((notification) => notification.status === 'failed' || notification.status === 'retry_needed').length;
   const pendingCount = notifications.filter((notification) => notification.status === 'pending' || notification.status === 'queued').length;
+  const skippedCount = notifications.filter((notification) => notification.status === 'skipped').length;
 
   return (
     <section className="panel notification-center" aria-labelledby="notifications-heading">
@@ -29,15 +33,15 @@ export function NotificationList({ projectId }: { projectId?: number }) {
           <p className="text-sm text-muted-foreground">Project-scoped delivery status, action paths, and retry visibility.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant={failedCount ? 'destructive' : 'muted'}>{failedCount} failed</Badge>
+          <Badge variant={failedCount ? 'destructive' : 'muted'}>{failedCount} needs retry</Badge>
           <Badge variant={pendingCount ? 'warning' : 'muted'}>{pendingCount} pending</Badge>
+          <Badge variant={skippedCount ? 'warning' : 'muted'}>{skippedCount} skipped</Badge>
         </div>
       </div>
-      {!projectId ? <DataState state="warning" title="No project context" message="Select a project to inspect notification delivery." /> : null}
       {notificationsQuery.isLoading ? <DataState state="loading" message="Loading delivery status." /> : null}
       {notificationsQuery.error ? <DataState state="error" title="Notifications unavailable" message={notificationsQuery.error.message} /> : null}
-      {!notificationsQuery.isLoading && !notificationsQuery.error && projectId && notifications.length === 0 ? (
-        <DataState state="empty" title="No notifications" message="No delivery records are loaded for this project." />
+      {!notificationsQuery.isLoading && !notificationsQuery.error && notifications.length === 0 ? (
+        <DataState state="empty" title="No notifications" message="No delivery records are loaded." />
       ) : null}
       <ul className="notification-list">
         {notifications.map((notification) => (
@@ -50,14 +54,16 @@ export function NotificationList({ projectId }: { projectId?: number }) {
 
 function NotificationRow({ notification }: { notification: NotificationRecord }) {
   const eventType = notification.event_type ?? notification.eventType;
-  const targetType = notification.target_type ?? notification.targetType;
-  const targetId = notification.target_id ?? notification.targetId;
+  const targetType = notification.target_type ?? notification.targetType ?? notification.relatedObjectType;
+  const targetId = notification.target_id ?? notification.targetId ?? notification.relatedObjectId;
   const projectId = notification.project_id ?? notification.projectId;
   const actionPath = notification.action_path ?? notification.actionPath;
   const eligibleAt = notification.eligible_at ?? notification.eligibleAt;
   const sentAt = notification.sent_at ?? notification.sentAt;
+  const lastAttemptAt = notification.last_attempt_at ?? notification.lastAttemptAt;
+  const retryCount = notification.retry_count ?? notification.retryCount ?? 0;
   const reason = notification.failure_reason ?? notification.failureReason ?? notification.skipped_reason ?? notification.skippedReason;
-  const retryAllowed = notification.status === 'failed';
+  const retryAllowed = notification.status === 'failed' || notification.status === 'retry_needed';
 
   return (
     <li className="items-start">
@@ -103,14 +109,15 @@ function NotificationRow({ notification }: { notification: NotificationRecord })
           {retryAllowed ? (
             <Button type="button" variant="outline" size="sm" disabled title="Retry is handled by the delivery worker">
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-              Retry queued by worker
+              {notification.status === 'retry_needed' ? `Retry needed${retryCount ? ` (${retryCount})` : ''}` : 'Retry queued by worker'}
             </Button>
           ) : (
             <Badge variant="muted">
               <MailCheck className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-              {notification.status === 'sent' ? 'Delivered' : 'Worker monitored'}
+              {notification.status === 'sent' ? 'Delivered' : notification.status === 'skipped' ? 'Skipped' : 'Worker monitored'}
             </Badge>
           )}
+          {lastAttemptAt ? <Badge variant="muted">Last attempt {formatDateTime(lastAttemptAt)}</Badge> : null}
         </div>
       </div>
     </li>

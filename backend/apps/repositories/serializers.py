@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import CodeArtifact, CodeArtifactVersion
@@ -56,6 +57,7 @@ class CodeArtifactSerializer(serializers.ModelSerializer):
             "latestVersion",
         ]
 
+    @extend_schema_field(CodeArtifactVersionSerializer(allow_null=True))
     def get_latestVersion(self, obj):
         version = obj.versions.first()
         return CodeArtifactVersionSerializer(version).data if version else None

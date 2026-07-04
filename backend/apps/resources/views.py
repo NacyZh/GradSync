@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -102,6 +103,16 @@ class BookingViewSet(
     serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=BookingSerializer,
+        responses={
+            201: BookingSerializer,
+            409: OpenApiResponse(description="Booking conflict"),
+        },
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
     def get_project(self):
         return get_object_or_404(
             projects_visible_to(self.request.user), pk=self.kwargs["project_id"]
@@ -181,11 +192,21 @@ class LaboratoryResourceViewSet(
             return ResourceUseSubmissionCreateSerializer
         return LaboratoryResourceSerializer
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("status", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: LaboratoryResourceSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
     def get_queryset(self):
         queryset = self.queryset
         queryset = apply_text_search(
             queryset,
-            self.request.query_params.get("search"),
+            self.request.query_params.get("q") or self.request.query_params.get("search"),
             ["name", "description", "resource_type__name", "use_instructions"],
         )
         status_filter = self.request.query_params.get("status")
@@ -236,6 +257,10 @@ class LaboratoryResourceViewSet(
             raise PermissionDenied(str(exc)) from exc
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(
+        request=ResourceUseSubmissionCreateSerializer,
+        responses={201: ResourceUseSubmissionSerializer},
+    )
     @action(detail=True, methods=["post"], url_path="use-submissions")
     def use_submissions(self, request, pk=None):
         resource = self.get_object()

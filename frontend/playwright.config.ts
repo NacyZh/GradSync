@@ -6,8 +6,13 @@ const backendPython =
   process.env.GRADSYNC_BACKEND_PYTHON ??
   (existsSync('../.venv/bin/python') ? '../.venv/bin/python' : 'python3');
 const backendEnv = {
-  DJANGO_SETTINGS_MODULE: 'gradsync.settings.e2e',
-  POSTGRES_HOST: '',
+  DJANGO_SETTINGS_MODULE: process.env.GRADSYNC_BACKEND_SETTINGS ?? 'gradsync.settings.e2e',
+  POSTGRES_HOST: process.env.POSTGRES_HOST ?? '',
+  POSTGRES_DB: process.env.POSTGRES_DB ?? 'gradsync',
+  POSTGRES_USER: process.env.POSTGRES_USER ?? 'gradsync',
+  POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD ?? 'gradsync',
+  POSTGRES_PORT: process.env.POSTGRES_PORT ?? '5432',
+  REDIS_URL: process.env.REDIS_URL ?? 'redis://localhost:6379/0',
 };
 
 export default defineConfig({

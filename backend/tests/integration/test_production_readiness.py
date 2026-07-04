@@ -82,6 +82,21 @@ def test_production_operational_docs_are_present_and_actionable():
 def test_release_workflow_deploys_by_ssh_with_protected_environment():
     workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text()
 
+    assert "concurrency:" in workflow
+    assert "timeout-minutes:" in workflow
+    assert "persist-credentials: false" in workflow
+    assert "DJANGO_SETTINGS_MODULE: gradsync.settings.ci" in workflow
+    assert "GRADSYNC_BACKEND_SETTINGS: ${{ env.DJANGO_SETTINGS_MODULE }}" in workflow
+    assert 'OPENAPI_STRICT_SHAPES: "1"' in workflow
+    assert "specs/003-research-collab-platform/contracts/openapi.yaml" in workflow
+    assert "production-image:" in workflow
+    assert "docker compose -f docker-compose.prod.yml config --quiet" in workflow
+    assert "docker build -f docker/backend.Dockerfile" in workflow
+    assert "docker build -f docker/frontend.Dockerfile" in workflow
+    assert "needs: [backend, frontend, production-image]" in workflow
+    assert "Check generated artifacts after frontend build" in workflow
+    assert "Run US4 research assets and locale e2e" not in workflow
+    assert "Run production UI layout checks" not in workflow
     assert "deploy-production" in workflow
     assert "environment:" in workflow
     assert "PRODUCTION_DEPLOY_SSH_KEY" in workflow
@@ -101,6 +116,7 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     assert 'docker compose -f "$COMPOSE_FILE" build --pull backend frontend' in script
     assert 'docker compose -f "$COMPOSE_FILE" run --rm migrate' in script
     assert "python manage.py check --deploy" in script
+    assert "python manage.py check_production_readiness --repo-root /app" in script
     assert "$PUBLIC_URL/healthz/" in script
     assert "$PUBLIC_URL/readyz/" in script
     assert "$PUBLIC_URL/api/schema/" in script

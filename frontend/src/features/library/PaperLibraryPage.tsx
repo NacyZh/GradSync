@@ -33,7 +33,9 @@ export function PaperLibraryPage() {
                 <button type="button" className="w-full rounded-md border p-3 text-left hover:bg-muted" onClick={() => setSelected(paper)}>
                   <span className="flex flex-wrap items-start justify-between gap-2">
                     <strong>{paper.title}</strong>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">{paper.visibility.replaceAll('_', ' ')}</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
+                      {(paper.visibility ?? 'project_members').replaceAll('_', ' ')}
+                    </span>
                   </span>
                   <span className="block text-sm text-muted-foreground">{paper.authors.join(', ')} · {paper.publicationYear ?? 'No year'}</span>
                 </button>

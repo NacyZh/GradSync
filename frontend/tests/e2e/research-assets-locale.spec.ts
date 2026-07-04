@@ -76,8 +76,8 @@ test('paper import, code download, and locale persistence workflow is reachable'
   await expect(page.getByRole('heading', { name: 'Paper library' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Graph Neural Methods' })).toBeVisible();
   await page.getByLabel('Paper title').fill('Graph Neural Methods');
-  await page.getByLabel('First author').fill('Lin Chen');
-  await page.getByRole('button', { name: 'Import' }).click();
+  await page.getByLabel('Authors').fill('Lin Chen');
+  await page.getByRole('button', { name: 'Stage metadata' }).click();
   await expect(page.getByRole('alert')).toContainText('Duplicate paper detected');
   await page.getByRole('button', { name: 'Download' }).click();
   await expect(page.getByRole('status')).toContainText('graph.pdf');

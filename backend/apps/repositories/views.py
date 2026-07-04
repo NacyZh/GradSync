@@ -2,9 +2,10 @@ from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import mixins, status, views, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -34,6 +35,17 @@ def _error_message(exc: DjangoValidationError) -> str:
 
 class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("tag", str, OpenApiParameter.QUERY),
+            OpenApiParameter("visibility", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: CodeArtifactSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def get_project(self):
         return get_object_or_404(ResearchProject.objects.all(), pk=self.kwargs["project_id"])
@@ -68,6 +80,16 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
             return CodeArtifactCreateSerializer
         return CodeArtifactSerializer
 
+    @extend_schema(
+        request={
+            "application/json": CodeArtifactCreateSerializer,
+            "multipart/form-data": CodeArtifactUploadSerializer,
+        },
+        responses={
+            201: CodeArtifactSerializer,
+            409: OpenApiResponse(description="Duplicate code artifact"),
+        },
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -89,6 +111,13 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
             raise PermissionDenied(str(exc)) from exc
         return Response(CodeArtifactSerializer(artifact).data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(
+        request=CodeArtifactVersionCreateSerializer,
+        responses={
+            201: CodeArtifactVersionSerializer,
+            409: OpenApiResponse(description="Duplicate code version"),
+        },
+    )
     @action(detail=True, methods=["post"], url_path="versions")
     def versions(self, request, project_id=None, pk=None):
         artifact = get_object_or_404(CodeArtifact, project=self.get_project(), pk=pk)
@@ -102,6 +131,12 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
             return Response({"message": exc.messages[0]}, status=status.HTTP_409_CONFLICT)
         return Response(CodeArtifactVersionSerializer(version).data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Download descriptor"),
+            403: OpenApiResponse(description="Download forbidden"),
+        }
+    )
     @action(
         detail=True,
         methods=["post"],
@@ -119,9 +154,17 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
 class CodeArtifactDownloadView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Download descriptor"),
+            403: OpenApiResponse(description="Download forbidden"),
+        }
+    )
     def get(self, request, artifact_id):
         artifact = get_object_or_404(
-            CodeArtifact.objects.select_related("project", "archive_file").prefetch_related("versions"),
+            CodeArtifact.objects.select_related("project", "archive_file").prefetch_related(
+                "versions"
+            ),
             pk=artifact_id,
         )
         try:

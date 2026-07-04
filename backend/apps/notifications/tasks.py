@@ -8,6 +8,11 @@ from apps.projects.models import ResearchProject
 from apps.tasks.models import Task
 
 from .models import Notification
+from .services import (
+    mark_notification_attempt_failed,
+    mark_notification_status,
+    notification_is_deliverable,
+)
 
 
 def _deadline_window(now, deadline):
@@ -113,43 +118,42 @@ def deliver_due_notifications(limit: int = 100) -> int:
     now = timezone.now()
     delivered = 0
     notifications = Notification.objects.filter(
-        status=Notification.Status.PENDING, eligible_at__lte=now
+        status__in=[Notification.Status.PENDING, Notification.Status.RETRY_NEEDED],
+        eligible_at__lte=now,
     ).select_related("recipient", "project", "sender")[:limit]
     for notification in notifications:
-        if not notification.project.memberships.filter(
-            user=notification.recipient, status="active"
-        ).exists():
-            notification.status = Notification.Status.SKIPPED
-            notification.failure_reason = "Recipient is no longer an active project member"
-            notification.save(update_fields=["status", "failure_reason"])
+        if not notification_is_deliverable(notification):
+            mark_notification_status(
+                notification,
+                Notification.Status.SKIPPED,
+                "Recipient is no longer an active project member",
+            )
             continue
-        notification.status = Notification.Status.QUEUED
-        notification.queued_at = now
-        notification.save(update_fields=["status", "queued_at"])
+        mark_notification_status(notification, Notification.Status.QUEUED)
+        project_label = notification.project.title if notification.project_id else "GradSync"
+        action_path = notification.action_path
+        if not action_path and notification.project_id:
+            action_path = f"/projects/{notification.project_id}"
         body = (
-            f"Project: {notification.project.title}\n"
+            f"Project: {project_label}\n"
             f"Record: {notification.target_type} {notification.target_id}\n"
             f"Action: {notification.subject}\n"
             f"Sender: {notification.sender.name if notification.sender else 'GradSync'}\n"
-            f"Path: {notification.action_path or f'/projects/{notification.project_id}'}"
+            f"Path: {action_path or '/'}"
         )
         try:
             send_mail(
                 notification.subject,
                 body,
                 settings.DEFAULT_FROM_EMAIL,
-                [notification.recipient.email],
+                [notification.recipient_email or notification.recipient.email],
             )
         except (
             Exception
         ) as exc:  # pragma: no cover - exercised by integration error paths in real mail setup
-            notification.status = Notification.Status.FAILED
-            notification.failure_reason = str(exc)
-            notification.save(update_fields=["status", "failure_reason"])
+            mark_notification_attempt_failed(notification, exc)
             continue
-        notification.status = Notification.Status.SENT
-        notification.sent_at = timezone.now()
-        notification.save(update_fields=["status", "sent_at"])
+        mark_notification_status(notification, Notification.Status.SENT)
         delivered += 1
     return delivered
 
