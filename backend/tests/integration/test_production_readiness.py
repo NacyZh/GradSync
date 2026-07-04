@@ -88,7 +88,8 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "DJANGO_SETTINGS_MODULE: gradsync.settings.ci" in workflow
     assert "GRADSYNC_BACKEND_SETTINGS: ${{ env.DJANGO_SETTINGS_MODULE }}" in workflow
     assert 'OPENAPI_STRICT_SHAPES: "1"' in workflow
-    assert "specs/003-research-collab-platform/contracts/openapi.yaml" in workflow
+    assert "specs/001-research-group-ops/contracts/openapi.yaml" in workflow
+    assert "specs/003-research-collab-platform/contracts/openapi.yaml" not in workflow
     assert "production-image:" in workflow
     assert "docker compose -f docker-compose.prod.yml config --quiet" in workflow
     assert "docker build -f docker/backend.Dockerfile" in workflow

@@ -13,7 +13,10 @@ DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-gradsync.settings.test}"
 PYTHON="${PYTHON:-}"
 export DJANGO_SETTINGS_MODULE
 
-test -f "$CONTRACT"
+if [ ! -f "$CONTRACT" ]; then
+  echo "OpenAPI contract file not found: $CONTRACT" >&2
+  exit 1
+fi
 if [ -z "$PYTHON" ]; then
   if [ -x ".venv/bin/python" ]; then
     PYTHON=".venv/bin/python"
