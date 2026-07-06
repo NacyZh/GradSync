@@ -10,6 +10,7 @@ from .views import (
     PaperImportStatusView,
     PaperViewSet,
     SharedPaperDetailView,
+    SharedPaperDownloadView,
     SharedPaperListCreateView,
 )
 
@@ -43,7 +44,7 @@ urlpatterns = [
     ),
     path(
         "library/papers/<int:paper_id>/download/",
-        PaperDownloadView.as_view(),
+        SharedPaperDownloadView.as_view(),
         name="shared-paper-download",
     ),
     path(

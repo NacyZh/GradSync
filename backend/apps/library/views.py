@@ -14,7 +14,7 @@ from apps.common.project_scope import visible_asset_q
 from apps.projects.models import ResearchProject
 
 from .document_services import DocumentCategoryService, DocumentService
-from .import_services import PaperImportService
+from .import_services import PaperImportError, PaperImportService, import_shared_paper_pdf
 from .models import DocumentCategory, DocumentRecord, PaperImportBatch, PaperImportJob, PaperRecord
 from .serializers import (
     DocumentCategoryCreateSerializer,
@@ -24,12 +24,17 @@ from .serializers import (
     PaperImportBatchSerializer,
     PaperImportJobSerializer,
     PaperImportSerializer,
+    PaperPdfImportSerializer,
     PaperRecordCreateSerializer,
     PaperRecordSerializer,
     PaperUploadSerializer,
     UploadErrorSerializer,
 )
-from .services import apply_paper_search_filters, shared_paper_queryset_for
+from .services import (
+    apply_paper_search_filters,
+    describe_shared_paper_download,
+    shared_paper_queryset_for,
+)
 
 
 def _flatten_error_detail(detail):
@@ -220,17 +225,37 @@ class SharedPaperListCreateView(generics.GenericAPIView):
             return self.get_paginated_response(serializer.data)
         return Response(PaperRecordSerializer(queryset, many=True).data)
 
-    @extend_schema(request={"multipart/form-data": None}, responses={202: PaperImportJobSerializer})
+    @extend_schema(request=PaperPdfImportSerializer, responses={202: PaperImportJobSerializer})
     def post(self, request):
-        # Full file-selection-only import processing is implemented in US2.
-        serializer = UploadErrorSerializer(
-            {
-                "code": "not_implemented",
-                "message": "Paper import processing is not available yet.",
-                "reason": "processing_error",
-            }
-        )
-        return Response(serializer.data, status=status.HTTP_400_BAD_REQUEST)
+        serializer = PaperPdfImportSerializer(data=request.data)
+        if not serializer.is_valid():
+            error = UploadErrorSerializer(
+                {
+                    "code": "metadata_fields_not_allowed"
+                    if "non_field_errors" in serializer.errors
+                    else "invalid_upload",
+                    "message": "Paper import accepts only a PDF file.",
+                    "reason": "metadata_fields_not_allowed"
+                    if "non_field_errors" in serializer.errors
+                    else "unsupported_type",
+                }
+            )
+            return Response(error.data, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            job = import_shared_paper_pdf(
+                user=request.user,
+                upload=serializer.validated_data["file"],
+            )
+        except PaperImportError as exc:
+            error = UploadErrorSerializer(
+                {
+                    "code": "invalid_upload",
+                    "message": exc.message,
+                    "reason": exc.reason,
+                }
+            )
+            return Response(error.data, status=status.HTTP_400_BAD_REQUEST)
+        return Response(PaperImportJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
 class SharedPaperDetailView(views.APIView):
@@ -240,6 +265,29 @@ class SharedPaperDetailView(views.APIView):
     def get(self, request, paper_id):
         paper = get_object_or_404(shared_paper_queryset_for(request.user), pk=paper_id)
         return Response(PaperRecordSerializer(paper).data)
+
+
+class SharedPaperDownloadView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Shared paper download descriptor"),
+            403: OpenApiResponse(description="Download forbidden"),
+        }
+    )
+    def get(self, request, paper_id):
+        paper = get_object_or_404(shared_paper_queryset_for(request.user), pk=paper_id)
+        try:
+            return Response(
+                describe_shared_paper_download(
+                    user=request.user,
+                    paper=paper,
+                    request_id=request.headers.get("X-Request-ID", ""),
+                )
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
 
 
 class PaperImportStatusView(views.APIView):

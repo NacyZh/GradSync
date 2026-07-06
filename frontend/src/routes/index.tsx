@@ -126,6 +126,10 @@ export const router = createBrowserRouter([
     element: protectedPage(<PaperLibraryPage />),
   },
   {
+    path: '/library/papers',
+    element: protectedPage(<PaperLibraryPage />),
+  },
+  {
     path: '/projects/:projectId/documents',
     element: protectedPage(<DocumentLibraryPage />),
   },

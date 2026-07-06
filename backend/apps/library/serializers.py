@@ -171,6 +171,16 @@ class UploadErrorSerializer(serializers.Serializer):
     reason = serializers.CharField()
 
 
+class PaperPdfImportSerializer(serializers.Serializer):
+    file = serializers.FileField()
+
+    def validate(self, attrs):
+        extra_fields = set(self.initial_data) - {"file"}
+        if extra_fields:
+            raise serializers.ValidationError("Paper import accepts only a PDF file.")
+        return attrs
+
+
 class PaperRecordCreateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=500)
     authors = serializers.ListField(child=serializers.CharField(), allow_empty=False)
