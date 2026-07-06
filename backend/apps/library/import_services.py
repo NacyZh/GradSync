@@ -1,4 +1,5 @@
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -14,7 +15,14 @@ from apps.common.file_services import checksum_sha256, store_uploaded_file
 from apps.projects.archive_services import ensure_project_writable
 from apps.projects.models import ResearchProject
 
-from .duplicate_services import find_duplicate, normalize_doi, title_author_year_fingerprint
+from .duplicate_services import (
+    create_duplicate_detection_result,
+    detect_shared_paper_duplicate,
+    find_duplicate,
+    normalize_doi,
+    normalize_title,
+    title_author_year_fingerprint,
+)
 from .models import (
     DuplicateDetectionResult,
     PaperFile,
@@ -51,6 +59,8 @@ class ExtractedPaperTitle:
     title: str
     source: str
     confidence: str
+    authors: list[str]
+    publication_year: int | None = None
 
 
 def _upload_position(upload) -> int | None:
@@ -96,6 +106,22 @@ def _reliable_title(value: str | None) -> str:
     if len(title) < 4 or title.lower() in {"untitled", "unknown", "paper"}:
         return ""
     return title[:500]
+
+
+def _metadata_authors(value: str | None) -> list[str]:
+    raw = " ".join(str(value or "").replace("\x00", " ").split()).strip()
+    if not raw:
+        return []
+    authors = re.split(r"\s*(?:;|,|\band\b)\s*", raw)
+    return [author[:160] for author in authors if author.strip()]
+
+
+def _metadata_year(*values: str | None) -> int | None:
+    for value in values:
+        match = re.search(r"(19|20)\d{2}", str(value or ""))
+        if match:
+            return int(match.group(0))
+    return None
 
 
 def validate_pdf_upload(upload) -> ValidatedPdfUpload:
@@ -149,11 +175,18 @@ def extract_title_from_pdf_upload(upload) -> ExtractedPaperTitle:
     metadata_title = _reliable_title(
         getattr(reader.metadata, "title", "") if reader.metadata else ""
     )
+    metadata_author = getattr(reader.metadata, "author", "") if reader.metadata else ""
+    metadata_year = _metadata_year(
+        getattr(reader.metadata, "creation_date", "") if reader.metadata else "",
+        getattr(reader.metadata, "modification_date", "") if reader.metadata else "",
+    )
     if metadata_title:
         return ExtractedPaperTitle(
             title=metadata_title,
             source=PaperTitleExtractionResult.SourceAttempted.EMBEDDED_METADATA,
             confidence=PaperTitleExtractionResult.Confidence.HIGH,
+            authors=_metadata_authors(metadata_author),
+            publication_year=metadata_year,
         )
 
     first_page_text = ""
@@ -170,6 +203,8 @@ def extract_title_from_pdf_upload(upload) -> ExtractedPaperTitle:
             title=visible_title,
             source=PaperTitleExtractionResult.SourceAttempted.FIRST_PAGE_VISIBLE_TEXT,
             confidence=PaperTitleExtractionResult.Confidence.MEDIUM,
+            authors=_metadata_authors(metadata_author),
+            publication_year=metadata_year,
         )
     raise PaperImportError("missing_reliable_title", "No reliable paper title could be extracted.")
 
@@ -197,11 +232,55 @@ def _job_failure_reason(reason: str) -> str:
     return mapping.get(reason, PaperImportJob.FailureReason.UNKNOWN)
 
 
+def create_accepted_paper_from_import(*, import_job: PaperImportJob) -> PaperRecord:
+    paper_file = import_job.paper_file
+    if paper_file is None or paper_file.uploaded_file is None:
+        raise PaperImportError("processing_error", "Import has no stored PDF file.")
+    extraction = paper_file.title_extraction_results.first()
+    if extraction is None or not extraction.extracted_title:
+        raise PaperImportError(
+            "missing_reliable_title",
+            "No reliable paper title could be extracted.",
+        )
+
+    user = import_job.requested_by
+    project = _shared_library_project(user)
+    paper = PaperRecord.objects.create(
+        project=project,
+        title=extraction.extracted_title,
+        canonical_title=extraction.extracted_title,
+        normalized_title=extraction.normalized_title or normalize_title(extraction.extracted_title),
+        title_source=extraction.source_attempted,
+        title_confidence=extraction.confidence,
+        authors=extraction.extracted_authors,
+        publication_year=extraction.extracted_year,
+        tags=extraction.extracted_keywords,
+        visibility=PaperRecord.Visibility.GROUP_WIDE,
+        visibility_changed_by=user,
+        visibility_changed_at=timezone.now(),
+        uploaded_file=paper_file.uploaded_file,
+        checksum_sha256=paper_file.uploaded_file.checksum_sha256,
+        import_source=PaperRecord.ImportSource.LOCAL_FILE,
+        source_path_label=paper_file.original_filename,
+        fingerprint=title_author_year_fingerprint(
+            title=extraction.extracted_title,
+            authors=extraction.extracted_authors,
+            publication_year=extraction.extracted_year,
+        ),
+        shared_access_started_at=timezone.now(),
+        created_by=user,
+        status=PaperRecord.Status.ACTIVE,
+    )
+    paper_file.paper = paper
+    paper_file.default_download_filename = canonical_paper_download_filename(paper)
+    paper_file.save(update_fields=["paper", "default_download_filename"])
+    return paper
+
+
 @transaction.atomic
 def import_shared_paper_pdf(*, user, upload) -> PaperImportJob:
     ensure_active_research_group_user(user)
     validated = validate_pdf_upload(upload)
-    project = _shared_library_project(user)
     uploaded_file = store_uploaded_file(upload=upload, category="paper", owner=user)
     paper_file = PaperFile.objects.create(
         uploaded_file=uploaded_file,
@@ -262,9 +341,9 @@ def import_shared_paper_pdf(*, user, upload) -> PaperImportJob:
         paper_file=paper_file,
         source_attempted=extracted.source,
         extracted_title=extracted.title,
-        normalized_title=title_author_year_fingerprint(
-            title=extracted.title, authors=[], publication_year=None
-        ).split("|", 1)[0],
+        normalized_title=normalize_title(extracted.title),
+        extracted_authors=extracted.authors,
+        extracted_year=extracted.publication_year,
         confidence=extracted.confidence,
         completed_at=timezone.now(),
     )
@@ -272,38 +351,72 @@ def import_shared_paper_pdf(*, user, upload) -> PaperImportJob:
     job.user_message = "Checking for duplicates."
     job.save(update_fields=["status", "user_message", "updated_at"])
 
-    paper = PaperRecord.objects.create(
-        project=project,
-        title=extracted.title,
-        canonical_title=extracted.title,
+    duplicate_decision = detect_shared_paper_duplicate(
+        file_fingerprint=validated.file_fingerprint,
         normalized_title=extraction.normalized_title,
-        title_source=extracted.source,
-        title_confidence=extracted.confidence,
-        authors=[],
-        tags=[],
-        visibility=PaperRecord.Visibility.GROUP_WIDE,
-        visibility_changed_by=user,
-        visibility_changed_at=timezone.now(),
-        uploaded_file=uploaded_file,
-        checksum_sha256=uploaded_file.checksum_sha256,
-        import_source=PaperRecord.ImportSource.LOCAL_FILE,
-        source_path_label=validated.filename,
-        fingerprint=title_author_year_fingerprint(
-            title=extracted.title, authors=[], publication_year=None
-        ),
-        shared_access_started_at=timezone.now(),
-        created_by=user,
-        status=PaperRecord.Status.ACTIVE,
+        authors=extracted.authors,
+        publication_year=extracted.publication_year,
     )
-    paper_file.paper = paper
-    paper_file.default_download_filename = canonical_paper_download_filename(paper)
-    paper_file.save(update_fields=["paper", "default_download_filename"])
-    DuplicateDetectionResult.objects.create(
+    duplicate_result = create_duplicate_detection_result(
         paper_file=paper_file,
-        decision=DuplicateDetectionResult.Decision.ACCEPTED_NEW,
-        match_basis=DuplicateDetectionResult.MatchBasis.NONE,
-        review_status=DuplicateDetectionResult.ReviewStatus.NONE,
+        decision=duplicate_decision,
+        authors=extracted.authors,
+        publication_year=extracted.publication_year,
     )
+    if duplicate_decision.decision in {
+        DuplicateDetectionResult.Decision.DUPLICATE_FILE_FINGERPRINT,
+        DuplicateDetectionResult.Decision.DUPLICATE_METADATA_STRONG_MATCH,
+    }:
+        job.status = PaperImportJob.Status.DUPLICATE
+        job.user_message = "Duplicate paper detected."
+        job.failure_reason = PaperImportJob.FailureReason.DUPLICATE
+        job.duplicate_paper = duplicate_decision.candidate_paper
+        job.completed_at = timezone.now()
+        job.save(
+            update_fields=[
+                "status",
+                "user_message",
+                "failure_reason",
+                "duplicate_paper",
+                "completed_at",
+                "updated_at",
+            ]
+        )
+        record_paper_library_activity(
+            actor=user,
+            paper=duplicate_decision.candidate_paper,
+            paper_file=paper_file,
+            import_job=job,
+            action=PaperLibraryActivity.Action.DUPLICATE_REJECTED,
+            outcome=PaperLibraryActivity.Outcome.REJECTED,
+            reason=duplicate_decision.decision,
+        )
+        return job
+
+    if duplicate_decision.decision == DuplicateDetectionResult.Decision.MAINTAINER_REVIEW:
+        job.status = PaperImportJob.Status.MAINTAINER_REVIEW
+        job.user_message = "Possible duplicate queued for maintainer review."
+        job.duplicate_paper = duplicate_result.candidate_paper
+        job.save(
+            update_fields=[
+                "status",
+                "user_message",
+                "duplicate_paper",
+                "updated_at",
+            ]
+        )
+        record_paper_library_activity(
+            actor=user,
+            paper=duplicate_decision.candidate_paper,
+            paper_file=paper_file,
+            import_job=job,
+            action=PaperLibraryActivity.Action.MAINTAINER_REVIEW_CREATED,
+            outcome=PaperLibraryActivity.Outcome.SUCCESS,
+            reason=duplicate_decision.match_basis,
+        )
+        return job
+
+    paper = create_accepted_paper_from_import(import_job=job)
     job.status = PaperImportJob.Status.ACCEPTED
     job.user_message = "Paper imported."
     job.accepted_paper = paper

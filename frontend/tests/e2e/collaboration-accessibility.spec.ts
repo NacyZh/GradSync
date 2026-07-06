@@ -37,6 +37,112 @@ async function expectNoLayoutOverflow(page: Page) {
   expect(issues).toEqual([]);
 }
 
+async function mockPaperLibraryAccessibility(page: Page) {
+  await mockAuthenticatedApi(page);
+  if (fullStackE2E) {
+    return;
+  }
+  await page.route('**/api/library/papers/**', async (route) => {
+    const request = route.request();
+    const url = request.url();
+    if (url.endsWith('/api/library/papers/') && request.method() === 'POST') {
+      await fulfillJson(route, {
+        id: 'import-a11y',
+        status: 'rejected',
+        requestedBy: 10,
+        userMessage: 'Missing reliable title',
+        acceptedPaper: null,
+        duplicatePaper: null,
+        extraction: {
+          source: 'embedded_metadata',
+          extractedTitle: '',
+          confidence: 'failed',
+          failureReason: 'missing_title',
+        },
+        duplicateDetection: null,
+        failureReason: 'missing_reliable_title',
+        createdAt: '2026-07-06T00:00:00Z',
+        updatedAt: '2026-07-06T00:00:02Z',
+        completedAt: '2026-07-06T00:00:02Z',
+      }, 202);
+      return;
+    }
+    if (url.endsWith('/api/library/papers/1/download/')) {
+      await fulfillJson(route, {
+        filename: 'Accessible Paper Workspace.pdf',
+        deliveryMode: 'direct_response',
+      });
+      return;
+    }
+    if (url.endsWith('/api/library/papers/1/')) {
+      await fulfillJson(route, {
+        id: '1',
+        projectId: '99',
+        title: 'Accessible Paper Workspace',
+        canonicalTitle: 'Accessible Paper Workspace',
+        authors: ['Ada Lovelace'],
+        publicationYear: 2026,
+        keywords: ['accessibility'],
+        visibility: 'group_wide',
+        status: 'active',
+        downloadAvailable: true,
+        defaultDownloadFilename: 'Accessible Paper Workspace.pdf',
+      });
+      return;
+    }
+    await fulfillJson(route, {
+      count: 1,
+      results: [
+        {
+          id: '1',
+          projectId: '99',
+          title: 'Accessible Paper Workspace',
+          canonicalTitle: 'Accessible Paper Workspace',
+          authors: ['Ada Lovelace'],
+          publicationYear: 2026,
+          keywords: ['accessibility'],
+          visibility: 'group_wide',
+          status: 'active',
+          downloadAvailable: true,
+          defaultDownloadFilename: 'Accessible Paper Workspace.pdf',
+        },
+      ],
+    });
+  });
+}
+
+test('paper library controls are keyboard reachable and announce import and download states', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked accessibility coverage uses deterministic import fixtures.');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPaperLibraryAccessibility(page);
+  await page.goto('/library/papers');
+
+  await expect(page.getByRole('main')).toBeVisible();
+  await expect(page.getByLabel('PDF file')).toBeVisible();
+  await expect(page.getByPlaceholder('Search title, author, year, keyword')).toBeVisible();
+  await expect(page.getByLabel('Author filter')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Select paper Accessible Paper Workspace/ })).toBeVisible();
+
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus-visible').first()).toBeVisible();
+
+  await page.getByRole('button', { name: /Select paper Accessible Paper Workspace/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Selected paper download' })).toContainText('Accessible Paper Workspace');
+  await page.getByRole('button', { name: /Download Accessible Paper Workspace/ }).click();
+  await expect(page.getByRole('status')).toContainText('Accessible Paper Workspace.pdf');
+
+  await page.getByLabel('PDF file').setInputFiles({
+    name: 'missing-title.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4 missing title'),
+  });
+  await page.getByRole('button', { name: 'Import PDF' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Rejected: missing_reliable_title' })).toBeVisible();
+  await expectNoLayoutOverflow(page);
+});
+
 for (const viewport of [
   { width: 390, height: 844, label: 'mobile' },
   { width: 1280, height: 900, label: 'desktop' },

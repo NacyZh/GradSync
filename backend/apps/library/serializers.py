@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import (
@@ -148,6 +149,7 @@ class PaperImportJobSerializer(serializers.ModelSerializer):
             "completedAt",
         ]
 
+    @extend_schema_field(PaperTitleExtractionResultSerializer(allow_null=True))
     def get_extraction(self, obj):
         if not obj.paper_file_id:
             return None
@@ -156,6 +158,7 @@ class PaperImportJobSerializer(serializers.ModelSerializer):
             return None
         return PaperTitleExtractionResultSerializer(result).data
 
+    @extend_schema_field(DuplicateDetectionResultSerializer(allow_null=True))
     def get_duplicateDetection(self, obj):
         if not obj.paper_file_id:
             return None

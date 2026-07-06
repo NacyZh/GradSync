@@ -75,6 +75,7 @@ def normalize(path: str) -> str:
         .replace("{document_id}", "{documentId}")
         .replace("{feedback_id}", "{feedbackId}")
         .replace("{paper_id}", "{paperId}")
+        .replace("{import_job_id}", "{importJobId}")
         .replace("{submission_id}", "{submissionId}")
         .replace("{writing_project_id}", "{writingProjectId}")
         .replace("{writing_version_id}", "{writingVersionId}")

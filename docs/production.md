@@ -170,6 +170,29 @@ Use `POSTGRES_BACKUP_RETENTION_DAYS` to control local backup retention. Store
 off-host encrypted copies according to the deployment environment's retention
 policy.
 
+### Paper Library Backup And Restore Validation
+
+The shared paper library stores metadata in PostgreSQL and PDF binaries in the
+configured Django file storage. A release that changes paper-library behavior
+must validate both sides before deploy:
+
+- Confirm the PostgreSQL backup includes `library_paperrecord`,
+  paper import jobs, title extraction results, duplicate detection results, and
+  paper-library activity records.
+- Confirm the file-storage backup includes every uploaded PDF referenced by an
+  active paper, including files migrated from legacy project scope.
+- Restore into a non-production environment and verify canonical titles,
+  default download filenames, title sources, extraction failure reasons,
+  duplicate decisions, maintainer review statuses, and upload/download activity
+  records are preserved.
+- Search as an active user after restore and confirm deleted or invalid papers
+  remain unavailable while valid shared papers remain downloadable.
+- If rollback follows migrations
+  `backend/apps/library/migrations/0004_paper_library_workflow.py` or
+  `backend/apps/library/migrations/0005_share_existing_valid_papers.py`, stop
+  writers first, restore the database backup when needed, and keep PDF files
+  intact until operators approve manual cleanup.
+
 ## Secret Rotation
 
 - Rotate `DJANGO_SECRET_KEY` only with a planned maintenance window because it

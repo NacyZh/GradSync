@@ -4,6 +4,11 @@ GradSync manages graduate research group operations across project-scoped tasks,
 draft reviews, weekly progress reports, lab resource bookings, and notification
 records.
 
+The shared paper library is available to all active authenticated users without
+project membership or per-paper joining. Users import papers by selecting a PDF
+only; GradSync extracts the canonical title, names downloads from that title,
+blocks duplicate uploads, and routes fuzzy matches to maintainer review.
+
 ## Stack
 
 - Backend: Django, Django REST Framework, Celery
@@ -98,12 +103,16 @@ For the paper library workflow feature, run the focused validation set in
 ```bash
 docker compose exec backend pytest backend/tests/unit backend/tests/integration backend/tests/contract
 cd frontend && npm run test
-cd frontend && npm run test:e2e -- collaboration-paper-library.spec.ts
+cd frontend && npm run test:e2e -- collaboration-paper-library.spec.ts collaboration-accessibility.spec.ts
+sh scripts/check-openapi-contract.sh --strict-shapes specs/004-paper-library-workflow/contracts/openapi.yaml
 ```
 
 The paper library workflow validates shared active-user paper access,
 file-selection-only PDF import, extracted-title naming, duplicate/review states,
-and the EndNote-like search/import/download workspace.
+and the EndNote-like search/import/download workspace. Duplicate file
+fingerprints and strong metadata matches link users to the existing paper;
+fuzzy matches remain out of the ordinary active library until a teacher or
+administrator confirms duplicate or distinct status.
 
 ## Production Deployment
 

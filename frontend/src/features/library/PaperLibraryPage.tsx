@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
+import { useAuth } from '../auth/AuthProvider';
 import { PaperDetailPanel } from './PaperDetailPanel';
 import { PaperFilters } from './PaperFilters';
 import { PaperImportPanel } from './PaperImportPanel';
@@ -19,12 +20,14 @@ function getErrorMessage(err: unknown) {
 }
 
 export function PaperLibraryPage() {
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [author, setAuthor] = useState('');
   const [year, setYear] = useState('');
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [acceptedImport, setAcceptedImport] = useState<PaperRecord | undefined>();
+  const [duplicateSelection, setDuplicateSelection] = useState<PaperRecord | undefined>();
   const filters = useMemo(
     () => ({ query: query.trim(), author: author.trim(), year: year.trim(), keyword: keyword.trim() }),
     [author, keyword, query, year],
@@ -34,8 +37,12 @@ export function PaperLibraryPage() {
   const detailQuery = useSharedPaperDetail(selectedId);
   const selectedSummary = papers.find((paper) => paper.id === selectedId);
   const selectedPaper =
-    detailQuery.data ?? selectedSummary ?? (acceptedImport?.id === selectedId ? acceptedImport : undefined);
+    detailQuery.data ??
+    selectedSummary ??
+    (acceptedImport?.id === selectedId ? acceptedImport : undefined) ??
+    (duplicateSelection?.id === selectedId ? duplicateSelection : undefined);
   const activeFilterText = [query, author, year, keyword].filter(Boolean).join(', ');
+  const isMaintainer = user?.global_role === 'advisor' || user?.global_role === 'admin';
 
   useEffect(() => {
     if (!selectedId && papers.length > 0) {
@@ -48,20 +55,28 @@ export function PaperLibraryPage() {
       title="Paper library"
       description="Search, inspect, and download shared papers available to active GradSync users."
     >
-      <div className="grid gap-4 xl:grid-cols-[minmax(20rem,0.7fr)_minmax(28rem,1.3fr)]">
-        <section className="panel" aria-label="Paper download">
-          <div className="mb-4">
+      <div
+        data-testid="paper-library-workspace"
+        className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(20rem,0.72fr)_minmax(30rem,1.28fr)]"
+      >
+        <section className="panel grid min-w-0 content-start gap-4" aria-label="Paper import and download">
+          <div>
             <PaperImportPanel
               onAccepted={(paper) => {
                 setAcceptedImport(paper);
                 setSelectedId(paper.id);
               }}
+              onSelectPaper={(paper) => {
+                setDuplicateSelection(paper);
+                setSelectedId(paper.id);
+              }}
+              isMaintainer={isMaintainer}
             />
           </div>
-          <PaperDetailPanel paper={selectedPaper} />
+          <PaperDetailPanel paper={selectedPaper} variant="download" />
         </section>
-        <section className="panel" aria-label="Shared paper search">
-          <div className="mb-4 grid gap-3">
+        <section className="panel grid min-w-0 content-start gap-4" aria-label="Shared paper search and display">
+          <div className="grid gap-3">
             <PaperFilters
               value={query}
               author={author}
@@ -94,29 +109,32 @@ export function PaperLibraryPage() {
               }
             />
           ) : null}
-          <ul className="grid gap-2">
-            {papers.map((paper) => (
-              <li key={paper.id}>
-                <button
-                  type="button"
-                  aria-label={`Select paper ${paperTitle(paper)}`}
-                  aria-pressed={selectedId === paper.id}
-                  className="w-full rounded-md border p-3 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => setSelectedId(paper.id)}
-                >
-                  <span className="flex flex-wrap items-start justify-between gap-2">
-                    <strong>{paperTitle(paper)}</strong>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
-                      {paper.titleSource?.replaceAll('_', ' ') || 'shared'}
+          <div className="grid gap-4 lg:grid-cols-[minmax(16rem,0.95fr)_minmax(18rem,1.05fr)]">
+            <ul className="grid content-start gap-2" aria-label="Shared paper results">
+              {papers.map((paper) => (
+                <li key={paper.id}>
+                  <button
+                    type="button"
+                    aria-label={`Select paper ${paperTitle(paper)}`}
+                    aria-pressed={selectedId === paper.id}
+                    className="min-h-24 w-full rounded-md border p-3 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => setSelectedId(paper.id)}
+                  >
+                    <span className="flex flex-wrap items-start justify-between gap-2">
+                      <strong>{paperTitle(paper)}</strong>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
+                        {paper.titleSource?.replaceAll('_', ' ') || 'shared'}
+                      </span>
                     </span>
-                  </span>
-                  <span className="block text-sm text-muted-foreground">
-                    {paper.authors.join(', ')} · {paper.publicationYear ?? 'No year'}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+                    <span className="block text-sm text-muted-foreground">
+                      {paper.authors.join(', ')} · {paper.publicationYear ?? 'No year'}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <PaperDetailPanel paper={selectedPaper} />
+          </div>
         </section>
       </div>
     </PageShell>

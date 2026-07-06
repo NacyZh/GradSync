@@ -118,6 +118,8 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "login": os.getenv("THROTTLE_LOGIN_RATE", "10/min"),
         "invite": os.getenv("THROTTLE_INVITE_RATE", "10/min"),
+        "paper_library": os.getenv("THROTTLE_PAPER_LIBRARY_RATE", "120/min"),
+        "paper_import": os.getenv("THROTTLE_PAPER_IMPORT_RATE", "30/hour"),
     },
 }
 

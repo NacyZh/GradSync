@@ -17,15 +17,28 @@ describe('research assets and locale UI', () => {
       <>
         <PaperFilters value="" onChange={onChange} />
         <DuplicateReviewPanel
-          batch={{
+          job={{
             id: '1',
-            projectId: '1',
-            status: 'staged',
-            totalItems: 2,
-            acceptedCount: 1,
-            duplicateCount: 1,
-            errorCount: 0,
-            results: [{ status: 'duplicate', duplicateReason: 'doi', message: 'Duplicate paper detected' }],
+            status: 'duplicate',
+            requestedBy: '10',
+            userMessage: 'Duplicate paper detected',
+            acceptedPaper: null,
+            duplicatePaper: {
+              id: 'paper-1',
+              projectId: '1',
+              title: 'Duplicate Paper',
+              canonicalTitle: 'Duplicate Paper',
+              authors: ['Ada Lovelace'],
+              visibility: 'group_wide',
+              status: 'active',
+            },
+            duplicateDetection: {
+              decision: 'duplicate_metadata_strong_match',
+              matchBasis: 'normalized_title_author_year',
+              candidatePaperId: 'paper-1',
+              similarityScore: 1,
+              reviewStatus: 'none',
+            },
           }}
         />
       </>,
@@ -33,13 +46,15 @@ describe('research assets and locale UI', () => {
 
     await userEvent.type(screen.getByPlaceholderText(/Search title/), 'graph');
     expect(onChange).toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Duplicate paper detected');
+    expect(screen.getByText('Duplicate paper detected')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View existing paper' })).toBeInTheDocument();
   });
 
   it('renders paper detail download states', () => {
     renderWithClient(
       <PaperDetailPanel
         projectId={1}
+        variant="download"
         paper={{
           id: '1',
           projectId: '1',
@@ -52,7 +67,7 @@ describe('research assets and locale UI', () => {
       />,
     );
     expect(screen.getByText('Graph Neural Methods')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Download' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Download Graph Neural Methods' })).toBeEnabled();
   });
 
   it('renders code version detail and download status', () => {

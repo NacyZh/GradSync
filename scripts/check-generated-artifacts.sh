@@ -36,6 +36,36 @@ find_generated_artifacts() {
     \) $result_action
 }
 
+check_paper_library_spec_review_artifacts() {
+  spec_dir="specs/004-paper-library-workflow"
+  [ -d "$spec_dir" ] || return 0
+
+  missing=""
+  for path in \
+    "$spec_dir/spec.md" \
+    "$spec_dir/plan.md" \
+    "$spec_dir/research.md" \
+    "$spec_dir/data-model.md" \
+    "$spec_dir/quickstart.md" \
+    "$spec_dir/security-review.md" \
+    "$spec_dir/tasks.md" \
+    "$spec_dir/contracts/openapi.yaml" \
+    "$spec_dir/contracts/frontend-ui.md"
+  do
+    if [ ! -f "$path" ]; then
+      missing="${missing}${path}
+"
+    fi
+  done
+
+  if [ -n "$missing" ]; then
+    echo "Paper library spec review artifacts are incomplete:" >&2
+    printf '%s' "$missing" >&2
+    echo "specs/ is ignored by default; force-add complete review artifacts intentionally." >&2
+    exit 1
+  fi
+}
+
 if [ "${1:-}" = "--clean" ]; then
   find_generated_artifacts delete
 elif [ "${1:-}" != "" ]; then
@@ -50,3 +80,5 @@ if [ -n "$found" ]; then
   echo "$found" >&2
   exit 1
 fi
+
+check_paper_library_spec_review_artifacts

@@ -163,6 +163,15 @@ export function getPaperImportJob(importJobId: string) {
   return apiRequest<PaperImportJob>(`/api/library/paper-imports/${importJobId}/`);
 }
 
+export type PaperImportReviewDecision = 'confirm_duplicate' | 'confirm_distinct';
+
+export function reviewPaperImport(importJobId: string, decision: PaperImportReviewDecision, note = '') {
+  return apiRequest<PaperImportJob>(`/api/library/paper-imports/${importJobId}/review/`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, note }),
+  });
+}
+
 export type PaperImportPayload = {
   items: PaperCreatePayload[];
   sourcePathLabel: string;
@@ -228,6 +237,22 @@ export function useSharedPaperPdfImport() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (file: File) => importSharedPaperPdf(file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shared-papers'] }),
+  });
+}
+
+export function usePaperImportReview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      importJobId,
+      decision,
+      note,
+    }: {
+      importJobId: string;
+      decision: PaperImportReviewDecision;
+      note?: string;
+    }) => reviewPaperImport(importJobId, decision, note),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shared-papers'] }),
   });
 }

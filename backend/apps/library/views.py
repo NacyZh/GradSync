@@ -14,6 +14,7 @@ from apps.common.project_scope import visible_asset_q
 from apps.projects.models import ResearchProject
 
 from .document_services import DocumentCategoryService, DocumentService
+from .duplicate_services import review_paper_import
 from .import_services import PaperImportError, PaperImportService, import_shared_paper_pdf
 from .models import DocumentCategory, DocumentRecord, PaperImportBatch, PaperImportJob, PaperRecord
 from .serializers import (
@@ -204,6 +205,11 @@ class PaperDownloadView(views.APIView):
 
 class SharedPaperListCreateView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
+    throttle_scope = "paper_library"
+
+    def get_throttles(self):
+        self.throttle_scope = "paper_import" if self.request.method == "POST" else "paper_library"
+        return super().get_throttles()
 
     @extend_schema(
         parameters=[
@@ -212,7 +218,11 @@ class SharedPaperListCreateView(generics.GenericAPIView):
             OpenApiParameter("year", int, OpenApiParameter.QUERY),
             OpenApiParameter("keyword", str, OpenApiParameter.QUERY),
         ],
-        responses={200: PaperRecordSerializer(many=True), 400: UploadErrorSerializer},
+        responses={
+            200: PaperRecordSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Active account required"),
+        },
     )
     def get(self, request):
         queryset = apply_paper_search_filters(
@@ -225,7 +235,16 @@ class SharedPaperListCreateView(generics.GenericAPIView):
             return self.get_paginated_response(serializer.data)
         return Response(PaperRecordSerializer(queryset, many=True).data)
 
-    @extend_schema(request=PaperPdfImportSerializer, responses={202: PaperImportJobSerializer})
+    @extend_schema(
+        request={"multipart/form-data": PaperPdfImportSerializer},
+        responses={
+            202: PaperImportJobSerializer,
+            400: UploadErrorSerializer,
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Active account required"),
+            413: UploadErrorSerializer,
+        },
+    )
     def post(self, request):
         serializer = PaperPdfImportSerializer(data=request.data)
         if not serializer.is_valid():
@@ -260,8 +279,16 @@ class SharedPaperListCreateView(generics.GenericAPIView):
 
 class SharedPaperDetailView(views.APIView):
     permission_classes = [IsAuthenticated]
+    throttle_scope = "paper_library"
 
-    @extend_schema(responses={200: PaperRecordSerializer})
+    @extend_schema(
+        responses={
+            200: PaperRecordSerializer,
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Active account required"),
+            404: OpenApiResponse(description="Paper not found"),
+        }
+    )
     def get(self, request, paper_id):
         paper = get_object_or_404(shared_paper_queryset_for(request.user), pk=paper_id)
         return Response(PaperRecordSerializer(paper).data)
@@ -269,11 +296,14 @@ class SharedPaperDetailView(views.APIView):
 
 class SharedPaperDownloadView(views.APIView):
     permission_classes = [IsAuthenticated]
+    throttle_scope = "paper_library"
 
     @extend_schema(
         responses={
             200: OpenApiResponse(description="Shared paper download descriptor"),
+            401: OpenApiResponse(description="Authentication required"),
             403: OpenApiResponse(description="Download forbidden"),
+            404: OpenApiResponse(description="Paper not found"),
         }
     )
     def get(self, request, paper_id):
@@ -292,8 +322,16 @@ class SharedPaperDownloadView(views.APIView):
 
 class PaperImportStatusView(views.APIView):
     permission_classes = [IsAuthenticated]
+    throttle_scope = "paper_library"
 
-    @extend_schema(responses={200: PaperImportJobSerializer})
+    @extend_schema(
+        responses={
+            200: PaperImportJobSerializer,
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Active account required"),
+            404: OpenApiResponse(description="Import job not found"),
+        }
+    )
     def get(self, request, import_job_id):
         job = get_object_or_404(
             PaperImportJob.objects.select_related("paper_file"),
@@ -309,8 +347,31 @@ class PaperImportStatusView(views.APIView):
 
 class PaperImportReviewView(views.APIView):
     permission_classes = [IsAuthenticated]
+    throttle_scope = "paper_import"
 
-    @extend_schema(responses={200: PaperImportJobSerializer})
+    @extend_schema(
+        request={
+            "application/json": {
+                "type": "object",
+                "required": ["decision"],
+                "properties": {
+                    "decision": {
+                        "type": "string",
+                        "enum": ["confirm_duplicate", "confirm_distinct"],
+                    },
+                    "note": {"type": "string", "maxLength": 1000},
+                },
+                "additionalProperties": False,
+            }
+        },
+        responses={
+            200: PaperImportJobSerializer,
+            400: OpenApiResponse(description="Invalid review decision"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Maintainer account required"),
+            404: OpenApiResponse(description="Import job not found"),
+        },
+    )
     def post(self, request, import_job_id):
         is_maintainer = getattr(request.user, "is_administrator", False) or getattr(
             request.user, "is_advisor", False
@@ -318,9 +379,20 @@ class PaperImportReviewView(views.APIView):
         if not is_maintainer:
             raise PermissionDenied("Only maintainers can review paper imports.")
         job = get_object_or_404(
-            PaperImportJob.objects.select_related("paper_file"),
+            PaperImportJob.objects.select_related("paper_file", "paper_file__uploaded_file"),
             pk=import_job_id,
         )
+        decision = str(request.data.get("decision", ""))
+        note = str(request.data.get("note", ""))
+        try:
+            job = review_paper_import(
+                import_job=job,
+                reviewer=request.user,
+                decision=decision,
+                note=note,
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(_error_message(exc)) from exc
         return Response(PaperImportJobSerializer(job).data)
 
 
