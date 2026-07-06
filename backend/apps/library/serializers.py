@@ -1,6 +1,15 @@
 from rest_framework import serializers
 
-from .models import DocumentCategory, DocumentRecord, PaperAttachment, PaperImportBatch, PaperRecord
+from .models import (
+    DocumentCategory,
+    DocumentRecord,
+    DuplicateDetectionResult,
+    PaperAttachment,
+    PaperImportBatch,
+    PaperImportJob,
+    PaperRecord,
+    PaperTitleExtractionResult,
+)
 
 
 class PaperAttachmentSerializer(serializers.ModelSerializer):
@@ -26,6 +35,18 @@ class PaperAttachmentSerializer(serializers.ModelSerializer):
 
 class PaperRecordSerializer(serializers.ModelSerializer):
     projectId = serializers.CharField(source="project_id", read_only=True)
+    canonicalTitle = serializers.CharField(source="canonical_title", read_only=True)
+    titleSource = serializers.CharField(source="title_source", read_only=True)
+    titleConfidence = serializers.CharField(source="title_confidence", read_only=True)
+    downloadAvailable = serializers.SerializerMethodField()
+    defaultDownloadFilename = serializers.SerializerMethodField()
+    migratedFromLegacyScope = serializers.BooleanField(
+        source="migrated_from_legacy_scope", read_only=True
+    )
+    sharedAccessStartedAt = serializers.DateTimeField(
+        source="shared_access_started_at", read_only=True
+    )
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     publicationYear = serializers.IntegerField(source="publication_year", required=False)
     externalIds = serializers.JSONField(source="external_ids", required=False)
     importSource = serializers.CharField(source="import_source", read_only=True)
@@ -41,6 +62,14 @@ class PaperRecordSerializer(serializers.ModelSerializer):
             "id",
             "projectId",
             "title",
+            "canonicalTitle",
+            "titleSource",
+            "titleConfidence",
+            "downloadAvailable",
+            "defaultDownloadFilename",
+            "migratedFromLegacyScope",
+            "sharedAccessStartedAt",
+            "createdAt",
             "authors",
             "venue",
             "publicationYear",
@@ -58,6 +87,88 @@ class PaperRecordSerializer(serializers.ModelSerializer):
             "status",
             "attachments",
         ]
+
+    def get_downloadAvailable(self, obj) -> bool:
+        return bool(obj.uploaded_file_id or obj.attachments.exists())
+
+    def get_defaultDownloadFilename(self, obj) -> str:
+        title = obj.canonical_title or obj.title or "paper"
+        safe = "".join(char if char.isalnum() or char in " ._-" else " " for char in title)
+        safe = " ".join(safe.split()).strip() or "paper"
+        return f"{safe}.pdf"
+
+
+class PaperTitleExtractionResultSerializer(serializers.ModelSerializer):
+    source = serializers.CharField(source="source_attempted", read_only=True)
+    extractedTitle = serializers.CharField(source="extracted_title", read_only=True)
+    failureReason = serializers.CharField(source="failure_reason", read_only=True)
+
+    class Meta:
+        model = PaperTitleExtractionResult
+        fields = ["source", "extractedTitle", "confidence", "failureReason"]
+
+
+class DuplicateDetectionResultSerializer(serializers.ModelSerializer):
+    matchBasis = serializers.CharField(source="match_basis", read_only=True)
+    candidatePaperId = serializers.CharField(source="candidate_paper_id", read_only=True)
+    similarityScore = serializers.FloatField(source="similarity_score", read_only=True)
+    reviewStatus = serializers.CharField(source="review_status", read_only=True)
+
+    class Meta:
+        model = DuplicateDetectionResult
+        fields = ["decision", "matchBasis", "candidatePaperId", "similarityScore", "reviewStatus"]
+
+
+class PaperImportJobSerializer(serializers.ModelSerializer):
+    requestedBy = serializers.CharField(source="requested_by_id", read_only=True)
+    userMessage = serializers.CharField(source="user_message", read_only=True)
+    acceptedPaper = PaperRecordSerializer(source="accepted_paper", read_only=True)
+    duplicatePaper = PaperRecordSerializer(source="duplicate_paper", read_only=True)
+    extraction = serializers.SerializerMethodField()
+    duplicateDetection = serializers.SerializerMethodField()
+    failureReason = serializers.CharField(source="failure_reason", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+    updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
+    completedAt = serializers.DateTimeField(source="completed_at", read_only=True)
+
+    class Meta:
+        model = PaperImportJob
+        fields = [
+            "id",
+            "status",
+            "requestedBy",
+            "userMessage",
+            "acceptedPaper",
+            "duplicatePaper",
+            "extraction",
+            "duplicateDetection",
+            "failureReason",
+            "createdAt",
+            "updatedAt",
+            "completedAt",
+        ]
+
+    def get_extraction(self, obj):
+        if not obj.paper_file_id:
+            return None
+        result = obj.paper_file.title_extraction_results.first()
+        if result is None:
+            return None
+        return PaperTitleExtractionResultSerializer(result).data
+
+    def get_duplicateDetection(self, obj):
+        if not obj.paper_file_id:
+            return None
+        result = obj.paper_file.duplicate_detection_results.first()
+        if result is None:
+            return None
+        return DuplicateDetectionResultSerializer(result).data
+
+
+class UploadErrorSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    message = serializers.CharField()
+    reason = serializers.CharField()
 
 
 class PaperRecordCreateSerializer(serializers.Serializer):

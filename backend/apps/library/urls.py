@@ -6,7 +6,11 @@ from .views import (
     DocumentDownloadView,
     DocumentViewSet,
     PaperDownloadView,
+    PaperImportReviewView,
+    PaperImportStatusView,
     PaperViewSet,
+    SharedPaperDetailView,
+    SharedPaperListCreateView,
 )
 
 router = DefaultRouter(trailing_slash=True)
@@ -31,5 +35,26 @@ urlpatterns = [
         name="project-documents-noslash",
     ),
     path("papers/<int:paper_id>/download", PaperDownloadView.as_view(), name="paper-download"),
+    path("library/papers/", SharedPaperListCreateView.as_view(), name="shared-paper-list"),
+    path(
+        "library/papers/<int:paper_id>/",
+        SharedPaperDetailView.as_view(),
+        name="shared-paper-detail",
+    ),
+    path(
+        "library/papers/<int:paper_id>/download/",
+        PaperDownloadView.as_view(),
+        name="shared-paper-download",
+    ),
+    path(
+        "library/paper-imports/<int:import_job_id>/",
+        PaperImportStatusView.as_view(),
+        name="paper-import-status",
+    ),
+    path(
+        "library/paper-imports/<int:import_job_id>/review/",
+        PaperImportReviewView.as_view(),
+        name="paper-import-review",
+    ),
     path("", include(router.urls)),
 ]

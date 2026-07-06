@@ -92,6 +92,19 @@ sh scripts/check-openapi-contract.sh specs/003-research-collab-platform/contract
 See `specs/001-research-group-ops/quickstart.md` and
 `specs/003-research-collab-platform/quickstart.md` for scenario validation.
 
+For the paper library workflow feature, run the focused validation set in
+`specs/004-paper-library-workflow/quickstart.md`:
+
+```bash
+docker compose exec backend pytest backend/tests/unit backend/tests/integration backend/tests/contract
+cd frontend && npm run test
+cd frontend && npm run test:e2e -- collaboration-paper-library.spec.ts
+```
+
+The paper library workflow validates shared active-user paper access,
+file-selection-only PDF import, extracted-title naming, duplicate/review states,
+and the EndNote-like search/import/download workspace.
+
 ## Production Deployment
 
 Production runs from immutable backend and frontend images:

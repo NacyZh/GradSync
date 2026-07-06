@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework import mixins, status, views, viewsets
+from rest_framework import generics, mixins, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -15,18 +15,21 @@ from apps.projects.models import ResearchProject
 
 from .document_services import DocumentCategoryService, DocumentService
 from .import_services import PaperImportService
-from .models import DocumentCategory, DocumentRecord, PaperImportBatch, PaperRecord
+from .models import DocumentCategory, DocumentRecord, PaperImportBatch, PaperImportJob, PaperRecord
 from .serializers import (
     DocumentCategoryCreateSerializer,
     DocumentCategorySerializer,
     DocumentRecordSerializer,
     DocumentUploadSerializer,
     PaperImportBatchSerializer,
+    PaperImportJobSerializer,
     PaperImportSerializer,
     PaperRecordCreateSerializer,
     PaperRecordSerializer,
     PaperUploadSerializer,
+    UploadErrorSerializer,
 )
+from .services import apply_paper_search_filters, shared_paper_queryset_for
 
 
 def _flatten_error_detail(detail):
@@ -192,6 +195,85 @@ class PaperDownloadView(views.APIView):
             return Response(describe_paper_download(request.user, paper))
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc
+
+
+class SharedPaperListCreateView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("author", str, OpenApiParameter.QUERY),
+            OpenApiParameter("year", int, OpenApiParameter.QUERY),
+            OpenApiParameter("keyword", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: PaperRecordSerializer(many=True), 400: UploadErrorSerializer},
+    )
+    def get(self, request):
+        queryset = apply_paper_search_filters(
+            shared_paper_queryset_for(request.user),
+            request.query_params,
+        )
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = PaperRecordSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(PaperRecordSerializer(queryset, many=True).data)
+
+    @extend_schema(request={"multipart/form-data": None}, responses={202: PaperImportJobSerializer})
+    def post(self, request):
+        # Full file-selection-only import processing is implemented in US2.
+        serializer = UploadErrorSerializer(
+            {
+                "code": "not_implemented",
+                "message": "Paper import processing is not available yet.",
+                "reason": "processing_error",
+            }
+        )
+        return Response(serializer.data, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SharedPaperDetailView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: PaperRecordSerializer})
+    def get(self, request, paper_id):
+        paper = get_object_or_404(shared_paper_queryset_for(request.user), pk=paper_id)
+        return Response(PaperRecordSerializer(paper).data)
+
+
+class PaperImportStatusView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: PaperImportJobSerializer})
+    def get(self, request, import_job_id):
+        job = get_object_or_404(
+            PaperImportJob.objects.select_related("paper_file"),
+            pk=import_job_id,
+        )
+        is_maintainer = getattr(request.user, "is_administrator", False) or getattr(
+            request.user, "is_advisor", False
+        )
+        if job.requested_by_id != request.user.id and not is_maintainer:
+            raise PermissionDenied("You cannot view this paper import.")
+        return Response(PaperImportJobSerializer(job).data)
+
+
+class PaperImportReviewView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: PaperImportJobSerializer})
+    def post(self, request, import_job_id):
+        is_maintainer = getattr(request.user, "is_administrator", False) or getattr(
+            request.user, "is_advisor", False
+        )
+        if not is_maintainer:
+            raise PermissionDenied("Only maintainers can review paper imports.")
+        job = get_object_or_404(
+            PaperImportJob.objects.select_related("paper_file"),
+            pk=import_job_id,
+        )
+        return Response(PaperImportJobSerializer(job).data)
 
 
 def _error_message(exc: DjangoValidationError) -> str:

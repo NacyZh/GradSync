@@ -59,8 +59,8 @@ def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
     assert "./frontend:" not in compose
     assert "${BACKEND_IMAGE" in compose
     assert "${FRONTEND_IMAGE" in compose
-    assert "--workers \"$${GRADSYNC_GUNICORN_WORKERS:-1}\"" in compose
-    assert "--concurrency=\"$${GRADSYNC_CELERY_CONCURRENCY:-1}\"" in compose
+    assert '--workers "$${GRADSYNC_GUNICORN_WORKERS:-1}"' in compose
+    assert '--concurrency="$${GRADSYNC_CELERY_CONCURRENCY:-1}"' in compose
     assert "mem_limit: ${GRADSYNC_BACKEND_MEM_LIMIT:-256m}" in compose
     assert "mem_limit: ${GRADSYNC_WORKER_MEM_LIMIT:-256m}" in compose
     assert "max_connections=${GRADSYNC_POSTGRES_MAX_CONNECTIONS:-40}" in compose
@@ -234,6 +234,22 @@ def test_notification_delivery_uses_dedicated_queue():
     from apps.notifications.tasks import deliver_due_notifications_task
 
     assert deliver_due_notifications_task.queue == "notifications"
+
+
+def test_paper_library_operational_signals_are_configured(settings):
+    from apps.library.models import DuplicateDetectionResult, PaperImportJob, PaperLibraryActivity
+
+    assert settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES > 0
+    assert settings.PAPER_LIBRARY_EXTRACTION_TIMEOUT_SECONDS > 0
+    assert 0 < settings.PAPER_LIBRARY_DUPLICATE_FUZZY_MATCH_THRESHOLD < 1
+    assert 0 < settings.PAPER_LIBRARY_DUPLICATE_STRONG_MATCH_THRESHOLD <= 1
+    assert (
+        DuplicateDetectionResult.Decision.MAINTAINER_REVIEW
+        in DuplicateDetectionResult.Decision.values
+    )
+    assert PaperImportJob.Status.FAILED in PaperImportJob.Status.values
+    assert PaperLibraryActivity.Action.UPLOAD_REJECTED in PaperLibraryActivity.Action.values
+    assert PaperLibraryActivity.Action.DOWNLOAD_STARTED in PaperLibraryActivity.Action.values
 
 
 def test_production_readiness_flags_configured_sentry_when_not_initialized():
