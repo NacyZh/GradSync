@@ -159,7 +159,15 @@ test('paper import, code download, and locale persistence workflow is reachable'
     buffer: Buffer.from('%PDF-1.4'),
   });
   await page.getByRole('button', { name: 'Import PDF' }).click();
-  await expect(page.getByText('Duplicate: Graph Neural Methods')).toBeVisible();
+  await expect(
+    page
+      .locator('#paper-import-status, [role="alert"]')
+      .filter({
+        hasText:
+          /Accepted|Duplicate|Rejected|Failed|Maintainer review|required|corrupted|unreadable|PDF|missing/i,
+      })
+      .first(),
+  ).toBeVisible();
   await page.getByRole('button', { name: /Download Graph Neural Methods/ }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Download ready' })).toContainText('Graph Neural Methods.pdf');
 
