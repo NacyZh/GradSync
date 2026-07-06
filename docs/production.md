@@ -102,6 +102,7 @@ server {
 
     ssl_certificate /etc/letsencrypt/live/120021123.xyz/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/120021123.xyz/privkey.pem;
+    client_max_body_size 30m;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -113,6 +114,10 @@ server {
     }
 }
 ```
+
+Keep `client_max_body_size` at or above the paper-library PDF upload limit
+plus multipart overhead. The application default is 25 MB for PDFs, so the
+proxy examples use 30 MB.
 
 Validate the deployed routing with trailing slashes on backend health endpoints:
 

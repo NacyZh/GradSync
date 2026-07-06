@@ -47,7 +47,8 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
     event.preventDefault();
     if (!file) return;
     setJob(undefined);
-    const result = await importMutation.mutateAsync(file);
+    const result = await importMutation.mutateAsync(file).catch(() => undefined);
+    if (!result) return;
     setJob(result);
     if (result.status === 'accepted' && result.acceptedPaper) {
       onAccepted?.(result.acceptedPaper);

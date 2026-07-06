@@ -33,6 +33,9 @@ const defaultHeaders = {
 };
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const statusMessages: Record<number, string> = {
+  413: 'Selected file exceeds the upload size limit.',
+};
 
 function apiUrl(path: string): string {
   if (/^https?:\/\//.test(path)) {
@@ -68,8 +71,9 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
           .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
           .join('; ')
       : '';
+    const fallbackMessage = statusMessages[response.status] ?? `Request failed with ${response.status}`;
     throw {
-      message: payload.message ?? (fieldMessages || `Request failed with ${response.status}`),
+      message: payload.message ?? (fieldMessages || fallbackMessage),
       fields: payload.fields,
     };
   }

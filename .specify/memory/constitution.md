@@ -139,7 +139,7 @@ environment injection for secrets/addresses, validation for all external input,
 single-responsibility functions, documentation comments for public interfaces,
 data entities, and core functions, shared utilities for repeated logic, and
 extension-compatible changes that do not casually remove old fields or
-interfaces.
+interfaces. Code MUST be productional level, NOT demo.
 
 Tests MUST cover core business logic with unit tests, external interfaces and
 critical flows with integration or contract tests, and normal, exceptional,

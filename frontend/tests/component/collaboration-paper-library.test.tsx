@@ -342,6 +342,28 @@ describe('collaboration paper library UI', () => {
     expect(await screen.findByText('Extracted Metadata Title')).toBeInTheDocument();
   });
 
+  it('shows a clear upload-size error when the proxy rejects an oversized PDF', async () => {
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/library/papers/') && init?.method === 'POST') {
+        return new Response('request entity too large', { status: 413 });
+      }
+      return new Response(JSON.stringify({ count: 0, results: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    renderPaperLibrary();
+    await userEvent.upload(
+      screen.getByLabelText('PDF file'),
+      new File(['%PDF-1.4'], 'too-large.pdf', { type: 'application/pdf' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Import PDF' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Selected file exceeds the upload size limit.');
+  });
+
   it('shows duplicate imports with an action for the existing paper', async () => {
     mockFetch((url, init) => {
       if (url.includes('/api/library/papers/') && init?.method === 'POST') {

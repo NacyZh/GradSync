@@ -46,6 +46,7 @@ def test_frontend_nginx_serves_static_assets_and_proxies_api():
     assert "location = /metrics/" in nginx_conf
     assert "proxy_set_header Host $host;" in nginx_conf
     assert "proxy_set_header X-Forwarded-Proto https;" in nginx_conf
+    assert "client_max_body_size 30m;" in nginx_conf
     assert 'Cache-Control "public, max-age=31536000, immutable"' in nginx_conf
     assert "try_files $uri /index.html" in nginx_conf
 
