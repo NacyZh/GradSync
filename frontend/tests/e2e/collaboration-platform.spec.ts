@@ -80,6 +80,103 @@ async function mockCollaborationApi(page: Page) {
     }
     await fulfillJson(route, { results: [{ id: paperUploaded ? '2' : '1', projectId: '1', title: paperUploaded ? 'Uploaded Graph Paper' : 'Group Wide Graph Paper', authors: ['Lin Chen'], publicationYear: 2025, visibility: paperUploaded ? 'project_members' : 'group_wide', status: 'active', attachments: [{ id: '11', filename: paperUploaded ? 'uploaded-paper.pdf' : 'graph.pdf', checksumSha256: 'a'.repeat(64), status: 'active' }] }] });
   });
+  await page.route('**/api/library/papers/**', async (route) => {
+    const request = route.request();
+    const url = request.url();
+    if (url.endsWith('/api/library/papers/') && request.method() === 'POST') {
+      paperUploaded = true;
+      await fulfillJson(route, {
+        id: 'import-platform',
+        status: 'accepted',
+        requestedBy: 10,
+        userMessage: 'Paper imported',
+        acceptedPaper: {
+          id: '2',
+          projectId: '1',
+          title: 'Uploaded Graph Paper',
+          canonicalTitle: 'Uploaded Graph Paper',
+          authors: ['Ada Lovelace'],
+          publicationYear: 2026,
+          keywords: [],
+          visibility: 'group_wide',
+          status: 'active',
+          downloadAvailable: true,
+          defaultDownloadFilename: 'Uploaded Graph Paper.pdf',
+        },
+        duplicatePaper: null,
+        extraction: {
+          source: 'embedded_metadata',
+          extractedTitle: 'Uploaded Graph Paper',
+          confidence: 'high',
+          failureReason: '',
+        },
+        duplicateDetection: null,
+        failureReason: '',
+        createdAt: '2026-07-06T00:00:00Z',
+        updatedAt: '2026-07-06T00:00:02Z',
+        completedAt: '2026-07-06T00:00:02Z',
+      }, 202);
+      return;
+    }
+    if (url.endsWith('/api/library/papers/2/download/')) {
+      await fulfillJson(route, { filename: 'Uploaded Graph Paper.pdf', deliveryMode: 'direct_response' });
+      return;
+    }
+    if (url.endsWith('/api/library/papers/1/download/')) {
+      await fulfillJson(route, { filename: 'Group Wide Graph Paper.pdf', deliveryMode: 'direct_response' });
+      return;
+    }
+    if (url.endsWith('/api/library/papers/2/')) {
+      await fulfillJson(route, {
+        id: '2',
+        projectId: '1',
+        title: 'Uploaded Graph Paper',
+        canonicalTitle: 'Uploaded Graph Paper',
+        authors: ['Ada Lovelace'],
+        publicationYear: 2026,
+        keywords: [],
+        visibility: 'group_wide',
+        status: 'active',
+        downloadAvailable: true,
+        defaultDownloadFilename: 'Uploaded Graph Paper.pdf',
+      });
+      return;
+    }
+    if (url.endsWith('/api/library/papers/1/')) {
+      await fulfillJson(route, {
+        id: '1',
+        projectId: '1',
+        title: 'Group Wide Graph Paper',
+        canonicalTitle: 'Group Wide Graph Paper',
+        authors: ['Lin Chen'],
+        publicationYear: 2025,
+        keywords: ['graph'],
+        visibility: 'group_wide',
+        status: 'active',
+        downloadAvailable: true,
+        defaultDownloadFilename: 'Group Wide Graph Paper.pdf',
+      });
+      return;
+    }
+    await fulfillJson(route, {
+      results: [
+        {
+          id: paperUploaded ? '2' : '1',
+          projectId: '1',
+          title: paperUploaded ? 'Uploaded Graph Paper' : 'Group Wide Graph Paper',
+          canonicalTitle: paperUploaded ? 'Uploaded Graph Paper' : 'Group Wide Graph Paper',
+          authors: paperUploaded ? ['Ada Lovelace'] : ['Lin Chen'],
+          publicationYear: paperUploaded ? 2026 : 2025,
+          keywords: paperUploaded ? [] : ['graph'],
+          visibility: 'group_wide',
+          status: 'active',
+          downloadAvailable: true,
+          defaultDownloadFilename: paperUploaded ? 'Uploaded Graph Paper.pdf' : 'Group Wide Graph Paper.pdf',
+        },
+      ],
+      count: 1,
+    });
+  });
   await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
     const request = route.request();
     if (request.url().includes('/download')) {
@@ -176,16 +273,15 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
     await expect(page.getByText('Member added')).toBeVisible();
   });
 
-  await test.step('paper library visibility upload and download', async () => {
-    await page.goto('/projects/1/papers');
-    await expect(page.getByRole('heading', { name: 'Group Wide Graph Paper' })).toBeVisible();
+  await test.step('shared paper library import and download', async () => {
+    await page.goto('/library/papers');
+    await expect(page.getByRole('button', { name: /Select paper Group Wide Graph Paper/ })).toBeVisible();
+    await expect(page.getByLabel('Paper title')).toHaveCount(0);
     await page.getByLabel('PDF file').setInputFiles({ name: 'uploaded-paper.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
-    await page.getByLabel('Paper title').fill('Uploaded Graph Paper');
-    await page.getByLabel('Authors').fill('Ada Lovelace');
-    await page.getByRole('button', { name: 'Upload paper' }).click();
-    await expect(page.getByText('Upload complete')).toBeVisible();
-    await page.getByRole('button', { name: /Download/ }).click();
-    await expect(page.getByText(/uploaded-paper.pdf/)).toBeVisible();
+    await page.getByRole('button', { name: 'Import PDF' }).click();
+    await expect(page.getByText('Accepted: Uploaded Graph Paper')).toBeVisible();
+    await page.getByRole('button', { name: /Download Uploaded Graph Paper/ }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Download ready' })).toContainText('Uploaded Graph Paper.pdf');
   });
 
   await test.step('code archive library', async () => {
