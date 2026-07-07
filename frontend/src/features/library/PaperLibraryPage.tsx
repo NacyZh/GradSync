@@ -128,7 +128,7 @@ export function PaperLibraryPage() {
     >
       <div
         data-testid="paper-library-workspace"
-        className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(13rem,0.55fr)_minmax(0,1.25fr)] xl:grid-cols-[minmax(13rem,0.45fr)_minmax(32rem,1.35fr)_minmax(18rem,0.8fr)]"
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(16rem,0.65fr)_minmax(0,1.35fr)] xl:grid-cols-[minmax(16rem,0.65fr)_minmax(30rem,1.4fr)_minmax(18rem,0.85fr)]"
       >
         <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label={t('paperLibraryImportDownloadRegion')}>
           <div>
@@ -187,6 +187,7 @@ export function PaperLibraryPage() {
             </div>
           ) : null}
           <div className="grid min-w-0 gap-4 overflow-hidden">
+            <PaperDetailPanel paper={selectedPaper} onRename={renameSelectedPaper} onDelete={deleteSelectedPaper} />
             <ul
               data-testid="paper-results-list"
               className="grid max-h-[32rem] min-w-0 content-start gap-2 overflow-y-auto overflow-x-hidden pr-1"
@@ -223,7 +224,6 @@ export function PaperLibraryPage() {
                 </li>
               ))}
             </ul>
-            <PaperDetailPanel paper={selectedPaper} onRename={renameSelectedPaper} onDelete={deleteSelectedPaper} />
           </div>
         </section>
         <PaperPreviewPanel paper={selectedPaper} />
