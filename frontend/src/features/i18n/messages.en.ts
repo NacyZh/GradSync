@@ -64,6 +64,7 @@ export const messagesEn = {
   paperLibraryConfirmDelete: 'Confirm delete',
   paperLibraryDeleteDescription: 'The paper will leave ordinary browse, open, and download workflows.',
   paperLibraryInPageViewer: 'In-page viewer',
+  paperLibraryPreviewRegion: 'Paper preview',
   paperLibraryViewerAvailable: 'PDF preview opens here when the stored file is available.',
   paperLibraryViewerUnavailable: 'This paper is unavailable and cannot be opened.',
   paperLibraryPreviewLoading: 'Loading PDF preview.',

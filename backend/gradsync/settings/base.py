@@ -165,18 +165,22 @@ EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@gradsync.local")
 
+PAPER_LIBRARY_MIN_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024
 COLLABORATION_UPLOAD_LIMITS = {
-    "paper": int(os.getenv("UPLOAD_LIMIT_PAPER_BYTES", str(25 * 1024 * 1024))),
+    "paper": int(os.getenv("UPLOAD_LIMIT_PAPER_BYTES", str(PAPER_LIBRARY_MIN_UPLOAD_LIMIT_BYTES))),
     "code": int(os.getenv("UPLOAD_LIMIT_CODE_BYTES", str(100 * 1024 * 1024))),
     "document": int(os.getenv("UPLOAD_LIMIT_DOCUMENT_BYTES", str(50 * 1024 * 1024))),
     "writing": int(os.getenv("UPLOAD_LIMIT_WRITING_BYTES", str(50 * 1024 * 1024))),
     "feedback": int(os.getenv("UPLOAD_LIMIT_FEEDBACK_BYTES", str(50 * 1024 * 1024))),
 }
-PAPER_LIBRARY_UPLOAD_LIMIT_BYTES = int(
-    os.getenv(
-        "PAPER_LIBRARY_UPLOAD_LIMIT_BYTES",
-        str(COLLABORATION_UPLOAD_LIMITS["paper"]),
-    )
+PAPER_LIBRARY_UPLOAD_LIMIT_BYTES = max(
+    PAPER_LIBRARY_MIN_UPLOAD_LIMIT_BYTES,
+    int(
+        os.getenv(
+            "PAPER_LIBRARY_UPLOAD_LIMIT_BYTES",
+            str(COLLABORATION_UPLOAD_LIMITS["paper"]),
+        )
+    ),
 )
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(
     os.getenv("DATA_UPLOAD_MAX_MEMORY_SIZE", str(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES + 1024 * 1024))

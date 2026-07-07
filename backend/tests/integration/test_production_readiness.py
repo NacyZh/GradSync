@@ -240,7 +240,7 @@ def test_notification_delivery_uses_dedicated_queue():
 def test_paper_library_operational_signals_are_configured(settings):
     from apps.library.models import DuplicateDetectionResult, PaperImportJob, PaperLibraryActivity
 
-    assert settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES > 0
+    assert settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES >= 25 * 1024 * 1024
     assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE >= settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES
     assert settings.FILE_UPLOAD_MAX_MEMORY_SIZE >= settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES
     assert settings.PAPER_LIBRARY_EXTRACTION_TIMEOUT_SECONDS > 0

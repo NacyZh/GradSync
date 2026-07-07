@@ -80,11 +80,18 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
     setUploadError(undefined);
     setJobs([]);
     const importedJobs: PaperImportJob[] = [];
+    const failedFiles: File[] = [];
+    const failedMessages: string[] = [];
     for (const selectedFile of files) {
       try {
         const result = await importMutation.mutateAsync(selectedFile);
         importedJobs.push(result);
         setJobs([...importedJobs]);
+        if (result.status === 'rejected' || result.status === 'failed') {
+          failedFiles.push(selectedFile);
+          failedMessages.push(`${selectedFile.name}: ${statusText(result, t)}`);
+          continue;
+        }
         if (result.status === 'accepted' && result.acceptedPaper) {
           onAccepted?.(result.acceptedPaper);
         }
@@ -93,11 +100,14 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         }
       } catch (err) {
         const message = err && typeof err === 'object' && 'message' in err ? String(err.message) : t('paperLibraryProcessingFailed');
-        setUploadError(`${selectedFile.name}: ${message}`);
-        break;
+        failedFiles.push(selectedFile);
+        failedMessages.push(`${selectedFile.name}: ${message}`);
       }
     }
-    if (importedJobs.length === files.length) {
+    setUploadError(failedMessages.length ? failedMessages.join(' ') : undefined);
+    if (failedFiles.length) {
+      setFiles(failedFiles);
+    } else {
       setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -105,7 +115,7 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
 
   return (
     <form
-      className="grid gap-3 rounded-md border p-3"
+      className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-3"
       onSubmit={onSubmit}
       aria-describedby="paper-import-status"
       noValidate
@@ -135,6 +145,7 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         <Button
           type="button"
           variant="outline"
+          className="min-w-0"
           onClick={() => {
             if (fileInputRef.current) fileInputRef.current.value = '';
             fileInputRef.current?.click();
@@ -145,21 +156,21 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
           <span className="truncate">{t('paperLibraryChoosePdfs')}</span>
         </Button>
         {files.length ? (
-          <ul className="max-h-24 min-w-0 overflow-y-auto rounded-md border bg-muted/20 p-2 text-xs text-muted-foreground" aria-label={t('paperLibrarySelectedFiles')}>
+          <ul className="max-h-24 min-w-0 max-w-full overflow-y-auto rounded-md border bg-muted/20 p-2 text-xs text-muted-foreground" aria-label={t('paperLibrarySelectedFiles')}>
             {files.map((selectedFile) => (
-              <li key={`${selectedFile.name}-${selectedFile.size}`} className="min-w-0 truncate" title={selectedFile.name}>
+              <li key={`${selectedFile.name}-${selectedFile.size}`} className="block min-w-0 max-w-full truncate" title={selectedFile.name}>
                 {selectedFile.name}
               </li>
             ))}
           </ul>
         ) : null}
       </div>
-      <Button type="submit" disabled={!files.length || importMutation.isPending}>
+      <Button type="submit" className="min-w-0" disabled={!files.length || importMutation.isPending}>
         {files.length > 1 ? t('paperLibraryImportPdfsButton') : t('paperLibraryImportPdfButton')}
       </Button>
       {importMutation.isPending ? <UploadProgress label={t('paperLibraryProcessingPdf')} value={65} /> : null}
       {uploadError || importMutation.error ? (
-        <p role="alert" className="text-sm font-medium text-destructive">
+        <p role="alert" className="min-w-0 break-words text-sm font-medium text-destructive">
           {uploadError ?? importMutation.error?.message}
         </p>
       ) : null}
@@ -168,7 +179,7 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
           id="paper-import-status"
           role="status"
           aria-live="polite"
-          className="text-sm font-medium text-success"
+          className="min-w-0 break-words text-sm font-medium text-success"
         >
           {currentStatus}
         </p>

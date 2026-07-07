@@ -64,6 +64,7 @@ export const messagesZh = {
   paperLibraryConfirmDelete: '确认删除',
   paperLibraryDeleteDescription: '该论文将离开普通浏览、打开和下载流程。',
   paperLibraryInPageViewer: '页内查看器',
+  paperLibraryPreviewRegion: '论文预览',
   paperLibraryViewerAvailable: '存储文件可用时，PDF 预览会在此处打开。',
   paperLibraryViewerUnavailable: '该论文不可用，无法打开。',
   paperLibraryPreviewLoading: '正在加载 PDF 预览。',

@@ -8,6 +8,7 @@ import { useI18n } from '../i18n/I18nProvider';
 import { PaperDetailPanel } from './PaperDetailPanel';
 import { PaperFilters } from './PaperFilters';
 import { PaperImportPanel } from './PaperImportPanel';
+import { PaperPreviewPanel } from './PaperPreviewPanel';
 import { useDeleteSharedPaper, useRenameSharedPaper, useSharedPaperDetail, useSharedPapers, type PaperRecord } from './api';
 
 function paperTitle(paper: PaperRecord) {
@@ -49,12 +50,14 @@ export function PaperLibraryPage() {
   );
   const detailQuery = useSharedPaperDetail(selectedId);
   const selectedSummary = papers.find((paper) => paper.id === selectedId);
-  const selectedPaper =
-    (renamedPaper?.id === selectedId ? renamedPaper : undefined) ??
-    detailQuery.data ??
-    selectedSummary ??
+  const importedSelection =
     (acceptedImport?.id === selectedId ? acceptedImport : undefined) ??
     (duplicateSelection?.id === selectedId ? duplicateSelection : undefined);
+  const selectedPaper =
+    (renamedPaper?.id === selectedId ? renamedPaper : undefined) ??
+    selectedSummary ??
+    importedSelection ??
+    detailQuery.data;
   const activeFilterText = [query, author, year, keyword].filter(Boolean).join(', ');
   const isMaintainer = user?.global_role === 'advisor' || user?.global_role === 'admin';
 
@@ -114,9 +117,9 @@ export function PaperLibraryPage() {
     >
       <div
         data-testid="paper-library-workspace"
-        className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(20rem,0.72fr)_minmax(30rem,1.28fr)]"
+        className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(15rem,0.65fr)_minmax(21rem,0.95fr)_minmax(20rem,1fr)]"
       >
-        <section className="panel grid min-w-0 content-start gap-4" aria-label={t('paperLibraryImportDownloadRegion')}>
+        <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label={t('paperLibraryImportDownloadRegion')}>
           <div>
             <PaperImportPanel
               onAccepted={(paper) => {
@@ -132,7 +135,7 @@ export function PaperLibraryPage() {
           </div>
           <PaperDetailPanel paper={selectedPaper} variant="download" />
         </section>
-        <section className="panel grid min-w-0 content-start gap-4" aria-label={t('paperLibrarySearchDisplayRegion')}>
+        <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label={t('paperLibrarySearchDisplayRegion')}>
           <div className="grid gap-3">
             <PaperFilters
               value={query}
@@ -166,11 +169,11 @@ export function PaperLibraryPage() {
               }
             />
           ) : null}
-          <div className="grid gap-4 lg:grid-cols-[minmax(16rem,0.95fr)_minmax(18rem,1.05fr)]">
+          <div className="grid min-w-0 gap-4">
             <ul
               data-testid="paper-results-list"
               className="grid content-start gap-2 overflow-y-auto pr-1"
-              style={{ maxHeight: '34rem' }}
+              style={{ maxHeight: '28rem' }}
               aria-label={t('paperLibrarySearchResults')}
             >
               {papers.map((paper) => (
@@ -180,7 +183,7 @@ export function PaperLibraryPage() {
                     aria-label={`${t('paperLibraryOpenPaperPrefix')} ${paperTitle(paper)}; ${t('paperLibrarySelectPaperPrefix')} ${paperTitle(paper)}`}
                     aria-pressed={selectedId === paper.id}
                     data-selected={selectedId === paper.id ? 'true' : 'false'}
-                    className={`min-h-24 w-full rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    className={`min-h-24 w-full min-w-0 overflow-hidden rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       selectedId === paper.id
                         ? 'border-primary bg-primary/10 shadow-sm'
                         : 'hover:bg-muted'
@@ -188,13 +191,13 @@ export function PaperLibraryPage() {
                     onClick={() => openPaper(paper.id)}
                     onKeyDown={(event) => handlePaperRowKeyDown(event, paper.id)}
                   >
-                    <span className="flex flex-wrap items-start justify-between gap-2">
-                      <strong>{paperTitle(paper)}</strong>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
+                    <span className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                      <strong className="min-w-0 break-words">{paperTitle(paper)}</strong>
+                      <span className="max-w-full shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
                         {paper.titleSource?.replaceAll('_', ' ') || t('paperLibrarySharedSource')}
                       </span>
                     </span>
-                    <span className="block text-sm text-muted-foreground">
+                    <span className="block min-w-0 break-words text-sm text-muted-foreground">
                       {paper.authors.join(', ') || t('paperLibraryUnknownAuthors')} · {paper.publicationYear ?? t('paperLibraryUnknownYear')}
                     </span>
                   </button>
@@ -204,6 +207,7 @@ export function PaperLibraryPage() {
             <PaperDetailPanel paper={selectedPaper} onRename={renameSelectedPaper} onDelete={deleteSelectedPaper} />
           </div>
         </section>
+        <PaperPreviewPanel paper={selectedPaper} />
       </div>
     </PageShell>
   );
