@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
+import {
+  fulfillJson,
+  fullStackE2E,
+  loginAs,
+  mockAuthenticatedApi,
+  validPdfBuffer,
+} from './api-mocks';
 
 test.beforeEach(async ({ page }) => {
   await mockAuthenticatedApi(page);
@@ -163,7 +169,7 @@ test('paper import, code download, and locale persistence workflow is reachable'
   await page.getByLabel('PDF file').setInputFiles({
     name: 'graph-copy.pdf',
     mimeType: 'application/pdf',
-    buffer: Buffer.from('%PDF-1.4'),
+    buffer: validPdfBuffer('Graph Neural Methods'),
   });
   await page.getByRole('button', { name: 'Import PDF' }).click();
   await expect(

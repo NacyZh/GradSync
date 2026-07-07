@@ -1,4 +1,5 @@
 import pytest
+from django.core.files.storage import default_storage
 from django.core.management import call_command
 
 from apps.accounts.management.commands.seed_e2e_research_ops import Command
@@ -36,11 +37,13 @@ def test_seed_e2e_research_ops_creates_deterministic_full_stack_data():
     attachment = PaperAttachment.objects.get(project=project, paper=paper)
     assert attachment.imported_by == advisor
     assert attachment.relative_path
+    assert default_storage.exists(attachment.storage_key)
 
     artifact = CodeArtifact.objects.get(project=project, name="Simulator")
     version = CodeArtifactVersion.objects.get(project=project, artifact=artifact)
     assert version.imported_by == advisor
     assert version.relative_path_manifest
+    assert default_storage.exists(version.storage_key)
 
 
 @pytest.mark.django_db(transaction=True)

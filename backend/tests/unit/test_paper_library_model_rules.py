@@ -10,16 +10,16 @@ from apps.library.models import (
     PaperTitleExtractionResult,
 )
 from apps.library.services import (
+    PaperDownloadUnavailable,
     canonical_paper_download_filename,
-    prepare_shared_paper_download,
+    delete_shared_paper,
     ensure_active_research_group_user,
     ensure_library_maintainer,
     is_library_maintainer,
     paper_download_response_metadata,
-    PaperDownloadUnavailable,
-    delete_shared_paper,
-    rename_shared_paper,
+    prepare_shared_paper_download,
     record_paper_library_activity,
+    rename_shared_paper,
     same_title_is_distinguishable,
 )
 from apps.projects.models import ResearchProject

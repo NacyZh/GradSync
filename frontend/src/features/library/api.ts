@@ -237,8 +237,8 @@ export function downloadPaper(projectId: number, paperId: string) {
   return downloadDescriptor(`/api/projects/${projectId}/papers/${paperId}/download/`);
 }
 
-export function downloadSharedPaper(paperId: string) {
-  return downloadFile(`/api/library/papers/${paperId}/download/`);
+export function downloadSharedPaper(paperId: string, fallbackFilename?: string) {
+  return downloadFile(`/api/library/papers/${paperId}/download/`, fallbackFilename);
 }
 
 export function downloadSharedPaperFile(paperId: string) {

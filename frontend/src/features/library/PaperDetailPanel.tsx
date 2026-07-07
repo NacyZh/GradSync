@@ -70,7 +70,11 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
     if (!paper) return;
     setError(undefined);
     try {
-      setStatus(projectId ? await downloadPaper(projectId, paper.id) : await downloadSharedPaper(paper.id));
+      setStatus(
+        projectId
+          ? await downloadPaper(projectId, paper.id)
+          : await downloadSharedPaper(paper.id, paper.defaultDownloadFilename ?? `${displayTitle}.pdf`),
+      );
     } catch (err) {
       setError(getErrorMessage(err, t('paperLibraryDownloadFallbackError')));
     }

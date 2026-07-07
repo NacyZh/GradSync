@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { fulfillJson } from './api-mocks';
+import { fulfillJson, validPdfBuffer } from './api-mocks';
 
 const advisorUser = {
   id: 10,
@@ -277,11 +277,15 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
     await page.goto('/library/papers');
     await expect(page.getByRole('button', { name: /Select paper Group Wide Graph Paper/ })).toBeVisible();
     await expect(page.getByLabel('Paper title')).toHaveCount(0);
-    await page.getByLabel('PDF file').setInputFiles({ name: 'uploaded-paper.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
+    await page.getByLabel('PDF file').setInputFiles({
+      name: 'uploaded-paper.pdf',
+      mimeType: 'application/pdf',
+      buffer: validPdfBuffer('Uploaded Graph Paper'),
+    });
     await page.getByRole('button', { name: 'Import PDF' }).click();
     await expect(page.getByText('Accepted: Uploaded Graph Paper')).toBeVisible();
     await page.getByRole('button', { name: /Download Uploaded Graph Paper/ }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Download ready' })).toContainText('Uploaded Graph Paper.pdf');
+    await expect(page.getByRole('status').filter({ hasText: 'Download started' })).toContainText('Uploaded Graph Paper.pdf');
   });
 
   await test.step('code archive library', async () => {

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.core.exceptions import PermissionDenied
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import default_storage
 from django.db.models import Q, QuerySet
 from django.utils import timezone
@@ -139,14 +138,22 @@ def same_title_is_distinguishable(
     matches = existing_queryset.filter(normalized_title=normalized)
     if not matches.exists():
         return True
-    requested_authors = {str(author).strip().lower() for author in (authors or []) if str(author).strip()}
+    requested_authors = {
+        str(author).strip().lower()
+        for author in (authors or [])
+        if str(author).strip()
+    }
     for paper in matches:
         paper_authors = {
             str(author).strip().lower()
             for author in (paper.authors or [])
             if str(author).strip()
         }
-        if publication_year and paper.publication_year and publication_year != paper.publication_year:
+        if (
+            publication_year
+            and paper.publication_year
+            and publication_year != paper.publication_year
+        ):
             continue
         if requested_authors and paper_authors and requested_authors.isdisjoint(paper_authors):
             continue
@@ -199,7 +206,10 @@ def rename_shared_paper(
         publication_year=paper.publication_year,
         existing_queryset=same_title_queryset,
     ):
-        message = "Another active paper already uses that title without distinguishing author or year context."
+        message = (
+            "Another active paper already uses that title without distinguishing "
+            "author or year context."
+        )
         record_paper_library_activity(
             actor=actor,
             paper=paper,
@@ -277,7 +287,10 @@ def ensure_paper_available(paper: PaperRecord) -> None:
 
 def _active_paper_storage_metadata(paper: PaperRecord) -> tuple[str, str]:
     if paper.uploaded_file_id:
-        return paper.uploaded_file.stored_name, paper.uploaded_file.content_type or "application/pdf"
+        return (
+            paper.uploaded_file.stored_name,
+            paper.uploaded_file.content_type or "application/pdf",
+        )
     attachment = paper.attachments.filter(status=PaperAttachment.Status.ACTIVE).first()
     if attachment is not None:
         return attachment.storage_key, attachment.content_type or "application/pdf"

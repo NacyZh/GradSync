@@ -8,13 +8,15 @@ from tests.factories.accounts import UserFactory
 from tests.factories.collaboration import PaperRecordFactory, UploadedFileFactory
 from tests.helpers import authenticate
 
-
 pytestmark = pytest.mark.django_db
 
 
 def test_shared_paper_detail_returns_viewer_capabilities(api_client):
     user = UserFactory(global_role="student", status="active")
-    paper = PaperRecordFactory(title="Viewer Contract Paper", canonical_title="Viewer Contract Paper")
+    paper = PaperRecordFactory(
+        title="Viewer Contract Paper",
+        canonical_title="Viewer Contract Paper",
+    )
 
     response = authenticate(api_client, user).get(f"/api/library/papers/{paper.id}/")
 

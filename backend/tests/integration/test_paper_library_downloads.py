@@ -10,7 +10,11 @@ from tests.helpers import authenticate
 
 
 @pytest.mark.django_db
-def test_shared_paper_download_uses_canonical_title_and_records_activity(api_client, tmp_path, settings):
+def test_shared_paper_download_uses_canonical_title_and_records_activity(
+    api_client,
+    tmp_path,
+    settings,
+):
     settings.MEDIA_ROOT = tmp_path
     advisor = UserFactory(global_role="advisor", status="active")
     downloader = UserFactory(global_role="student", status="active")

@@ -32,7 +32,7 @@ async function errorMessageFromResponse(response: Response) {
   return `Request failed with ${response.status}`;
 }
 
-export async function downloadFile(path: string): Promise<DownloadDescriptor> {
+export async function downloadFile(path: string, fallbackFilename = 'download.pdf'): Promise<DownloadDescriptor> {
   const response = await fetch(apiUrl(path), {
     credentials: 'include',
     method: 'GET',
@@ -46,7 +46,7 @@ export async function downloadFile(path: string): Promise<DownloadDescriptor> {
     throw { message: await errorMessageFromResponse(response) };
   }
 
-  const filename = filenameFromContentDisposition(response.headers.get('Content-Disposition')) ?? 'download.pdf';
+  const filename = filenameFromContentDisposition(response.headers.get('Content-Disposition')) ?? fallbackFilename;
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

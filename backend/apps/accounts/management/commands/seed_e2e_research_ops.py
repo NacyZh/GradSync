@@ -1,4 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -10,6 +12,13 @@ from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 from apps.resources.models import Booking, ResourceItem, ResourceType
 from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
+
+
+def _replace_seed_file(storage_key: str, content: bytes) -> int:
+    if default_storage.exists(storage_key):
+        default_storage.delete(storage_key)
+    default_storage.save(storage_key, ContentFile(content))
+    return len(content)
 
 
 class Command(BaseCommand):
@@ -156,13 +165,14 @@ class Command(BaseCommand):
             fingerprint="graph neural methods|lin chen|",
             created_by=advisor,
         )
+        paper_bytes = b"%PDF-1.4\n% GradSync e2e seeded paper\n%%EOF\n"
         PaperAttachment.objects.create(
             paper=paper,
             project=project,
             storage_key="e2e/graph.pdf",
             filename="graph.pdf",
             content_type="application/pdf",
-            size_bytes=1024,
+            size_bytes=_replace_seed_file("e2e/graph.pdf", paper_bytes),
             checksum_sha256="a" * 64,
             relative_path="papers/graph.pdf",
             imported_by=advisor,
@@ -175,6 +185,7 @@ class Command(BaseCommand):
             source_path_label="team-library/code/simulator",
             created_by=advisor,
         )
+        archive_bytes = b"GradSync e2e simulator archive\n"
         CodeArtifactVersion.objects.create(
             artifact=artifact,
             project=project,
@@ -182,7 +193,7 @@ class Command(BaseCommand):
             storage_key="e2e/sim.zip",
             filename="sim.zip",
             content_type="application/zip",
-            size_bytes=2048,
+            size_bytes=_replace_seed_file("e2e/sim.zip", archive_bytes),
             checksum_sha256="b" * 64,
             description="Local folder import for the deterministic e2e simulator.",
             relative_path_manifest=["README.md", "src/simulator.py"],
