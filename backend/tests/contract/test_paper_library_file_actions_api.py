@@ -1,8 +1,11 @@
 import pytest
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.test import override_settings
 
 from apps.library.models import PaperRecord
 from tests.factories.accounts import UserFactory
-from tests.factories.collaboration import PaperRecordFactory
+from tests.factories.collaboration import PaperRecordFactory, UploadedFileFactory
 from tests.helpers import authenticate
 
 
@@ -168,3 +171,69 @@ def test_delete_missing_or_unavailable_paper_returns_not_found_or_conflict(api_c
 
     assert deleted_response.status_code == 409
     assert missing_response.status_code == 404
+
+
+@override_settings(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES=3 * 1024 * 1024)
+def test_shared_paper_upload_policy_returns_effective_backend_limit(api_client):
+    user = UserFactory(global_role="student", status="active")
+
+    response = authenticate(api_client, user).get("/api/library/papers/upload-policy/")
+
+    assert response.status_code == 200
+    assert response.data == {
+        "category": "paper",
+        "maxSizeBytes": 3 * 1024 * 1024,
+        "displayLabel": "3 MB",
+        "allowedExtensions": [".pdf"],
+        "contentTypes": ["application/pdf"],
+    }
+
+
+def test_shared_paper_upload_policy_requires_active_account(api_client):
+    inactive_user = UserFactory(global_role="student", status="suspended")
+
+    response = authenticate(api_client, inactive_user).get("/api/library/papers/upload-policy/")
+
+    assert response.status_code == 403
+
+
+def test_shared_paper_download_returns_pdf_with_title_attachment(api_client, tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
+    user = UserFactory(global_role="student", status="active")
+    storage_key = "contract/papers/graph-download.pdf"
+    pdf_bytes = b"%PDF-1.4\ncontract-download\n%%EOF"
+    default_storage.save(storage_key, ContentFile(pdf_bytes))
+    uploaded_file = UploadedFileFactory(
+        stored_name=storage_key,
+        original_filename="private-local-name.pdf",
+        content_type="application/pdf",
+        size_bytes=len(pdf_bytes),
+    )
+    paper = PaperRecordFactory(
+        title="Local Filename",
+        canonical_title="Contract Graph: Download?",
+        uploaded_file=uploaded_file,
+        checksum_sha256=uploaded_file.checksum_sha256,
+    )
+
+    response = authenticate(api_client, user).get(f"/api/library/papers/{paper.id}/download/")
+
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "application/pdf"
+    assert response.headers["Content-Disposition"] == (
+        'attachment; filename="Contract Graph Download.pdf"'
+    )
+
+
+def test_shared_paper_download_returns_410_for_unavailable_paper(api_client):
+    user = UserFactory(global_role="student", status="active")
+    paper = PaperRecordFactory(
+        status=PaperRecord.Status.DELETED,
+        title="Deleted Contract Paper",
+        canonical_title="Deleted Contract Paper",
+    )
+
+    response = authenticate(api_client, user).get(f"/api/library/papers/{paper.id}/download/")
+
+    assert response.status_code == 410
+    assert response.data["message"] == "This paper is no longer available."

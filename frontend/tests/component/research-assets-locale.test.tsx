@@ -6,11 +6,78 @@ import { DuplicateReviewPanel } from '../../src/features/library/DuplicateReview
 import { PaperDetailPanel } from '../../src/features/library/PaperDetailPanel';
 import { PaperFilters } from '../../src/features/library/PaperFilters';
 import { I18nProvider, useI18n } from '../../src/features/i18n/I18nProvider';
+import { messagesEn } from '../../src/features/i18n/messages.en';
+import { messagesZh } from '../../src/features/i18n/messages.zh';
 import { CodeArtifactVersionPanel } from '../../src/features/repositories/CodeArtifactVersionPanel';
 import { DownloadStatus } from '../../src/shared/ui/DownloadStatus';
 import { renderWithClient } from './test-utils';
 
 describe('research assets and locale UI', () => {
+  it('covers paper-library strings in both locale catalogs without Chinese in English values', () => {
+    const paperLibraryKeys = [
+      'paperLibrary',
+      'paperLibraryDescription',
+      'paperLibraryImportDownloadRegion',
+      'paperLibrarySearchDisplayRegion',
+      'paperLibrarySearchPlaceholder',
+      'paperLibrarySearchResults',
+      'paperLibraryLoadingTitle',
+      'paperLibraryUnavailableTitle',
+      'paperLibraryEmptyTitle',
+      'paperLibraryEmptyDefault',
+      'paperLibraryEmptyFilteredPrefix',
+      'paperLibrarySelectedPaper',
+      'paperLibrarySelectedPaperDetails',
+      'paperLibrarySelectBeforeDownload',
+      'paperLibraryMetadataAfterSelection',
+      'paperLibraryImportPdf',
+      'paperLibraryPdfFile',
+      'paperLibraryImportPdfButton',
+      'paperLibraryProcessingPdf',
+      'paperLibrarySelectedPdfPrefix',
+      'paperLibraryAcceptedPrefix',
+      'paperLibraryDuplicatePrefix',
+      'paperLibraryMaintainerReviewRequired',
+      'paperLibraryRejectedPrefix',
+      'paperLibraryFailedPrefix',
+      'paperLibraryUploadRejected',
+      'paperLibraryProcessingFailed',
+      'paperLibraryUploadLimitExceededPrefix',
+      'paperLibraryUploadLimitExceededSuffix',
+      'paperLibraryRename',
+      'paperLibraryDelete',
+      'paperLibraryNewTitle',
+      'paperLibrarySaveTitle',
+      'paperLibraryCancel',
+      'paperLibraryDeleteReason',
+      'paperLibraryConfirmDelete',
+      'paperLibraryDeleteDescription',
+      'paperLibraryInPageViewer',
+      'paperLibraryViewerAvailable',
+      'paperLibraryViewerUnavailable',
+      'paperLibraryUnknownAuthors',
+      'paperLibraryUnknownYear',
+      'paperLibraryOriginalTitle',
+      'paperLibraryVenue',
+      'paperLibraryDoi',
+      'paperLibraryKeywords',
+      'paperLibraryNoKeywords',
+      'paperLibraryTitleSource',
+      'paperLibraryChecksum',
+      'paperLibraryUnspecified',
+      'paperLibraryUnavailableValue',
+      'paperLibraryDownloadStarted',
+    ] as const;
+
+    const enCatalog = messagesEn as Record<string, string | undefined>;
+    const zhCatalog = messagesZh as Record<string, string | undefined>;
+    for (const key of paperLibraryKeys) {
+      expect(enCatalog[key]).toBeTruthy();
+      expect(zhCatalog[key]).toBeTruthy();
+      expect(enCatalog[key]).not.toMatch(/[\u3400-\u9fff]/);
+    }
+  });
+
   it('renders paper search and duplicate review states', async () => {
     const onChange = vi.fn();
     renderWithClient(

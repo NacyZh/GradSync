@@ -1,3 +1,5 @@
+from django.core.files.storage import default_storage
+from django.http import FileResponse
 from django.utils import timezone
 
 from apps.audit.models import DownloadEvent
@@ -19,6 +21,20 @@ def _descriptor(filename: str) -> dict:
         "url": "",
         "expiresAt": timezone.now().isoformat().replace("+00:00", "Z"),
     }
+
+
+def storage_file_download_response(
+    storage_key: str,
+    *,
+    filename: str,
+    content_type: str = "application/octet-stream",
+) -> FileResponse:
+    return FileResponse(
+        default_storage.open(storage_key, "rb"),
+        as_attachment=True,
+        filename=filename,
+        content_type=content_type,
+    )
 
 
 def describe_paper_download(user, paper: PaperRecord) -> dict:

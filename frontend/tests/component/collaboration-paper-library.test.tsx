@@ -11,11 +11,27 @@ type MockResult =
   | {
       status: number;
       json: unknown;
+      headers?: Record<string, string>;
+    }
+  | {
+      status?: number;
+      body: BodyInit;
+      headers?: Record<string, string>;
     };
 
 function mockFetch(handler: (url: string, init?: RequestInit) => MockResult) {
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const result = handler(String(input), init);
+    if (
+      typeof result === 'object' &&
+      result !== null &&
+      'body' in result
+    ) {
+      return new Response(result.body, {
+        status: result.status ?? 200,
+        headers: result.headers ?? {},
+      });
+    }
     const status =
       typeof result === 'object' &&
       result !== null &&
@@ -32,7 +48,17 @@ function mockFetch(handler: (url: string, init?: RequestInit) => MockResult) {
         : result;
     return new Response(JSON.stringify(payload), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(
+          typeof result === 'object' &&
+          result !== null &&
+          'headers' in result &&
+          result.headers
+            ? result.headers
+            : {}
+        ),
+      },
     });
   }) as typeof fetch;
 }
@@ -94,8 +120,11 @@ function mockSharedPaperLibrary(papers = [paperFixture()]) {
 
 function mockSharedPaperDownload(filename = 'Graph Neural Methods.pdf') {
   return {
-    filename,
-    deliveryMode: 'direct_response',
+    body: new Blob(['%PDF-1.4 component'], { type: 'application/pdf' }),
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
   };
 }
 
@@ -107,6 +136,10 @@ function renderPaperLibrary() {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function expectNoChineseText(container: HTMLElement) {
+  expect(container.textContent ?? '').not.toMatch(/[\u3400-\u9fff]/);
 }
 
 describe('collaboration paper library UI', () => {
@@ -212,13 +245,15 @@ describe('collaboration paper library UI', () => {
 
   it('searches shared papers, selects detail, and downloads by canonical title', async () => {
     const requests: string[] = [];
+    const createObjectURL = vi.fn(() => 'blob:paper-download');
+    const revokeObjectURL = vi.fn();
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
     mockFetch((url, init) => {
       requests.push(`${init?.method ?? 'GET'} ${url}`);
       if (url.includes('/api/library/papers/2/download/')) {
-        return {
-          filename: 'Neural Collaboration Without Project Scope.pdf',
-          deliveryMode: 'direct_response',
-        };
+        return mockSharedPaperDownload('Neural Collaboration Without Project Scope.pdf');
       }
       if (url.includes('/api/library/papers/1/')) {
         return {
@@ -298,8 +333,48 @@ describe('collaboration paper library UI', () => {
     await userEvent.click(screen.getByRole('button', { name: /Download/ }));
 
     expect(await screen.findByText(/Neural Collaboration Without Project Scope\.pdf/)).toBeInTheDocument();
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
     expect(requests.some((request) => request.includes('/api/library/papers/?'))).toBe(true);
     expect(requests.some((request) => request.includes('/api/library/papers/2/'))).toBe(true);
+    anchorClick.mockRestore();
+  });
+
+  it('keeps selected-paper download disabled until a paper is selected', async () => {
+    mockSharedPaperLibrary([paperFixture({ title: 'Download Later', canonicalTitle: 'Download Later' })]);
+
+    renderPaperLibrary();
+
+    const downloadRegion = await screen.findByRole('region', { name: 'Selected paper download' });
+    expect(within(downloadRegion).getByText('Select a paper from the results before downloading.')).toBeInTheDocument();
+    expect(within(downloadRegion).getByRole('button', { name: 'Download selected paper' })).toBeDisabled();
+  });
+
+  it('shows a recoverable download error when the shared PDF is unavailable', async () => {
+    const paper = paperFixture({
+      id: 'recoverable',
+      title: 'Recoverable Download Paper',
+      canonicalTitle: 'Recoverable Download Paper',
+    });
+    mockFetch((url) => {
+      if (url.includes('/api/library/papers/recoverable/download/')) {
+        return {
+          status: 410,
+          json: { message: 'This paper is no longer available.' },
+        };
+      }
+      if (url.includes('/api/library/papers/recoverable/')) {
+        return paper;
+      }
+      return { count: 1, results: [paper] };
+    });
+
+    renderPaperLibrary();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Select paper Recoverable Download Paper/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Download Recoverable Download Paper/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This paper is no longer available.');
   });
 
   it('renders an empty state tied to the active shared-library search', async () => {
@@ -311,6 +386,52 @@ describe('collaboration paper library UI', () => {
     expect(await screen.findByText('No shared papers')).toBeInTheDocument();
     expect(screen.getByText('Active filters: Search: missing')).toBeInTheDocument();
     expect(screen.getByText('No shared papers match missing.')).toBeInTheDocument();
+  });
+
+  it('keeps English paper-library render paths free of Chinese characters', async () => {
+    const paper = paperFixture({
+      id: 'locale-maintainer',
+      title: 'English Locale Paper',
+      canonicalTitle: 'English Locale Paper',
+      actionCapabilities: {
+        canRename: true,
+        canDelete: true,
+        canDownload: true,
+        canView: true,
+      },
+    });
+    mockFetch((url, init) => {
+      if (url.includes('/api/library/papers/upload-policy/')) {
+        return {
+          category: 'paper',
+          maxSizeBytes: 2 * 1024 * 1024,
+          displayLabel: '2 MB',
+          allowedExtensions: ['.pdf'],
+          contentTypes: ['application/pdf'],
+        };
+      }
+      if (url.includes('/api/library/papers/locale-maintainer/') && init?.method === 'PATCH') {
+        return { ...paper, title: 'Renamed Locale Paper', canonicalTitle: 'Renamed Locale Paper' };
+      }
+      if (url.includes('/api/library/papers/locale-maintainer/') && init?.method === 'DELETE') {
+        return { status: 204, json: undefined };
+      }
+      if (url.includes('/api/library/papers/locale-maintainer/')) {
+        return paper;
+      }
+      return { count: 1, results: [paper] };
+    });
+
+    const { container } = renderPaperLibrary();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open paper English Locale Paper/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rename paper' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete paper' }));
+
+    expect(screen.getByLabelText('PDF file')).toBeInTheDocument();
+    expect(screen.getByText('The paper will leave ordinary browse, open, and download workflows.')).toBeInTheDocument();
+    expectNoChineseText(container);
   });
 
   it('renders an inactive-account state when shared paper access is forbidden', async () => {
@@ -407,8 +528,27 @@ describe('collaboration paper library UI', () => {
   it('shows a clear upload-size error when the proxy rejects an oversized PDF', async () => {
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes('/api/library/papers/upload-policy/')) {
+        return new Response(JSON.stringify({
+          category: 'paper',
+          maxSizeBytes: 7 * 1024 * 1024,
+          displayLabel: '7 MB',
+          allowedExtensions: ['.pdf'],
+          contentTypes: ['application/pdf'],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('/api/library/papers/') && init?.method === 'POST') {
-        return new Response('request entity too large', { status: 413 });
+        return new Response(JSON.stringify({
+          code: 'invalid_upload',
+          message: 'The selected PDF exceeds the 7 MB upload size limit.',
+          reason: 'oversized',
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
       }
       return new Response(JSON.stringify({ count: 0, results: [] }), {
         status: 200,
@@ -417,13 +557,16 @@ describe('collaboration paper library UI', () => {
     }) as typeof fetch;
 
     renderPaperLibrary();
+    expect(await screen.findByText((_, element) => element?.textContent === '.pdf up to 7 MB')).toBeInTheDocument();
+    expect(screen.queryByText((_, element) => element?.textContent === '.pdf up to 25 MB')).not.toBeInTheDocument();
+
     await userEvent.upload(
       screen.getByLabelText('PDF file'),
       new File(['%PDF-1.4'], 'too-large.pdf', { type: 'application/pdf' }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Import PDF' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Selected file exceeds the upload size limit.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The selected PDF exceeds the 7 MB upload size limit.');
   });
 
   it('shows duplicate imports with an action for the existing paper', async () => {

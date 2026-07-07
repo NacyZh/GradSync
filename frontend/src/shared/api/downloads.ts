@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest, apiUrl } from './client';
 
 export type DownloadDescriptor = {
   filename: string;
@@ -9,4 +9,58 @@ export type DownloadDescriptor = {
 
 export function downloadDescriptor(path: string) {
   return apiRequest<DownloadDescriptor>(path, { method: 'POST' });
+}
+
+function filenameFromContentDisposition(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const encodedMatch = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (encodedMatch?.[1]) {
+    return decodeURIComponent(encodedMatch[1].replace(/"/g, '').trim());
+  }
+  const plainMatch = header.match(/filename="?([^";]+)"?/i);
+  return plainMatch?.[1]?.trim();
+}
+
+async function errorMessageFromResponse(response: Response) {
+  const payload = await response.json().catch(() => ({})) as Partial<{ message: string; fields: Record<string, string[]> }>;
+  if (payload.message) return payload.message;
+  if (payload.fields) {
+    return Object.entries(payload.fields)
+      .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
+      .join('; ');
+  }
+  return `Request failed with ${response.status}`;
+}
+
+export async function downloadFile(path: string): Promise<DownloadDescriptor> {
+  const response = await fetch(apiUrl(path), {
+    credentials: 'include',
+    method: 'GET',
+  });
+
+  if (response.status === 401) {
+    window.dispatchEvent(new CustomEvent('gradsync:auth-required'));
+  }
+
+  if (!response.ok) {
+    throw { message: await errorMessageFromResponse(response) };
+  }
+
+  const filename = filenameFromContentDisposition(response.headers.get('Content-Disposition')) ?? 'download.pdf';
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.rel = 'noopener';
+  anchor.style.display = 'none';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+
+  return {
+    filename,
+    deliveryMode: 'direct_response',
+  };
 }

@@ -46,9 +46,13 @@ async function mockPaperLibraryViewportApi(page: Page) {
     }
 
     if (url.endsWith('/api/library/papers/1/download/')) {
-      await fulfillJson(route, {
-        filename: 'Graph Neural Methods for Research Groups.pdf',
-        deliveryMode: 'direct_response',
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename="Graph Neural Methods for Research Groups.pdf"',
+        },
+        body: Buffer.from('%PDF-1.4 viewport-download'),
       });
       return;
     }
@@ -125,20 +129,6 @@ async function mockPaperLibraryViewportApi(page: Page) {
 
 async function selectPaperRow(page: Page, title: string) {
   await page.getByRole('button', { name: new RegExp(`Open paper ${title}`) }).click();
-}
-
-async function interceptPaperDownload(page: Page, paperId: string, filename: string) {
-  await page.route(`**/api/library/papers/${paperId}/download/`, async (route) => {
-    await fulfillJson(route, {
-      filename,
-      deliveryMode: 'direct_response',
-    });
-  });
-}
-
-async function expectEnglishPaperLibraryText(page: Page) {
-  await expect(page.getByRole('heading', { name: 'Paper library' })).toBeVisible();
-  await expect(page.getByText(/论文|选择文件|下载论文/)).toHaveCount(0);
 }
 
 async function mockScrollablePaperLibraryApi(page: Page) {
@@ -255,6 +245,69 @@ async function mockDeletePaperLibraryApi(page: Page) {
   });
 }
 
+async function mockUploadSizePolicyApi(page: Page) {
+  await mockAuthenticatedApi(page);
+  let importCount = 0;
+
+  await page.route('**/api/library/papers/**', async (route) => {
+    const request = route.request();
+    const url = request.url();
+
+    if (url.endsWith('/api/library/papers/upload-policy/')) {
+      await fulfillJson(route, {
+        category: 'paper',
+        maxSizeBytes: 2048,
+        displayLabel: '2 KB',
+        allowedExtensions: ['.pdf'],
+        contentTypes: ['application/pdf'],
+      });
+      return;
+    }
+
+    if (url.endsWith('/api/library/papers/') && request.method() === 'POST') {
+      importCount += 1;
+      if (importCount === 1) {
+        await fulfillJson(route, {
+          id: 'import-boundary',
+          status: 'accepted',
+          requestedBy: 10,
+          userMessage: 'Paper imported',
+          acceptedPaper: {
+            id: 'boundary-1',
+            projectId: '99',
+            title: 'Boundary Upload Paper',
+            canonicalTitle: 'Boundary Upload Paper',
+            authors: [],
+            keywords: [],
+            visibility: 'group_wide',
+            status: 'active',
+            downloadAvailable: true,
+            defaultDownloadFilename: 'Boundary Upload Paper.pdf',
+          },
+          duplicatePaper: null,
+          extraction: {
+            source: 'embedded_metadata',
+            extractedTitle: 'Boundary Upload Paper',
+            confidence: 'high',
+            failureReason: '',
+          },
+          duplicateDetection: null,
+          failureReason: '',
+        }, 202);
+        return;
+      }
+      await fulfillJson(route, {
+        code: 'invalid_upload',
+        message: 'The selected PDF exceeds the 2 KB upload size limit.',
+        reason: 'oversized',
+      }, 400);
+      return;
+    }
+
+    await fulfillJson(route, { count: 0, results: [] });
+  });
+}
+
 async function expectNoControlOverflow(page: Page) {
   const issues = await page.evaluate(() => {
     const overflow: string[] = [];
@@ -334,6 +387,36 @@ test('maintainer deletes a selected paper and no restore action appears', async 
   await expectNoControlOverflow(page);
 });
 
+test('paper upload size guidance uses backend policy and repeats it on rejection', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked upload-size coverage uses deterministic policy fixtures.');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockUploadSizePolicyApi(page);
+  await page.goto('/library/papers');
+
+  await expect(page.getByText('.pdf up to 2 KB')).toBeVisible();
+  await expect(page.getByText('.pdf up to 25 MB')).toHaveCount(0);
+
+  await page.getByLabel('PDF file').setInputFiles({
+    name: 'boundary.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.alloc(2048, '%'),
+  });
+  await page.getByRole('button', { name: 'Import PDF' }).click();
+  await expect(page.getByText('Accepted: Boundary Upload Paper')).toBeVisible();
+
+  await page.getByLabel('PDF file').setInputFiles({
+    name: 'too-large.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.alloc(2049, '%'),
+  });
+  await page.getByRole('button', { name: 'Import PDF' }).click();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'The selected PDF exceeds the 2 KB upload size limit.' }),
+  ).toBeVisible();
+  await expectNoControlOverflow(page);
+});
+
 for (const viewport of [
   { width: 1280, height: 900, label: 'desktop' },
   { width: 390, height: 844, label: 'narrow' },
@@ -366,6 +449,20 @@ for (const viewport of [
     await expectNoControlOverflow(page);
   });
 }
+
+test('shared paper download starts a local PDF download with title-based filename', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked download interception verifies browser filename deterministically.');
+
+  await mockPaperLibraryViewportApi(page);
+  await page.goto('/library/papers');
+
+  await page.getByRole('button', { name: /Select paper Graph Neural Methods/ }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Download Graph Neural Methods/ }).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toBe('Graph Neural Methods for Research Groups.pdf');
+});
 
 test('shared paper library search and download does not require project membership', async ({ page }) => {
   await mockAuthenticatedApi(page);
@@ -514,9 +611,13 @@ test('shared paper library search and download does not require project membersh
         return;
       }
       if (url.endsWith('/api/library/papers/1/download/')) {
-        await fulfillJson(route, {
-          filename: 'Graph Neural Methods for Research Groups.pdf',
-          deliveryMode: 'direct_response',
+        await route.fulfill({
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="Graph Neural Methods for Research Groups.pdf"',
+          },
+          body: Buffer.from('%PDF-1.4 shared-download'),
         });
         return;
       }

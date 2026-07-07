@@ -49,7 +49,14 @@ test('paper import, code download, and locale persistence workflow is reachable'
         return;
       }
       if (url.endsWith('/api/library/papers/1/download/')) {
-        await fulfillJson(route, { filename: 'Graph Neural Methods.pdf', deliveryMode: 'direct_response' });
+        await route.fulfill({
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="Graph Neural Methods.pdf"',
+          },
+          body: Buffer.from('%PDF-1.4 locale-download'),
+        });
         return;
       }
       if (url.endsWith('/api/library/papers/1/')) {
@@ -169,7 +176,7 @@ test('paper import, code download, and locale persistence workflow is reachable'
       .first(),
   ).toBeVisible();
   await page.getByRole('button', { name: /Download Graph Neural Methods/ }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Download ready' })).toContainText('Graph Neural Methods.pdf');
+  await expect(page.getByRole('status').filter({ hasText: 'Download started' })).toContainText('Graph Neural Methods.pdf');
 
   await page.goto('/projects/1/code');
   await expect(page.getByRole('heading', { name: 'Code repository' })).toBeVisible();
@@ -178,4 +185,143 @@ test('paper import, code download, and locale persistence workflow is reachable'
   await expect(page.getByRole('status')).toContainText('sim.zip');
 
   await page.getByRole('button', { name: /Language|语言/ }).click();
+});
+
+test('English paper-library upload, rename, delete, viewer, and download states stay English-only', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked English localization coverage uses deterministic paper fixtures.');
+
+  await page.route('**/api/accounts/locale/', async (route) => {
+    await fulfillJson(route, { locale: 'en' });
+  });
+
+  let paper = {
+    id: 'locale-1',
+    projectId: '1',
+    title: 'Locale Review Paper',
+    canonicalTitle: 'Locale Review Paper',
+    authors: ['Lin Chen'],
+    publicationYear: 2026,
+    keywords: ['locale'],
+    visibility: 'group_wide',
+    status: 'active',
+    downloadAvailable: true,
+    viewerAvailable: true,
+    defaultDownloadFilename: 'Locale Review Paper.pdf',
+    actionCapabilities: {
+      canRename: true,
+      canDelete: true,
+      canDownload: true,
+      canView: true,
+    },
+  };
+  let deleted = false;
+
+  await page.route('**/api/library/papers/**', async (route) => {
+    const request = route.request();
+    const url = request.url();
+
+    if (url.endsWith('/api/library/papers/upload-policy/')) {
+      await fulfillJson(route, {
+        category: 'paper',
+        maxSizeBytes: 2048,
+        displayLabel: '2 KB',
+        allowedExtensions: ['.pdf'],
+        contentTypes: ['application/pdf'],
+      });
+      return;
+    }
+
+    if (url.endsWith('/api/library/papers/') && request.method() === 'POST') {
+      await fulfillJson(route, {
+        id: 'locale-import',
+        status: 'accepted',
+        requestedBy: 10,
+        userMessage: 'Paper imported',
+        acceptedPaper: {
+          ...paper,
+          id: 'locale-imported',
+          title: 'Imported Locale Paper',
+          canonicalTitle: 'Imported Locale Paper',
+          defaultDownloadFilename: 'Imported Locale Paper.pdf',
+        },
+        duplicatePaper: null,
+        extraction: {
+          source: 'embedded_metadata',
+          extractedTitle: 'Imported Locale Paper',
+          confidence: 'high',
+          failureReason: '',
+        },
+        duplicateDetection: null,
+        failureReason: '',
+      }, 202);
+      return;
+    }
+
+    if (url.endsWith('/api/library/papers/locale-1/download/')) {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename="Renamed Locale Paper.pdf"',
+        },
+        body: Buffer.from('%PDF-1.4 locale-paper'),
+      });
+      return;
+    }
+
+    if (url.endsWith('/api/library/papers/locale-1/') && request.method() === 'PATCH') {
+      paper = {
+        ...paper,
+        title: 'Renamed Locale Paper',
+        canonicalTitle: 'Renamed Locale Paper',
+        defaultDownloadFilename: 'Renamed Locale Paper.pdf',
+      };
+      await fulfillJson(route, paper);
+      return;
+    }
+
+    if (url.endsWith('/api/library/papers/locale-1/') && request.method() === 'DELETE') {
+      deleted = true;
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    if (url.endsWith('/api/library/papers/locale-1/')) {
+      await fulfillJson(route, paper);
+      return;
+    }
+
+    await fulfillJson(route, { count: deleted ? 0 : 1, results: deleted ? [] : [paper] });
+  });
+
+  await page.goto('/library/papers');
+  await expect(page.getByRole('heading', { name: 'Paper library' })).toBeVisible();
+  await expect(page.getByText(/论文|选择文件|下载论文/)).toHaveCount(0);
+
+  await page.getByLabel('PDF file').setInputFiles({
+    name: 'locale.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4 locale'),
+  });
+  await page.getByRole('button', { name: 'Import PDF' }).click();
+  await expect(page.getByText('Accepted: Imported Locale Paper')).toBeVisible();
+
+  await page.getByRole('button', { name: /Open paper Locale Review Paper/ }).click();
+  await expect(page.getByText('In-page viewer')).toBeVisible();
+  await page.getByRole('button', { name: 'Rename paper' }).click();
+  await page.getByLabel('New paper title').fill('Renamed Locale Paper');
+  await page.getByRole('button', { name: 'Save title' }).click();
+  await expect(page.getByText('Renamed Locale Paper').first()).toBeVisible();
+
+  await page.getByRole('button', { name: /Download Renamed Locale Paper/ }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Download started' })).toContainText(
+    'Download started: Renamed Locale Paper.pdf',
+  );
+
+  await page.getByRole('button', { name: 'Delete paper' }).click();
+  await expect(page.getByText('The paper will leave ordinary browse, open, and download workflows.')).toBeVisible();
+  await page.getByLabel('Delete reason').fill('English validation');
+  await page.getByRole('button', { name: 'Confirm delete' }).click();
+  await expect(page.getByText('No shared papers are available yet.')).toBeVisible();
+  await expect(page.getByText(/论文|选择文件|下载论文/)).toHaveCount(0);
 });

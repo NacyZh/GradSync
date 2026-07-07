@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
+import { useI18n } from '../i18n/I18nProvider';
 import { DuplicateReviewPanel } from './DuplicateReviewPanel';
-import { useSharedPaperPdfImport, type PaperImportJob, type PaperRecord } from './api';
+import { usePaperUploadPolicy, useSharedPaperPdfImport, type PaperImportJob, type PaperRecord } from './api';
 
 type PaperImportPanelProps = {
   onAccepted?: (paper: PaperRecord) => void;
@@ -15,37 +16,52 @@ type PaperImportPanelProps = {
   isMaintainer?: boolean;
 };
 
-function statusText(job?: PaperImportJob) {
+type PaperLibraryT = ReturnType<typeof useI18n>['t'];
+
+function statusText(job: PaperImportJob | undefined, t: PaperLibraryT) {
   if (!job) return '';
   if (job.status === 'accepted' && job.acceptedPaper) {
-    return `Accepted: ${job.acceptedPaper.canonicalTitle || job.acceptedPaper.title}`;
+    return `${t('paperLibraryAcceptedPrefix')} ${job.acceptedPaper.canonicalTitle || job.acceptedPaper.title}`;
   }
   if (job.status === 'duplicate' && job.duplicatePaper) {
-    return `Duplicate: ${job.duplicatePaper.canonicalTitle || job.duplicatePaper.title}`;
+    return `${t('paperLibraryDuplicatePrefix')} ${job.duplicatePaper.canonicalTitle || job.duplicatePaper.title}`;
   }
   if (job.status === 'maintainer_review') {
-    return 'Maintainer review required';
+    return t('paperLibraryMaintainerReviewRequired');
   }
   if (job.status === 'rejected') {
-    return `Rejected: ${job.failureReason || job.userMessage || 'Upload rejected'}`;
+    return `${t('paperLibraryRejectedPrefix')} ${job.failureReason || job.userMessage || t('paperLibraryUploadRejected')}`;
   }
   if (job.status === 'failed') {
-    return `Failed: ${job.failureReason || job.userMessage || 'Processing failed'}`;
+    return `${t('paperLibraryFailedPrefix')} ${job.failureReason || job.userMessage || t('paperLibraryProcessingFailed')}`;
   }
   return job.userMessage || job.status.replaceAll('_', ' ');
 }
 
 export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = false }: PaperImportPanelProps) {
+  const { t } = useI18n();
   const [file, setFile] = useState<File | undefined>();
   const [job, setJob] = useState<PaperImportJob | undefined>();
+  const [uploadError, setUploadError] = useState<string | undefined>();
   const importMutation = useSharedPaperPdfImport();
+  const uploadPolicyQuery = usePaperUploadPolicy();
+  const maxSizeLabel = uploadPolicyQuery.data?.displayLabel ?? t('paperLibraryLoadingPolicy');
   const currentStatus = importMutation.isPending
-    ? 'Processing PDF'
-    : statusText(job) || (file ? `Selected PDF: ${file.name}` : '');
+    ? t('paperLibraryProcessingPdf')
+    : statusText(job, t) || (file ? `${t('paperLibrarySelectedPdfPrefix')} ${file.name}` : '');
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!file) return;
+    if (uploadPolicyQuery.data?.maxSizeBytes && file.size > uploadPolicyQuery.data.maxSizeBytes) {
+      setUploadError(
+        `${t('paperLibraryUploadLimitExceededPrefix')} ${uploadPolicyQuery.data.displayLabel} ${t(
+          'paperLibraryUploadLimitExceededSuffix',
+        )}`,
+      );
+      return;
+    }
+    setUploadError(undefined);
     setJob(undefined);
     const result = await importMutation.mutateAsync(file).catch(() => undefined);
     if (!result) return;
@@ -67,25 +83,31 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
       aria-describedby="paper-import-status"
       noValidate
     >
-      <UploadRequirements title="Import paper PDF" extensions={['.pdf']} maxSizeLabel="25 MB" />
+      <UploadRequirements
+        title={t('paperLibraryImportPdf')}
+        extensions={uploadPolicyQuery.data?.allowedExtensions ?? ['.pdf']}
+        maxSizeLabel={maxSizeLabel}
+        description={`${(uploadPolicyQuery.data?.allowedExtensions ?? ['.pdf']).join(', ')} ${t('paperLibraryUpTo')} ${maxSizeLabel}`}
+      />
       <Input
-        aria-label="PDF file"
+        aria-label={t('paperLibraryPdfFile')}
         name="file"
         type="file"
         accept="application/pdf,.pdf"
         onChange={(event) => {
           setFile(event.target.files?.[0]);
           setJob(undefined);
+          setUploadError(undefined);
         }}
         required
       />
       <Button type="submit" disabled={!file || importMutation.isPending}>
-        Import PDF
+        {t('paperLibraryImportPdfButton')}
       </Button>
-      {importMutation.isPending ? <UploadProgress label="Processing PDF" value={65} /> : null}
-      {importMutation.error ? (
+      {importMutation.isPending ? <UploadProgress label={t('paperLibraryProcessingPdf')} value={65} /> : null}
+      {uploadError || importMutation.error ? (
         <p role="alert" className="text-sm font-medium text-destructive">
-          {importMutation.error.message}
+          {uploadError ?? importMutation.error?.message}
         </p>
       ) : null}
       {currentStatus ? (

@@ -2,6 +2,8 @@ import { Search } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 
+import { useI18n } from '../i18n/I18nProvider';
+
 type PaperFiltersProps = {
   value: string;
   author?: string;
@@ -27,45 +29,46 @@ export function PaperFilters({
   onKeywordChange,
   onVisibilityChange,
 }: PaperFiltersProps) {
+  const { t } = useI18n();
   const activeFilters = [
-    value ? `Search: ${value}` : '',
-    author ? `Author: ${author}` : '',
-    year ? `Year: ${year}` : '',
-    keyword ? `Keyword: ${keyword}` : '',
+    value ? `${t('paperLibrarySearchFilterPrefix')} ${value}` : '',
+    author ? `${t('paperLibraryAuthorFilterPrefix')} ${author}` : '',
+    year ? `${t('paperLibraryYearFilterPrefix')} ${year}` : '',
+    keyword ? `${t('paperLibraryKeywordFilterPrefix')} ${keyword}` : '',
   ].filter(Boolean);
 
   return (
     <div className="grid gap-2">
       <div className="grid gap-2 md:grid-cols-[minmax(16rem,1fr)_10rem_8rem_10rem]">
         <label className="block">
-          <span className="sr-only">Search papers</span>
+          <span className="sr-only">{t('paperLibrarySearchPapers')}</span>
           <span className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input className="pl-9" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Search title, author, year, keyword" />
+            <Input className="pl-9" value={value} onChange={(event) => onChange(event.target.value)} placeholder={t('paperLibrarySearchPlaceholder')} />
           </span>
         </label>
-        <Input aria-label="Author filter" value={author} onChange={(event) => onAuthorChange?.(event.target.value)} placeholder="Author" />
-        <Input aria-label="Year filter" value={year} onChange={(event) => onYearChange?.(event.target.value)} placeholder="Year" inputMode="numeric" />
-        <Input aria-label="Keyword filter" value={keyword} onChange={(event) => onKeywordChange?.(event.target.value)} placeholder="Keyword" />
+        <Input aria-label={t('paperLibraryAuthorFilter')} value={author} onChange={(event) => onAuthorChange?.(event.target.value)} placeholder={t('paperLibraryAuthorPlaceholder')} />
+        <Input aria-label={t('paperLibraryYearFilter')} value={year} onChange={(event) => onYearChange?.(event.target.value)} placeholder={t('paperLibraryYearPlaceholder')} inputMode="numeric" />
+        <Input aria-label={t('paperLibraryKeywordFilter')} value={keyword} onChange={(event) => onKeywordChange?.(event.target.value)} placeholder={t('paperLibraryKeywordPlaceholder')} />
         {visibility !== undefined && onVisibilityChange ? (
           <label className="block md:col-span-1">
-            <span className="sr-only">Visibility filter</span>
+            <span className="sr-only">{t('paperLibraryVisibilityFilter')}</span>
             <select
-              aria-label="Visibility filter"
+              aria-label={t('paperLibraryVisibilityFilter')}
               className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={visibility}
               onChange={(event) => onVisibilityChange(event.target.value)}
             >
-              <option value="">All visibility</option>
-              <option value="project_members">Project members</option>
-              <option value="group_wide">Group wide</option>
+              <option value="">{t('paperLibraryAllVisibility')}</option>
+              <option value="project_members">{t('paperLibraryProjectMembers')}</option>
+              <option value="group_wide">{t('paperLibraryGroupWide')}</option>
             </select>
           </label>
         ) : null}
       </div>
       {activeFilters.length ? (
         <p className="text-sm text-muted-foreground" aria-live="polite">
-          Active filters: {activeFilters.join(', ')}
+          {t('paperLibraryActiveFilters')} {activeFilters.join(', ')}
         </p>
       ) : null}
     </div>

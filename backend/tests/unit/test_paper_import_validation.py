@@ -83,6 +83,28 @@ def test_pdf_validation_rejects_oversized_upload():
     assert exc_info.value.reason == "oversized"
 
 
+def test_pdf_validation_allows_exact_upload_size_boundary():
+    content = _pdf("Exact Boundary Paper")
+
+    with override_settings(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES=len(content)):
+        validated = validate_pdf_upload(_upload(content))
+
+    assert validated.size_bytes == len(content)
+
+
+def test_pdf_validation_oversized_message_repeats_policy_display_label():
+    content = _pdf("Oversized Boundary Paper")
+    limit = len(content) - 1
+
+    with override_settings(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES=limit):
+        policy = paper_upload_policy()
+        with pytest.raises(PaperImportError) as exc_info:
+            validate_pdf_upload(_upload(content))
+
+    assert exc_info.value.reason == "oversized"
+    assert policy["displayLabel"] in exc_info.value.message
+
+
 @pytest.mark.django_db
 def test_shared_import_rejects_missing_title_with_specific_job_reason():
     user = UserFactory(status="active")

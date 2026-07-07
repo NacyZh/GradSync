@@ -9,14 +9,25 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.common.downloads import describe_document_download, describe_paper_download
+from apps.common.downloads import (
+    describe_document_download,
+    describe_paper_download,
+    storage_file_download_response,
+)
 from apps.common.project_scope import visible_asset_q
 from apps.projects.models import ResearchProject
 
 from .document_services import DocumentCategoryService, DocumentService
 from .duplicate_services import review_paper_import
 from .import_services import PaperImportError, PaperImportService, import_shared_paper_pdf
-from .models import DocumentCategory, DocumentRecord, PaperImportBatch, PaperImportJob, PaperRecord
+from .models import (
+    DocumentCategory,
+    DocumentRecord,
+    PaperImportBatch,
+    PaperImportJob,
+    PaperLibraryActivity,
+    PaperRecord,
+)
 from .serializers import (
     DocumentCategoryCreateSerializer,
     DocumentCategorySerializer,
@@ -37,11 +48,14 @@ from .serializers import (
 from .services import (
     apply_paper_search_filters,
     delete_shared_paper,
-    describe_shared_paper_download,
+    ensure_active_research_group_user,
     ensure_library_maintainer,
     PaperDeleteConflict,
+    PaperDownloadUnavailable,
     PaperRenameConflict,
     paper_upload_policy,
+    prepare_shared_paper_download,
+    record_paper_library_activity,
     rename_shared_paper,
     shared_paper_queryset_for,
 )
@@ -275,6 +289,14 @@ class SharedPaperListCreateView(generics.GenericAPIView):
                 upload=serializer.validated_data["file"],
             )
         except PaperImportError as exc:
+            if exc.reason == "oversized":
+                record_paper_library_activity(
+                    actor=request.user,
+                    action=PaperLibraryActivity.Action.UPLOAD_SIZE_REJECTED,
+                    outcome=PaperLibraryActivity.Outcome.REJECTED,
+                    reason=paper_upload_policy()["displayLabel"],
+                    request_id=request.headers.get("X-Request-ID", ""),
+                )
             error = UploadErrorSerializer(
                 {
                     "code": "invalid_upload",
@@ -387,22 +409,33 @@ class SharedPaperDownloadView(views.APIView):
 
     @extend_schema(
         responses={
-            200: OpenApiResponse(description="Shared paper download descriptor"),
+            200: OpenApiResponse(description="Shared paper PDF download"),
             401: OpenApiResponse(description="Authentication required"),
             403: OpenApiResponse(description="Download forbidden"),
             404: OpenApiResponse(description="Paper not found"),
+            410: OpenApiResponse(description="Paper was deleted or file is unavailable"),
         }
     )
     def get(self, request, paper_id):
-        paper = get_object_or_404(shared_paper_queryset_for(request.user), pk=paper_id)
+        ensure_active_research_group_user(request.user)
+        paper = get_object_or_404(
+            PaperRecord.objects.select_related("project", "uploaded_file", "created_by")
+            .prefetch_related("attachments"),
+            pk=paper_id,
+        )
         try:
-            return Response(
-                describe_shared_paper_download(
-                    user=request.user,
-                    paper=paper,
-                    request_id=request.headers.get("X-Request-ID", ""),
-                )
+            download = prepare_shared_paper_download(
+                user=request.user,
+                paper=paper,
+                request_id=request.headers.get("X-Request-ID", ""),
             )
+            return storage_file_download_response(
+                download.storage_key,
+                filename=download.filename,
+                content_type=download.content_type,
+            )
+        except PaperDownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
         except DjangoPermissionDenied as exc:
             raise PermissionDenied(str(exc)) from exc
 

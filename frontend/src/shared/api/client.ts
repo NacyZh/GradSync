@@ -37,7 +37,7 @@ const statusMessages: Record<number, string> = {
   413: 'Selected file exceeds the upload size limit.',
 };
 
-function apiUrl(path: string): string {
+export function apiUrl(path: string): string {
   if (/^https?:\/\//.test(path)) {
     return path;
   }

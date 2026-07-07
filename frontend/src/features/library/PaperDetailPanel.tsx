@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 
 import { DownloadStatus } from '../../shared/ui/DownloadStatus';
 import { VisibilityBadge } from '../../shared/ui/VisibilityBadge';
+import { useI18n } from '../i18n/I18nProvider';
 import { downloadPaper, downloadSharedPaper, type PaperRecord } from './api';
 
 type PaperDetailPanelProps = {
@@ -16,14 +17,15 @@ type PaperDetailPanelProps = {
   onDelete?: (reason?: string) => Promise<void>;
 };
 
-function getErrorMessage(err: unknown) {
+function getErrorMessage(err: unknown, fallback: string) {
   if (err && typeof err === 'object' && 'message' in err) {
     return String(err.message);
   }
-  return 'Download unavailable';
+  return fallback;
 }
 
 export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRename, onDelete }: PaperDetailPanelProps) {
+  const { t } = useI18n();
   const [status, setStatus] = useState<{ filename: string; deliveryMode: 'direct_response' | 'signed_url' } | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [isRenaming, setIsRenaming] = useState(false);
@@ -37,22 +39,22 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
   if (!paper) {
     if (variant === 'download') {
       return (
-        <section aria-label="Selected paper download" className="grid gap-3 rounded-md border p-4">
+        <section aria-label={t('paperLibrarySelectedPaperDownload')} className="grid gap-3 rounded-md border p-4">
           <div>
-            <h3 className="text-base font-bold">Selected paper</h3>
-            <p className="text-sm text-muted-foreground">Select a paper from the results before downloading.</p>
+            <h3 className="text-base font-bold">{t('paperLibrarySelectedPaper')}</h3>
+            <p className="text-sm text-muted-foreground">{t('paperLibrarySelectBeforeDownload')}</p>
           </div>
-          <Button type="button" disabled aria-label="Download selected paper">
+          <Button type="button" disabled aria-label={t('paperLibraryDownloadSelectedPaper')}>
             <Download className="h-4 w-4" aria-hidden="true" />
-            Download
+            {t('download')}
           </Button>
         </section>
       );
     }
     return (
-      <section aria-label="Selected paper details" className="grid gap-2 rounded-md border border-dashed p-4">
-        <h3 className="text-base font-bold">Selected paper details</h3>
-        <p className="text-sm text-muted-foreground">Paper metadata appears after a result is selected.</p>
+      <section aria-label={t('paperLibrarySelectedPaperDetails')} className="grid gap-2 rounded-md border border-dashed p-4">
+        <h3 className="text-base font-bold">{t('paperLibrarySelectedPaperDetails')}</h3>
+        <p className="text-sm text-muted-foreground">{t('paperLibraryMetadataAfterSelection')}</p>
       </section>
     );
   }
@@ -70,7 +72,7 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
     try {
       setStatus(projectId ? await downloadPaper(projectId, paper.id) : await downloadSharedPaper(paper.id));
     } catch (err) {
-      setError(getErrorMessage(err));
+      setError(getErrorMessage(err, t('paperLibraryDownloadFallbackError')));
     }
   }
 
@@ -85,7 +87,7 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
     event.preventDefault();
     const cleanedTitle = renameTitle.trim();
     if (!cleanedTitle) {
-      setRenameError('Paper title is required.');
+      setRenameError(t('paperLibraryTitleRequired'));
       return;
     }
     setRenameError(undefined);
@@ -94,7 +96,7 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
       await onRename?.(cleanedTitle, '');
       setIsRenaming(false);
     } catch (err) {
-      setRenameError(getErrorMessage(err));
+      setRenameError(getErrorMessage(err, t('paperLibraryActionUnavailable')));
     } finally {
       setIsSavingRename(false);
     }
@@ -115,7 +117,7 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
       await onDelete?.(deleteReason.trim());
       setIsConfirmingDelete(false);
     } catch (err) {
-      setDeleteError(getErrorMessage(err));
+      setDeleteError(getErrorMessage(err, t('paperLibraryActionUnavailable')));
     } finally {
       setIsDeleting(false);
     }
@@ -123,58 +125,58 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
 
   if (variant === 'download') {
     return (
-      <section aria-label="Selected paper download" className="grid gap-3 rounded-md border p-4">
+      <section aria-label={t('paperLibrarySelectedPaperDownload')} className="grid gap-3 rounded-md border p-4">
         <div>
-          <h3 className="text-base font-bold">Selected paper</h3>
+          <h3 className="text-base font-bold">{t('paperLibrarySelectedPaper')}</h3>
           <p className="mt-1 font-semibold">{displayTitle}</p>
-          <p className="text-sm text-muted-foreground">{authors.join(', ') || 'Unknown authors'}</p>
+          <p className="text-sm text-muted-foreground">{authors.join(', ') || t('paperLibraryUnknownAuthors')}</p>
         </div>
         <Button
           type="button"
           onClick={onDownload}
           disabled={!canDownload}
-          aria-label={`Download ${displayTitle}`}
+          aria-label={`${t('download')} ${displayTitle}`}
         >
           <Download className="h-4 w-4" aria-hidden="true" />
-          Download
+          {t('download')}
         </Button>
         {!canDownload ? (
-          <p className="text-sm text-muted-foreground">Download is unavailable for the selected paper.</p>
+          <p className="text-sm text-muted-foreground">{t('paperLibraryDownloadUnavailable')}</p>
         ) : null}
-        <DownloadStatus descriptor={status} error={error} />
+        <DownloadStatus descriptor={status} error={error} startedLabel={t('paperLibraryDownloadStarted')} />
       </section>
     );
   }
 
   return (
-    <section aria-label="Selected paper details" className="grid gap-3 rounded-md border p-4">
+    <section aria-label={t('paperLibrarySelectedPaperDetails')} className="grid gap-3 rounded-md border p-4">
       <div>
         <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
           <h3 className="text-lg font-bold">{displayTitle}</h3>
           <div className="flex flex-wrap items-center gap-2">
             <VisibilityBadge visibility={paper.visibility} />
             {canRename ? (
-              <Button type="button" variant="outline" size="sm" onClick={startRename} aria-label="Rename paper">
+              <Button type="button" variant="outline" size="sm" onClick={startRename} aria-label={t('paperLibraryRename')}>
                 <Pencil className="h-4 w-4" aria-hidden="true" />
-                Rename
+                {t('paperLibraryRenameButton')}
               </Button>
             ) : null}
             {canDelete ? (
-              <Button type="button" variant="outline" size="sm" onClick={startDelete} aria-label="Delete paper">
+              <Button type="button" variant="outline" size="sm" onClick={startDelete} aria-label={t('paperLibraryDelete')}>
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
-                Delete
+                {t('paperLibraryDeleteButton')}
               </Button>
             ) : null}
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">{authors.join(', ') || 'Unknown authors'}</p>
+        <p className="text-sm text-muted-foreground">{authors.join(', ') || t('paperLibraryUnknownAuthors')}</p>
       </div>
       {isRenaming ? (
         <form onSubmit={submitRename} className="grid gap-2 rounded-md border p-3">
           <label className="grid gap-1 text-sm font-semibold">
-            New paper title
+            {t('paperLibraryNewTitle')}
             <input
-              aria-label="New paper title"
+              aria-label={t('paperLibraryNewTitle')}
               className="min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-normal"
               value={renameTitle}
               maxLength={500}
@@ -188,10 +190,10 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={isSavingRename}>
-              Save title
+              {t('paperLibrarySaveTitle')}
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setIsRenaming(false)}>
-              Cancel
+              {t('paperLibraryCancel')}
             </Button>
           </div>
         </form>
@@ -199,15 +201,13 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
       {isConfirmingDelete ? (
         <form onSubmit={submitDelete} className="grid gap-2 rounded-md border border-destructive/40 p-3">
           <div className="grid gap-1 text-sm">
-            <p className="font-semibold text-destructive">Delete {displayTitle}</p>
-            <p className="text-muted-foreground">
-              The paper will leave ordinary browse, open, and download workflows.
-            </p>
+            <p className="font-semibold text-destructive">{t('paperLibraryDeleteButton')} {displayTitle}</p>
+            <p className="text-muted-foreground">{t('paperLibraryDeleteDescription')}</p>
           </div>
           <label className="grid gap-1 text-sm font-semibold">
-            Delete reason
+            {t('paperLibraryDeleteReason')}
             <input
-              aria-label="Delete reason"
+              aria-label={t('paperLibraryDeleteReason')}
               className="min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-normal"
               value={deleteReason}
               maxLength={255}
@@ -221,10 +221,10 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={isDeleting}>
-              Confirm delete
+              {t('paperLibraryConfirmDelete')}
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setIsConfirmingDelete(false)}>
-              Cancel
+              {t('paperLibraryCancel')}
             </Button>
           </div>
         </form>
@@ -235,20 +235,20 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
           viewerAvailable ? 'bg-muted/30 text-muted-foreground' : 'border-destructive text-destructive'
         }`}
       >
-        <p className="font-semibold text-foreground">In-page viewer</p>
+        <p className="font-semibold text-foreground">{t('paperLibraryInPageViewer')}</p>
         <p>
           {viewerAvailable
-            ? 'PDF preview opens here when the stored file is available.'
-            : 'This paper is unavailable and cannot be opened.'}
+            ? t('paperLibraryViewerAvailable')
+            : t('paperLibraryViewerUnavailable')}
         </p>
       </div>
       <dl className="grid gap-2 text-sm">
-        {paper.title !== displayTitle ? <div><dt className="font-semibold">Original title</dt><dd>{paper.title}</dd></div> : null}
-        <div><dt className="font-semibold">Venue</dt><dd>{paper.venue || 'Unspecified'}</dd></div>
-        <div><dt className="font-semibold">DOI</dt><dd>{paper.doi || 'Unspecified'}</dd></div>
-        <div><dt className="font-semibold">Keywords</dt><dd>{keywords.join(', ') || 'No keywords'}</dd></div>
-        <div><dt className="font-semibold">Title source</dt><dd>{paper.titleSource?.replaceAll('_', ' ') || 'Unspecified'}</dd></div>
-        <div><dt className="font-semibold">Checksum</dt><dd className="break-all">{paper.checksumSha256 || 'Unavailable'}</dd></div>
+        {paper.title !== displayTitle ? <div><dt className="font-semibold">{t('paperLibraryOriginalTitle')}</dt><dd>{paper.title}</dd></div> : null}
+        <div><dt className="font-semibold">{t('paperLibraryVenue')}</dt><dd>{paper.venue || t('paperLibraryUnspecified')}</dd></div>
+        <div><dt className="font-semibold">{t('paperLibraryDoi')}</dt><dd>{paper.doi || t('paperLibraryUnspecified')}</dd></div>
+        <div><dt className="font-semibold">{t('paperLibraryKeywords')}</dt><dd>{keywords.join(', ') || t('paperLibraryNoKeywords')}</dd></div>
+        <div><dt className="font-semibold">{t('paperLibraryTitleSource')}</dt><dd>{paper.titleSource?.replaceAll('_', ' ') || t('paperLibraryUnspecified')}</dd></div>
+        <div><dt className="font-semibold">{t('paperLibraryChecksum')}</dt><dd className="break-all">{paper.checksumSha256 || t('paperLibraryUnavailableValue')}</dd></div>
       </dl>
     </section>
   );

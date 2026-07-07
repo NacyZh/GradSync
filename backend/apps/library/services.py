@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from django.conf import settings
+from dataclasses import dataclass
+
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
 from apps.accounts.models import User
 
 from .models import PaperAttachment, PaperImportJob, PaperLibraryActivity, PaperRecord
+from .upload_policy import shared_paper_upload_policy
 
 
 class PaperRenameConflict(ValueError):
@@ -17,6 +20,18 @@ class PaperRenameConflict(ValueError):
 
 class PaperDeleteConflict(ValueError):
     pass
+
+
+class PaperDownloadUnavailable(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class PreparedSharedPaperDownload:
+    storage_key: str
+    filename: str
+    content_type: str
+    content_disposition: str
 
 
 def is_active_research_group_user(user) -> bool:
@@ -98,25 +113,13 @@ def paper_download_response_metadata(paper: PaperRecord) -> dict:
 
 
 def format_upload_size_label(size_bytes: int) -> str:
-    size = int(size_bytes)
-    units = [("GB", 1024**3), ("MB", 1024**2), ("KB", 1024)]
-    for unit, factor in units:
-        if size >= factor:
-            value = size / factor
-            formatted = f"{value:.1f}".rstrip("0").rstrip(".")
-            return f"{formatted} {unit}"
-    return f"{size} bytes"
+    from apps.common.upload_policy import format_upload_size_label as _format_upload_size_label
+
+    return _format_upload_size_label(size_bytes)
 
 
 def paper_upload_policy() -> dict:
-    limit = int(getattr(settings, "PAPER_LIBRARY_UPLOAD_LIMIT_BYTES", 0) or 0)
-    return {
-        "category": "paper",
-        "maxSizeBytes": limit,
-        "displayLabel": format_upload_size_label(limit),
-        "allowedExtensions": [".pdf"],
-        "contentTypes": ["application/pdf"],
-    }
+    return shared_paper_upload_policy()
 
 
 def same_title_is_distinguishable(
@@ -272,19 +275,48 @@ def ensure_paper_available(paper: PaperRecord) -> None:
         raise PermissionDenied("Paper is not available in the shared library.")
 
 
-def describe_shared_paper_download(
+def _active_paper_storage_metadata(paper: PaperRecord) -> tuple[str, str]:
+    if paper.uploaded_file_id:
+        return paper.uploaded_file.stored_name, paper.uploaded_file.content_type or "application/pdf"
+    attachment = paper.attachments.filter(status=PaperAttachment.Status.ACTIVE).first()
+    if attachment is not None:
+        return attachment.storage_key, attachment.content_type or "application/pdf"
+    return "", "application/pdf"
+
+
+def prepare_shared_paper_download(
     *,
     user,
     paper: PaperRecord,
     request_id: str = "",
-) -> dict:
+) -> PreparedSharedPaperDownload:
     ensure_active_research_group_user(user)
-    ensure_paper_available(paper)
-    if not paper.uploaded_file_id and not paper.attachments.filter(
-        status=PaperAttachment.Status.ACTIVE
-    ).exists():
-        raise PermissionDenied("No active PDF is available for this paper.")
+    if paper.status != PaperRecord.Status.ACTIVE:
+        message = "This paper is no longer available."
+        record_paper_library_activity(
+            actor=user,
+            paper=paper,
+            action=PaperLibraryActivity.Action.UNAVAILABLE_ACCESS,
+            outcome=PaperLibraryActivity.Outcome.REJECTED,
+            reason=message,
+            request_id=request_id,
+        )
+        raise PaperDownloadUnavailable(message)
 
+    storage_key, _storage_content_type = _active_paper_storage_metadata(paper)
+    if not storage_key or not default_storage.exists(storage_key):
+        message = "The paper file is no longer available."
+        record_paper_library_activity(
+            actor=user,
+            paper=paper,
+            action=PaperLibraryActivity.Action.DOWNLOAD_FAILED,
+            outcome=PaperLibraryActivity.Outcome.FAILED,
+            reason=message,
+            request_id=request_id,
+        )
+        raise PaperDownloadUnavailable(message)
+
+    metadata = paper_download_response_metadata(paper)
     record_paper_library_activity(
         actor=user,
         paper=paper,
@@ -292,8 +324,23 @@ def describe_shared_paper_download(
         outcome=PaperLibraryActivity.Outcome.SUCCESS,
         request_id=request_id,
     )
+    return PreparedSharedPaperDownload(
+        storage_key=storage_key,
+        filename=metadata["filename"],
+        content_type=metadata["contentType"],
+        content_disposition=metadata["contentDisposition"],
+    )
+
+
+def describe_shared_paper_download(
+    *,
+    user,
+    paper: PaperRecord,
+    request_id: str = "",
+) -> dict:
+    prepared = prepare_shared_paper_download(user=user, paper=paper, request_id=request_id)
     return {
-        "filename": canonical_paper_download_filename(paper),
+        "filename": prepared.filename,
         "deliveryMode": "direct_response",
         "url": "",
         "expiresAt": timezone.now().isoformat().replace("+00:00", "Z"),

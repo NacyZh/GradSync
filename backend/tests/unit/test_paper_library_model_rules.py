@@ -11,10 +11,12 @@ from apps.library.models import (
 )
 from apps.library.services import (
     canonical_paper_download_filename,
+    prepare_shared_paper_download,
     ensure_active_research_group_user,
     ensure_library_maintainer,
     is_library_maintainer,
     paper_download_response_metadata,
+    PaperDownloadUnavailable,
     delete_shared_paper,
     rename_shared_paper,
     record_paper_library_activity,
@@ -129,6 +131,27 @@ def test_title_based_download_metadata_uses_safe_pdf_attachment_filename():
     assert metadata["filename"] == "Graph Neural Methods 2026.pdf"
     assert metadata["contentType"] == "application/pdf"
     assert metadata["contentDisposition"] == 'attachment; filename="Graph Neural Methods 2026.pdf"'
+
+
+@pytest.mark.django_db
+def test_prepare_shared_paper_download_denies_deleted_paper_and_records_unavailable_access():
+    user = UserFactory(global_role="student", status="active")
+    paper = PaperRecordFactory(
+        status=PaperRecord.Status.DELETED,
+        title="Deleted Download",
+        canonical_title="Deleted Download",
+    )
+
+    with pytest.raises(PaperDownloadUnavailable, match="no longer available"):
+        prepare_shared_paper_download(user=user, paper=paper, request_id="stale-delete")
+
+    activity = PaperLibraryActivity.objects.get(
+        actor=user,
+        paper=paper,
+        action=PaperLibraryActivity.Action.UNAVAILABLE_ACCESS,
+    )
+    assert activity.outcome == PaperLibraryActivity.Outcome.REJECTED
+    assert activity.request_id == "stale-delete"
 
 
 @pytest.mark.django_db

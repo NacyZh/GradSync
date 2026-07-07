@@ -3,7 +3,6 @@ import re
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -37,6 +36,7 @@ from .services import (
     ensure_active_research_group_user,
     record_paper_library_activity,
 )
+from .upload_policy import shared_paper_oversized_message, shared_paper_upload_limit_bytes
 
 
 class PaperImportError(Exception):
@@ -139,9 +139,9 @@ def validate_pdf_upload(upload) -> ValidatedPdfUpload:
     size_bytes = int(getattr(upload, "size", 0) or 0)
     if size_bytes <= 0:
         raise PaperImportError("empty_file", "The selected PDF is empty.")
-    limit = int(getattr(settings, "PAPER_LIBRARY_UPLOAD_LIMIT_BYTES", 0) or 0)
+    limit = shared_paper_upload_limit_bytes()
     if limit and size_bytes > limit:
-        raise PaperImportError("oversized", "The selected PDF exceeds the upload size limit.")
+        raise PaperImportError("oversized", shared_paper_oversized_message())
 
     try:
         _reader_for(upload)

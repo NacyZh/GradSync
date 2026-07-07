@@ -23,6 +23,34 @@ class UploadPolicyResult:
     content_type: str
 
 
+def format_upload_size_label(size_bytes: int) -> str:
+    size = int(size_bytes)
+    units = [("GB", 1024**3), ("MB", 1024**2), ("KB", 1024)]
+    for unit, factor in units:
+        if size >= factor:
+            value = size / factor
+            formatted = f"{value:.1f}".rstrip("0").rstrip(".")
+            return f"{formatted} {unit}"
+    return f"{size} bytes"
+
+
+def upload_policy_metadata(
+    *,
+    category: str,
+    max_size_bytes: int,
+    allowed_extensions: list[str],
+    content_types: list[str],
+) -> dict:
+    limit = int(max_size_bytes)
+    return {
+        "category": category,
+        "maxSizeBytes": limit,
+        "displayLabel": format_upload_size_label(limit),
+        "allowedExtensions": allowed_extensions,
+        "contentTypes": content_types,
+    }
+
+
 ALLOWED_EXTENSIONS = {
     UploadCategory.PAPER: {".pdf"},
     UploadCategory.CODE: {".zip", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".7z"},

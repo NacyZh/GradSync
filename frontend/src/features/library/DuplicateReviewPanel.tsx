@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 
+import { useI18n } from '../i18n/I18nProvider';
 import { usePaperImportReview, type PaperImportJob, type PaperRecord } from './api';
 
 type DuplicateReviewPanelProps = {
@@ -9,12 +10,12 @@ type DuplicateReviewPanelProps = {
   onSelectPaper?: (paper: PaperRecord) => void;
 };
 
-function paperTitle(paper?: PaperRecord | null) {
-  return paper ? paper.canonicalTitle || paper.title : 'Candidate paper unavailable';
+function paperTitle(paper: PaperRecord | null | undefined, fallback: string) {
+  return paper ? paper.canonicalTitle || paper.title : fallback;
 }
 
-function basisText(value?: string) {
-  if (!value || value === 'none') return 'No duplicate match';
+function basisText(value: string | undefined, noMatchLabel: string) {
+  if (!value || value === 'none') return noMatchLabel;
   return value.replaceAll('_', ' ');
 }
 
@@ -24,6 +25,7 @@ export function DuplicateReviewPanel({
   onReviewed,
   onSelectPaper,
 }: DuplicateReviewPanelProps) {
+  const { t } = useI18n();
   const reviewMutation = usePaperImportReview();
   if (!job || !job.duplicateDetection) return null;
 
@@ -39,32 +41,32 @@ export function DuplicateReviewPanel({
   }
 
   return (
-    <section className="grid gap-3 rounded-md border p-3 text-sm" aria-label="Duplicate review">
+    <section className="grid gap-3 rounded-md border p-3 text-sm" aria-label={t('paperLibraryDuplicateReview')}>
       <div>
         <p className="font-semibold">
-          {isDuplicate ? 'Duplicate paper detected' : 'Maintainer review required'}
+          {isDuplicate ? t('paperLibraryDuplicateDetected') : t('paperLibraryMaintainerReviewRequired')}
         </p>
         <p className="text-muted-foreground">
-          Match basis: {basisText(detection.matchBasis)}
+          {t('paperLibraryMatchBasis')} {basisText(detection.matchBasis, t('paperLibraryNoDuplicateMatch'))}
           {typeof detection.similarityScore === 'number'
-            ? ` · Similarity ${(detection.similarityScore * 100).toFixed(0)}%`
+            ? ` · ${t('paperLibrarySimilarity')} ${(detection.similarityScore * 100).toFixed(0)}%`
             : ''}
         </p>
       </div>
       {candidate ? (
         <div className="grid gap-2 rounded-md bg-muted p-3">
-          <span className="font-medium">{paperTitle(candidate)}</span>
+          <span className="font-medium">{paperTitle(candidate, t('paperLibraryCandidateUnavailable'))}</span>
           <span className="text-muted-foreground">
-            {(candidate.authors ?? []).join(', ') || 'Unknown authors'}
+            {(candidate.authors ?? []).join(', ') || t('paperLibraryUnknownAuthors')}
           </span>
           <Button type="button" variant="secondary" onClick={() => onSelectPaper?.(candidate)}>
-            View existing paper
+            {t('paperLibraryViewExistingPaper')}
           </Button>
         </div>
       ) : null}
       {isReview ? (
         <p role="status" className="text-muted-foreground">
-          Review status: {detection.reviewStatus.replaceAll('_', ' ')}
+          {t('paperLibraryReviewStatus')} {detection.reviewStatus.replaceAll('_', ' ')}
         </p>
       ) : null}
       {isReview && isMaintainer ? (
@@ -75,14 +77,14 @@ export function DuplicateReviewPanel({
             disabled={reviewMutation.isPending}
             onClick={() => review('confirm_duplicate')}
           >
-            Confirm duplicate
+            {t('paperLibraryConfirmDuplicate')}
           </Button>
           <Button
             type="button"
             disabled={reviewMutation.isPending}
             onClick={() => review('confirm_distinct')}
           >
-            Confirm distinct
+            {t('paperLibraryConfirmDistinct')}
           </Button>
         </div>
       ) : null}

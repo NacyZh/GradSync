@@ -4,6 +4,7 @@ import type { KeyboardEvent } from 'react';
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
 import { useAuth } from '../auth/AuthProvider';
+import { useI18n } from '../i18n/I18nProvider';
 import { PaperDetailPanel } from './PaperDetailPanel';
 import { PaperFilters } from './PaperFilters';
 import { PaperImportPanel } from './PaperImportPanel';
@@ -13,14 +14,15 @@ function paperTitle(paper: PaperRecord) {
   return paper.canonicalTitle || paper.title;
 }
 
-function getErrorMessage(err: unknown) {
+function getErrorMessage(err: unknown, fallback: string) {
   if (err && typeof err === 'object' && 'message' in err) {
     return String(err.message);
   }
-  return 'Unable to load the shared paper library.';
+  return fallback;
 }
 
 export function PaperLibraryPage() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [author, setAuthor] = useState('');
@@ -69,7 +71,7 @@ export function PaperLibraryPage() {
 
   async function renameSelectedPaper(newTitle: string, reason = '') {
     if (!selectedId) {
-      throw new Error('Select a paper before renaming.');
+      throw new Error(t('paperLibrarySelectBeforeRenaming'));
     }
     const renamed = await renameMutation.mutateAsync({
       paperId: selectedId,
@@ -81,7 +83,7 @@ export function PaperLibraryPage() {
 
   async function deleteSelectedPaper(reason = '') {
     if (!selectedId) {
-      throw new Error('Select a paper before deleting.');
+      throw new Error(t('paperLibrarySelectBeforeDeleting'));
     }
     const paperId = selectedId;
     await deleteMutation.mutateAsync({
@@ -107,14 +109,14 @@ export function PaperLibraryPage() {
 
   return (
     <PageShell
-      title="Paper library"
-      description="Search, inspect, and download shared papers available to active GradSync users."
+      title={t('paperLibrary')}
+      description={t('paperLibraryDescription')}
     >
       <div
         data-testid="paper-library-workspace"
         className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(20rem,0.72fr)_minmax(30rem,1.28fr)]"
       >
-        <section className="panel grid min-w-0 content-start gap-4" aria-label="Paper import and download">
+        <section className="panel grid min-w-0 content-start gap-4" aria-label={t('paperLibraryImportDownloadRegion')}>
           <div>
             <PaperImportPanel
               onAccepted={(paper) => {
@@ -130,7 +132,7 @@ export function PaperLibraryPage() {
           </div>
           <PaperDetailPanel paper={selectedPaper} variant="download" />
         </section>
-        <section className="panel grid min-w-0 content-start gap-4" aria-label="Shared paper search and display">
+        <section className="panel grid min-w-0 content-start gap-4" aria-label={t('paperLibrarySearchDisplayRegion')}>
           <div className="grid gap-3">
             <PaperFilters
               value={query}
@@ -144,23 +146,23 @@ export function PaperLibraryPage() {
             />
           </div>
           {papersQuery.isLoading ? (
-            <DataState state="loading" title="Loading papers" message="Loading shared papers." />
+            <DataState state="loading" title={t('paperLibraryLoadingTitle')} message={t('paperLibraryLoadingMessage')} />
           ) : null}
           {papersQuery.error ? (
             <DataState
               state="error"
-              title="Paper library unavailable"
-              message={getErrorMessage(papersQuery.error)}
+              title={t('paperLibraryUnavailableTitle')}
+              message={getErrorMessage(papersQuery.error, t('paperLibraryLoadError'))}
             />
           ) : null}
           {!papersQuery.isLoading && !papersQuery.error && !papers.length ? (
             <DataState
               state="empty"
-              title="No shared papers"
+              title={t('paperLibraryEmptyTitle')}
               message={
                 activeFilterText
-                  ? `No shared papers match ${activeFilterText}.`
-                  : 'No shared papers are available yet.'
+                  ? `${t('paperLibraryEmptyFilteredPrefix')} ${activeFilterText}.`
+                  : t('paperLibraryEmptyDefault')
               }
             />
           ) : null}
@@ -169,13 +171,13 @@ export function PaperLibraryPage() {
               data-testid="paper-results-list"
               className="grid content-start gap-2 overflow-y-auto pr-1"
               style={{ maxHeight: '34rem' }}
-              aria-label="Shared paper results"
+              aria-label={t('paperLibrarySearchResults')}
             >
               {papers.map((paper) => (
                 <li key={paper.id}>
                   <button
                     type="button"
-                    aria-label={`Open paper ${paperTitle(paper)}; Select paper ${paperTitle(paper)}`}
+                    aria-label={`${t('paperLibraryOpenPaperPrefix')} ${paperTitle(paper)}; ${t('paperLibrarySelectPaperPrefix')} ${paperTitle(paper)}`}
                     aria-pressed={selectedId === paper.id}
                     data-selected={selectedId === paper.id ? 'true' : 'false'}
                     className={`min-h-24 w-full rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -189,11 +191,11 @@ export function PaperLibraryPage() {
                     <span className="flex flex-wrap items-start justify-between gap-2">
                       <strong>{paperTitle(paper)}</strong>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
-                        {paper.titleSource?.replaceAll('_', ' ') || 'shared'}
+                        {paper.titleSource?.replaceAll('_', ' ') || t('paperLibrarySharedSource')}
                       </span>
                     </span>
                     <span className="block text-sm text-muted-foreground">
-                      {paper.authors.join(', ')} · {paper.publicationYear ?? 'No year'}
+                      {paper.authors.join(', ') || t('paperLibraryUnknownAuthors')} · {paper.publicationYear ?? t('paperLibraryUnknownYear')}
                     </span>
                   </button>
                 </li>

@@ -1,4 +1,6 @@
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 
 from apps.library.models import PaperLibraryActivity, PaperRecord
 from apps.projects.models import ResearchProject
@@ -137,7 +139,7 @@ def test_maintainer_delete_excludes_paper_from_shared_list_detail_download_and_a
     assert list_response.status_code == 200
     assert list_response.data["results"] == []
     assert detail_response.status_code == 404
-    assert download_response.status_code == 404
+    assert download_response.status_code == 410
     assert activity.actor == maintainer
     assert activity.outcome == PaperLibraryActivity.Outcome.SUCCESS
     assert activity.reason == "Incorrect upload"
@@ -160,3 +162,30 @@ def test_non_maintainer_delete_is_denied_and_keeps_paper_available(api_client):
     assert response.status_code == 403
     assert paper.status == PaperRecord.Status.ACTIVE
     assert [item["id"] for item in list_response.data["results"]] == [paper.id]
+
+
+@pytest.mark.django_db
+@override_settings(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES=12)
+def test_over_limit_shared_paper_upload_repeats_policy_label_and_records_activity(api_client):
+    user = UserFactory(global_role="student", status="active")
+    upload = SimpleUploadedFile(
+        "too-large.pdf",
+        b"%PDF-1.4\n" + (b"x" * 128),
+        content_type="application/pdf",
+    )
+
+    response = authenticate(api_client, user).post(
+        "/api/library/papers/",
+        {"file": upload},
+        format="multipart",
+    )
+    activity = PaperLibraryActivity.objects.get(
+        actor=user,
+        action=PaperLibraryActivity.Action.UPLOAD_SIZE_REJECTED,
+    )
+
+    assert response.status_code == 400
+    assert response.data["reason"] == "oversized"
+    assert "12 bytes" in response.data["message"]
+    assert activity.outcome == PaperLibraryActivity.Outcome.REJECTED
+    assert activity.reason == "12 bytes"
