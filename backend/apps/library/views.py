@@ -25,15 +25,24 @@ from .serializers import (
     PaperImportBatchSerializer,
     PaperImportJobSerializer,
     PaperImportSerializer,
+    PaperDeleteRequestSerializer,
     PaperPdfImportSerializer,
     PaperRecordCreateSerializer,
     PaperRecordSerializer,
+    PaperRenameRequestSerializer,
+    PaperUploadPolicySerializer,
     PaperUploadSerializer,
     UploadErrorSerializer,
 )
 from .services import (
     apply_paper_search_filters,
+    delete_shared_paper,
     describe_shared_paper_download,
+    ensure_library_maintainer,
+    PaperDeleteConflict,
+    PaperRenameConflict,
+    paper_upload_policy,
+    rename_shared_paper,
     shared_paper_queryset_for,
 )
 
@@ -291,7 +300,85 @@ class SharedPaperDetailView(views.APIView):
     )
     def get(self, request, paper_id):
         paper = get_object_or_404(shared_paper_queryset_for(request.user), pk=paper_id)
-        return Response(PaperRecordSerializer(paper).data)
+        return Response(PaperRecordSerializer(paper, context={"request": request}).data)
+
+    @extend_schema(
+        request=PaperRenameRequestSerializer,
+        responses={
+            200: PaperRecordSerializer,
+            400: OpenApiResponse(description="Invalid title"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Maintainer account required"),
+            404: OpenApiResponse(description="Paper not found"),
+            409: OpenApiResponse(description="Indistinguishable same title"),
+        },
+    )
+    def patch(self, request, paper_id):
+        ensure_library_maintainer(request.user)
+        paper = get_object_or_404(shared_paper_queryset_for(request.user), pk=paper_id)
+        serializer = PaperRenameRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            renamed = rename_shared_paper(
+                actor=request.user,
+                paper=paper,
+                new_title=serializer.validated_data["newTitle"],
+                reason=serializer.validated_data.get("reason", ""),
+                request_id=request.headers.get("X-Request-ID", ""),
+            )
+        except PaperRenameConflict as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ValueError as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(PaperRecordSerializer(renamed, context={"request": request}).data)
+
+    @extend_schema(
+        request=PaperDeleteRequestSerializer,
+        responses={
+            204: OpenApiResponse(description="Paper deleted from ordinary availability"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Maintainer account required"),
+            404: OpenApiResponse(description="Paper not found"),
+            409: OpenApiResponse(description="Paper is already unavailable"),
+        },
+    )
+    def delete(self, request, paper_id):
+        ensure_library_maintainer(request.user)
+        paper = get_object_or_404(
+            PaperRecord.objects.select_related("project", "uploaded_file", "created_by")
+            .prefetch_related("attachments"),
+            pk=paper_id,
+        )
+        serializer = PaperDeleteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            delete_shared_paper(
+                actor=request.user,
+                paper=paper,
+                reason=serializer.validated_data.get("reason", ""),
+                request_id=request.headers.get("X-Request-ID", ""),
+            )
+        except PaperDeleteConflict as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SharedPaperUploadPolicyView(views.APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "paper_library"
+
+    @extend_schema(
+        responses={
+            200: PaperUploadPolicySerializer,
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Active account required"),
+        }
+    )
+    def get(self, request):
+        from .services import ensure_active_research_group_user
+
+        ensure_active_research_group_user(request.user)
+        return Response(PaperUploadPolicySerializer(paper_upload_policy()).data)
 
 
 class SharedPaperDownloadView(views.APIView):

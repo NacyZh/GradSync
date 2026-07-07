@@ -88,6 +88,15 @@ class PaperRecord(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     archived_at = models.DateTimeField(null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deleted_paper_records",
+    )
+    delete_reason = models.CharField(max_length=255, blank=True)
 
     class Meta:
         ordering = ["title"]
@@ -325,9 +334,16 @@ class PaperLibraryActivity(models.Model):
     class Action(models.TextChoices):
         UPLOAD_ACCEPTED = "upload_accepted", "Upload accepted"
         UPLOAD_REJECTED = "upload_rejected", "Upload rejected"
+        UPLOAD_SIZE_REJECTED = "upload_size_rejected", "Upload size rejected"
         DUPLICATE_REJECTED = "duplicate_rejected", "Duplicate rejected"
         MAINTAINER_REVIEW_CREATED = "maintainer_review_created", "Maintainer review created"
+        PAPER_RENAMED = "paper_renamed", "Paper renamed"
+        PAPER_RENAME_REJECTED = "paper_rename_rejected", "Paper rename rejected"
+        PAPER_DELETED = "paper_deleted", "Paper deleted"
+        PAPER_DELETE_REJECTED = "paper_delete_rejected", "Paper delete rejected"
         DOWNLOAD_STARTED = "download_started", "Download started"
+        DOWNLOAD_FAILED = "download_failed", "Download failed"
+        UNAVAILABLE_ACCESS = "unavailable_access", "Unavailable access"
         MIGRATION_SHARED_ACCESS_APPLIED = (
             "migration_shared_access_applied",
             "Migration shared access applied",

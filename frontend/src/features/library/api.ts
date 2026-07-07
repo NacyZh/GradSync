@@ -11,6 +11,13 @@ export type PaperRecord = {
   titleSource?: 'embedded_metadata' | 'first_page_visible_text' | 'legacy' | string;
   titleConfidence?: 'high' | 'medium' | 'low' | 'failed' | string;
   downloadAvailable?: boolean;
+  viewerAvailable?: boolean;
+  actionCapabilities?: {
+    canRename: boolean;
+    canDelete: boolean;
+    canDownload: boolean;
+    canView: boolean;
+  };
   defaultDownloadFilename?: string;
   migratedFromLegacyScope?: boolean;
   sharedAccessStartedAt?: string;
@@ -35,6 +42,30 @@ export type PaperSearchFilters = {
   author?: string;
   year?: string;
   keyword?: string;
+};
+
+export type PaperUploadPolicy = {
+  category: 'paper';
+  maxSizeBytes: number;
+  displayLabel: string;
+  allowedExtensions: string[];
+  contentTypes: string[];
+};
+
+export type PaperRenamePayload = {
+  newTitle: string;
+  reason?: string;
+};
+
+export type PaperDeletePayload = {
+  reason?: string;
+};
+
+export type PaperDownloadDescriptor = {
+  filename: string;
+  deliveryMode: 'direct_response' | 'signed_url';
+  url?: string;
+  expiresAt?: string;
 };
 
 export type PaperImportBatch = {
@@ -127,6 +158,24 @@ export function getSharedPaper(paperId: string) {
   return apiRequest<PaperRecord>(`/api/library/papers/${paperId}/`);
 }
 
+export function getPaperUploadPolicy() {
+  return apiRequest<PaperUploadPolicy>('/api/library/papers/upload-policy/');
+}
+
+export function renameSharedPaper(paperId: string, payload: PaperRenamePayload) {
+  return apiRequest<PaperRecord>(`/api/library/papers/${paperId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteSharedPaper(paperId: string, payload: PaperDeletePayload = {}) {
+  return apiRequest<void>(`/api/library/papers/${paperId}/`, {
+    method: 'DELETE',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function createPaper(projectId: number, payload: PaperCreatePayload) {
   return apiRequest<PaperRecord>(`/api/projects/${projectId}/papers/`, {
     method: 'POST',
@@ -189,9 +238,11 @@ export function downloadPaper(projectId: number, paperId: string) {
 }
 
 export function downloadSharedPaper(paperId: string) {
-  return apiRequest<{ filename: string; deliveryMode: 'direct_response' | 'signed_url'; url?: string; expiresAt?: string }>(
-    `/api/library/papers/${paperId}/download/`,
-  );
+  return apiRequest<PaperDownloadDescriptor>(`/api/library/papers/${paperId}/download/`);
+}
+
+export function downloadSharedPaperFile(paperId: string) {
+  return downloadDescriptor(`/api/library/papers/${paperId}/download/`);
 }
 
 export function usePapers(projectId: number, query: string, visibility = '') {
@@ -214,6 +265,59 @@ export function useSharedPaperDetail(paperId?: string) {
     queryKey: ['shared-paper', paperId],
     queryFn: () => getSharedPaper(paperId ?? ''),
     enabled: Boolean(paperId),
+  });
+}
+
+export function usePaperUploadPolicy() {
+  return useQuery({
+    queryKey: ['paper-upload-policy'],
+    queryFn: getPaperUploadPolicy,
+  });
+}
+
+export function useRenameSharedPaper() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paperId, payload }: { paperId: string; payload: PaperRenamePayload }) =>
+      renameSharedPaper(paperId, payload),
+    onSuccess: (paper) => {
+      queryClient.setQueryData(['shared-paper', paper.id], paper);
+      queryClient.setQueriesData<{ count: number; results: PaperRecord[] }>(
+        { queryKey: ['shared-papers'] },
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            results: current.results.map((item) => (item.id === paper.id ? paper : item)),
+          };
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: ['shared-papers'] });
+      queryClient.invalidateQueries({ queryKey: ['shared-paper', paper.id] });
+    },
+  });
+}
+
+export function useDeleteSharedPaper() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paperId, payload }: { paperId: string; payload?: PaperDeletePayload }) =>
+      deleteSharedPaper(paperId, payload),
+    onSuccess: (_result, variables) => {
+      queryClient.removeQueries({ queryKey: ['shared-paper', variables.paperId] });
+      queryClient.setQueriesData<{ count: number; results: PaperRecord[] }>(
+        { queryKey: ['shared-papers'] },
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            count: Math.max(0, current.count - current.results.filter((item) => item.id === variables.paperId).length),
+            results: current.results.filter((item) => item.id !== variables.paperId),
+          };
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: ['shared-papers'] });
+    },
   });
 }
 

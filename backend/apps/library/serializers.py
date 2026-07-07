@@ -56,6 +56,8 @@ class PaperRecordSerializer(serializers.ModelSerializer):
     uploadedFileId = serializers.CharField(source="uploaded_file_id", read_only=True)
     keywords = serializers.JSONField(source="tags", read_only=True)
     attachments = PaperAttachmentSerializer(many=True, read_only=True)
+    viewerAvailable = serializers.SerializerMethodField()
+    actionCapabilities = serializers.SerializerMethodField()
 
     class Meta:
         model = PaperRecord
@@ -87,6 +89,8 @@ class PaperRecordSerializer(serializers.ModelSerializer):
             "sourcePathLabel",
             "status",
             "attachments",
+            "viewerAvailable",
+            "actionCapabilities",
         ]
 
     def get_downloadAvailable(self, obj) -> bool:
@@ -97,6 +101,74 @@ class PaperRecordSerializer(serializers.ModelSerializer):
         safe = "".join(char if char.isalnum() or char in " ._-" else " " for char in title)
         safe = " ".join(safe.split()).strip() or "paper"
         return f"{safe}.pdf"
+
+    def get_viewerAvailable(self, obj) -> bool:
+        return obj.status == PaperRecord.Status.ACTIVE
+
+    def get_actionCapabilities(self, obj) -> dict:
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        is_maintainer = bool(
+            getattr(user, "is_authenticated", False)
+            and obj.status == PaperRecord.Status.ACTIVE
+            and (getattr(user, "is_administrator", False) or getattr(user, "is_advisor", False))
+        )
+        can_download = bool(
+            obj.status == PaperRecord.Status.ACTIVE
+            and (obj.uploaded_file_id or obj.attachments.exists())
+        )
+        return {
+            "canRename": is_maintainer,
+            "canDelete": is_maintainer,
+            "canDownload": can_download,
+            "canView": obj.status == PaperRecord.Status.ACTIVE,
+        }
+
+
+class PaperUploadPolicySerializer(serializers.Serializer):
+    category = serializers.CharField()
+    maxSizeBytes = serializers.IntegerField(min_value=0)
+    displayLabel = serializers.CharField()
+    allowedExtensions = serializers.ListField(child=serializers.CharField())
+    contentTypes = serializers.ListField(child=serializers.CharField())
+
+
+class StrictFieldsSerializer(serializers.Serializer):
+    def to_internal_value(self, data):
+        if hasattr(data, "keys"):
+            extra_fields = set(data.keys()) - set(self.fields.keys())
+            if extra_fields:
+                raise serializers.ValidationError(
+                    {field: "Unexpected field." for field in sorted(extra_fields)}
+                )
+        return super().to_internal_value(data)
+
+
+class PaperRenameRequestSerializer(StrictFieldsSerializer):
+    newTitle = serializers.CharField(max_length=500, trim_whitespace=True)
+    reason = serializers.CharField(max_length=255, allow_blank=True, required=False)
+
+    def validate(self, attrs):
+        if not attrs["newTitle"].strip():
+            raise serializers.ValidationError({"newTitle": "Paper title is required."})
+        return attrs
+
+
+class PaperDeleteRequestSerializer(StrictFieldsSerializer):
+    reason = serializers.CharField(max_length=255, allow_blank=True, required=False)
+
+
+class PaperActionCapabilitiesSerializer(serializers.Serializer):
+    canRename = serializers.BooleanField()
+    canDelete = serializers.BooleanField()
+    canDownload = serializers.BooleanField()
+    canView = serializers.BooleanField()
+
+
+class PaperUnavailableErrorSerializer(serializers.Serializer):
+    code = serializers.CharField(default="paper_unavailable")
+    message = serializers.CharField()
+    paperId = serializers.CharField(required=False)
 
 
 class PaperTitleExtractionResultSerializer(serializers.ModelSerializer):

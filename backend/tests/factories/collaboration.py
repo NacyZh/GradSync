@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from apps.accounts.models import RoleActivationRequest, StudentProfile
 from apps.common.models import UploadedFile
+from apps.library.models import PaperFile, PaperRecord
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.submissions.models import TeacherFeedback, WritingProject, WritingVersion
 from tests.factories.accounts import UserFactory
@@ -40,12 +41,65 @@ class UploadedFileFactory(factory.django.DjangoModelFactory):
     checksum_sha256 = factory.Sequence(lambda n: f"{n:064x}"[-64:])
 
 
+class ActiveResearchUserFactory(UserFactory):
+    global_role = "student"
+    status = "active"
+
+
+class PaperLibraryMaintainerFactory(UserFactory):
+    global_role = "advisor"
+    status = "active"
+
+
+class PaperLibraryNonMaintainerFactory(UserFactory):
+    global_role = "student"
+    status = "active"
+
+
 class ResearchProjectFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = ResearchProject
 
     title = factory.Sequence(lambda n: f"Research Project {n}")
     advisor = factory.SubFactory(UserFactory, global_role="advisor", status="active")
+
+
+class PaperRecordFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PaperRecord
+
+    project = factory.SubFactory(ResearchProjectFactory)
+    title = factory.Sequence(lambda n: f"Shared Paper {n}")
+    canonical_title = factory.SelfAttribute("title")
+    authors = factory.LazyFunction(lambda: ["Ada Lovelace"])
+    publication_year = 2026
+    visibility = PaperRecord.Visibility.GROUP_WIDE
+    uploaded_file = factory.SubFactory(UploadedFileFactory)
+    checksum_sha256 = factory.SelfAttribute("uploaded_file.checksum_sha256")
+    created_by = factory.SelfAttribute("project.advisor")
+    status = PaperRecord.Status.ACTIVE
+
+
+class PaperFileFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PaperFile
+
+    paper = factory.SubFactory(PaperRecordFactory)
+    uploaded_file = factory.SubFactory(UploadedFileFactory)
+    original_filename = factory.Sequence(lambda n: f"paper-{n}.pdf")
+    default_download_filename = factory.Sequence(lambda n: f"Shared Paper {n}.pdf")
+    content_type = "application/pdf"
+    size_bytes = 1024
+    file_fingerprint = factory.Sequence(lambda n: f"paper-file-{n:011d}")
+    validation_status = PaperFile.ValidationStatus.VALID
+    uploaded_by = factory.SelfAttribute("paper.created_by")
+
+
+def active_shared_pdf_paper(**overrides):
+    paper = PaperRecordFactory(**overrides)
+    if not hasattr(paper.uploaded_file, "paper_file_record"):
+        PaperFileFactory(paper=paper, uploaded_file=paper.uploaded_file)
+    return paper
 
 
 class ProjectMembershipFactory(factory.django.DjangoModelFactory):

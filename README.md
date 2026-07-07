@@ -114,6 +114,16 @@ fingerprints and strong metadata matches link users to the existing paper;
 fuzzy matches remain out of the ordinary active library until a teacher or
 administrator confirms duplicate or distinct status.
 
+For the paper library file actions feature, run the focused validation set in
+`specs/005-paper-library-file-actions/quickstart.md`:
+
+```bash
+docker compose exec backend pytest backend/tests/unit/test_paper_library_model_rules.py backend/tests/unit/test_paper_import_validation.py backend/tests/contract/test_paper_library_file_actions_api.py
+cd frontend && npm test -- collaboration-paper-library.test.tsx
+cd frontend && npm run test:e2e -- collaboration-paper-library.spec.ts
+sh scripts/check-openapi-contract.sh --strict-shapes specs/005-paper-library-file-actions/contracts/openapi.yaml
+```
+
 ## Production Deployment
 
 Production runs from immutable backend and frontend images:

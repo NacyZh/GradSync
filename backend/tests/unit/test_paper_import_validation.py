@@ -11,6 +11,7 @@ from apps.library.import_services import (
     validate_pdf_upload,
 )
 from apps.library.models import PaperImportJob, PaperRecord
+from apps.library.services import paper_upload_policy
 from tests.factories.accounts import UserFactory
 
 
@@ -91,3 +92,24 @@ def test_shared_import_rejects_missing_title_with_specific_job_reason():
     assert job.status == PaperImportJob.Status.REJECTED
     assert job.failure_reason == PaperImportJob.FailureReason.MISSING_RELIABLE_TITLE
     assert PaperRecord.objects.count() == 0
+
+
+@override_settings(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES=2 * 1024 * 1024)
+def test_paper_upload_policy_formats_effective_size_for_display():
+    policy = paper_upload_policy()
+
+    assert policy == {
+        "category": "paper",
+        "maxSizeBytes": 2 * 1024 * 1024,
+        "displayLabel": "2 MB",
+        "allowedExtensions": [".pdf"],
+        "contentTypes": ["application/pdf"],
+    }
+
+
+@override_settings(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES=1536)
+def test_paper_upload_policy_formats_small_limits_without_ui_drift():
+    policy = paper_upload_policy()
+
+    assert policy["maxSizeBytes"] == 1536
+    assert policy["displayLabel"] == "1.5 KB"

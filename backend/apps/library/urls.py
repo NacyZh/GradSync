@@ -12,6 +12,7 @@ from .views import (
     SharedPaperDetailView,
     SharedPaperDownloadView,
     SharedPaperListCreateView,
+    SharedPaperUploadPolicyView,
 )
 
 router = DefaultRouter(trailing_slash=True)
@@ -37,6 +38,11 @@ urlpatterns = [
     ),
     path("papers/<int:paper_id>/download", PaperDownloadView.as_view(), name="paper-download"),
     path("library/papers/", SharedPaperListCreateView.as_view(), name="shared-paper-list"),
+    path(
+        "library/papers/upload-policy/",
+        SharedPaperUploadPolicyView.as_view(),
+        name="shared-paper-upload-policy",
+    ),
     path(
         "library/papers/<int:paper_id>/",
         SharedPaperDetailView.as_view(),

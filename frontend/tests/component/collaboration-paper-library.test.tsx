@@ -37,6 +37,68 @@ function mockFetch(handler: (url: string, init?: RequestInit) => MockResult) {
   }) as typeof fetch;
 }
 
+type PaperFixtureOverrides = Partial<{
+  id: string;
+  projectId: string;
+  title: string;
+  canonicalTitle: string;
+  authors: string[];
+  publicationYear: number;
+  keywords: string[];
+  visibility: 'project_members' | 'group_wide';
+  status: string;
+  downloadAvailable: boolean;
+  defaultDownloadFilename: string;
+  viewerAvailable: boolean;
+  actionCapabilities: {
+    canRename: boolean;
+    canDelete: boolean;
+    canDownload: boolean;
+    canView: boolean;
+  };
+}>;
+
+function paperFixture(overrides: PaperFixtureOverrides = {}) {
+  const canonicalTitle = overrides.canonicalTitle ?? overrides.title ?? 'Graph Neural Methods';
+  return {
+    id: overrides.id ?? '1',
+    projectId: overrides.projectId ?? '7',
+    title: overrides.title ?? canonicalTitle,
+    canonicalTitle,
+    authors: overrides.authors ?? ['Lin Chen'],
+    publicationYear: overrides.publicationYear ?? 2026,
+    keywords: overrides.keywords ?? ['graph'],
+    visibility: overrides.visibility ?? 'group_wide',
+    status: overrides.status ?? 'active',
+    downloadAvailable: overrides.downloadAvailable ?? true,
+    defaultDownloadFilename: overrides.defaultDownloadFilename ?? `${canonicalTitle}.pdf`,
+    viewerAvailable: overrides.viewerAvailable ?? true,
+    actionCapabilities: overrides.actionCapabilities ?? {
+      canRename: false,
+      canDelete: false,
+      canDownload: overrides.downloadAvailable ?? true,
+      canView: true,
+    },
+  };
+}
+
+function mockSharedPaperLibrary(papers = [paperFixture()]) {
+  mockFetch((url) => {
+    const detail = papers.find((paper) => url.includes(`/api/library/papers/${paper.id}/`));
+    if (detail) {
+      return detail;
+    }
+    return { count: papers.length, results: papers };
+  });
+}
+
+function mockSharedPaperDownload(filename = 'Graph Neural Methods.pdf') {
+  return {
+    filename,
+    deliveryMode: 'direct_response',
+  };
+}
+
 function renderPaperLibrary() {
   return renderWithClient(
     <MemoryRouter initialEntries={['/library/papers']}>
@@ -477,5 +539,251 @@ describe('collaboration paper library UI', () => {
     expect((await screen.findAllByText('Maintainer review required')).length).toBeGreaterThan(0);
     expect(screen.getByText(/Review status: pending/)).toBeInTheDocument();
     expect(screen.queryByText(/Accepted:/)).not.toBeInTheDocument();
+  });
+
+  it('renders many papers in a stable scrollable list and opens the selected paper in-page', async () => {
+    const papers = Array.from({ length: 18 }, (_, index) =>
+      paperFixture({
+        id: String(index + 1),
+        title: `Scrollable Paper ${index + 1}`,
+        canonicalTitle: `Scrollable Paper ${index + 1}`,
+        authors: [`Author ${index + 1}`],
+      }),
+    );
+    mockSharedPaperLibrary(papers);
+
+    renderPaperLibrary();
+
+    const list = await screen.findByTestId('paper-results-list');
+    expect(list).toHaveClass('overflow-y-auto');
+    expect(list).toHaveStyle({ maxHeight: '34rem' });
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open paper Scrollable Paper 14/ }));
+
+    const selectedRow = screen.getByRole('button', { name: /Open paper Scrollable Paper 14/ });
+    expect(selectedRow).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByRole('region', { name: 'Selected paper details' })).toHaveTextContent(
+      'Scrollable Paper 14',
+    );
+    expect(screen.getByText('In-page viewer')).toBeInTheDocument();
+  });
+
+  it('opens a focused paper row with Enter and Space keyboard input', async () => {
+    mockSharedPaperLibrary([
+      paperFixture({ id: '1', title: 'Keyboard Paper One', canonicalTitle: 'Keyboard Paper One' }),
+      paperFixture({ id: '2', title: 'Keyboard Paper Two', canonicalTitle: 'Keyboard Paper Two' }),
+    ]);
+
+    renderPaperLibrary();
+
+    const secondRow = await screen.findByRole('button', { name: /Open paper Keyboard Paper Two/ });
+    secondRow.focus();
+    await userEvent.keyboard('{Enter}');
+
+    expect(secondRow).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByRole('region', { name: 'Selected paper details' })).toHaveTextContent(
+      'Keyboard Paper Two',
+    );
+
+    const firstRow = screen.getByRole('button', { name: /Open paper Keyboard Paper One/ });
+    firstRow.focus();
+    await userEvent.keyboard(' ');
+
+    expect(firstRow).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByRole('region', { name: 'Selected paper details' })).toHaveTextContent(
+      'Keyboard Paper One',
+    );
+  });
+
+  it('allows maintainers to rename a selected paper and updates list and detail context', async () => {
+    let currentPaper = paperFixture({
+      id: 'rename-1',
+      title: 'Original Rename Title',
+      canonicalTitle: 'Original Rename Title',
+      actionCapabilities: {
+        canRename: true,
+        canDelete: false,
+        canDownload: true,
+        canView: true,
+      },
+    });
+    const requests: string[] = [];
+    mockFetch((url, init) => {
+      requests.push(`${init?.method ?? 'GET'} ${url}`);
+      if (url.includes('/api/library/papers/rename-1/') && init?.method === 'PATCH') {
+        const payload = JSON.parse(String(init.body));
+        expect(payload).toEqual({ newTitle: 'Renamed Library Title', reason: '' });
+        currentPaper = {
+          ...currentPaper,
+          title: 'Renamed Library Title',
+          canonicalTitle: 'Renamed Library Title',
+          defaultDownloadFilename: 'Renamed Library Title.pdf',
+        };
+        return currentPaper;
+      }
+      if (url.includes('/api/library/papers/rename-1/')) {
+        return currentPaper;
+      }
+      return { count: 1, results: [currentPaper] };
+    });
+
+    renderPaperLibrary();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open paper Original Rename Title/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rename paper' }));
+    await userEvent.clear(screen.getByLabelText('New paper title'));
+    await userEvent.type(screen.getByLabelText('New paper title'), 'Renamed Library Title');
+    await userEvent.click(screen.getByRole('button', { name: 'Save title' }));
+
+    expect(
+      await screen.findByRole('button', { name: /Open paper Renamed Library Title/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Selected paper details' })).toHaveTextContent(
+      'Renamed Library Title',
+    );
+    expect(requests.some((request) => request.startsWith('PATCH'))).toBe(true);
+  });
+
+  it('hides rename controls for non-maintainers', async () => {
+    const paper = paperFixture({
+      id: 'rename-denied',
+      title: 'No Rename Permission',
+      canonicalTitle: 'No Rename Permission',
+      actionCapabilities: {
+        canRename: false,
+        canDelete: false,
+        canDownload: true,
+        canView: true,
+      },
+    });
+    mockSharedPaperLibrary([paper]);
+
+    renderPaperLibrary();
+
+    await screen.findByRole('button', { name: /Open paper No Rename Permission/ });
+    expect(screen.queryByRole('button', { name: 'Rename paper' })).not.toBeInTheDocument();
+  });
+
+  it('shows validation errors from failed rename attempts', async () => {
+    const maintainerPaper = paperFixture({
+      id: 'rename-invalid',
+      title: 'Invalid Rename Source',
+      canonicalTitle: 'Invalid Rename Source',
+      actionCapabilities: {
+        canRename: true,
+        canDelete: false,
+        canDownload: true,
+        canView: true,
+      },
+    });
+    mockFetch((url, init) => {
+      if (url.includes('/api/library/papers/rename-invalid/') && init?.method === 'PATCH') {
+        return {
+          status: 400,
+          json: { message: 'Paper title is required.' },
+        };
+      }
+      if (url.includes('/api/library/papers/rename-invalid/')) {
+        return maintainerPaper;
+      }
+      return { count: 1, results: [maintainerPaper] };
+    });
+
+    renderPaperLibrary();
+    await userEvent.click(await screen.findByRole('button', { name: /Open paper Invalid Rename Source/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rename paper' }));
+    await userEvent.clear(screen.getByLabelText('New paper title'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save title' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Paper title is required.');
+  });
+
+  it('allows maintainers to delete a selected paper after confirmation without restore controls', async () => {
+    let papers = [
+      paperFixture({
+        id: 'delete-1',
+        title: 'Delete Candidate Paper',
+        canonicalTitle: 'Delete Candidate Paper',
+        actionCapabilities: {
+          canRename: true,
+          canDelete: true,
+          canDownload: true,
+          canView: true,
+        },
+      }),
+    ];
+    const requests: string[] = [];
+    mockFetch((url, init) => {
+      requests.push(`${init?.method ?? 'GET'} ${url}`);
+      if (url.includes('/api/library/papers/delete-1/') && init?.method === 'DELETE') {
+        expect(JSON.parse(String(init.body))).toEqual({ reason: 'Duplicate upload' });
+        papers = [];
+        return { status: 200, json: null };
+      }
+      const detail = papers.find((paper) => url.includes(`/api/library/papers/${paper.id}/`));
+      if (detail) {
+        return detail;
+      }
+      return { count: papers.length, results: papers };
+    });
+
+    renderPaperLibrary();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open paper Delete Candidate Paper/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete paper' }));
+    expect(screen.getByText('Delete Delete Candidate Paper')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Delete reason'), 'Duplicate upload');
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Open paper Delete Candidate Paper/ })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('No shared papers are available yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /restore/i })).not.toBeInTheDocument();
+    expect(requests.some((request) => request.startsWith('DELETE'))).toBe(true);
+  });
+
+  it('hides delete controls for non-maintainers', async () => {
+    const paper = paperFixture({
+      id: 'delete-denied',
+      title: 'No Delete Permission',
+      canonicalTitle: 'No Delete Permission',
+      actionCapabilities: {
+        canRename: false,
+        canDelete: false,
+        canDownload: true,
+        canView: true,
+      },
+    });
+    mockSharedPaperLibrary([paper]);
+
+    renderPaperLibrary();
+
+    await screen.findByRole('button', { name: /Open paper No Delete Permission/ });
+    expect(screen.queryByRole('button', { name: 'Delete paper' })).not.toBeInTheDocument();
+  });
+
+  it('shows stale unavailable selected papers without restore controls', async () => {
+    const paper = paperFixture({
+      id: 'stale-deleted',
+      title: 'Stale Deleted Paper',
+      canonicalTitle: 'Stale Deleted Paper',
+      status: 'deleted',
+      downloadAvailable: false,
+      viewerAvailable: false,
+      actionCapabilities: {
+        canRename: false,
+        canDelete: false,
+        canDownload: false,
+        canView: false,
+      },
+    });
+    mockSharedPaperLibrary([paper]);
+
+    renderPaperLibrary();
+
+    await screen.findByRole('button', { name: /Open paper Stale Deleted Paper/ });
+    expect(screen.getByRole('alert')).toHaveTextContent('This paper is unavailable and cannot be opened.');
+    expect(screen.queryByRole('button', { name: /restore/i })).not.toBeInTheDocument();
   });
 });

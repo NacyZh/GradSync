@@ -123,6 +123,138 @@ async function mockPaperLibraryViewportApi(page: Page) {
   });
 }
 
+async function selectPaperRow(page: Page, title: string) {
+  await page.getByRole('button', { name: new RegExp(`Open paper ${title}`) }).click();
+}
+
+async function interceptPaperDownload(page: Page, paperId: string, filename: string) {
+  await page.route(`**/api/library/papers/${paperId}/download/`, async (route) => {
+    await fulfillJson(route, {
+      filename,
+      deliveryMode: 'direct_response',
+    });
+  });
+}
+
+async function expectEnglishPaperLibraryText(page: Page) {
+  await expect(page.getByRole('heading', { name: 'Paper library' })).toBeVisible();
+  await expect(page.getByText(/论文|选择文件|下载论文/)).toHaveCount(0);
+}
+
+async function mockScrollablePaperLibraryApi(page: Page) {
+  await mockAuthenticatedApi(page);
+  const papers = Array.from({ length: 16 }, (_, index) => ({
+    id: String(index + 1),
+    projectId: '99',
+    title: `Scrollable Paper ${index + 1}`,
+    canonicalTitle: `Scrollable Paper ${index + 1}`,
+    authors: [`Author ${index + 1}`],
+    publicationYear: 2026,
+    keywords: ['scroll'],
+    visibility: 'group_wide',
+    status: 'active',
+    downloadAvailable: true,
+    viewerAvailable: true,
+    defaultDownloadFilename: `Scrollable Paper ${index + 1}.pdf`,
+  }));
+
+  await page.route('**/api/library/papers/**', async (route) => {
+    const url = route.request().url();
+    const detail = papers.find((paper) => url.endsWith(`/api/library/papers/${paper.id}/`));
+    if (detail) {
+      await fulfillJson(route, detail);
+      return;
+    }
+    await fulfillJson(route, { count: papers.length, results: papers });
+  });
+}
+
+async function mockRenamePaperLibraryApi(page: Page) {
+  await mockAuthenticatedApi(page);
+  let paper = {
+    id: 'rename-1',
+    projectId: '99',
+    title: 'Original Rename Title',
+    canonicalTitle: 'Original Rename Title',
+    authors: ['Ada Lovelace'],
+    publicationYear: 2026,
+    keywords: ['rename'],
+    visibility: 'group_wide',
+    status: 'active',
+    downloadAvailable: true,
+    viewerAvailable: true,
+    actionCapabilities: {
+      canRename: true,
+      canDelete: false,
+      canDownload: true,
+      canView: true,
+    },
+    defaultDownloadFilename: 'Original Rename Title.pdf',
+  };
+
+  await page.route('**/api/library/papers/**', async (route) => {
+    const request = route.request();
+    const url = request.url();
+    if (url.endsWith('/api/library/papers/rename-1/') && request.method() === 'PATCH') {
+      paper = {
+        ...paper,
+        title: 'Renamed Playwright Title',
+        canonicalTitle: 'Renamed Playwright Title',
+        defaultDownloadFilename: 'Renamed Playwright Title.pdf',
+      };
+      await fulfillJson(route, paper);
+      return;
+    }
+    if (url.endsWith('/api/library/papers/rename-1/')) {
+      await fulfillJson(route, paper);
+      return;
+    }
+    await fulfillJson(route, { count: 1, results: [paper] });
+  });
+}
+
+async function mockDeletePaperLibraryApi(page: Page) {
+  await mockAuthenticatedApi(page);
+  let papers = [
+    {
+      id: 'delete-1',
+      projectId: '99',
+      title: 'Delete Playwright Paper',
+      canonicalTitle: 'Delete Playwright Paper',
+      authors: ['Ada Lovelace'],
+      publicationYear: 2026,
+      keywords: ['delete'],
+      visibility: 'group_wide',
+      status: 'active',
+      downloadAvailable: true,
+      viewerAvailable: true,
+      actionCapabilities: {
+        canRename: true,
+        canDelete: true,
+        canDownload: true,
+        canView: true,
+      },
+      defaultDownloadFilename: 'Delete Playwright Paper.pdf',
+    },
+  ];
+
+  await page.route('**/api/library/papers/**', async (route) => {
+    const request = route.request();
+    const url = request.url();
+    if (url.endsWith('/api/library/papers/delete-1/') && request.method() === 'DELETE') {
+      papers = [];
+      await fulfillJson(route, null);
+      return;
+    }
+    const detail = papers.find((paper) => url.endsWith(`/api/library/papers/${paper.id}/`));
+    if (detail) {
+      await fulfillJson(route, detail);
+      return;
+    }
+    await fulfillJson(route, { count: papers.length, results: papers });
+  });
+}
+
 async function expectNoControlOverflow(page: Page) {
   const issues = await page.evaluate(() => {
     const overflow: string[] = [];
@@ -141,6 +273,66 @@ async function expectNoControlOverflow(page: Page) {
   });
   expect(issues).toEqual([]);
 }
+
+test('paper rows scroll, select, and open an in-page viewer with pointer and keyboard', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked viewport coverage uses deterministic scroll fixtures.');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockScrollablePaperLibraryApi(page);
+  await page.goto('/library/papers');
+
+  const list = page.getByTestId('paper-results-list');
+  await expect(list).toBeVisible();
+  await expect(list).toHaveCSS('overflow-y', 'auto');
+  await selectPaperRow(page, 'Scrollable Paper 14');
+  await expect(page.getByRole('region', { name: 'Selected paper details' })).toContainText(
+    'Scrollable Paper 14',
+  );
+  await expect(page.getByText('In-page viewer')).toBeVisible();
+
+  await page.getByRole('button', { name: /Open paper Scrollable Paper 2/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Selected paper details' })).toContainText(
+    'Scrollable Paper 2',
+  );
+});
+
+test('maintainer renames a selected paper and sees updated list and detail context', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked rename coverage uses deterministic maintainer fixtures.');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockRenamePaperLibraryApi(page);
+  await page.goto('/library/papers');
+
+  await selectPaperRow(page, 'Original Rename Title');
+  await page.getByRole('button', { name: 'Rename paper' }).click();
+  await page.getByLabel('New paper title').fill('Renamed Playwright Title');
+  await page.getByRole('button', { name: 'Save title' }).click();
+
+  await expect(page.getByRole('button', { name: /Open paper Renamed Playwright Title/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Selected paper details' })).toContainText(
+    'Renamed Playwright Title',
+  );
+  await expectNoControlOverflow(page);
+});
+
+test('maintainer deletes a selected paper and no restore action appears', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked delete coverage uses deterministic maintainer fixtures.');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockDeletePaperLibraryApi(page);
+  await page.goto('/library/papers');
+
+  await selectPaperRow(page, 'Delete Playwright Paper');
+  await page.getByRole('button', { name: 'Delete paper' }).click();
+  await page.getByLabel('Delete reason').fill('Duplicate upload');
+  await page.getByRole('button', { name: 'Confirm delete' }).click();
+
+  await expect(page.getByRole('button', { name: /Open paper Delete Playwright Paper/ })).toHaveCount(0);
+  await expect(page.getByText('No shared papers are available yet.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /restore/i })).toHaveCount(0);
+  await expectNoControlOverflow(page);
+});
 
 for (const viewport of [
   { width: 1280, height: 900, label: 'desktop' },
