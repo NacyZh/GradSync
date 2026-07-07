@@ -83,9 +83,9 @@ export function PaperLibraryPage() {
     (duplicateSelection?.id === selectedId ? duplicateSelection : undefined);
   const selectedPaper =
     (renamedPaper?.id === selectedId ? renamedPaper : undefined) ??
-    selectedSummary ??
     importedSelection ??
-    detailQuery.data;
+    detailQuery.data ??
+    selectedSummary;
   const activeFilterText = [query, author, year, keyword].filter(Boolean).join(', ');
   const isMaintainer = user?.global_role === 'advisor' || user?.global_role === 'admin';
   const selectedPaperWithCapabilities = withDefaultActionCapabilities(selectedPaper, isMaintainer);

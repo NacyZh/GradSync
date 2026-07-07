@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.library.models import PaperRecord
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
@@ -80,14 +80,7 @@ class Command(BaseCommand):
             ProjectMembership.objects.update_or_create(
                 project=project, user=user, defaults={"role": role, "status": "active"}
             )
-        PaperRecord.objects.filter(
-            project=project,
-            title__in=[
-                "Graph Neural Methods",
-                "Graph Neural Methods for Materials Research",
-                "Graph Neural Methods for Research Groups",
-            ],
-        ).delete()
+        call_command("remove_seeded_paper_samples", verbosity=options["verbosity"])
         parent, _ = Task.objects.get_or_create(
             project=project,
             title="Prepare manuscript methods section",

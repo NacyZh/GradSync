@@ -28,6 +28,23 @@ def test_shared_paper_detail_returns_viewer_capabilities(api_client):
     assert response.data["actionCapabilities"]["canDownload"] is True
 
 
+def test_shared_paper_list_returns_maintainer_action_capabilities(api_client):
+    maintainer = UserFactory(global_role="advisor", status="active")
+    paper = PaperRecordFactory(
+        title="Maintainer List Capability Paper",
+        canonical_title="Maintainer List Capability Paper",
+        project__advisor=maintainer,
+        created_by=maintainer,
+    )
+
+    response = authenticate(api_client, maintainer).get("/api/library/papers/")
+
+    assert response.status_code == 200
+    item = next(result for result in response.data["results"] if result["id"] == paper.id)
+    assert item["actionCapabilities"]["canRename"] is True
+    assert item["actionCapabilities"]["canDelete"] is True
+
+
 def test_shared_paper_detail_excludes_deleted_and_invalid_papers(api_client):
     user = UserFactory(global_role="student", status="active")
     deleted = PaperRecordFactory(status=PaperRecord.Status.DELETED)

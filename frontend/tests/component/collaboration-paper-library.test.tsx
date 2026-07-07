@@ -397,6 +397,52 @@ describe('collaboration paper library UI', () => {
     expect(screen.getByRole('button', { name: 'Delete paper' })).toBeInTheDocument();
   });
 
+  it('uses selected paper detail capabilities when list summaries are stale', async () => {
+    const listPaper = paperFixture({
+      id: 'detail-capabilities',
+      title: 'Detail Capability Paper',
+      canonicalTitle: 'Detail Capability Paper',
+      actionCapabilities: {
+        canRename: false,
+        canDelete: false,
+        canDownload: true,
+        canView: true,
+      },
+    });
+    const detailPaper = {
+      ...listPaper,
+      actionCapabilities: {
+        canRename: true,
+        canDelete: true,
+        canDownload: true,
+        canView: true,
+      },
+    };
+
+    mockFetch((url) => {
+      if (url.includes('/api/accounts/me/')) {
+        return {
+          id: 10,
+          email: 'advisor@example.edu',
+          name: 'Advisor',
+          global_role: 'advisor',
+          status: 'active',
+        };
+      }
+      if (url.includes('/api/library/papers/detail-capabilities/')) {
+        return detailPaper;
+      }
+      return { count: 1, results: [listPaper] };
+    });
+
+    renderAuthenticatedPaperLibrary();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open paper Detail Capability Paper/ }));
+
+    expect(await screen.findByRole('button', { name: 'Rename paper' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete paper' })).toBeInTheDocument();
+  });
+
   it('uses bounded layout state hooks for loading, empty, error, permission, unavailable, and no-paper states', async () => {
     global.fetch = vi.fn(() => new Promise<Response>(() => undefined)) as typeof fetch;
     renderPaperLibrary();

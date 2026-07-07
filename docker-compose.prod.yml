@@ -8,7 +8,9 @@ services:
       - path: .env.production.example
       - path: .env.production
         required: false
-    command: python manage.py migrate --noinput
+    command: >
+      sh -c "python manage.py migrate --noinput
+      && python manage.py remove_seeded_paper_samples"
     mem_limit: ${GRADSYNC_MIGRATE_MEM_LIMIT:-256m}
     restart: "no"
     depends_on:

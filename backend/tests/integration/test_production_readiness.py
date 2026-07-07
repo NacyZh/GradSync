@@ -47,7 +47,8 @@ def test_frontend_nginx_serves_static_assets_and_proxies_api():
     assert "proxy_set_header Host $host;" in nginx_conf
     assert "proxy_set_header X-Forwarded-Proto https;" in nginx_conf
     assert "client_max_body_size 30m;" in nginx_conf
-    assert 'Cache-Control "public, max-age=31536000, immutable"' in nginx_conf
+    assert 'Cache-Control "public, max-age=31536000, immutable" always' in nginx_conf
+    assert 'Cache-Control "no-store" always' in nginx_conf
     assert "try_files $uri /index.html" in nginx_conf
 
 
@@ -67,6 +68,7 @@ def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
     assert "max_connections=${GRADSYNC_POSTGRES_MAX_CONNECTIONS:-40}" in compose
     assert "X-Forwarded-Proto':'https'" in compose
     assert "http://127.0.0.1:8080/healthz/" in compose
+    assert "python manage.py remove_seeded_paper_samples" in compose
 
 
 def test_production_operational_docs_are_present_and_actionable():

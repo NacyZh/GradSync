@@ -254,9 +254,10 @@ class SharedPaperListCreateView(generics.GenericAPIView):
         )
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = PaperRecordSerializer(page, many=True)
+            serializer = PaperRecordSerializer(page, many=True, context={"request": request})
             return self.get_paginated_response(serializer.data)
-        return Response(PaperRecordSerializer(queryset, many=True).data)
+        serializer = PaperRecordSerializer(queryset, many=True, context={"request": request})
+        return Response(serializer.data)
 
     @extend_schema(
         request={"multipart/form-data": PaperPdfImportSerializer},

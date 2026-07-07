@@ -65,6 +65,8 @@
 
   html {
     color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   html[data-theme='dark'] {
@@ -90,6 +92,13 @@
 
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  .select-none {
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 
