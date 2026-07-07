@@ -128,7 +128,7 @@ export function PaperLibraryPage() {
     >
       <div
         data-testid="paper-library-workspace"
-        className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(14rem,0.65fr)_minmax(0,1.1fr)] xl:grid-cols-[minmax(15rem,0.58fr)_minmax(24rem,0.95fr)_minmax(22rem,1fr)]"
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(13rem,0.55fr)_minmax(0,1.25fr)] xl:grid-cols-[minmax(13rem,0.45fr)_minmax(32rem,1.35fr)_minmax(18rem,0.8fr)]"
       >
         <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label={t('paperLibraryImportDownloadRegion')}>
           <div>

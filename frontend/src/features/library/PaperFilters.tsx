@@ -39,8 +39,8 @@ export function PaperFilters({
 
   return (
     <div className="grid gap-2">
-      <div className="grid gap-2 md:grid-cols-[minmax(16rem,1fr)_10rem_8rem_10rem]">
-        <label className="block">
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+        <label className="block min-w-0 sm:col-span-2">
           <span className="sr-only">{t('paperLibrarySearchPapers')}</span>
           <span className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
