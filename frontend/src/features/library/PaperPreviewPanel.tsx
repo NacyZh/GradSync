@@ -68,12 +68,12 @@ export function PaperPreviewPanel({ paper }: PaperPreviewPanelProps) {
 
   if (!paper) {
     return (
-      <section aria-label={t('paperLibraryPreviewRegion')} className="panel relative z-0 grid min-w-0 content-start gap-3">
+      <section data-testid="paper-preview-panel" aria-label={t('paperLibraryPreviewRegion')} className="panel relative z-0 grid min-w-0 content-start gap-3 overflow-hidden lg:col-span-2 xl:col-span-1">
         <div className="flex min-w-0 items-center gap-2">
           <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
           <h3 className="min-w-0 text-base font-bold">{t('paperLibraryInPageViewer')}</h3>
         </div>
-        <p className="min-w-0 break-words text-sm text-muted-foreground">{t('paperLibraryMetadataAfterSelection')}</p>
+        <p data-testid="paper-preview-state" className="min-w-0 break-words text-sm text-muted-foreground">{t('paperLibraryMetadataAfterSelection')}</p>
         <div className="grid min-h-80 place-items-center rounded-md border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
           {t('paperLibraryPreviewUnavailable')}
         </div>
@@ -82,12 +82,13 @@ export function PaperPreviewPanel({ paper }: PaperPreviewPanelProps) {
   }
 
   return (
-    <section aria-label={t('paperLibraryPreviewRegion')} className="panel relative z-0 grid min-w-0 content-start gap-3">
+    <section data-testid="paper-preview-panel" aria-label={t('paperLibraryPreviewRegion')} className="panel relative z-0 grid min-w-0 content-start gap-3 overflow-hidden lg:col-span-2 xl:col-span-1">
       <div className="flex min-w-0 items-center gap-2">
         <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
         <h3 className="min-w-0 break-words text-base font-bold">{t('paperLibraryInPageViewer')}</h3>
       </div>
       <p
+        data-testid="paper-preview-state"
         role={canPreview ? undefined : 'alert'}
         className={`min-w-0 break-words text-sm ${canPreview ? 'text-muted-foreground' : 'text-destructive'}`}
       >
@@ -102,10 +103,10 @@ export function PaperPreviewPanel({ paper }: PaperPreviewPanelProps) {
         <iframe
           title={`${displayTitle} ${t('paperLibraryPdfPreview')}`}
           src={previewUrl}
-          className="h-[72vh] min-h-[34rem] w-full min-w-0 max-w-full rounded-md border bg-background"
+          className="h-[60vh] min-h-[22rem] w-full min-w-0 max-w-full rounded-md border bg-background md:min-h-[30rem] xl:h-[72vh] xl:min-h-[34rem]"
         />
       ) : canPreview ? (
-        <div className="grid min-h-80 place-items-center rounded-md border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
+        <div className="grid min-h-80 min-w-0 place-items-center rounded-md border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
           {isPreviewLoading ? t('paperLibraryPreviewLoading') : t('paperLibraryPreviewUnavailable')}
         </div>
       ) : null}

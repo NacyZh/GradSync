@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -68,7 +68,9 @@ type PaperFixtureOverrides = Partial<{
   projectId: string;
   title: string;
   canonicalTitle: string;
+  titleSource: string;
   authors: string[];
+  venue: string;
   publicationYear: number;
   keywords: string[];
   visibility: 'project_members' | 'group_wide';
@@ -86,13 +88,18 @@ type PaperFixtureOverrides = Partial<{
 
 function paperFixture(overrides: PaperFixtureOverrides = {}) {
   const canonicalTitle = overrides.canonicalTitle ?? overrides.title ?? 'Graph Neural Methods';
+  const publicationYear = Object.prototype.hasOwnProperty.call(overrides, 'publicationYear')
+    ? overrides.publicationYear
+    : 2026;
   return {
     id: overrides.id ?? '1',
     projectId: overrides.projectId ?? '7',
     title: overrides.title ?? canonicalTitle,
     canonicalTitle,
+    titleSource: overrides.titleSource ?? 'embedded_metadata',
     authors: overrides.authors ?? ['Lin Chen'],
-    publicationYear: overrides.publicationYear ?? 2026,
+    venue: overrides.venue,
+    publicationYear,
     keywords: overrides.keywords ?? ['graph'],
     visibility: overrides.visibility ?? 'group_wide',
     status: overrides.status ?? 'active',
@@ -136,6 +143,68 @@ function renderPaperLibrary() {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+const longLayoutTitle =
+  'A Very Long Academic Paper Title About Compact Shared Library Browsing Rows Metadata Density Responsive Containers and Full Detail Context Preservation';
+const longAuthors = [
+  'Alexandra Cassandra Researcher',
+  'Benjamin Longform Contributor',
+  'Charlotte Metadata Specialist',
+  'Deepak Responsive Layout Analyst',
+  'Elena File Workflow Reviewer',
+];
+const longVenue =
+  'Proceedings of the International Symposium on Extremely Long Journal Names and Responsive Research Operations';
+
+function layoutPapers() {
+  return [
+    paperFixture({
+      id: 'short-layout',
+      title: 'Compact Row Patterns',
+      canonicalTitle: 'Compact Row Patterns',
+      authors: ['Lin Chen'],
+      venue: 'UI Systems',
+      titleSource: 'embedded_metadata',
+    }),
+    paperFixture({
+      id: 'long-layout',
+      title: 'Local PDF Title',
+      canonicalTitle: longLayoutTitle,
+      authors: longAuthors,
+      venue: longVenue,
+      keywords: ['layout', 'overflow', 'responsive'],
+      titleSource: 'first_page_visible_text',
+    }),
+    paperFixture({
+      id: 'missing-layout',
+      title: 'Missing Metadata Paper',
+      canonicalTitle: 'Missing Metadata Paper',
+      authors: [],
+      venue: '',
+      publicationYear: undefined,
+      keywords: [],
+      titleSource: '',
+    }),
+  ];
+}
+
+async function findPaperRow(title: string | RegExp) {
+  const row = await screen.findByRole('button', { name: title instanceof RegExp ? title : new RegExp(title) });
+  expect(row).toHaveAttribute('data-testid', 'paper-result-row');
+  return row;
+}
+
+function getSelectedDetailRegion() {
+  return screen.getByRole('region', { name: 'Selected paper details' });
+}
+
+function getSelectedTitle(region = getSelectedDetailRegion()) {
+  return within(region).getByTestId('paper-detail-title');
+}
+
+function getPrimaryActionGroups() {
+  return screen.getAllByTestId('paper-primary-action-group');
 }
 
 function expectNoChineseText(container: HTMLElement) {
@@ -191,6 +260,170 @@ describe('collaboration paper library UI', () => {
     expect(within(rightArea).getByPlaceholderText('Search title, author, year, keyword')).toBeInTheDocument();
     expect(within(rightArea).getByRole('region', { name: 'Selected paper details' })).toBeInTheDocument();
     expect(within(previewArea).getByText('In-page viewer')).toBeInTheDocument();
+  });
+
+  it('renders compact row presentation with clamped titles and bounded metadata summaries', async () => {
+    mockSharedPaperLibrary(layoutPapers());
+
+    renderPaperLibrary();
+
+    const rows = await screen.findAllByTestId('paper-result-row');
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row).toHaveClass('min-h-16');
+      expect(row).toHaveClass('grid-cols-[minmax(0,1fr)_auto]');
+      expect(row).toHaveClass('overflow-hidden');
+      expect(within(row).getByTestId('paper-row-title')).toHaveClass('line-clamp-2');
+      expect(within(row).getByTestId('paper-row-metadata')).toHaveClass('truncate');
+    }
+
+    const missingRow = await findPaperRow(/Missing Metadata Paper/);
+    expect(missingRow).toHaveTextContent('Unknown authors');
+    expect(missingRow).toHaveTextContent('No year');
+    expect(missingRow).toHaveTextContent('shared');
+  });
+
+  it('keeps the full selected title in detail when the browsing row title is clamped', async () => {
+    mockSharedPaperLibrary(layoutPapers());
+
+    renderPaperLibrary();
+
+    const longRow = await findPaperRow(/A Very Long Academic Paper Title/);
+    expect(within(longRow).getByTestId('paper-row-title')).toHaveClass('line-clamp-2');
+    await userEvent.click(longRow);
+
+    const detail = getSelectedDetailRegion();
+    expect(getSelectedTitle(detail)).toHaveTextContent(longLayoutTitle);
+    expect(getSelectedTitle(detail)).not.toHaveClass('line-clamp-2');
+    expect(detail).toHaveTextContent(longVenue);
+    expect(detail).toHaveTextContent(longAuthors.join(', '));
+  });
+
+  it('renders many papers in a bounded vertically scrollable results region without hiding detail context', async () => {
+    const papers = Array.from({ length: 32 }, (_, index) =>
+      paperFixture({
+        id: `bounded-${index + 1}`,
+        title: `Bounded Scroll Paper ${index + 1}`,
+        canonicalTitle: `Bounded Scroll Paper ${index + 1}`,
+        authors: [`Author ${index + 1}`],
+      }),
+    );
+    mockSharedPaperLibrary(papers);
+
+    renderPaperLibrary();
+
+    const list = await screen.findByTestId('paper-results-list');
+    expect(list).toHaveClass('max-h-[32rem]');
+    expect(list).toHaveClass('overflow-y-auto');
+    expect(await screen.findAllByTestId('paper-result-row')).toHaveLength(32);
+
+    await userEvent.click(await findPaperRow(/Bounded Scroll Paper 29/));
+
+    expect(getSelectedTitle()).toHaveTextContent('Bounded Scroll Paper 29');
+    expect(screen.getByTestId('paper-preview-panel')).toBeInTheDocument();
+  });
+
+  it('keeps selected download context and permitted action groups inside stable layout hooks', async () => {
+    const maintainer = paperFixture({
+      id: 'maintainer-layout',
+      title: longLayoutTitle,
+      canonicalTitle: longLayoutTitle,
+      authors: longAuthors,
+      venue: longVenue,
+      actionCapabilities: {
+        canRename: true,
+        canDelete: true,
+        canDownload: true,
+        canView: true,
+      },
+    });
+    mockSharedPaperLibrary([maintainer]);
+
+    renderPaperLibrary();
+
+    await userEvent.click(await findPaperRow(/A Very Long Academic Paper Title/));
+    expect(getSelectedTitle()).toHaveTextContent(longLayoutTitle);
+    for (const group of getPrimaryActionGroups()) {
+      expect(group).toHaveClass('min-w-0');
+      expect(group).toHaveClass('flex-wrap');
+    }
+    expect(screen.getByRole('button', { name: 'Rename paper' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete paper' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Download A Very Long Academic Paper Title/ })).toBeEnabled();
+  });
+
+  it('uses bounded layout state hooks for loading, empty, error, permission, unavailable, and no-paper states', async () => {
+    global.fetch = vi.fn(() => new Promise<Response>(() => undefined)) as typeof fetch;
+    renderPaperLibrary();
+    expect(await screen.findByTestId('paper-layout-state')).toHaveTextContent('Loading papers');
+
+    cleanup();
+    mockFetch(() => ({ count: 0, results: [] }));
+    renderPaperLibrary();
+    await waitFor(() => {
+      expect(screen.getByTestId('paper-layout-state')).toHaveTextContent('No shared papers');
+    });
+
+    cleanup();
+    mockFetch(() => ({ status: 500, json: { message: 'Paper service unavailable.' } }));
+    renderPaperLibrary();
+    await waitFor(() => {
+      expect(screen.getByTestId('paper-layout-state')).toHaveTextContent('Paper library unavailable');
+    });
+
+    cleanup();
+    mockFetch(() => ({
+      status: 403,
+      json: { message: 'Active account required for the shared paper library.' },
+    }));
+    renderPaperLibrary();
+    await waitFor(() => {
+      expect(screen.getByTestId('paper-layout-state')).toHaveTextContent('Active account required');
+    });
+
+    cleanup();
+    const unavailable = paperFixture({
+      id: 'unavailable-layout',
+      title: 'Unavailable Layout Paper',
+      canonicalTitle: 'Unavailable Layout Paper',
+      status: 'deleted',
+      downloadAvailable: false,
+      viewerAvailable: false,
+      actionCapabilities: {
+        canRename: false,
+        canDelete: false,
+        canDownload: false,
+        canView: false,
+      },
+    });
+    mockSharedPaperLibrary([unavailable]);
+    renderPaperLibrary();
+    await waitFor(() => {
+      expect(screen.getByTestId('paper-preview-state')).toHaveTextContent('This paper is unavailable');
+    });
+  });
+
+  it('does not leave restricted maintainer action gaps for non-maintainers', async () => {
+    const paper = paperFixture({
+      id: 'non-maintainer-layout',
+      title: 'Non Maintainer Layout Paper',
+      canonicalTitle: 'Non Maintainer Layout Paper',
+      actionCapabilities: {
+        canRename: false,
+        canDelete: false,
+        canDownload: true,
+        canView: true,
+      },
+    });
+    mockSharedPaperLibrary([paper]);
+
+    renderPaperLibrary();
+
+    await findPaperRow(/Non Maintainer Layout Paper/);
+    const detail = getSelectedDetailRegion();
+    expect(within(detail).queryByRole('button', { name: 'Rename paper' })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole('button', { name: 'Delete paper' })).not.toBeInTheDocument();
+    expect(within(detail).getByTestId('paper-primary-action-group')).toHaveClass('flex-wrap');
   });
 
   it('keeps narrow-screen workflows distinct without metadata fields or lost selection context', async () => {
@@ -780,7 +1013,7 @@ describe('collaboration paper library UI', () => {
 
     const list = await screen.findByTestId('paper-results-list');
     expect(list).toHaveClass('overflow-y-auto');
-    expect(list).toHaveStyle({ maxHeight: '28rem' });
+    expect(list).toHaveClass('max-h-[32rem]');
 
     await userEvent.click(await screen.findByRole('button', { name: /Open paper Scrollable Paper 14/ }));
 

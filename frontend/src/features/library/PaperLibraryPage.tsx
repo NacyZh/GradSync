@@ -22,6 +22,17 @@ function getErrorMessage(err: unknown, fallback: string) {
   return fallback;
 }
 
+function paperSourceLabel(paper: PaperRecord, fallback: string) {
+  return paper.titleSource?.replaceAll('_', ' ') || fallback;
+}
+
+function paperMetadataSummary(paper: PaperRecord, unknownAuthors: string, unknownYear: string) {
+  const authors = paper.authors.join(', ') || unknownAuthors;
+  const year = paper.publicationYear ?? unknownYear;
+  const venue = paper.venue ? ` · ${paper.venue}` : '';
+  return `${authors} · ${year}${venue}`;
+}
+
 export function PaperLibraryPage() {
   const { t } = useI18n();
   const { user } = useAuth();
@@ -117,7 +128,7 @@ export function PaperLibraryPage() {
     >
       <div
         data-testid="paper-library-workspace"
-        className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(15rem,0.65fr)_minmax(21rem,0.95fr)_minmax(20rem,1fr)]"
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(14rem,0.65fr)_minmax(0,1.1fr)] xl:grid-cols-[minmax(15rem,0.58fr)_minmax(24rem,0.95fr)_minmax(22rem,1fr)]"
       >
         <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label={t('paperLibraryImportDownloadRegion')}>
           <div>
@@ -149,56 +160,64 @@ export function PaperLibraryPage() {
             />
           </div>
           {papersQuery.isLoading ? (
-            <DataState state="loading" title={t('paperLibraryLoadingTitle')} message={t('paperLibraryLoadingMessage')} />
+            <div data-testid="paper-layout-state" className="min-w-0">
+              <DataState state="loading" title={t('paperLibraryLoadingTitle')} message={t('paperLibraryLoadingMessage')} />
+            </div>
           ) : null}
           {papersQuery.error ? (
-            <DataState
-              state="error"
-              title={t('paperLibraryUnavailableTitle')}
-              message={getErrorMessage(papersQuery.error, t('paperLibraryLoadError'))}
-            />
+            <div data-testid="paper-layout-state" className="min-w-0">
+              <DataState
+                state="error"
+                title={t('paperLibraryUnavailableTitle')}
+                message={getErrorMessage(papersQuery.error, t('paperLibraryLoadError'))}
+              />
+            </div>
           ) : null}
           {!papersQuery.isLoading && !papersQuery.error && !papers.length ? (
-            <DataState
-              state="empty"
-              title={t('paperLibraryEmptyTitle')}
-              message={
-                activeFilterText
-                  ? `${t('paperLibraryEmptyFilteredPrefix')} ${activeFilterText}.`
-                  : t('paperLibraryEmptyDefault')
-              }
-            />
+            <div data-testid="paper-layout-state" className="min-w-0">
+              <DataState
+                state="empty"
+                title={t('paperLibraryEmptyTitle')}
+                message={
+                  activeFilterText
+                    ? `${t('paperLibraryEmptyFilteredPrefix')} ${activeFilterText}.`
+                    : t('paperLibraryEmptyDefault')
+                }
+              />
+            </div>
           ) : null}
-          <div className="grid min-w-0 gap-4">
+          <div className="grid min-w-0 gap-4 overflow-hidden">
             <ul
               data-testid="paper-results-list"
-              className="grid content-start gap-2 overflow-y-auto pr-1"
-              style={{ maxHeight: '28rem' }}
+              className="grid max-h-[32rem] min-w-0 content-start gap-2 overflow-y-auto overflow-x-hidden pr-1"
               aria-label={t('paperLibrarySearchResults')}
             >
               {papers.map((paper) => (
-                <li key={paper.id}>
+                <li key={paper.id} className="min-w-0">
                   <button
                     type="button"
                     aria-label={`${t('paperLibraryOpenPaperPrefix')} ${paperTitle(paper)}; ${t('paperLibrarySelectPaperPrefix')} ${paperTitle(paper)}`}
                     aria-pressed={selectedId === paper.id}
                     data-selected={selectedId === paper.id ? 'true' : 'false'}
-                    className={`min-h-24 w-full min-w-0 overflow-hidden rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    data-testid="paper-result-row"
+                    className={`grid min-h-16 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-md border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                       selectedId === paper.id
                         ? 'border-primary bg-primary/10 shadow-sm'
-                        : 'hover:bg-muted'
+                        : 'bg-background hover:bg-muted'
                     }`}
                     onClick={() => openPaper(paper.id)}
                     onKeyDown={(event) => handlePaperRowKeyDown(event, paper.id)}
                   >
-                    <span className="flex min-w-0 flex-wrap items-start justify-between gap-2">
-                      <strong className="min-w-0 break-words">{paperTitle(paper)}</strong>
-                      <span className="max-w-full shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
-                        {paper.titleSource?.replaceAll('_', ' ') || t('paperLibrarySharedSource')}
+                    <span className="grid min-w-0 gap-1">
+                      <strong data-testid="paper-row-title" className="line-clamp-2 min-w-0 break-words text-sm leading-snug">
+                        {paperTitle(paper)}
+                      </strong>
+                      <span data-testid="paper-row-metadata" className="block min-w-0 truncate text-xs text-muted-foreground">
+                        {paperMetadataSummary(paper, t('paperLibraryUnknownAuthors'), t('paperLibraryUnknownYear'))}
                       </span>
                     </span>
-                    <span className="block min-w-0 break-words text-sm text-muted-foreground">
-                      {paper.authors.join(', ') || t('paperLibraryUnknownAuthors')} · {paper.publicationYear ?? t('paperLibraryUnknownYear')}
+                    <span className="max-w-[9rem] shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
+                      {paperSourceLabel(paper, t('paperLibrarySharedSource'))}
                     </span>
                   </button>
                 </li>

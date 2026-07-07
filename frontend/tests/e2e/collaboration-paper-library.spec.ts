@@ -2,6 +2,27 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
+const REQUIRED_LAYOUT_VIEWPORTS = [
+  { width: 1440, height: 920, label: 'desktop-1440' },
+  { width: 1024, height: 900, label: 'tablet-1024' },
+  { width: 768, height: 900, label: 'narrow-tablet-768' },
+  { width: 390, height: 844, label: 'mobile-390' },
+];
+const paperRowSelector = '[data-testid="paper-result-row"]';
+const paperRowTitleSelector = '[data-testid="paper-row-title"]';
+const selectedTitleSelector = '[data-testid="paper-detail-title"]';
+const previewStateSelector = '[data-testid="paper-preview-state"]';
+const primaryActionGroupSelector = '[data-testid="paper-primary-action-group"]';
+
+const longLayoutTitle =
+  'A Very Long Academic Paper Title About Compact Shared Library Browsing Rows Metadata Density Responsive Containers and Full Detail Context Preservation';
+const longLayoutAuthors = [
+  'Alexandra Cassandra Researcher',
+  'Benjamin Longform Contributor',
+  'Charlotte Metadata Specialist',
+  'Deepak Responsive Layout Analyst',
+];
+
 async function mockPaperLibraryViewportApi(page: Page) {
   await mockAuthenticatedApi(page);
   let imported = false;
@@ -127,8 +148,120 @@ async function mockPaperLibraryViewportApi(page: Page) {
   });
 }
 
+async function mockLayoutValidationApi(page: Page, options: { empty?: boolean; error?: number; maintainer?: boolean } = {}) {
+  await mockAuthenticatedApi(page);
+  const papers = [
+    {
+      id: 'long-layout',
+      projectId: '99',
+      title: 'Local PDF Title',
+      canonicalTitle: longLayoutTitle,
+      authors: longLayoutAuthors,
+      publicationYear: 2026,
+      venue: 'Proceedings of the International Symposium on Extremely Long Journal Names and Responsive Research Operations',
+      keywords: ['layout', 'overflow', 'responsive'],
+      titleSource: 'first_page_visible_text',
+      visibility: 'group_wide',
+      status: 'active',
+      downloadAvailable: true,
+      viewerAvailable: true,
+      actionCapabilities: {
+        canRename: Boolean(options.maintainer),
+        canDelete: Boolean(options.maintainer),
+        canDownload: true,
+        canView: true,
+      },
+      defaultDownloadFilename: `${longLayoutTitle}.pdf`,
+    },
+    ...Array.from({ length: 12 }, (_, index) => ({
+      id: `layout-${index + 1}`,
+      projectId: '99',
+      title: `Compact Layout Paper ${index + 1}`,
+      canonicalTitle: `Compact Layout Paper ${index + 1}`,
+      authors: index === 0 ? [] : [`Author ${index + 1}`],
+      publicationYear: index === 0 ? undefined : 2026,
+      keywords: ['layout'],
+      titleSource: index === 0 ? '' : 'embedded_metadata',
+      visibility: 'group_wide',
+      status: index === 1 ? 'deleted' : 'active',
+      downloadAvailable: index !== 1,
+      viewerAvailable: index !== 1,
+      actionCapabilities: {
+        canRename: false,
+        canDelete: false,
+        canDownload: index !== 1,
+        canView: index !== 1,
+      },
+      defaultDownloadFilename: `Compact Layout Paper ${index + 1}.pdf`,
+    })),
+  ];
+
+  await page.route('**/api/library/papers/**', async (route) => {
+    const request = route.request();
+    const url = request.url();
+    if (url.endsWith('/api/library/papers/upload-policy/')) {
+      await fulfillJson(route, {
+        category: 'paper',
+        maxSizeBytes: 25 * 1024 * 1024,
+        displayLabel: '25 MB',
+        allowedExtensions: ['.pdf'],
+        contentTypes: ['application/pdf'],
+      });
+      return;
+    }
+    if (url.endsWith('/api/library/papers/') && request.method() === 'POST') {
+      await fulfillJson(route, {
+        id: 'import-layout-responsive',
+        status: 'accepted',
+        requestedBy: 10,
+        userMessage: 'Paper imported',
+        acceptedPaper: {
+          id: 'imported-responsive',
+          projectId: '99',
+          title: 'Imported Responsive Layout Paper',
+          canonicalTitle: 'Imported Responsive Layout Paper',
+          authors: [],
+          keywords: [],
+          visibility: 'group_wide',
+          status: 'active',
+          downloadAvailable: true,
+          viewerAvailable: true,
+          defaultDownloadFilename: 'Imported Responsive Layout Paper.pdf',
+        },
+        duplicatePaper: null,
+      }, 202);
+      return;
+    }
+    if (url.endsWith('/api/library/papers/long-layout/download/')) {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${longLayoutTitle}.pdf"`,
+        },
+        body: Buffer.from('%PDF-1.4 layout'),
+      });
+      return;
+    }
+    if (options.error) {
+      await fulfillJson(route, { message: 'Layout state permission or service error.' }, options.error);
+      return;
+    }
+    const detail = papers.find((paper) => url.endsWith(`/api/library/papers/${paper.id}/`));
+    if (detail) {
+      await fulfillJson(route, detail);
+      return;
+    }
+    await fulfillJson(route, { count: options.empty ? 0 : papers.length, results: options.empty ? [] : papers });
+  });
+}
+
 async function selectPaperRow(page: Page, title: string) {
   await page.getByRole('button', { name: new RegExp(`Open paper ${title}`) }).click();
+}
+
+function selectedDetailTitle(page: Page) {
+  return page.getByRole('region', { name: 'Selected paper details' }).locator(selectedTitleSelector);
 }
 
 async function mockScrollablePaperLibraryApi(page: Page) {
@@ -326,6 +459,172 @@ async function expectNoControlOverflow(page: Page) {
   });
   expect(issues).toEqual([]);
 }
+
+async function expectNoFullPageHorizontalScroll(page: Page) {
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
+  expect(overflow.scrollWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.clientWidth + 1);
+  expect(overflow.bodyScrollWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.innerWidth + 1);
+}
+
+async function expectRowsInsideParentBounds(page: Page) {
+  const issues = await page.evaluate(({ rowSelector }) => {
+    const list = document.querySelector('[data-testid="paper-results-list"]');
+    const parentRect = list?.getBoundingClientRect();
+    if (!parentRect) return ['missing paper-results-list'];
+    return Array.from(document.querySelectorAll(rowSelector)).flatMap((element, index) => {
+      const rect = element.getBoundingClientRect();
+      const rowIssues: string[] = [];
+      if (rect.left < parentRect.left - 1 || rect.right > parentRect.right + 1) {
+        rowIssues.push(`row ${index} outside parent ${rect.left}-${rect.right}/${parentRect.left}-${parentRect.right}`);
+      }
+      if ((element as HTMLElement).scrollWidth > (element as HTMLElement).clientWidth + 2) {
+        rowIssues.push(`row ${index} has internal horizontal overflow`);
+      }
+      return rowIssues;
+    });
+  }, { rowSelector: paperRowSelector });
+  expect(issues).toEqual([]);
+}
+
+async function expectPrimaryActionsInsideParentBounds(page: Page) {
+  const issues = await page.evaluate(({ actionSelector }) => {
+    return Array.from(document.querySelectorAll(actionSelector)).flatMap((element, index) => {
+      const rect = element.getBoundingClientRect();
+      const parentRect = element.parentElement?.getBoundingClientRect();
+      if (!parentRect) return [`action group ${index} missing parent`];
+      const actionIssues: string[] = [];
+      if (rect.left < parentRect.left - 1 || rect.right > parentRect.right + 1) {
+        actionIssues.push(`action group ${index} outside parent`);
+      }
+      if ((element as HTMLElement).scrollWidth > (element as HTMLElement).clientWidth + 2) {
+        actionIssues.push(`action group ${index} overflow`);
+      }
+      return actionIssues;
+    });
+  }, { actionSelector: primaryActionGroupSelector });
+  expect(issues).toEqual([]);
+}
+
+async function expectPaperLayoutStable(page: Page) {
+  await expectNoFullPageHorizontalScroll(page);
+  await expectRowsInsideParentBounds(page);
+  await expectPrimaryActionsInsideParentBounds(page);
+  await expectNoControlOverflow(page);
+}
+
+test('paper layout uses compact rows and full selected detail at 1440px', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked layout coverage uses deterministic long-content fixtures.');
+
+  await page.setViewportSize({ width: 1440, height: 920 });
+  await mockLayoutValidationApi(page, { maintainer: true });
+  await page.goto('/library/papers');
+
+  const longRow = page.getByTestId('paper-result-row').filter({ hasText: 'A Very Long Academic Paper Title' });
+  await expect(longRow).toBeVisible();
+  await expect(longRow.locator(paperRowTitleSelector)).toHaveClass(/line-clamp-2/);
+  await longRow.click();
+
+  await expect(selectedDetailTitle(page)).toContainText(longLayoutTitle);
+  await expect(page.getByRole('region', { name: 'Selected paper details' })).toContainText(
+    'Proceedings of the International Symposium',
+  );
+  await expectPaperLayoutStable(page);
+});
+
+test('paper selected context, preview, download, and maintainer actions stay bounded at 1024px', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked layout coverage uses deterministic maintainer fixtures.');
+
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await mockLayoutValidationApi(page, { maintainer: true });
+  await page.goto('/library/papers');
+
+  await page.getByTestId('paper-result-row').filter({ hasText: 'A Very Long Academic Paper Title' }).click();
+  await expect(selectedDetailTitle(page)).toContainText(longLayoutTitle);
+  await expect(page.locator(previewStateSelector)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rename paper' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete paper' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Download A Very Long Academic Paper Title/ })).toBeVisible();
+  await expectPaperLayoutStable(page);
+});
+
+test('paper layout viewport matrix has no page, row, or action overflow', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked viewport coverage uses deterministic long-content fixtures.');
+
+  for (const viewport of REQUIRED_LAYOUT_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await mockLayoutValidationApi(page, { maintainer: true });
+    await page.goto('/library/papers');
+
+    await expect(page.getByTestId('paper-result-row').first()).toBeVisible();
+    await page.getByTestId('paper-result-row').filter({ hasText: 'A Very Long Academic Paper Title' }).click();
+    await expect(selectedDetailTitle(page)).toContainText(longLayoutTitle);
+    await expectPaperLayoutStable(page);
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
+test('mobile paper workflow keeps search browse select open upload and download reachable', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked mobile workflow coverage uses deterministic layout fixtures.');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockLayoutValidationApi(page);
+  await page.goto('/library/papers');
+
+  await page.getByPlaceholder('Search title, author, year, keyword').fill('Very Long');
+  await page.getByTestId('paper-result-row').filter({ hasText: 'A Very Long Academic Paper Title' }).click();
+  await expect(selectedDetailTitle(page)).toContainText(longLayoutTitle);
+  await expect(page.locator(previewStateSelector)).toBeVisible();
+  await page.getByRole('button', { name: /Download A Very Long Academic Paper Title/ }).click();
+  await expect(page.getByRole('status')).toContainText('.pdf');
+
+  await page.getByLabel('PDF file').setInputFiles({
+    name: 'mobile-layout.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4 mobile layout'),
+  });
+  await page.getByRole('button', { name: 'Import PDF' }).click();
+  await expect(page.getByText('Accepted: Imported Responsive Layout Paper')).toBeVisible();
+  await expectPaperLayoutStable(page);
+});
+
+test('paper layout state coverage stays bounded for empty error permission unavailable and selected states', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked layout state coverage uses deterministic state fixtures.');
+
+  await page.setViewportSize({ width: 768, height: 900 });
+
+  await mockLayoutValidationApi(page, { empty: true });
+  await page.goto('/library/papers');
+  await expect(page.getByTestId('paper-layout-state')).toContainText('No shared papers');
+  await expectNoFullPageHorizontalScroll(page);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+
+  await mockLayoutValidationApi(page, { error: 500 });
+  await page.goto('/library/papers');
+  await expect(page.getByTestId('paper-layout-state')).toContainText('Paper library unavailable');
+  await expectNoFullPageHorizontalScroll(page);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+
+  await mockLayoutValidationApi(page, { error: 403 });
+  await page.goto('/library/papers');
+  await expect(page.getByTestId('paper-layout-state')).toContainText('Layout state permission');
+  await expectNoFullPageHorizontalScroll(page);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+
+  await mockLayoutValidationApi(page);
+  await page.goto('/library/papers');
+  await page.getByTestId('paper-result-row').filter({ hasText: 'Compact Layout Paper 2' }).click();
+  await expect(page.locator(previewStateSelector)).toContainText('This paper is unavailable');
+  await page.getByTestId('paper-result-row').filter({ hasText: 'A Very Long Academic Paper Title' }).click();
+  await expect(selectedDetailTitle(page)).toContainText(longLayoutTitle);
+  await expect(page.getByRole('button', { name: 'Rename paper' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete paper' })).toHaveCount(0);
+  await expectPaperLayoutStable(page);
+});
 
 test('paper rows scroll, select, and open an in-page viewer with pointer and keyboard', async ({ page }) => {
   test.skip(fullStackE2E, 'Mocked viewport coverage uses deterministic scroll fixtures.');

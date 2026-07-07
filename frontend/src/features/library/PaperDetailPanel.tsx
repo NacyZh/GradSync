@@ -40,20 +40,22 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
   if (!paper) {
     if (variant === 'download') {
       return (
-        <section aria-label={t('paperLibrarySelectedPaperDownload')} className="grid gap-3 rounded-md border p-4">
+        <section data-testid="paper-detail-panel" aria-label={t('paperLibrarySelectedPaperDownload')} className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-4">
           <div>
             <h3 className="text-base font-bold">{t('paperLibrarySelectedPaper')}</h3>
             <p className="text-sm text-muted-foreground">{t('paperLibrarySelectBeforeDownload')}</p>
           </div>
-          <Button type="button" disabled aria-label={t('paperLibraryDownloadSelectedPaper')}>
-            <Download className="h-4 w-4" aria-hidden="true" />
-            {t('download')}
-          </Button>
+          <div data-testid="paper-primary-action-group" className="flex min-w-0 flex-wrap gap-2">
+            <Button type="button" disabled aria-label={t('paperLibraryDownloadSelectedPaper')} className="min-w-0">
+              <Download className="h-4 w-4" aria-hidden="true" />
+              {t('download')}
+            </Button>
+          </div>
         </section>
       );
     }
     return (
-      <section aria-label={t('paperLibrarySelectedPaperDetails')} className="grid gap-2 rounded-md border border-dashed p-4">
+      <section data-testid="paper-detail-panel" aria-label={t('paperLibrarySelectedPaperDetails')} className="grid min-w-0 gap-2 overflow-hidden rounded-md border border-dashed p-4">
         <h3 className="text-base font-bold">{t('paperLibrarySelectedPaperDetails')}</h3>
         <p className="text-sm text-muted-foreground">{t('paperLibraryMetadataAfterSelection')}</p>
       </section>
@@ -129,21 +131,24 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
 
   if (variant === 'download') {
     return (
-      <section aria-label={t('paperLibrarySelectedPaperDownload')} className="grid gap-3 rounded-md border p-4">
-        <div>
+      <section data-testid="paper-detail-panel" aria-label={t('paperLibrarySelectedPaperDownload')} className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-4">
+        <div className="min-w-0">
           <h3 className="text-base font-bold">{t('paperLibrarySelectedPaper')}</h3>
-          <p className="mt-1 font-semibold">{displayTitle}</p>
-          <p className="text-sm text-muted-foreground">{authors.join(', ') || t('paperLibraryUnknownAuthors')}</p>
+          <p data-testid="paper-detail-title" className="mt-1 min-w-0 break-words font-semibold">{displayTitle}</p>
+          <p className="min-w-0 truncate text-sm text-muted-foreground">{authors.join(', ') || t('paperLibraryUnknownAuthors')}</p>
         </div>
-        <Button
-          type="button"
-          onClick={onDownload}
-          disabled={!canDownload}
-          aria-label={`${t('download')} ${displayTitle}`}
-        >
-          <Download className="h-4 w-4" aria-hidden="true" />
-          {t('download')}
-        </Button>
+        <div data-testid="paper-primary-action-group" className="flex min-w-0 flex-wrap gap-2">
+          <Button
+            type="button"
+            onClick={onDownload}
+            disabled={!canDownload}
+            aria-label={`${t('download')} ${displayTitle}`}
+            className="min-w-0"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            <span className="truncate">{t('download')}</span>
+          </Button>
+        </div>
         {!canDownload ? (
           <p className="text-sm text-muted-foreground">{t('paperLibraryDownloadUnavailable')}</p>
         ) : null}
@@ -153,35 +158,35 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
   }
 
   return (
-    <section aria-label={t('paperLibrarySelectedPaperDetails')} className="grid gap-3 rounded-md border p-4">
-      <div>
-        <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-          <h3 className="text-lg font-bold">{displayTitle}</h3>
-          <div className="flex flex-wrap items-center gap-2">
+    <section data-testid="paper-detail-panel" aria-label={t('paperLibrarySelectedPaperDetails')} className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-4">
+      <div className="min-w-0">
+        <div className="mb-2 grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+          <h3 data-testid="paper-detail-title" className="min-w-0 break-words text-lg font-bold leading-snug">{displayTitle}</h3>
+          <div data-testid="paper-primary-action-group" className="flex min-w-0 flex-wrap items-center gap-2 md:justify-end">
             <VisibilityBadge visibility={paper.visibility} />
             {canRename ? (
-              <Button type="button" variant="outline" size="sm" onClick={startRename} aria-label={t('paperLibraryRename')}>
+              <Button type="button" variant="outline" size="sm" onClick={startRename} aria-label={t('paperLibraryRename')} className="min-w-0">
                 <Pencil className="h-4 w-4" aria-hidden="true" />
-                {t('paperLibraryRenameButton')}
+                <span className="truncate">{t('paperLibraryRenameButton')}</span>
               </Button>
             ) : null}
             {canDelete ? (
-              <Button type="button" variant="outline" size="sm" onClick={startDelete} aria-label={t('paperLibraryDelete')}>
+              <Button type="button" variant="outline" size="sm" onClick={startDelete} aria-label={t('paperLibraryDelete')} className="min-w-0">
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
-                {t('paperLibraryDeleteButton')}
+                <span className="truncate">{t('paperLibraryDeleteButton')}</span>
               </Button>
             ) : null}
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">{authors.join(', ') || t('paperLibraryUnknownAuthors')}</p>
+        <p className="min-w-0 break-words text-sm text-muted-foreground">{authors.join(', ') || t('paperLibraryUnknownAuthors')}</p>
       </div>
       {isRenaming ? (
-        <form onSubmit={submitRename} className="grid gap-2 rounded-md border p-3">
+        <form onSubmit={submitRename} className="grid min-w-0 gap-2 rounded-md border p-3">
           <label className="grid gap-1 text-sm font-semibold">
             {t('paperLibraryNewTitle')}
             <input
               aria-label={t('paperLibraryNewTitle')}
-              className="min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-normal"
+              className="min-h-10 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm font-normal"
               value={renameTitle}
               maxLength={500}
               onChange={(event) => setRenameTitle(event.target.value)}
@@ -203,16 +208,16 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
         </form>
       ) : null}
       {isConfirmingDelete ? (
-        <form onSubmit={submitDelete} className="grid gap-2 rounded-md border border-destructive/40 p-3">
-          <div className="grid gap-1 text-sm">
-            <p className="font-semibold text-destructive">{t('paperLibraryDeleteButton')} {displayTitle}</p>
+        <form onSubmit={submitDelete} className="grid min-w-0 gap-2 rounded-md border border-destructive/40 p-3">
+          <div className="grid min-w-0 gap-1 text-sm">
+            <p className="min-w-0 break-words font-semibold text-destructive">{t('paperLibraryDeleteButton')} {displayTitle}</p>
             <p className="text-muted-foreground">{t('paperLibraryDeleteDescription')}</p>
           </div>
           <label className="grid gap-1 text-sm font-semibold">
             {t('paperLibraryDeleteReason')}
             <input
               aria-label={t('paperLibraryDeleteReason')}
-              className="min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-normal"
+              className="min-h-10 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm font-normal"
               value={deleteReason}
               maxLength={255}
               onChange={(event) => setDeleteReason(event.target.value)}
@@ -233,13 +238,13 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
           </div>
         </form>
       ) : null}
-      <dl className="grid gap-2 text-sm">
-        {paper.title !== displayTitle ? <div><dt className="font-semibold">{t('paperLibraryOriginalTitle')}</dt><dd>{paper.title}</dd></div> : null}
-        <div><dt className="font-semibold">{t('paperLibraryVenue')}</dt><dd>{paper.venue || t('paperLibraryUnspecified')}</dd></div>
-        <div><dt className="font-semibold">{t('paperLibraryDoi')}</dt><dd>{paper.doi || t('paperLibraryUnspecified')}</dd></div>
-        <div><dt className="font-semibold">{t('paperLibraryKeywords')}</dt><dd>{keywords.join(', ') || t('paperLibraryNoKeywords')}</dd></div>
-        <div><dt className="font-semibold">{t('paperLibraryTitleSource')}</dt><dd>{paper.titleSource?.replaceAll('_', ' ') || t('paperLibraryUnspecified')}</dd></div>
-        <div><dt className="font-semibold">{t('paperLibraryChecksum')}</dt><dd className="break-all">{paper.checksumSha256 || t('paperLibraryUnavailableValue')}</dd></div>
+      <dl className="grid min-w-0 gap-2 text-sm">
+        {paper.title !== displayTitle ? <div className="min-w-0"><dt className="font-semibold">{t('paperLibraryOriginalTitle')}</dt><dd className="min-w-0 break-words">{paper.title}</dd></div> : null}
+        <div className="min-w-0"><dt className="font-semibold">{t('paperLibraryVenue')}</dt><dd className="min-w-0 break-words">{paper.venue || t('paperLibraryUnspecified')}</dd></div>
+        <div className="min-w-0"><dt className="font-semibold">{t('paperLibraryDoi')}</dt><dd className="min-w-0 break-words">{paper.doi || t('paperLibraryUnspecified')}</dd></div>
+        <div className="min-w-0"><dt className="font-semibold">{t('paperLibraryKeywords')}</dt><dd className="min-w-0 break-words">{keywords.join(', ') || t('paperLibraryNoKeywords')}</dd></div>
+        <div className="min-w-0"><dt className="font-semibold">{t('paperLibraryTitleSource')}</dt><dd className="min-w-0 break-words">{paper.titleSource?.replaceAll('_', ' ') || t('paperLibraryUnspecified')}</dd></div>
+        <div className="min-w-0"><dt className="font-semibold">{t('paperLibraryChecksum')}</dt><dd className="break-all">{paper.checksumSha256 || t('paperLibraryUnavailableValue')}</dd></div>
       </dl>
     </section>
   );
