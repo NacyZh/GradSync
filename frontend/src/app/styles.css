@@ -219,7 +219,7 @@
 
   .panel,
   .metric-card {
-    @apply min-w-0 rounded-lg border bg-card p-5 text-card-foreground;
+    @apply min-w-0 overflow-hidden rounded-lg border bg-card p-5 text-card-foreground;
   }
 
   .panel h2,
