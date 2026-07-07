@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.library.models import PaperAttachment, PaperRecord
+from apps.library.models import PaperRecord
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
@@ -80,6 +80,14 @@ class Command(BaseCommand):
             ProjectMembership.objects.update_or_create(
                 project=project, user=user, defaults={"role": role, "status": "active"}
             )
+        PaperRecord.objects.filter(
+            project=project,
+            title__in=[
+                "Graph Neural Methods",
+                "Graph Neural Methods for Materials Research",
+                "Graph Neural Methods for Research Groups",
+            ],
+        ).delete()
         parent, _ = Task.objects.get_or_create(
             project=project,
             title="Prepare manuscript methods section",
@@ -170,31 +178,6 @@ class Command(BaseCommand):
                 "subject": "Weekly report ready for review",
                 "action_path": f"/projects/{project.id}/reports/{report.id}",
                 "eligible_at": timezone.now(),
-            },
-        )
-        paper, _ = PaperRecord.objects.get_or_create(
-            project=project,
-            title="Graph Neural Methods for Materials Research",
-            defaults={
-                "authors": ["Lin Chen"],
-                "publication_year": 2026,
-                "tags": ["graph", "materials"],
-                "created_by": student,
-                "import_source": PaperRecord.ImportSource.LOCAL_FOLDER,
-                "source_path_label": "team-library/materials-gnn",
-            },
-        )
-        PaperAttachment.objects.get_or_create(
-            paper=paper,
-            project=project,
-            checksum_sha256="d" * 64,
-            defaults={
-                "storage_key": "validation/papers/materials-gnn.pdf",
-                "filename": "materials-gnn.pdf",
-                "relative_path": "papers/materials-gnn.pdf",
-                "content_type": "application/pdf",
-                "size_bytes": 1024,
-                "imported_by": student,
             },
         )
         artifact, _ = CodeArtifact.objects.get_or_create(

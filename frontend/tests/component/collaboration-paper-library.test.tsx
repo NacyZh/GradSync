@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
+import { AuthProvider } from '../../src/features/auth/AuthProvider';
 import { PaperLibraryPage } from '../../src/features/library/PaperLibraryPage';
 import { renderWithClient } from './test-utils';
 
@@ -142,6 +143,18 @@ function renderPaperLibrary() {
         <Route path="/library/papers" element={<PaperLibraryPage />} />
       </Routes>
     </MemoryRouter>,
+  );
+}
+
+function renderAuthenticatedPaperLibrary() {
+  return renderWithClient(
+    <AuthProvider>
+      <MemoryRouter initialEntries={['/library/papers']}>
+        <Routes>
+          <Route path="/library/papers" element={<PaperLibraryPage />} />
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
   );
 }
 
@@ -350,6 +363,38 @@ describe('collaboration paper library UI', () => {
     expect(screen.getByRole('button', { name: 'Rename paper' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete paper' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Download A Very Long Academic Paper Title/ })).toBeEnabled();
+  });
+
+  it('shows maintainer rename and delete actions when older paper responses omit action capabilities', async () => {
+    const paperWithoutCapabilities = paperFixture({
+      id: 'legacy-capabilities',
+      title: 'Legacy Capability Paper',
+      canonicalTitle: 'Legacy Capability Paper',
+    });
+    Reflect.deleteProperty(paperWithoutCapabilities, 'actionCapabilities');
+
+    mockFetch((url) => {
+      if (url.includes('/api/accounts/me/')) {
+        return {
+          id: 10,
+          email: 'advisor@example.edu',
+          name: 'Advisor',
+          global_role: 'advisor',
+          status: 'active',
+        };
+      }
+      if (url.includes('/api/library/papers/legacy-capabilities/')) {
+        return paperWithoutCapabilities;
+      }
+      return { count: 1, results: [paperWithoutCapabilities] };
+    });
+
+    renderAuthenticatedPaperLibrary();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Open paper Legacy Capability Paper/ }));
+
+    expect(screen.getByRole('button', { name: 'Rename paper' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete paper' })).toBeInTheDocument();
   });
 
   it('uses bounded layout state hooks for loading, empty, error, permission, unavailable, and no-paper states', async () => {

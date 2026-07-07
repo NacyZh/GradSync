@@ -33,6 +33,23 @@ function paperMetadataSummary(paper: PaperRecord, unknownAuthors: string, unknow
   return `${authors} · ${year}${venue}`;
 }
 
+function withDefaultActionCapabilities(paper: PaperRecord | undefined, isMaintainer: boolean) {
+  if (!paper || paper.actionCapabilities) {
+    return paper;
+  }
+  const canUseFile = Boolean(paper.downloadAvailable || paper.uploadedFileId || paper.attachments?.length);
+  const isActive = paper.status === 'active';
+  return {
+    ...paper,
+    actionCapabilities: {
+      canRename: isMaintainer && isActive,
+      canDelete: isMaintainer && isActive,
+      canDownload: isActive && canUseFile,
+      canView: isActive,
+    },
+  };
+}
+
 export function PaperLibraryPage() {
   const { t } = useI18n();
   const { user } = useAuth();
@@ -71,6 +88,7 @@ export function PaperLibraryPage() {
     detailQuery.data;
   const activeFilterText = [query, author, year, keyword].filter(Boolean).join(', ');
   const isMaintainer = user?.global_role === 'advisor' || user?.global_role === 'admin';
+  const selectedPaperWithCapabilities = withDefaultActionCapabilities(selectedPaper, isMaintainer);
 
   function openPaper(paperId: string) {
     setSelectedId(paperId);
@@ -144,7 +162,7 @@ export function PaperLibraryPage() {
               isMaintainer={isMaintainer}
             />
           </div>
-          <PaperDetailPanel paper={selectedPaper} variant="download" />
+          <PaperDetailPanel paper={selectedPaperWithCapabilities} variant="download" />
         </section>
         <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label={t('paperLibrarySearchDisplayRegion')}>
           <div className="grid gap-3">
@@ -187,7 +205,7 @@ export function PaperLibraryPage() {
             </div>
           ) : null}
           <div className="grid min-w-0 gap-4 overflow-hidden">
-            <PaperDetailPanel paper={selectedPaper} onRename={renameSelectedPaper} onDelete={deleteSelectedPaper} />
+            <PaperDetailPanel paper={selectedPaperWithCapabilities} onRename={renameSelectedPaper} onDelete={deleteSelectedPaper} />
             <ul
               data-testid="paper-results-list"
               className="grid max-h-[32rem] min-w-0 content-start gap-2 overflow-y-auto overflow-x-hidden pr-1"
@@ -226,7 +244,7 @@ export function PaperLibraryPage() {
             </ul>
           </div>
         </section>
-        <PaperPreviewPanel paper={selectedPaper} />
+        <PaperPreviewPanel paper={selectedPaperWithCapabilities} />
       </div>
     </PageShell>
   );
