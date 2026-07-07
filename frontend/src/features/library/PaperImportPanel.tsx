@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { FolderOpen } from 'lucide-react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
@@ -40,39 +40,66 @@ function statusText(job: PaperImportJob | undefined, t: PaperLibraryT) {
 
 export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = false }: PaperImportPanelProps) {
   const { t } = useI18n();
-  const [file, setFile] = useState<File | undefined>();
-  const [job, setJob] = useState<PaperImportJob | undefined>();
+  const [files, setFiles] = useState<File[]>([]);
+  const [jobs, setJobs] = useState<PaperImportJob[]>([]);
   const [uploadError, setUploadError] = useState<string | undefined>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const importMutation = useSharedPaperPdfImport();
   const uploadPolicyQuery = usePaperUploadPolicy();
   const maxSizeLabel = uploadPolicyQuery.data?.displayLabel ?? t('paperLibraryLoadingPolicy');
+  const latestJob = jobs.at(-1);
+  const reviewJob = [...jobs]
+    .reverse()
+    .find((item) => item.status === 'duplicate' || item.status === 'maintainer_review');
+  const selectedFileSummary =
+    files.length === 1
+      ? `${t('paperLibrarySelectedPdfPrefix')} ${files[0].name}`
+      : files.length > 1
+        ? `${files.length} ${t('paperLibrarySelectedPdfsSuffix')}`
+        : '';
   const currentStatus = importMutation.isPending
     ? t('paperLibraryProcessingPdf')
-    : statusText(job, t) || (file ? `${t('paperLibrarySelectedPdfPrefix')} ${file.name}` : '');
+    : statusText(latestJob, t) || selectedFileSummary;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!file) return;
-    if (uploadPolicyQuery.data?.maxSizeBytes && file.size > uploadPolicyQuery.data.maxSizeBytes) {
+    if (!files.length) return;
+    const oversized = files.find(
+      (selectedFile) =>
+        uploadPolicyQuery.data?.maxSizeBytes &&
+        selectedFile.size > uploadPolicyQuery.data.maxSizeBytes,
+    );
+    if (oversized) {
       setUploadError(
-        `${t('paperLibraryUploadLimitExceededPrefix')} ${uploadPolicyQuery.data.displayLabel} ${t(
+        `${oversized.name}: ${t('paperLibraryUploadLimitExceededPrefix')} ${uploadPolicyQuery.data?.displayLabel} ${t(
           'paperLibraryUploadLimitExceededSuffix',
         )}`,
       );
       return;
     }
     setUploadError(undefined);
-    setJob(undefined);
-    const result = await importMutation.mutateAsync(file).catch(() => undefined);
-    if (!result) return;
-    setJob(result);
-    if (result.status === 'accepted' && result.acceptedPaper) {
-      onAccepted?.(result.acceptedPaper);
-      setFile(undefined);
+    setJobs([]);
+    const importedJobs: PaperImportJob[] = [];
+    for (const selectedFile of files) {
+      try {
+        const result = await importMutation.mutateAsync(selectedFile);
+        importedJobs.push(result);
+        setJobs([...importedJobs]);
+        if (result.status === 'accepted' && result.acceptedPaper) {
+          onAccepted?.(result.acceptedPaper);
+        }
+        if (result.status === 'duplicate' && result.duplicatePaper) {
+          onSelectPaper?.(result.duplicatePaper);
+        }
+      } catch (err) {
+        const message = err && typeof err === 'object' && 'message' in err ? String(err.message) : t('paperLibraryProcessingFailed');
+        setUploadError(`${selectedFile.name}: ${message}`);
+        break;
+      }
     }
-    if (result.status === 'duplicate' && result.duplicatePaper) {
-      onSelectPaper?.(result.duplicatePaper);
-      setFile(undefined);
+    if (importedJobs.length === files.length) {
+      setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
@@ -89,20 +116,46 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         maxSizeLabel={maxSizeLabel}
         description={`${(uploadPolicyQuery.data?.allowedExtensions ?? ['.pdf']).join(', ')} ${t('paperLibraryUpTo')} ${maxSizeLabel}`}
       />
-      <Input
-        aria-label={t('paperLibraryPdfFile')}
-        name="file"
-        type="file"
-        accept="application/pdf,.pdf"
-        onChange={(event) => {
-          setFile(event.target.files?.[0]);
-          setJob(undefined);
-          setUploadError(undefined);
-        }}
-        required
-      />
-      <Button type="submit" disabled={!file || importMutation.isPending}>
-        {t('paperLibraryImportPdfButton')}
+      <div className="grid min-w-0 gap-2">
+        <input
+          id="paper-pdf-file-input"
+          ref={fileInputRef}
+          className="hidden"
+          aria-label={t('paperLibraryPdfFile')}
+          name="file"
+          type="file"
+          accept="application/pdf,.pdf"
+          multiple
+          onChange={(event) => {
+            setFiles(Array.from(event.target.files ?? []));
+            setJobs([]);
+            setUploadError(undefined);
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            fileInputRef.current?.click();
+          }}
+          aria-label={t('paperLibraryChoosePdfs')}
+        >
+          <FolderOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">{t('paperLibraryChoosePdfs')}</span>
+        </Button>
+        {files.length ? (
+          <ul className="max-h-24 min-w-0 overflow-y-auto rounded-md border bg-muted/20 p-2 text-xs text-muted-foreground" aria-label={t('paperLibrarySelectedFiles')}>
+            {files.map((selectedFile) => (
+              <li key={`${selectedFile.name}-${selectedFile.size}`} className="min-w-0 truncate" title={selectedFile.name}>
+                {selectedFile.name}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      <Button type="submit" disabled={!files.length || importMutation.isPending}>
+        {files.length > 1 ? t('paperLibraryImportPdfsButton') : t('paperLibraryImportPdfButton')}
       </Button>
       {importMutation.isPending ? <UploadProgress label={t('paperLibraryProcessingPdf')} value={65} /> : null}
       {uploadError || importMutation.error ? (
@@ -121,11 +174,13 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         </p>
       ) : null}
       <DuplicateReviewPanel
-        job={job}
+        job={reviewJob}
         isMaintainer={isMaintainer}
         onSelectPaper={onSelectPaper}
         onReviewed={(reviewedJob) => {
-          setJob(reviewedJob);
+          setJobs((current) =>
+            current.map((item) => (item.id === reviewedJob.id ? reviewedJob : item)),
+          );
           if (reviewedJob.status === 'accepted' && reviewedJob.acceptedPaper) {
             onAccepted?.(reviewedJob.acceptedPaper);
           }

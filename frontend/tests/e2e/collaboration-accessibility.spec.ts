@@ -119,7 +119,7 @@ test('paper library controls are keyboard reachable and announce import and down
   await page.goto('/library/papers');
 
   await expect(page.getByRole('main')).toBeVisible();
-  await expect(page.getByLabel('PDF file')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose PDFs' })).toBeVisible();
   await expect(page.getByPlaceholder('Search title, author, year, keyword')).toBeVisible();
   await expect(page.getByLabel('Author filter')).toBeVisible();
   await expect(page.getByRole('button', { name: /Select paper Accessible Paper Workspace/ })).toBeVisible();

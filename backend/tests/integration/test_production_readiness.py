@@ -241,6 +241,8 @@ def test_paper_library_operational_signals_are_configured(settings):
     from apps.library.models import DuplicateDetectionResult, PaperImportJob, PaperLibraryActivity
 
     assert settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES > 0
+    assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE >= settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES
+    assert settings.FILE_UPLOAD_MAX_MEMORY_SIZE >= settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES
     assert settings.PAPER_LIBRARY_EXTRACTION_TIMEOUT_SECONDS > 0
     assert 0 < settings.PAPER_LIBRARY_DUPLICATE_FUZZY_MATCH_THRESHOLD < 1
     assert 0 < settings.PAPER_LIBRARY_DUPLICATE_STRONG_MATCH_THRESHOLD <= 1

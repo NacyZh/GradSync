@@ -64,3 +64,20 @@ export async function downloadFile(path: string, fallbackFilename = 'download.pd
     deliveryMode: 'direct_response',
   };
 }
+
+export async function fetchDownloadBlobUrl(path: string): Promise<string> {
+  const response = await fetch(apiUrl(path), {
+    credentials: 'include',
+    method: 'GET',
+  });
+
+  if (response.status === 401) {
+    window.dispatchEvent(new CustomEvent('gradsync:auth-required'));
+  }
+
+  if (!response.ok) {
+    throw { message: await errorMessageFromResponse(response) };
+  }
+
+  return URL.createObjectURL(await response.blob());
+}

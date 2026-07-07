@@ -1,5 +1,5 @@
 import { Download, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { DownloadStatus } from '../../shared/ui/DownloadStatus';
 import { VisibilityBadge } from '../../shared/ui/VisibilityBadge';
 import { useI18n } from '../i18n/I18nProvider';
-import { downloadPaper, downloadSharedPaper, type PaperRecord } from './api';
+import { downloadPaper, downloadSharedPaper, previewSharedPaperFile, type PaperRecord } from './api';
 
 type PaperDetailPanelProps = {
   projectId?: number;
@@ -36,6 +36,53 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteError, setDeleteError] = useState<string | undefined>();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | undefined>();
+  const [previewError, setPreviewError] = useState<string | undefined>();
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const canPreview = Boolean(
+    paper &&
+      paper.status === 'active' &&
+      paper.viewerAvailable !== false &&
+      (paper.downloadAvailable || paper.uploadedFileId || paper.attachments?.length),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setPreviewError(undefined);
+    setPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return undefined;
+    });
+    if (!paper || projectId || variant !== 'detail' || !canPreview) {
+      setIsPreviewLoading(false);
+      return () => undefined;
+    }
+    setIsPreviewLoading(true);
+    previewSharedPaperFile(paper.id)
+      .then((objectUrl) => {
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        setPreviewUrl(objectUrl);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setPreviewError(getErrorMessage(err, t('paperLibraryPreviewUnavailable')));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canPreview, paper, projectId, t, variant]);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
   if (!paper) {
     if (variant === 'download') {
       return (
@@ -62,7 +109,7 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
   const authors = Array.isArray(paper.authors) ? paper.authors : [];
   const keywords = paper.keywords ?? paper.tags ?? [];
   const canDownload = Boolean(paper.downloadAvailable || paper.uploadedFileId || paper.attachments?.length);
-  const viewerAvailable = paper.viewerAvailable !== false && paper.status === 'active';
+  const viewerAvailable = canPreview;
   const canRename = Boolean(variant === 'detail' && onRename && paper.actionCapabilities?.canRename);
   const canDelete = Boolean(variant === 'detail' && onDelete && paper.actionCapabilities?.canDelete);
 
@@ -235,16 +282,30 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
       ) : null}
       <div
         role={viewerAvailable ? undefined : 'alert'}
-        className={`rounded-md border p-3 text-sm ${
+        className={`grid gap-3 rounded-md border p-3 text-sm ${
           viewerAvailable ? 'bg-muted/30 text-muted-foreground' : 'border-destructive text-destructive'
         }`}
       >
         <p className="font-semibold text-foreground">{t('paperLibraryInPageViewer')}</p>
         <p>
-          {viewerAvailable
-            ? t('paperLibraryViewerAvailable')
-            : t('paperLibraryViewerUnavailable')}
+          {isPreviewLoading
+            ? t('paperLibraryPreviewLoading')
+            : previewError ||
+              (viewerAvailable
+                ? t('paperLibraryViewerAvailable')
+                : t('paperLibraryViewerUnavailable'))}
         </p>
+        {previewUrl ? (
+          <iframe
+            title={`${displayTitle} ${t('paperLibraryPdfPreview')}`}
+            src={previewUrl}
+            className="h-[34rem] w-full rounded-md border bg-background"
+          />
+        ) : viewerAvailable ? (
+          <div className="grid min-h-80 place-items-center rounded-md border border-dashed bg-background text-center text-sm text-muted-foreground">
+            {isPreviewLoading ? t('paperLibraryPreviewLoading') : t('paperLibraryPreviewUnavailable')}
+          </div>
+        ) : null}
       </div>
       <dl className="grid gap-2 text-sm">
         {paper.title !== displayTitle ? <div><dt className="font-semibold">{t('paperLibraryOriginalTitle')}</dt><dd>{paper.title}</dd></div> : null}

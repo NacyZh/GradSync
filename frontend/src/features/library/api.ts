@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '../../shared/api/client';
-import { downloadDescriptor, downloadFile } from '../../shared/api/downloads';
+import { downloadDescriptor, downloadFile, fetchDownloadBlobUrl } from '../../shared/api/downloads';
 
 export type PaperRecord = {
   id: string;
@@ -243,6 +243,10 @@ export function downloadSharedPaper(paperId: string, fallbackFilename?: string) 
 
 export function downloadSharedPaperFile(paperId: string) {
   return downloadFile(`/api/library/papers/${paperId}/download/`);
+}
+
+export function previewSharedPaperFile(paperId: string) {
+  return fetchDownloadBlobUrl(`/api/library/papers/${paperId}/download/`);
 }
 
 export function usePapers(projectId: number, query: string, visibility = '') {

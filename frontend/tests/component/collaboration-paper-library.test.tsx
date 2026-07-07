@@ -430,6 +430,7 @@ describe('collaboration paper library UI', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Delete paper' }));
 
     expect(screen.getByLabelText('PDF file')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose PDFs' })).toBeInTheDocument();
     expect(screen.getByText('The paper will leave ordinary browse, open, and download workflows.')).toBeInTheDocument();
     expectNoChineseText(container);
   });
@@ -523,6 +524,72 @@ describe('collaboration paper library UI', () => {
 
     expect(await screen.findByText(/Accepted: Extracted Metadata Title/)).toBeInTheDocument();
     expect(await screen.findByText('Extracted Metadata Title')).toBeInTheDocument();
+  });
+
+  it('imports multiple PDFs sequentially and contains long filenames within the file list', async () => {
+    const postedFiles: string[] = [];
+    mockFetch((url, init) => {
+      if (url.includes('/api/library/papers/upload-policy/')) {
+        return {
+          category: 'paper',
+          maxSizeBytes: 25 * 1024 * 1024,
+          displayLabel: '25 MB',
+          allowedExtensions: ['.pdf'],
+          contentTypes: ['application/pdf'],
+        };
+      }
+      if (url.includes('/api/library/papers/') && init?.method === 'POST') {
+        const body = init.body as FormData;
+        const file = body.get('file') as File;
+        postedFiles.push(file.name);
+        const title = postedFiles.length === 1 ? 'Batch Paper One' : 'Batch Paper Two';
+        return {
+          id: `import-${postedFiles.length}`,
+          status: 'accepted',
+          requestedBy: '10',
+          userMessage: 'Paper imported',
+          acceptedPaper: {
+            id: `batch-${postedFiles.length}`,
+            projectId: '12',
+            title,
+            canonicalTitle: title,
+            authors: [],
+            keywords: [],
+            visibility: 'group_wide',
+            status: 'active',
+            downloadAvailable: true,
+          },
+          duplicatePaper: null,
+          extraction: {
+            source: 'embedded_metadata',
+            extractedTitle: title,
+            confidence: 'high',
+            failureReason: '',
+          },
+          duplicateDetection: null,
+          failureReason: '',
+        };
+      }
+      return { count: 0, results: [] };
+    });
+
+    renderPaperLibrary();
+    const longName =
+      'a-very-long-local-paper-file-name-that-should-not-stretch-the-import-panel-or-overflow-layout.pdf';
+    await userEvent.upload(screen.getByLabelText('PDF file'), [
+      new File(['%PDF-1.4'], longName, { type: 'application/pdf' }),
+      new File(['%PDF-1.4'], 'second.pdf', { type: 'application/pdf' }),
+    ]);
+
+    expect(screen.getByRole('list', { name: 'Selected PDF files' })).toHaveClass('overflow-y-auto');
+    expect(screen.getByText(longName)).toHaveClass('truncate');
+    expect(screen.getByText('2 PDFs selected')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Import PDFs' }));
+
+    await waitFor(() => {
+      expect(postedFiles).toEqual([longName, 'second.pdf']);
+    });
+    expect(await screen.findByText(/Accepted: Batch Paper Two/)).toBeInTheDocument();
   });
 
   it('shows a clear upload-size error when the proxy rejects an oversized PDF', async () => {
