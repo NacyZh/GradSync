@@ -53,6 +53,14 @@ export type CodeArtifactUploadPayload = {
   visibility: 'project_members' | 'group_wide';
 };
 
+export type CodeArtifactUploadPolicy = {
+  category: string;
+  maxSizeBytes: number;
+  displayLabel: string;
+  allowedExtensions: string[];
+  contentTypes: string[];
+};
+
 export type CodeArtifactRenamePayload = {
   name: string;
   reason?: string;
@@ -115,6 +123,10 @@ export function uploadCodeArtifact(projectId: number, payload: CodeArtifactUploa
     method: 'POST',
     body: formData,
   });
+}
+
+export function getCodeArtifactUploadPolicy() {
+  return apiRequest<CodeArtifactUploadPolicy>('/api/code-artifacts/upload-policy/');
 }
 
 export function importCodeVersion(projectId: number, artifactId: string, payload: CodeVersionPayload) {
@@ -187,6 +199,13 @@ export function useCodeArtifactUpload(projectId: number) {
   return useMutation({
     mutationFn: (payload: CodeArtifactUploadPayload) => uploadCodeArtifact(projectId, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] }),
+  });
+}
+
+export function useCodeArtifactUploadPolicy() {
+  return useQuery({
+    queryKey: ['code-artifact-upload-policy'],
+    queryFn: getCodeArtifactUploadPolicy,
   });
 }
 

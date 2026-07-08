@@ -60,6 +60,14 @@ export const selectedProject = {
   ],
 };
 
+export const codeUploadPolicy = {
+  category: 'code',
+  maxSizeBytes: 100 * 1024 * 1024,
+  displayLabel: '100 MB',
+  allowedExtensions: ['.7z', '.bz2', '.gz', '.tar', '.tgz', '.xz', '.zip'],
+  contentTypes: ['application/zip', 'application/gzip', 'application/x-gzip', 'application/x-tar', 'application/octet-stream'],
+};
+
 export const paperLibraryFixtures = {
   activeUser: currentUser,
   inactiveUser: {
@@ -200,6 +208,9 @@ export async function mockAuthenticatedApi(page: Page) {
   });
   await page.route('**/api/accounts/logout/', async (route) => {
     await route.fulfill({ status: 204 });
+  });
+  await page.route('**/api/code-artifacts/upload-policy/', async (route) => {
+    await fulfillJson(route, codeUploadPolicy);
   });
   await page.route('**/api/projects/1/', async (route) => {
     if (route.request().method() === 'GET') {

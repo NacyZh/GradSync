@@ -38,9 +38,18 @@ const baseArtifact = {
   },
 };
 
+const codeUploadPolicy = {
+  category: 'code',
+  maxSizeBytes: 100 * 1024 * 1024,
+  displayLabel: '100 MB',
+  allowedExtensions: ['.7z', '.bz2', '.gz', '.tar', '.tgz', '.xz', '.zip'],
+  contentTypes: ['application/zip', 'application/gzip', 'application/x-gzip', 'application/x-tar', 'application/octet-stream'],
+};
+
 function mockFetch(handler: (url: string, init?: RequestInit) => unknown | MockResponse) {
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const payload = handler(String(input), init);
+    const url = String(input);
+    const payload = url.endsWith('/api/code-artifacts/upload-policy/') ? codeUploadPolicy : handler(url, init);
     if (payload instanceof Response) {
       return payload;
     }
@@ -248,7 +257,7 @@ describe('collaboration code library UI', () => {
 
     renderCodeRepository();
     expect(await screen.findByText('No code artifacts')).toBeInTheDocument();
-    expect(screen.getByText(/Allowed archives: .zip, .tar, .gz, .tgz, .bz2, .xz, .7z up to 100 MB/)).toBeInTheDocument();
+    expect(screen.getByText(/Allowed archives: .7z, .bz2, .gz, .tar, .tgz, .xz, .zip up to 100 MB/)).toBeInTheDocument();
 
     const archiveInput = screen.getByLabelText('Archive file');
     await userEvent.upload(archiveInput, new File(['bad'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false });
@@ -262,6 +271,22 @@ describe('collaboration code library UI', () => {
     expect(screen.getByText('Selected archive: reselected.tgz')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reselect archive' })).toBeInTheDocument();
+  });
+
+  it('blocks archives larger than the backend upload policy before submitting', async () => {
+    mockFetch(() => ({ results: [] }));
+
+    renderCodeRepository();
+    expect(await screen.findByText('No code artifacts')).toBeInTheDocument();
+
+    const oversizedArchive = new File(['zip'], 'too-large.zip', {
+      type: 'application/zip',
+    });
+    Object.defineProperty(oversizedArchive, 'size', { value: codeUploadPolicy.maxSizeBytes + 1 });
+    await userEvent.upload(screen.getByLabelText('Archive file'), oversizedArchive);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose an archive no larger than 100 MB.');
+    expect(screen.getByRole('button', { name: 'Upload archive' })).toBeDisabled();
   });
 
   it('shows maintainer rename and delete actions and syncs selected/list state', async () => {

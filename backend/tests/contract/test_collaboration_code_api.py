@@ -47,6 +47,50 @@ def test_code_artifact_upload_list_and_download_contract(api_client):
 
 
 @pytest.mark.django_db
+@override_settings(COLLABORATION_UPLOAD_LIMITS={"code": 2048})
+def test_code_artifact_upload_policy_returns_backend_limit(api_client):
+    user = UserFactory(global_role="student", status="active")
+
+    response = authenticate(api_client, user).get("/api/code-artifacts/upload-policy/")
+
+    assert response.status_code == 200
+    assert response.data == {
+        "category": "code",
+        "maxSizeBytes": 2048,
+        "displayLabel": "2 KB",
+        "allowedExtensions": [".7z", ".bz2", ".gz", ".tar", ".tgz", ".xz", ".zip"],
+        "contentTypes": [
+            "application/zip",
+            "application/gzip",
+            "application/x-gzip",
+            "application/x-tar",
+            "application/octet-stream",
+        ],
+    }
+
+
+@pytest.mark.django_db
+def test_admin_can_upload_code_artifact_without_project_membership(api_client):
+    advisor = UserFactory(global_role="advisor", status="active")
+    admin = UserFactory(global_role="admin", status="active")
+    project = ResearchProject.objects.create(title="Admin Upload", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+
+    response = authenticate(api_client, admin).post(
+        f"/api/projects/{project.id}/code-artifacts/",
+        {
+            "archive": _archive("admin.zip"),
+            "name": "Admin Archive",
+            "description": "Administrator uploaded archive",
+        },
+        format="multipart",
+    )
+
+    assert response.status_code == 201
+    assert response.data["name"] == "Admin Archive"
+
+
+@pytest.mark.django_db
 def test_code_artifact_visibility_and_upload_validation_contract(api_client):
     teacher = UserFactory(global_role="advisor", status="active")
     student = UserFactory(global_role="student", status="active")

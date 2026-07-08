@@ -21,8 +21,10 @@ from .serializers import (
     CodeArtifactUploadSerializer,
     CodeArtifactVersionCreateSerializer,
     CodeArtifactVersionSerializer,
+    CodeUploadPolicySerializer,
 )
 from .services import CodeArtifactService
+from .upload_policy import code_archive_upload_policy
 
 
 def _error_message(exc: DjangoValidationError) -> str:
@@ -293,3 +295,16 @@ class CodeArtifactDownloadView(views.APIView):
             return Response(describe_code_artifact_download(request.user, artifact))
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc
+
+
+class CodeArtifactUploadPolicyView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={
+            200: CodeUploadPolicySerializer,
+            401: OpenApiResponse(description="Authentication required"),
+        }
+    )
+    def get(self, request):
+        return Response(CodeUploadPolicySerializer(code_archive_upload_policy()).data)

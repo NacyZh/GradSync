@@ -123,6 +123,12 @@ class CodeArtifactService:
         self.project = project
 
     def _require_member(self):
+        if getattr(self.user, "is_superuser", False) or getattr(
+            self.user, "is_administrator", False
+        ):
+            return
+        if self.project.advisor_id == getattr(self.user, "id", None):
+            return
         if not self.project.memberships.filter(user=self.user, status="active").exists():
             raise ValidationError("You are not a member of this project")
 

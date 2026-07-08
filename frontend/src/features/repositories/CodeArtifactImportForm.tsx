@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
-import { useCodeArtifactUpload, type CodeArtifact } from './api';
+import { useCodeArtifactUpload, useCodeArtifactUploadPolicy, type CodeArtifact } from './api';
 
-const ALLOWED_ARCHIVE_EXTENSIONS = ['.zip', '.tar', '.gz', '.tgz', '.bz2', '.xz', '.7z'];
-const ARCHIVE_ACCEPT = `${ALLOWED_ARCHIVE_EXTENSIONS.join(',')},application/zip,application/gzip,application/x-tar`;
+const DEFAULT_ARCHIVE_EXTENSIONS = ['.zip', '.tar', '.gz', '.tgz', '.bz2', '.xz', '.7z'];
+const DEFAULT_ARCHIVE_CONTENT_TYPES = ['application/zip', 'application/gzip', 'application/x-tar'];
 
 function formatFileSize(size: number) {
   const units = [
@@ -27,9 +27,9 @@ function formatFileSize(size: number) {
   return `${size} bytes`;
 }
 
-function isSupportedArchive(file: File) {
+function isSupportedArchive(file: File, extensions: string[]) {
   const name = file.name.toLowerCase();
-  return ALLOWED_ARCHIVE_EXTENSIONS.some((extension) => name.endsWith(extension));
+  return extensions.some((extension) => name.endsWith(extension));
 }
 
 function errorMessage(err: unknown) {
@@ -53,10 +53,20 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useCodeArtifactUpload(projectId);
-  const archiveError = archive && !isSupportedArchive(archive)
-    ? 'Choose a supported archive file: .zip, .tar, .gz, .tgz, .bz2, .xz, or .7z.'
+  const uploadPolicyQuery = useCodeArtifactUploadPolicy();
+  const allowedArchiveExtensions = uploadPolicyQuery.data?.allowedExtensions ?? DEFAULT_ARCHIVE_EXTENSIONS;
+  const archiveContentTypes = uploadPolicyQuery.data?.contentTypes ?? DEFAULT_ARCHIVE_CONTENT_TYPES;
+  const maxSizeLabel = uploadPolicyQuery.data?.displayLabel ?? 'checking limit';
+  const requirementsDescription = uploadPolicyQuery.data
+    ? `Allowed archives: ${allowedArchiveExtensions.join(', ')} up to ${uploadPolicyQuery.data.displayLabel}`
+    : `Allowed archives: ${allowedArchiveExtensions.join(', ')}`;
+  const archiveAccept = `${allowedArchiveExtensions.join(',')},${archiveContentTypes.join(',')}`;
+  const archiveError = archive && !isSupportedArchive(archive, allowedArchiveExtensions)
+    ? `Choose a supported archive file: ${allowedArchiveExtensions.join(', ')}.`
     : archive && archive.size <= 0
       ? 'Choose a non-empty archive file.'
+      : archive && uploadPolicyQuery.data?.maxSizeBytes && archive.size > uploadPolicyQuery.data.maxSizeBytes
+        ? `Choose an archive no larger than ${uploadPolicyQuery.data.displayLabel}.`
       : '';
   const canUpload = Boolean(archive && !archiveError && name.trim() && description.trim() && !uploadMutation.isPending);
   const visibleError = archiveError || error;
@@ -105,9 +115,9 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
     <form className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-3" onSubmit={onSubmit} noValidate>
       <UploadRequirements
         title="Code archive upload"
-        extensions={ALLOWED_ARCHIVE_EXTENSIONS}
-        maxSizeLabel="100 MB"
-        description={`Allowed archives: ${ALLOWED_ARCHIVE_EXTENSIONS.join(', ')} up to 100 MB`}
+        extensions={allowedArchiveExtensions}
+        maxSizeLabel={maxSizeLabel}
+        description={requirementsDescription}
       />
       <div className="grid min-w-0 gap-2">
         <input
@@ -116,7 +126,7 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
           aria-label="Archive file"
           name="archive"
           type="file"
-          accept={ARCHIVE_ACCEPT}
+          accept={archiveAccept}
           onChange={(event) => {
             setArchive(event.target.files?.[0]);
             setError('');

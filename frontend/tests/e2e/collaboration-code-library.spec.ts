@@ -138,7 +138,7 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
 
   await page.getByPlaceholder('Search name, description, tag').fill('Archive');
   await expect(page.getByRole('button', { name: 'Choose archive' })).toBeVisible();
-  await expect(page.getByText(/Allowed archives: .zip, .tar, .gz, .tgz, .bz2, .xz, .7z up to 100 MB/)).toBeVisible();
+  await expect(page.getByText(/Allowed archives: .7z, .bz2, .gz, .tar, .tgz, .xz, .zip up to 100 MB/)).toBeVisible();
   await page.getByLabel('Archive file').setInputFiles({
     name: 'draft.txt',
     mimeType: 'text/plain',

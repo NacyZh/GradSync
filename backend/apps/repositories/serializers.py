@@ -112,6 +112,14 @@ class CodeArtifactRenameSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
 
 
+class CodeUploadPolicySerializer(serializers.Serializer):
+    category = serializers.CharField()
+    maxSizeBytes = serializers.IntegerField(min_value=0)
+    displayLabel = serializers.CharField()
+    allowedExtensions = serializers.ListField(child=serializers.CharField())
+    contentTypes = serializers.ListField(child=serializers.CharField())
+
+
 def _split_string_list(value) -> list[str]:
     if value is None:
         return []
