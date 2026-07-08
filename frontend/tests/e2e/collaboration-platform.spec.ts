@@ -290,7 +290,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
 
   await test.step('code archive library', async () => {
     await page.goto('/projects/1/code');
-    await expect(page.getByRole('heading', { name: 'Group Code Archive' })).toBeVisible();
+    await expect(page.getByTestId('code-selected-detail-region').getByRole('heading', { name: 'Group Code Archive' })).toBeVisible();
     await page.getByLabel('Archive file').setInputFiles({ name: 'uploaded.zip', mimeType: 'application/zip', buffer: Buffer.from('zip') });
     await page.getByLabel('Artifact name').fill('Uploaded Archive');
     await page.getByLabel('Artifact description').fill('Searchable implementation archive');
