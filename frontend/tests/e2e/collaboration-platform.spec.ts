@@ -300,10 +300,17 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
 
   await test.step('document categories and document library', async () => {
     await page.goto('/projects/1/documents');
-    await expect(page.getByRole('heading', { name: 'Microscope Protocol' })).toBeVisible();
+    await expect(
+      page
+        .getByTestId('document-selected-detail-region')
+        .getByRole('heading', { name: 'Microscope Protocol' }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Category Protocols' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await page.getByLabel('Document file').setInputFiles({ name: 'uploaded.md', mimeType: 'text/markdown', buffer: Buffer.from('# protocol') });
     await page.getByLabel('Document title').fill('Uploaded Protocol');
-    await page.getByLabel('Document category').selectOption('1');
     await page.getByLabel('Document description').fill('Shared instructions');
     await page.getByRole('button', { name: 'Upload document' }).click();
     await expect(page.getByText('Upload complete')).toBeVisible();

@@ -385,6 +385,9 @@ def test_document_delete_contract_archives_and_restricts_actions(api_client):
     assert list_response.status_code == 200
     assert "Delete Me" not in [item["title"] for item in list_response.data["results"]]
     assert direct_detail.status_code == 404
-    assert DocumentRecord.objects.get(pk=document.data["id"]).status == DocumentRecord.Status.ARCHIVED
+    assert (
+        DocumentRecord.objects.get(pk=document.data["id"]).status
+        == DocumentRecord.Status.ARCHIVED
+    )
     assert AuditEvent.objects.filter(event_type="document.deleted", actor=teacher).exists()
     assert AuditEvent.objects.filter(event_type="document.delete.rejected", actor=student).exists()

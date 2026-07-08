@@ -38,7 +38,9 @@ urlpatterns = [
     ),
     path(
         "projects/<int:project_id>/documents/<int:pk>",
-        DocumentViewSet.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}),
+        DocumentViewSet.as_view(
+            {"get": "retrieve", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="project-document-detail-noslash",
     ),
     path("papers/<int:paper_id>/download", PaperDownloadView.as_view(), name="paper-download"),

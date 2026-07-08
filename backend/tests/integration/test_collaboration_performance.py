@@ -21,7 +21,9 @@ def test_cross_story_lists_return_within_release_thresholds(api_client):
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
     ProjectMembership.objects.create(project=project, user=student, role="student")
     category = DocumentCategory.objects.create(name="Protocols", created_by=advisor)
-    archived_category = DocumentCategory.objects.create(name="Archived Protocols", created_by=advisor)
+    archived_category = DocumentCategory.objects.create(
+        name="Archived Protocols", created_by=advisor
+    )
     doc_file = UploadedFileFactory(
         owner=advisor, category="document", original_filename="protocol.pdf"
     )
@@ -126,7 +128,8 @@ def test_cross_story_lists_return_within_release_thresholds(api_client):
     assert len(responses[0].data["results"]) == 50
     assert responses[0].data["count"] == 1000
     assert all(
-        result["categoryId"] == str(category.id) and result["status"] == DocumentRecord.Status.ACTIVE
+        result["categoryId"] == str(category.id)
+        and result["status"] == DocumentRecord.Status.ACTIVE
         for result in responses[0].data["results"]
     )
     assert len(responses[1].data["results"]) == 50

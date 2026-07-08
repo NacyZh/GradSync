@@ -2,11 +2,11 @@ import pytest
 
 from apps.common.models import UploadedFile
 from apps.library.document_services import (
-    DocumentService,
     SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
     SEEDED_DOCUMENT_EXAMPLE_ORIGINAL_FILENAME,
     SEEDED_DOCUMENT_EXAMPLE_STORED_NAME,
     SEEDED_DOCUMENT_EXAMPLE_TITLE,
+    DocumentService,
     active_document_queryset,
     can_manage_document,
     document_action_capabilities,
@@ -41,7 +41,10 @@ def test_document_maintainer_is_project_advisor_or_administrator():
 
 
 def test_safe_document_title_from_filename_removes_paths_and_unsafe_characters():
-    assert safe_document_title_from_filename(r"C:\Users\ada\..\protocol <final>.pdf") == "protocol final .pdf"
+    assert (
+        safe_document_title_from_filename(r"C:\Users\ada\..\protocol <final>.pdf")
+        == "protocol final .pdf"
+    )
     assert safe_document_title_from_filename("../../") == "Untitled document"
     assert len(safe_document_title_from_filename("x" * 300 + ".pdf")) == 255
 
