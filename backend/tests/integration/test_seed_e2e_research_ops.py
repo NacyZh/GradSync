@@ -62,6 +62,19 @@ def test_seed_e2e_research_ops_can_run_twice_without_stale_field_errors():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_seed_validation_research_ops_does_not_reintroduce_seeded_code_samples():
+    call_command("seed_validation_research_ops", verbosity=0)
+
+    assert not CodeArtifact.objects.filter(
+        name="Materials simulator",
+        source_path_label="team-code/materials-simulator",
+        versions__storage_key="validation/code/materials-simulator.zip",
+        versions__filename="materials-simulator.zip",
+        versions__checksum_sha256="e" * 64,
+    ).exists()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_remove_seeded_code_samples_is_exact_and_repeatable():
     call_command("seed_e2e_research_ops", skip_migrate=True, verbosity=0)
     advisor = User.objects.get(email="advisor@example.edu")

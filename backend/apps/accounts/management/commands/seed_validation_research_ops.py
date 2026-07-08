@@ -200,6 +200,7 @@ class Command(BaseCommand):
                 "imported_by": student,
             },
         )
+        call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
         self.stdout.write(self.style.SUCCESS(f"Seeded validation project {project.id}"))
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Validation login credentials:"))

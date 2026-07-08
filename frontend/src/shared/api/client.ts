@@ -37,6 +37,21 @@ const statusMessages: Record<number, string> = {
   413: 'Selected file exceeds the upload size limit.',
 };
 
+function normalizeFieldMessages(payload: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(payload)
+      .filter(([field, value]) => field !== 'message' && field !== 'detail' && Array.isArray(value))
+      .map(([field, value]) => [field, (value as unknown[]).map(String)]),
+  );
+}
+
+function formatFieldMessages(fields: Record<string, string[]> | undefined) {
+  if (!fields) return '';
+  return Object.entries(fields)
+    .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
+    .join('; ');
+}
+
 export function apiUrl(path: string): string {
   if (/^https?:\/\//.test(path)) {
     return path;
@@ -65,16 +80,13 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   }
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as Partial<ApiError>;
-    const fieldMessages = payload.fields
-      ? Object.entries(payload.fields)
-          .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
-          .join('; ')
-      : '';
+    const payload = (await response.json().catch(() => ({}))) as Partial<ApiError> & Record<string, unknown>;
+    const fields = payload.fields ?? normalizeFieldMessages(payload);
+    const fieldMessages = formatFieldMessages(fields);
     const fallbackMessage = statusMessages[response.status] ?? `Request failed with ${response.status}`;
     throw {
-      message: payload.message ?? (fieldMessages || fallbackMessage),
-      fields: payload.fields,
+      message: payload.message ?? (typeof payload.detail === 'string' ? payload.detail : fieldMessages || fallbackMessage),
+      fields,
     };
   }
 

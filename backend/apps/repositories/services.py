@@ -17,6 +17,22 @@ SEEDED_CODE_SAMPLE_SOURCE_PATH_LABEL = "team-library/code/simulator"
 SEEDED_CODE_SAMPLE_STORAGE_KEY = "e2e/sim.zip"
 SEEDED_CODE_SAMPLE_FILENAME = "sim.zip"
 SEEDED_CODE_SAMPLE_CHECKSUM_SHA256 = "b" * 64
+SEEDED_CODE_SAMPLE_IDENTITIES = (
+    {
+        "name": SEEDED_CODE_SAMPLE_NAME,
+        "source_path_label": SEEDED_CODE_SAMPLE_SOURCE_PATH_LABEL,
+        "storage_key": SEEDED_CODE_SAMPLE_STORAGE_KEY,
+        "filename": SEEDED_CODE_SAMPLE_FILENAME,
+        "checksum_sha256": SEEDED_CODE_SAMPLE_CHECKSUM_SHA256,
+    },
+    {
+        "name": "Materials simulator",
+        "source_path_label": "team-code/materials-simulator",
+        "storage_key": "validation/code/materials-simulator.zip",
+        "filename": "materials-simulator.zip",
+        "checksum_sha256": "e" * 64,
+    },
+)
 
 
 @dataclass(frozen=True)
@@ -56,25 +72,28 @@ def record_rejected_code_artifact_management_attempt(project, actor, artifact, a
 
 
 def is_seeded_code_sample(artifact: CodeArtifact) -> bool:
-    if artifact.name != SEEDED_CODE_SAMPLE_NAME:
-        return False
-    if artifact.source_path_label != SEEDED_CODE_SAMPLE_SOURCE_PATH_LABEL:
-        return False
     versions = list(artifact.versions.all())
     if len(versions) != 1:
         return False
     version = versions[0]
-    return (
-        version.storage_key == SEEDED_CODE_SAMPLE_STORAGE_KEY
-        and version.filename == SEEDED_CODE_SAMPLE_FILENAME
-        and version.checksum_sha256 == SEEDED_CODE_SAMPLE_CHECKSUM_SHA256
+    return any(
+        artifact.name == identity["name"]
+        and artifact.source_path_label == identity["source_path_label"]
+        and version.storage_key == identity["storage_key"]
+        and version.filename == identity["filename"]
+        and version.checksum_sha256 == identity["checksum_sha256"]
+        for identity in SEEDED_CODE_SAMPLE_IDENTITIES
     )
 
 
 def remove_seeded_code_samples(*, dry_run: bool = False) -> SeededCodeCleanupResult:
+    seed_names = [identity["name"] for identity in SEEDED_CODE_SAMPLE_IDENTITIES]
+    seed_source_labels = [
+        identity["source_path_label"] for identity in SEEDED_CODE_SAMPLE_IDENTITIES
+    ]
     candidates = CodeArtifact.objects.filter(
-        name=SEEDED_CODE_SAMPLE_NAME,
-        source_path_label=SEEDED_CODE_SAMPLE_SOURCE_PATH_LABEL,
+        name__in=seed_names,
+        source_path_label__in=seed_source_labels,
     ).prefetch_related("versions")
     matched = [artifact for artifact in candidates if is_seeded_code_sample(artifact)]
     if dry_run:
@@ -86,7 +105,7 @@ def remove_seeded_code_samples(*, dry_run: bool = False) -> SeededCodeCleanupRes
         for version in artifact.versions.all()
         if version.storage_key
     ]
-    storage_keys.append(SEEDED_CODE_SAMPLE_STORAGE_KEY)
+    storage_keys.extend(identity["storage_key"] for identity in SEEDED_CODE_SAMPLE_IDENTITIES)
     with transaction.atomic():
         removed = 0
         for artifact in matched:

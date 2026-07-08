@@ -58,6 +58,7 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
     : archive && archive.size <= 0
       ? 'Choose a non-empty archive file.'
       : '';
+  const canUpload = Boolean(archive && !archiveError && name.trim() && description.trim() && !uploadMutation.isPending);
   const visibleError = archiveError || error;
 
   function chooseArchive() {
@@ -162,7 +163,7 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
         <option value="project_members">Project members</option>
         <option value="group_wide">Group wide</option>
       </select>
-      <Button type="submit" disabled={!archive || Boolean(archiveError) || uploadMutation.isPending}>Upload archive</Button>
+      <Button type="submit" disabled={!canUpload}>Upload archive</Button>
       {uploadMutation.isPending ? <UploadProgress label="Uploading archive" value={65} /> : null}
       <LocalizedValidation message={visibleError} />
       {uploadComplete ? <p role="status" className="text-sm font-medium text-success">Upload complete</p> : null}

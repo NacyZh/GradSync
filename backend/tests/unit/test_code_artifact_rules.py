@@ -140,7 +140,39 @@ def test_seeded_code_sample_matcher_requires_exact_known_identity():
         checksum_sha256="b" * 64,
         imported_by=advisor,
     )
+    validation_sample = CodeArtifact.objects.create(
+        project=project,
+        name="Materials simulator",
+        source_path_label="team-code/materials-simulator",
+        created_by=advisor,
+    )
+    CodeArtifactVersion.objects.create(
+        artifact=validation_sample,
+        project=project,
+        version_label="v1",
+        storage_key="validation/code/materials-simulator.zip",
+        filename="materials-simulator.zip",
+        checksum_sha256="e" * 64,
+        imported_by=advisor,
+    )
+    user_materials = CodeArtifact.objects.create(
+        project=project,
+        name="Materials simulator",
+        source_path_label="user-uploads/code/materials-simulator",
+        created_by=advisor,
+    )
+    CodeArtifactVersion.objects.create(
+        artifact=user_materials,
+        project=project,
+        version_label="v1",
+        storage_key="validation/code/materials-simulator.zip",
+        filename="materials-simulator.zip",
+        checksum_sha256="e" * 64,
+        imported_by=advisor,
+    )
 
     assert is_seeded_code_sample(exact)
+    assert is_seeded_code_sample(validation_sample)
     assert not is_seeded_code_sample(similar_name)
     assert not is_seeded_code_sample(similar_version)
+    assert not is_seeded_code_sample(user_materials)

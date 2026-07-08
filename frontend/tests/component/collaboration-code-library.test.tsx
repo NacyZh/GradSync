@@ -205,11 +205,42 @@ describe('collaboration code library UI', () => {
     expect(screen.getByText('Selected archive: uploaded.zip')).toBeInTheDocument();
     expect(screen.getByText('3 bytes')).toBeInTheDocument();
     expect(screen.queryByText(/fakepath|Users|home/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload archive' })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('Artifact name'), 'Uploaded Archive');
+    expect(screen.getByRole('button', { name: 'Upload archive' })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('Artifact description'), 'Searchable implementation archive');
+    expect(screen.getByRole('button', { name: 'Upload archive' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Upload archive' }));
+
+    await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
+  });
+
+  it('shows backend field validation instead of a generic bad request for archive uploads', async () => {
+    mockFetch((url, init) => {
+      if (init?.method === 'POST' && url.endsWith('/code-artifacts/')) {
+        return {
+          status: 400,
+          json: {
+            archive: ['Code uploads must be a compressed archive.'],
+          },
+        };
+      }
+      return { results: [] };
+    });
+
+    renderCodeRepository();
+    expect(await screen.findByText('No code artifacts')).toBeInTheDocument();
+
+    await userEvent.upload(
+      screen.getByLabelText('Archive file'),
+      new File(['zip'], 'uploaded.zip', { type: 'application/zip' }),
+    );
     await userEvent.type(screen.getByLabelText('Artifact name'), 'Uploaded Archive');
     await userEvent.type(screen.getByLabelText('Artifact description'), 'Searchable implementation archive');
     await userEvent.click(screen.getByRole('button', { name: 'Upload archive' }));
 
-    await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
+    expect(await screen.findByRole('alert')).toHaveTextContent('archive: Code uploads must be a compressed archive.');
+    expect(screen.queryByText('Request failed with 400')).not.toBeInTheDocument();
   });
 
   it('supports clearing and reselecting archives with preflight validation', async () => {
