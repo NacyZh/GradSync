@@ -920,6 +920,7 @@ describe('collaboration paper library UI', () => {
     expect(screen.getByRole('list', { name: 'Selected PDF files' })).toHaveClass('overflow-y-auto');
     expect(screen.getByText(longName)).toHaveClass('truncate');
     expect(screen.getByText('3 PDFs selected')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear selected PDFs' })).toHaveClass('min-w-0');
     await userEvent.click(screen.getByRole('button', { name: 'Import PDFs' }));
 
     await waitFor(() => {
@@ -928,6 +929,39 @@ describe('collaboration paper library UI', () => {
     expect(await screen.findByText(/Accepted: Batch Paper Three/)).toBeInTheDocument();
     expect(await screen.findByRole('alert')).toHaveTextContent('The PDF title could not be extracted.');
     expect(screen.getByText(longName)).toHaveClass('truncate');
+  });
+
+  it('clears selected PDF files without stretching the import controls', async () => {
+    mockFetch((url) => {
+      if (url.includes('/api/library/papers/upload-policy/')) {
+        return {
+          category: 'paper',
+          maxSizeBytes: 25 * 1024 * 1024,
+          displayLabel: '25 MB',
+          allowedExtensions: ['.pdf'],
+          contentTypes: ['application/pdf'],
+        };
+      }
+      return { count: 0, results: [] };
+    });
+
+    renderPaperLibrary();
+    await userEvent.upload(screen.getByLabelText('PDF file'), [
+      new File(['%PDF-1.4'], 'first.pdf', { type: 'application/pdf' }),
+      new File(['%PDF-1.4'], 'second.pdf', { type: 'application/pdf' }),
+    ]);
+
+    expect(screen.getByRole('list', { name: 'Selected PDF files' })).toBeInTheDocument();
+    expect(screen.getByText('2 PDFs selected')).toBeInTheDocument();
+
+    const clearButton = screen.getByRole('button', { name: 'Clear selected PDFs' });
+    expect(clearButton).toHaveClass('min-w-0');
+    await userEvent.click(clearButton);
+
+    expect(screen.queryByRole('list', { name: 'Selected PDF files' })).not.toBeInTheDocument();
+    expect(screen.queryByText('2 PDFs selected')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear selected PDFs' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import PDF' })).toBeDisabled();
   });
 
   it('shows a clear upload-size error when the proxy rejects an oversized PDF', async () => {

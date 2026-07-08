@@ -583,6 +583,15 @@ test('mobile paper workflow keeps search browse select open upload and download 
   await expect(page.getByRole('status')).toContainText('.pdf');
 
   await page.getByLabel('PDF file').setInputFiles({
+    name: 'mobile-clear.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4 mobile clear'),
+  });
+  await expect(page.getByRole('button', { name: 'Clear selected PDFs' })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear selected PDFs' }).click();
+  await expect(page.getByText('Selected PDF: mobile-clear.pdf')).toHaveCount(0);
+
+  await page.getByLabel('PDF file').setInputFiles({
     name: 'mobile-layout.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-1.4 mobile layout'),

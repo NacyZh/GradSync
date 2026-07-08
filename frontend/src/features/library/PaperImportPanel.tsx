@@ -1,4 +1,4 @@
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -60,6 +60,15 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
   const currentStatus = importMutation.isPending
     ? t('paperLibraryProcessingPdf')
     : statusText(latestJob, t) || selectedFileSummary;
+
+  function clearSelectedFiles() {
+    setFiles([]);
+    setJobs([]);
+    setUploadError(undefined);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -142,19 +151,33 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
             setUploadError(undefined);
           }}
         />
-        <Button
-          type="button"
-          variant="outline"
-          className="min-w-0"
-          onClick={() => {
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            fileInputRef.current?.click();
-          }}
-          aria-label={t('paperLibraryChoosePdfs')}
-        >
-          <FolderOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">{t('paperLibraryChoosePdfs')}</span>
-        </Button>
+        <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Button
+            type="button"
+            variant="outline"
+            className="min-w-0"
+            onClick={() => {
+              if (fileInputRef.current) fileInputRef.current.value = '';
+              fileInputRef.current?.click();
+            }}
+            aria-label={t('paperLibraryChoosePdfs')}
+          >
+            <FolderOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{t('paperLibraryChoosePdfs')}</span>
+          </Button>
+          {files.length ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-0"
+              onClick={clearSelectedFiles}
+              aria-label={t('paperLibraryClearSelectedPdfs')}
+            >
+              <X className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{t('paperLibraryClear')}</span>
+            </Button>
+          ) : null}
+        </div>
         {files.length ? (
           <ul className="max-h-24 min-w-0 max-w-full overflow-y-auto rounded-md border bg-muted/20 p-2 text-xs text-muted-foreground" aria-label={t('paperLibrarySelectedFiles')}>
             {files.map((selectedFile) => (

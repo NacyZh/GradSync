@@ -35,6 +35,8 @@ export const messagesEn = {
   paperLibraryImportPdf: 'Import paper PDF',
   paperLibraryPdfFile: 'PDF file',
   paperLibraryChoosePdfs: 'Choose PDFs',
+  paperLibraryClear: 'Clear',
+  paperLibraryClearSelectedPdfs: 'Clear selected PDFs',
   paperLibrarySelectedFiles: 'Selected PDF files',
   paperLibrarySelectedPdfsSuffix: 'PDFs selected',
   paperLibraryImportPdfButton: 'Import PDF',
