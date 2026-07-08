@@ -1,6 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
+import {
+  buildDocumentCategory,
+  buildDocumentRecord,
+  fulfillJson,
+  fullStackE2E,
+  loginAs,
+  maintainerDocumentCapabilities,
+  mockAuthenticatedApi,
+} from './api-mocks';
 
 async function mockCollaborationPages(page: Page) {
   await mockAuthenticatedApi(page);
@@ -140,6 +148,99 @@ test('paper library controls are keyboard reachable and announce import and down
   });
   await page.getByRole('button', { name: 'Import PDF' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Rejected: missing_reliable_title' })).toBeVisible();
+  await expectNoLayoutOverflow(page);
+});
+
+test('document library upload, clear, selector, search, download, rename, and delete are keyboard reachable', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked document accessibility coverage uses deterministic fixtures.');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAuthenticatedApi(page);
+  let documents = [
+    buildDocumentRecord({
+      actionCapabilities: maintainerDocumentCapabilities,
+    }),
+  ];
+  await page.route('**/api/document-categories**', async (route) =>
+    fulfillJson(route, [
+      buildDocumentCategory({ id: '1', name: 'Protocols' }),
+      buildDocumentCategory({ id: '2', name: 'Reports' }),
+    ]),
+  );
+  await page.route('**/api/projects/1/documents**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'PATCH') {
+      documents = [
+        buildDocumentRecord({
+          title: 'Keyboard Renamed Protocol',
+          actionCapabilities: maintainerDocumentCapabilities,
+        }),
+      ];
+      await fulfillJson(route, documents[0]);
+      return;
+    }
+    if (request.method() === 'DELETE') {
+      documents = [];
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await fulfillJson(route, { results: documents });
+  });
+  await page.route('**/api/documents/*/download', async (route) =>
+    fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' }),
+  );
+
+  await page.goto('/projects/1/documents');
+
+  await expect(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Category Protocols' })).toBeVisible();
+  await expect(page.getByPlaceholder('Search title, category, description')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Select document Microscope Protocol/ })).toBeVisible();
+
+  await page.getByLabel('Document file').setInputFiles({
+    name: 'keyboard-upload.md',
+    mimeType: 'text/markdown',
+    buffer: Buffer.from('# keyboard upload'),
+  });
+  await expect(page.getByText('Selected document: keyboard-upload.md')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear selected file' }).focus();
+  await expect(page.locator(':focus-visible').first()).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Selected document: keyboard-upload.md')).toBeHidden();
+
+  await page.getByRole('button', { name: 'Category Reports' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Category Reports' })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.getByPlaceholder('Search title, category, description').focus();
+  await page.keyboard.type('Protocol');
+  await expect(page.getByPlaceholder('Search title, category, description')).toHaveValue('Protocol');
+
+  await page.getByRole('button', { name: /Select document Microscope Protocol/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Selected document download' })).toContainText('Microscope Protocol');
+
+  await page.getByRole('button', { name: /Download Microscope Protocol/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status')).toContainText('protocol.pdf');
+
+  await page.getByRole('button', { name: 'Rename document' }).focus();
+  await expect(page.locator(':focus-visible').first()).toBeVisible();
+  await page.keyboard.press('Enter');
+  await page.getByLabel('New document title').focus();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await page.keyboard.type('Keyboard Renamed Protocol');
+  await page.getByRole('button', { name: 'Save title' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('document-selected-detail-region')).toContainText('Keyboard Renamed Protocol');
+
+  await page.getByRole('button', { name: 'Delete document' }).focus();
+  await expect(page.locator(':focus-visible').first()).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(/Delete Keyboard Renamed Protocol/)).toBeVisible();
+  await page.getByRole('button', { name: 'Confirm delete' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Selected document download' })).toContainText('No document selected');
   await expectNoLayoutOverflow(page);
 });
 

@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from apps.accounts.models import RoleActivationRequest, StudentProfile
 from apps.common.models import UploadedFile
-from apps.library.models import PaperFile, PaperRecord
+from apps.library.models import DocumentCategory, DocumentRecord, PaperFile, PaperRecord
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 from apps.submissions.models import TeacherFeedback, WritingProject, WritingVersion
@@ -53,6 +53,16 @@ class PaperLibraryMaintainerFactory(UserFactory):
 
 
 class PaperLibraryNonMaintainerFactory(UserFactory):
+    global_role = "student"
+    status = "active"
+
+
+class DocumentLibraryMaintainerFactory(UserFactory):
+    global_role = "advisor"
+    status = "active"
+
+
+class DocumentLibraryNonMaintainerFactory(UserFactory):
     global_role = "student"
     status = "active"
 
@@ -111,6 +121,63 @@ class ProjectMembershipFactory(factory.django.DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     role = ProjectMembership.Role.STUDENT
     status = ProjectMembership.Status.ACTIVE
+
+
+class DocumentCategoryFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = DocumentCategory
+
+    name = factory.Sequence(lambda n: f"Protocols {n}")
+    description = "Lab operating documents"
+    created_by = factory.SubFactory(DocumentLibraryMaintainerFactory)
+    status = DocumentCategory.Status.ACTIVE
+
+
+class DocumentRecordFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = DocumentRecord
+
+    project = factory.SubFactory(ResearchProjectFactory)
+    visibility = DocumentRecord.Visibility.PROJECT_MEMBERS
+    category = factory.SubFactory(DocumentCategoryFactory)
+    title = factory.Sequence(lambda n: f"Microscope Protocol {n}")
+    description = "Calibration workflow"
+    document_file = factory.SubFactory(
+        UploadedFileFactory,
+        category=UploadedFile.Category.DOCUMENT,
+        original_filename=factory.Sequence(lambda n: f"protocol-{n}.pdf"),
+        stored_name=factory.Sequence(lambda n: f"collaboration/document/protocol-{n}.pdf"),
+    )
+    checksum_sha256 = factory.SelfAttribute("document_file.checksum_sha256")
+    created_by = factory.SelfAttribute("project.advisor")
+    status = DocumentRecord.Status.ACTIVE
+
+
+def active_document_category(**overrides):
+    return DocumentCategoryFactory(**overrides)
+
+
+def active_project_document(**overrides):
+    return DocumentRecordFactory(**overrides)
+
+
+def active_group_document(**overrides):
+    overrides.setdefault("visibility", DocumentRecord.Visibility.GROUP_WIDE)
+    return DocumentRecordFactory(**overrides)
+
+
+def archived_project_document(**overrides):
+    overrides.setdefault("status", DocumentRecord.Status.ARCHIVED)
+    return DocumentRecordFactory(**overrides)
+
+
+def long_metadata_document(**overrides):
+    overrides.setdefault(
+        "title",
+        "Document title with exceptionally long protocol naming for responsive layout validation",
+    )
+    overrides.setdefault("description", "Long document description " * 24)
+    return active_project_document(**overrides)
 
 
 class CodeArtifactFactory(factory.django.DjangoModelFactory):

@@ -70,6 +70,7 @@ def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
     assert "http://127.0.0.1:8080/healthz/" in compose
     assert "python manage.py remove_seeded_paper_samples" in compose
     assert "python manage.py remove_seeded_code_samples" in compose
+    assert "python manage.py remove_seeded_document_examples" in compose
 
 
 def test_production_operational_docs_are_present_and_actionable():

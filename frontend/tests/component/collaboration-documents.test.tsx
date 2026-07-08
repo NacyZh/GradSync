@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -6,11 +6,49 @@ import { describe, expect, it, vi } from 'vitest';
 import { DocumentLibraryPage } from '../../src/features/library/DocumentLibraryPage';
 import { renderWithClient } from './test-utils';
 
-function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
+type MockResponse = {
+  status?: number;
+  json?: unknown;
+};
+
+const categories = [
+  { id: '1', name: 'Protocols', description: 'Lab protocols', status: 'active' },
+  { id: '2', name: 'Reports', description: 'Research reports', status: 'active' },
+];
+
+const baseDocument = {
+  id: '4',
+  projectId: '1',
+  categoryId: '1',
+  categoryName: 'Protocols',
+  title: 'Microscope Protocol',
+  description: 'Calibration workflow',
+  visibility: 'group_wide' as const,
+  uploaderId: '10',
+  documentFileId: '44',
+  checksumSha256: 'a'.repeat(64),
+  createdAt: '2026-07-03T08:00:00Z',
+  status: 'active',
+  actionCapabilities: {
+    canView: true,
+    canDownload: true,
+    canRename: true,
+    canDelete: true,
+    canUploadGroupWide: true,
+  },
+};
+
+function mockFetch(handler: (url: string, init?: RequestInit) => unknown | MockResponse) {
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const payload = handler(String(input), init);
-    return new Response(JSON.stringify(payload), {
-      status: 200,
+    const response = payload as MockResponse;
+    const status =
+      response && typeof response === 'object' && 'status' in response && typeof response.status === 'number'
+        ? response.status
+        : 200;
+    const json = response && typeof response === 'object' && 'json' in response ? response.json : payload;
+    return new Response(status === 204 ? null : JSON.stringify(json), {
+      status,
       headers: { 'Content-Type': 'application/json' },
     });
   }) as typeof fetch;
@@ -27,83 +65,280 @@ function renderDocuments() {
 }
 
 describe('collaboration document library UI', () => {
-  it('shows category browser, document filters, visibility, and download state', async () => {
+  it('uses papers-style upload/download and search/display regions', async () => {
     mockFetch((url) => {
       if (url.includes('/download')) {
         return { filename: 'protocol.pdf', deliveryMode: 'direct_response' };
       }
       if (url.includes('/document-categories')) {
-        return [
-          { id: '1', name: 'Protocols', description: 'Lab protocols', status: 'active' },
-          { id: '2', name: 'Reports', description: 'Research reports', status: 'active' },
-        ];
+        return categories;
+      }
+      return { results: [baseDocument] };
+    });
+
+    renderDocuments();
+
+    expect(await screen.findByTestId('document-library-workspace')).toBeInTheDocument();
+    expect(screen.getByLabelText('Document library upload and download region')).toBeInTheDocument();
+    expect(screen.getByLabelText('Document library search and display region')).toBeInTheDocument();
+    expect(screen.getByText('Categorized document upload')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Selected document download' })).toHaveTextContent('Microscope Protocol'),
+    );
+    expect(screen.getByPlaceholderText('Search title, category, description')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Category Protocols' })).toBeInTheDocument();
+    expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Microscope Protocol');
+    expect(screen.getByRole('button', { name: /Select document Microscope Protocol/ })).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(screen.getByRole('button', { name: /Download Microscope Protocol/ }));
+    expect(await screen.findByText(/protocol.pdf/)).toBeInTheDocument();
+  });
+
+  it('uses the shared category selector for list filtering and upload destination', async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    mockFetch((url, init) => {
+      requests.push({ url, init });
+      if (url.includes('/document-categories')) {
+        return categories;
+      }
+      if (init?.method === 'POST' && url.endsWith('/documents')) {
+        return {
+          ...baseDocument,
+          id: '5',
+          title: 'Uploaded Protocol',
+          visibility: 'project_members',
+        };
+      }
+      const category = new URL(url, 'http://localhost').searchParams.get('categoryId');
+      return { results: category === '2' ? [] : [baseDocument] };
+    });
+
+    renderDocuments();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Category Reports' }));
+    await waitFor(() =>
+      expect(requests.some((request) => request.url.includes('categoryId=2'))).toBe(true),
+    );
+    expect(await screen.findByText('No documents in category')).toBeInTheDocument();
+
+    await userEvent.upload(
+      screen.getByLabelText('Document file'),
+      new File(['# protocol'], 'uploaded.md', { type: 'text/markdown' }),
+    );
+    expect(screen.getByText(/Selected document: uploaded\.md/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Upload document' }));
+
+    await waitFor(() => expect(requests.some((request) => request.init?.method === 'POST')).toBe(true));
+    expect(await screen.findByText('Upload complete')).toBeInTheDocument();
+  });
+
+  it('keeps long document rows bounded and shows no-selection download state', async () => {
+    const longTitle = 'Document title with exceptionally long protocol naming for responsive layout validation';
+    mockFetch((url) => {
+      if (url.includes('/document-categories')) {
+        return categories;
       }
       return {
         results: [{
-          id: '4',
-          projectId: '1',
-          categoryId: '1',
-          categoryName: 'Protocols',
-          title: 'Microscope Protocol',
-          description: 'Calibration workflow',
-          visibility: 'group_wide',
-          uploaderId: '10',
-          checksumSha256: 'a'.repeat(64),
-          createdAt: '2026-07-03T08:00:00Z',
-          status: 'active',
+          ...baseDocument,
+          id: 'long',
+          title: longTitle,
+          description: 'Long document description '.repeat(24),
+          categoryName: 'Very long methods and laboratory safety category',
         }],
       };
     });
 
     renderDocuments();
 
-    expect((await screen.findAllByText('Protocols')).length).toBeGreaterThan(0);
-    expect(screen.getByPlaceholderText('Search title, category, description')).toBeInTheDocument();
-    expect((await screen.findAllByText('Microscope Protocol')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('group wide').length).toBeGreaterThan(0);
-
-    await userEvent.click(screen.getByRole('button', { name: /Download/ }));
-    expect(await screen.findByText(/protocol.pdf/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('document-results-list')).toHaveTextContent(longTitle));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('document-results-list')).getByText((_, element) => element?.textContent === longTitle),
+      ).toHaveClass('break-words'),
+    );
+    expect(screen.getByTestId('document-results-list')).toHaveClass('overflow-x-hidden');
+    expect(screen.getByRole('region', { name: 'Selected document download' })).toHaveTextContent(longTitle);
   });
 
-  it('uploads a categorized document and distinguishes empty states', async () => {
-    const requests: RequestInit[] = [];
-    mockFetch((url, init) => {
-      requests.push(init ?? {});
+  it('keeps upload available when there are no categories or documents', async () => {
+    mockFetch((url) => {
       if (url.includes('/document-categories')) {
-        return [{ id: '1', name: 'Protocols', description: 'Lab protocols', status: 'active' }];
-      }
-      if (init?.method === 'POST' && url.endsWith('/documents')) {
-        return {
-          id: '5',
-          projectId: '1',
-          categoryId: '1',
-          categoryName: 'Protocols',
-          title: 'Uploaded Protocol',
-          description: 'Shared instructions',
-          visibility: 'project_members',
-          uploaderId: '10',
-          checksumSha256: 'b'.repeat(64),
-          createdAt: '2026-07-03T08:00:00Z',
-          status: 'active',
-        };
+        return [];
       }
       return { results: [] };
     });
 
     renderDocuments();
-    expect(await screen.findByText('No documents')).toBeInTheDocument();
 
-    await userEvent.upload(
-      screen.getByLabelText('Document file'),
-      new File(['# protocol'], 'uploaded.md', { type: 'text/markdown' }),
-    );
-    await userEvent.type(screen.getByLabelText('Document title'), 'Uploaded Protocol');
-    await userEvent.selectOptions(screen.getByLabelText('Document category'), '1');
-    await userEvent.type(screen.getByLabelText('Document description'), 'Shared instructions');
+    expect(await screen.findByText('No categories')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Selected document download' })).toHaveTextContent('No document selected');
+    expect(screen.getByRole('button', { name: 'Choose file' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload document' })).toBeDisabled();
+  });
+
+  it('supports clear and reselect, optional title, and maintainer-only group-wide upload control', async () => {
+    const requests: RequestInit[] = [];
+    mockFetch((url, init) => {
+      requests.push(init ?? {});
+      if (url.includes('/document-categories')) {
+        return categories;
+      }
+      if (init?.method === 'POST') {
+        return {
+          ...baseDocument,
+          id: 'uploaded',
+          title: 'uploaded.md',
+          visibility: 'group_wide',
+        };
+      }
+      return { results: [baseDocument] };
+    });
+
+    renderDocuments();
+
+    await waitFor(() => expect(screen.getByLabelText('Document visibility')).toBeInTheDocument());
+    const fileInput = screen.getByLabelText('Document file');
+    await userEvent.upload(fileInput, new File(['old'], 'old.md', { type: 'text/markdown' }));
+    expect(screen.getByText(/Selected document: old\.md/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear selected file' }));
+    expect(screen.queryByText(/Selected document: old\.md/)).not.toBeInTheDocument();
+
+    await userEvent.upload(fileInput, new File(['new'], 'uploaded.md', { type: 'text/markdown' }));
+    await userEvent.selectOptions(screen.getByLabelText('Document visibility'), 'group_wide');
     await userEvent.click(screen.getByRole('button', { name: 'Upload document' }));
 
     await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
-    expect(await screen.findByText('Upload complete')).toBeInTheDocument();
+    const uploadRequest = requests.find((request) => request.method === 'POST');
+    const formData = uploadRequest?.body as FormData;
+    expect(formData.get('file')).toBeInstanceOf(File);
+    expect(formData.get('categoryId')).toBe('1');
+    expect(formData.get('visibility')).toBe('group_wide');
+    expect(formData.has('title')).toBe(false);
+  });
+
+  it('hides group-wide upload control for non-maintainer document responses', async () => {
+    mockFetch((url) => {
+      if (url.includes('/document-categories')) {
+        return categories;
+      }
+      return {
+        results: [{
+          ...baseDocument,
+          actionCapabilities: {
+            canView: true,
+            canDownload: true,
+            canRename: false,
+            canDelete: false,
+            canUploadGroupWide: false,
+          },
+        }],
+      };
+    });
+
+    renderDocuments();
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Select document Microscope Protocol/ })).toBeInTheDocument(),
+    );
+    expect(screen.queryByLabelText('Document visibility')).not.toBeInTheDocument();
+  });
+
+  it('supports maintainer rename and delete while syncing selected/list/download state', async () => {
+    let documents = [
+      baseDocument,
+      {
+        ...baseDocument,
+        id: 'delete-me',
+        title: 'Delete Candidate',
+      },
+    ];
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    mockFetch((url, init) => {
+      requests.push({ url, init });
+      if (url.includes('/document-categories')) {
+        return categories;
+      }
+      if (init?.method === 'PATCH') {
+        const renamed = { ...documents[0], title: 'Renamed Protocol' };
+        documents = [renamed, documents[1]];
+        return renamed;
+      }
+      if (init?.method === 'DELETE') {
+        documents = documents.filter((document) => document.id !== 'delete-me');
+        return { status: 204 };
+      }
+      return { results: documents };
+    });
+
+    renderDocuments();
+
+    await waitFor(() => expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Microscope Protocol'));
+    await userEvent.click(screen.getByRole('button', { name: 'Rename document' }));
+    await userEvent.clear(screen.getByLabelText('New document title'));
+    await userEvent.type(screen.getByLabelText('New document title'), 'Renamed Protocol');
+    await userEvent.click(screen.getByRole('button', { name: 'Save title' }));
+
+    await waitFor(() => expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Renamed Protocol'));
+    expect(screen.getByRole('region', { name: 'Selected document download' })).toHaveTextContent('Renamed Protocol');
+    expect(screen.getByTestId('document-results-list')).toHaveTextContent('Renamed Protocol');
+    expect(requests.some((request) => request.init?.method === 'PATCH')).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: /Select document Delete Candidate/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete document' }));
+    expect(screen.getByText(/Delete Delete Candidate/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
+
+    await waitFor(() => expect(screen.queryByText('Delete Candidate')).not.toBeInTheDocument());
+    expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Renamed Protocol');
+    expect(requests.some((request) => request.init?.method === 'DELETE')).toBe(true);
+  });
+
+  it('hides rename and delete controls for non-maintainer documents', async () => {
+    mockFetch((url) => {
+      if (url.includes('/document-categories')) {
+        return categories;
+      }
+      return {
+        results: [{
+          ...baseDocument,
+          actionCapabilities: {
+            canView: true,
+            canDownload: true,
+            canRename: false,
+            canDelete: false,
+            canUploadGroupWide: false,
+          },
+        }],
+      };
+    });
+
+    renderDocuments();
+
+    await waitFor(() => expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Microscope Protocol'));
+    expect(screen.queryByRole('button', { name: 'Rename document' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete document' })).not.toBeInTheDocument();
+  });
+
+  it('shows recoverable selected-download errors without losing document context', async () => {
+    mockFetch((url) => {
+      if (url.includes('/download')) {
+        return { status: 410, json: { message: 'Document is no longer available' } };
+      }
+      if (url.includes('/document-categories')) {
+        return categories;
+      }
+      return { results: [baseDocument] };
+    });
+
+    renderDocuments();
+
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Selected document download' })).toHaveTextContent('Microscope Protocol'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Download Microscope Protocol/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Document is no longer available');
+    expect(screen.getByRole('region', { name: 'Selected document download' })).toHaveTextContent('Microscope Protocol');
   });
 });

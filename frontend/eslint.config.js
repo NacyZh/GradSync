@@ -11,6 +11,7 @@ export default [
       'coverage/',
       'playwright-report/',
       'test-results/',
+      '*.min.js',
       '*.tsbuildinfo',
       'vite.config.js',
       'vite.config.d.ts',

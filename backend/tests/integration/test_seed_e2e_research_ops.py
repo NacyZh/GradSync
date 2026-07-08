@@ -4,7 +4,14 @@ from django.core.management import call_command
 
 from apps.accounts.management.commands.seed_e2e_research_ops import Command
 from apps.accounts.models import User
-from apps.library.models import PaperAttachment, PaperRecord
+from apps.common.models import UploadedFile
+from apps.library.document_services import (
+    SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
+    SEEDED_DOCUMENT_EXAMPLE_ORIGINAL_FILENAME,
+    SEEDED_DOCUMENT_EXAMPLE_STORED_NAME,
+    SEEDED_DOCUMENT_EXAMPLE_TITLE,
+)
+from apps.library.models import DocumentCategory, DocumentRecord, PaperAttachment, PaperRecord
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
@@ -31,6 +38,8 @@ def test_seed_e2e_research_ops_creates_deterministic_full_stack_data():
     assert Booking.objects.filter(
         project=project, resource_item__name="Confocal microscope"
     ).exists()
+    assert DocumentCategory.objects.filter(name="Protocols", status="active").exists()
+    assert DocumentCategory.objects.filter(name="Reports", status="active").exists()
     assert Notification.objects.filter(project=project, recipient=advisor).exists()
 
     paper = PaperRecord.objects.get(project=project, title="Graph Neural Methods")
@@ -49,6 +58,13 @@ def test_seed_e2e_research_ops_creates_deterministic_full_stack_data():
         name="Simulator",
         source_path_label="team-library/code/simulator",
     ).exists()
+    assert not DocumentRecord.objects.filter(
+        project=project,
+        title=SEEDED_DOCUMENT_EXAMPLE_TITLE,
+        category__name="Protocols",
+        document_file__stored_name=SEEDED_DOCUMENT_EXAMPLE_STORED_NAME,
+        checksum_sha256=SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
+    ).exists()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -59,6 +75,7 @@ def test_seed_e2e_research_ops_can_run_twice_without_stale_field_errors():
     assert User.objects.count() == 3
     assert ResearchProject.objects.count() == 1
     assert ResourceType.objects.filter(name="Microscope").count() == 1
+    assert DocumentCategory.objects.filter(status="active").count() == 2
 
 
 @pytest.mark.django_db(transaction=True)
@@ -72,6 +89,13 @@ def test_seed_validation_research_ops_does_not_reintroduce_seeded_code_samples()
         versions__filename="materials-simulator.zip",
         versions__checksum_sha256="e" * 64,
     ).exists()
+    assert not DocumentRecord.objects.filter(
+        title=SEEDED_DOCUMENT_EXAMPLE_TITLE,
+        document_file__stored_name=SEEDED_DOCUMENT_EXAMPLE_STORED_NAME,
+        checksum_sha256=SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
+    ).exists()
+    assert DocumentCategory.objects.filter(name="Protocols", status="active").exists()
+    assert DocumentCategory.objects.filter(name="Reports", status="active").exists()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -121,6 +145,56 @@ def test_remove_seeded_code_samples_is_exact_and_repeatable():
         .values_list("name", flat=True)
     )
     assert visible_names == ["Analysis Toolkit", "Simulator"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_remove_seeded_document_examples_is_exact_and_repeatable():
+    call_command("seed_e2e_research_ops", skip_migrate=True, verbosity=0)
+    advisor = User.objects.get(email="advisor@example.edu")
+    project = ResearchProject.objects.get(title="Graphene Lab")
+    category = DocumentCategory.objects.get(name="Protocols")
+    seeded_file = UploadedFile.objects.create(
+        owner=advisor,
+        category=UploadedFile.Category.DOCUMENT,
+        original_filename=SEEDED_DOCUMENT_EXAMPLE_ORIGINAL_FILENAME,
+        stored_name=SEEDED_DOCUMENT_EXAMPLE_STORED_NAME,
+        content_type="application/pdf",
+        size_bytes=128,
+        checksum_sha256=SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
+    )
+    seeded = DocumentRecord.objects.create(
+        project=project,
+        category=category,
+        title=SEEDED_DOCUMENT_EXAMPLE_TITLE,
+        document_file=seeded_file,
+        checksum_sha256=SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
+        created_by=advisor,
+    )
+    preserved_file = UploadedFile.objects.create(
+        owner=advisor,
+        category=UploadedFile.Category.DOCUMENT,
+        original_filename=SEEDED_DOCUMENT_EXAMPLE_ORIGINAL_FILENAME,
+        stored_name="user/example-protocol.pdf",
+        content_type="application/pdf",
+        size_bytes=128,
+        checksum_sha256=SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
+    )
+    preserved = DocumentRecord.objects.create(
+        project=project,
+        category=category,
+        title=SEEDED_DOCUMENT_EXAMPLE_TITLE,
+        document_file=preserved_file,
+        checksum_sha256=SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
+        created_by=advisor,
+    )
+
+    call_command("remove_seeded_document_examples", verbosity=0)
+    call_command("remove_seeded_document_examples", verbosity=0)
+
+    assert not DocumentRecord.objects.filter(pk=seeded.pk).exists()
+    assert not UploadedFile.objects.filter(pk=seeded_file.pk).exists()
+    assert DocumentRecord.objects.filter(pk=preserved.pk).exists()
+    assert UploadedFile.objects.filter(pk=preserved_file.pk).exists()
 
 
 def test_seed_e2e_research_ops_runs_migrations_before_flushing_by_default(monkeypatch):

@@ -21,6 +21,7 @@ def test_cross_story_lists_return_within_release_thresholds(api_client):
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
     ProjectMembership.objects.create(project=project, user=student, role="student")
     category = DocumentCategory.objects.create(name="Protocols", created_by=advisor)
+    archived_category = DocumentCategory.objects.create(name="Archived Protocols", created_by=advisor)
     doc_file = UploadedFileFactory(
         owner=advisor, category="document", original_filename="protocol.pdf"
     )
@@ -30,20 +31,32 @@ def test_cross_story_lists_return_within_release_thresholds(api_client):
     resource_type = ResourceType.objects.create(name="Instrument")
     resource = ResourceItem.objects.create(resource_type=resource_type, name="Spectrometer")
 
-    DocumentRecord.objects.bulk_create(
-        [
-            DocumentRecord(
-                project=project,
-                category=category,
-                title=f"Protocol {index}",
-                description="Calibration workflow",
-                document_file=doc_file,
-                checksum_sha256=f"{index:064x}"[-64:],
-                created_by=advisor,
-            )
-            for index in range(250)
-        ]
-    )
+    active_documents = [
+        DocumentRecord(
+            project=project,
+            category=category,
+            title=f"Protocol {index:04d}",
+            description="Calibration workflow",
+            document_file=doc_file,
+            checksum_sha256=f"{index:064x}"[-64:],
+            created_by=advisor,
+        )
+        for index in range(1000)
+    ]
+    archived_documents = [
+        DocumentRecord(
+            project=project,
+            category=archived_category,
+            title=f"Protocol archived {index:04d}",
+            description="Historical calibration workflow",
+            document_file=doc_file,
+            checksum_sha256=f"{1000 + index:064x}"[-64:],
+            created_by=advisor,
+            status=DocumentRecord.Status.ARCHIVED,
+        )
+        for index in range(75)
+    ]
+    DocumentRecord.objects.bulk_create([*active_documents, *archived_documents])
     writing_projects = WritingProject.objects.bulk_create(
         [
             WritingProject(
@@ -99,7 +112,10 @@ def test_cross_story_lists_return_within_release_thresholds(api_client):
     client = authenticate(api_client, student)
     start = time.monotonic()
     responses = [
-        client.get(f"/api/projects/{project.id}/documents?q=Protocol&page_size=50"),
+        client.get(
+            f"/api/projects/{project.id}/documents"
+            f"?q=Protocol&categoryId={category.id}&page_size=50"
+        ),
         client.get(f"/api/projects/{project.id}/writing-projects/?q=Thesis&page_size=50"),
         client.get("/api/resources/?search=Spectrometer&page_size=50"),
         client.get(f"/api/projects/{project.id}/notifications/"),
@@ -108,8 +124,24 @@ def test_cross_story_lists_return_within_release_thresholds(api_client):
 
     assert all(response.status_code == 200 for response in responses)
     assert len(responses[0].data["results"]) == 50
+    assert responses[0].data["count"] == 1000
+    assert all(
+        result["categoryId"] == str(category.id) and result["status"] == DocumentRecord.Status.ACTIVE
+        for result in responses[0].data["results"]
+    )
     assert len(responses[1].data["results"]) == 50
     assert elapsed < 2
+
+    empty_start = time.monotonic()
+    empty_response = client.get(
+        f"/api/projects/{project.id}/documents"
+        f"?q=NoMatchingDocument&categoryId={category.id}&page_size=50"
+    )
+    empty_elapsed = time.monotonic() - empty_start
+
+    assert empty_response.status_code == 200
+    assert empty_response.data["results"] == []
+    assert empty_elapsed < 2
 
 
 @pytest.mark.django_db

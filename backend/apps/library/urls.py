@@ -36,6 +36,11 @@ urlpatterns = [
         DocumentViewSet.as_view({"get": "list", "post": "create"}),
         name="project-documents-noslash",
     ),
+    path(
+        "projects/<int:project_id>/documents/<int:pk>",
+        DocumentViewSet.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}),
+        name="project-document-detail-noslash",
+    ),
     path("papers/<int:paper_id>/download", PaperDownloadView.as_view(), name="paper-download"),
     path("library/papers/", SharedPaperListCreateView.as_view(), name="shared-paper-list"),
     path(

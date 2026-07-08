@@ -5,7 +5,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.library.models import PaperAttachment, PaperRecord
+from apps.library.models import DocumentCategory, PaperAttachment, PaperRecord
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
@@ -66,6 +66,16 @@ class Command(BaseCommand):
         )
         ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
         ProjectMembership.objects.create(project=project, user=student, role="student")
+        DocumentCategory.objects.create(
+            name="Protocols",
+            description="Shared research protocols",
+            created_by=advisor,
+        )
+        DocumentCategory.objects.create(
+            name="Reports",
+            description="Project reports and supporting documents",
+            created_by=advisor,
+        )
 
         task = Task.objects.create(
             project=project,
@@ -200,6 +210,7 @@ class Command(BaseCommand):
             imported_by=advisor,
         )
         call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
+        call_command("remove_seeded_document_examples", verbosity=options["verbosity"])
 
         self.stdout.write(
             self.style.SUCCESS(

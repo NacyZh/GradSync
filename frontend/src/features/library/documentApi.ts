@@ -23,14 +23,26 @@ export type DocumentRecord = {
   documentFileId?: string;
   checksumSha256?: string;
   status: string;
+  actionCapabilities?: {
+    canView: boolean;
+    canDownload: boolean;
+    canRename: boolean;
+    canDelete: boolean;
+    canUploadGroupWide: boolean;
+  };
 };
 
 export type DocumentUploadPayload = {
   file: File;
-  title: string;
+  title?: string;
   categoryId: string;
   description?: string;
-  visibility: 'project_members' | 'group_wide';
+  visibility?: 'project_members' | 'group_wide';
+};
+
+export type DocumentRenamePayload = {
+  newTitle: string;
+  reason?: string;
 };
 
 export function listDocumentCategories() {
@@ -56,13 +68,30 @@ export function listDocuments(projectId: number, query = '', categoryId = '', vi
 export function uploadDocument(projectId: number, payload: DocumentUploadPayload) {
   const formData = new FormData();
   formData.append('file', payload.file);
-  formData.append('title', payload.title);
   formData.append('categoryId', payload.categoryId);
-  formData.append('visibility', payload.visibility);
+  if (payload.title?.trim()) formData.append('title', payload.title.trim());
   if (payload.description) formData.append('description', payload.description);
+  if (payload.visibility) formData.append('visibility', payload.visibility);
   return apiRequest<DocumentRecord>(`/api/projects/${projectId}/documents`, {
     method: 'POST',
     body: formData,
+  });
+}
+
+export function retrieveDocument(projectId: number, documentId: string) {
+  return apiRequest<DocumentRecord>(`/api/projects/${projectId}/documents/${documentId}`);
+}
+
+export function renameDocument(projectId: number, documentId: string, payload: DocumentRenamePayload) {
+  return apiRequest<DocumentRecord>(`/api/projects/${projectId}/documents/${documentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDocument(projectId: number, documentId: string) {
+  return apiRequest<void>(`/api/projects/${projectId}/documents/${documentId}`, {
+    method: 'DELETE',
   });
 }
 
@@ -85,10 +114,38 @@ export function useDocuments(projectId: number, query: string, categoryId: strin
   });
 }
 
+export function useDocument(projectId: number, documentId?: string) {
+  return useQuery({
+    queryKey: ['document', projectId, documentId],
+    queryFn: () => retrieveDocument(projectId, documentId as string),
+    enabled: Boolean(projectId && documentId),
+  });
+}
+
 export function useDocumentUpload(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: DocumentUploadPayload) => uploadDocument(projectId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents', projectId] }),
+  });
+}
+
+export function useRenameDocument(projectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ documentId, payload }: { documentId: string; payload: DocumentRenamePayload }) =>
+      renameDocument(projectId, documentId, payload),
+    onSuccess: (document) => {
+      queryClient.setQueryData(['document', projectId, document.id], document);
+      queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+    },
+  });
+}
+
+export function useDeleteDocument(projectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (documentId: string) => deleteDocument(projectId, documentId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents', projectId] }),
   });
 }

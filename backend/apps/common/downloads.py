@@ -9,6 +9,10 @@ from apps.library.models import DocumentRecord, PaperAttachment, PaperRecord
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 
 
+class DownloadUnavailable(Exception):
+    pass
+
+
 def _require_active_member(user, project):
     if not project.memberships.filter(user=user, status="active").exists():
         raise PermissionError("You are not authorized to download this file")
@@ -111,6 +115,10 @@ def describe_code_artifact_download(user, artifact: CodeArtifact) -> dict:
 
 
 def describe_document_download(user, document: DocumentRecord) -> dict:
+    if document.status != DocumentRecord.Status.ACTIVE:
+        raise DownloadUnavailable("Document is no longer available")
+    if not document.document_file_id:
+        raise DownloadUnavailable("No file is available for this document")
     return describe_uploaded_file_download(
         user,
         document.document_file,

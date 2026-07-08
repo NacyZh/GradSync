@@ -11,7 +11,8 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput
       && python manage.py remove_seeded_paper_samples
-      && python manage.py remove_seeded_code_samples"
+      && python manage.py remove_seeded_code_samples
+      && python manage.py remove_seeded_document_examples"
     mem_limit: ${GRADSYNC_MIGRATE_MEM_LIMIT:-256m}
     restart: "no"
     depends_on:

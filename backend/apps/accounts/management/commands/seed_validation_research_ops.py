@@ -3,6 +3,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.library.models import DocumentCategory
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
@@ -80,8 +81,17 @@ class Command(BaseCommand):
             ProjectMembership.objects.update_or_create(
                 project=project, user=user, defaults={"role": role, "status": "active"}
             )
+        for name, description in [
+            ("Protocols", "Shared research protocols"),
+            ("Reports", "Project reports and supporting documents"),
+        ]:
+            DocumentCategory.objects.get_or_create(
+                name=name,
+                defaults={"description": description, "created_by": advisor},
+            )
         call_command("remove_seeded_paper_samples", verbosity=options["verbosity"])
         call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
+        call_command("remove_seeded_document_examples", verbosity=options["verbosity"])
         parent, _ = Task.objects.get_or_create(
             project=project,
             title="Prepare manuscript methods section",
@@ -201,6 +211,7 @@ class Command(BaseCommand):
             },
         )
         call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
+        call_command("remove_seeded_document_examples", verbosity=options["verbosity"])
         self.stdout.write(self.style.SUCCESS(f"Seeded validation project {project.id}"))
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Validation login credentials:"))

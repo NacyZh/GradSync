@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.downloads import (
+    DownloadUnavailable,
     describe_document_download,
     describe_paper_download,
     storage_file_download_response,
@@ -17,7 +18,7 @@ from apps.common.downloads import (
 from apps.common.project_scope import visible_asset_q
 from apps.projects.models import ResearchProject
 
-from .document_services import DocumentCategoryService, DocumentService
+from .document_services import DocumentCategoryService, DocumentService, active_document_queryset
 from .duplicate_services import review_paper_import
 from .import_services import PaperImportError, PaperImportService, import_shared_paper_pdf
 from .models import (
@@ -31,7 +32,9 @@ from .models import (
 from .serializers import (
     DocumentCategoryCreateSerializer,
     DocumentCategorySerializer,
+    DocumentDeleteRequestSerializer,
     DocumentRecordSerializer,
+    DocumentRenameRequestSerializer,
     DocumentUploadSerializer,
     PaperDeleteRequestSerializer,
     PaperImportBatchSerializer,
@@ -526,6 +529,17 @@ def _error_message(exc: DjangoValidationError) -> str:
     return str(exc.messages[0] if exc.messages else exc)
 
 
+def _is_document_conflict_message(message: str) -> bool:
+    return any(
+        conflict in message
+        for conflict in [
+            "already exists",
+            "no longer active",
+            "does not belong",
+        ]
+    )
+
+
 class DocumentCategoryView(views.APIView):
     permission_classes = [IsAuthenticated]
 
@@ -552,7 +566,12 @@ class DocumentCategoryView(views.APIView):
         return Response(DocumentCategorySerializer(category).data, status=status.HTTP_201_CREATED)
 
 
-class DocumentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
+class DocumentViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
     serializer_class = DocumentRecordSerializer
     permission_classes = [IsAuthenticated]
 
@@ -567,19 +586,21 @@ class DocumentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.G
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
+    @extend_schema(
+        responses={
+            200: DocumentRecordSerializer,
+            403: OpenApiResponse(description="Retrieve forbidden"),
+            404: OpenApiResponse(description="Document not found"),
+        },
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
     def get_project(self):
         return get_object_or_404(ResearchProject.objects.all(), pk=self.kwargs["project_id"])
 
     def get_queryset(self):
-        queryset = (
-            DocumentRecord.objects.filter(
-                project=self.get_project(),
-                status=DocumentRecord.Status.ACTIVE,
-            )
-            .filter(visible_asset_q(self.request.user))
-            .select_related("category", "document_file", "project")
-            .distinct()
-        )
+        queryset = active_document_queryset(self.request.user, self.get_project())
         query = self.request.query_params.get("q")
         if query:
             queryset = queryset.filter(
@@ -598,6 +619,8 @@ class DocumentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.G
     def get_serializer_class(self):
         if self.action == "create":
             return DocumentUploadSerializer
+        if self.action == "partial_update":
+            return DocumentRenameRequestSerializer
         return DocumentRecordSerializer
 
     @extend_schema(
@@ -615,7 +638,76 @@ class DocumentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.G
             return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except DjangoPermissionDenied as exc:
             raise PermissionDenied(str(exc)) from exc
-        return Response(DocumentRecordSerializer(document).data, status=status.HTTP_201_CREATED)
+        return Response(
+            DocumentRecordSerializer(document, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @extend_schema(
+        request=DocumentRenameRequestSerializer,
+        responses={
+            200: DocumentRecordSerializer,
+            400: OpenApiResponse(description="Rename validation failed"),
+            403: OpenApiResponse(description="Rename forbidden"),
+            404: OpenApiResponse(description="Document not found"),
+            409: OpenApiResponse(description="Duplicate or unavailable document"),
+        },
+    )
+    def partial_update(self, request, *args, **kwargs):
+        document = get_object_or_404(
+            DocumentRecord.objects.select_related("category", "document_file", "project"),
+            project=self.get_project(),
+            pk=kwargs["pk"],
+        )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            renamed = DocumentService(request.user, self.get_project()).rename_document(
+                document,
+                **serializer.validated_data,
+            )
+        except DjangoValidationError as exc:
+            message = _error_message(exc)
+            status_code = (
+                status.HTTP_409_CONFLICT
+                if _is_document_conflict_message(message)
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"message": message}, status=status_code)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(
+            DocumentRecordSerializer(renamed, context=self.get_serializer_context()).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        request=DocumentDeleteRequestSerializer,
+        responses={
+            204: OpenApiResponse(description="Document archived"),
+            403: OpenApiResponse(description="Delete forbidden"),
+            404: OpenApiResponse(description="Document not found"),
+            409: OpenApiResponse(description="Unavailable document"),
+        },
+    )
+    def destroy(self, request, *args, **kwargs):
+        document = get_object_or_404(
+            DocumentRecord.objects.select_related("category", "document_file", "project"),
+            project=self.get_project(),
+            pk=kwargs["pk"],
+        )
+        serializer = DocumentDeleteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            DocumentService(request.user, self.get_project()).archive_document(
+                document,
+                reason=serializer.validated_data.get("reason", ""),
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_409_CONFLICT)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DocumentDownloadView(views.APIView):
@@ -634,5 +726,7 @@ class DocumentDownloadView(views.APIView):
         )
         try:
             return Response(describe_document_download(request.user, document))
+        except DownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc

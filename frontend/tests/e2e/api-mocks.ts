@@ -173,6 +173,71 @@ export const paperLibraryFixtures = {
   },
 };
 
+export type DocumentActionCapabilitiesFixture = {
+  canView: boolean;
+  canDownload: boolean;
+  canRename: boolean;
+  canDelete: boolean;
+  canUploadGroupWide: boolean;
+};
+
+export const maintainerDocumentCapabilities: DocumentActionCapabilitiesFixture = {
+  canView: true,
+  canDownload: true,
+  canRename: true,
+  canDelete: true,
+  canUploadGroupWide: true,
+};
+
+export const nonMaintainerDocumentCapabilities: DocumentActionCapabilitiesFixture = {
+  canView: true,
+  canDownload: true,
+  canRename: false,
+  canDelete: false,
+  canUploadGroupWide: false,
+};
+
+export function buildDocumentCategory(overrides: Record<string, unknown> = {}) {
+  return {
+    id: '1',
+    name: 'Protocols',
+    description: 'Lab protocols',
+    status: 'active',
+    createdById: '10',
+    ...overrides,
+  };
+}
+
+export function buildDocumentRecord(overrides: Record<string, unknown> = {}) {
+  return {
+    id: '4',
+    projectId: '1',
+    categoryId: '1',
+    categoryName: 'Protocols',
+    title: 'Microscope Protocol',
+    description: 'Calibration workflow',
+    visibility: 'group_wide',
+    uploaderId: '10',
+    documentFileId: '44',
+    checksumSha256: 'a'.repeat(64),
+    createdAt: '2026-07-03T08:00:00Z',
+    status: 'active',
+    actionCapabilities: maintainerDocumentCapabilities,
+    ...overrides,
+  };
+}
+
+export function buildLongDocumentRecord(overrides: Record<string, unknown> = {}) {
+  return buildDocumentRecord({
+    id: 'long-document',
+    title:
+      'Document title with exceptionally long protocol naming for responsive layout validation',
+    description: 'Long document description '.repeat(24),
+    categoryName: 'Very long methods and laboratory safety category',
+    ...overrides,
+  });
+}
+
 export async function mockUnauthenticated(page: Page) {
   await page.route('**/api/accounts/me/', async (route) => {
     await route.fulfill({ status: 401, json: { message: 'Authentication required' } });

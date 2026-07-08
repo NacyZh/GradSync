@@ -135,3 +135,39 @@ def test_category_list_returns_active_categories(api_client):
 
     assert response.status_code == 200
     assert [category["name"] for category in response.data] == ["Protocols"]
+
+
+@pytest.mark.django_db
+def test_archived_stale_and_unauthorized_document_downloads_are_blocked(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    student = UserFactory(global_role="student", status="active")
+    outsider = UserFactory(global_role="student", status="active")
+    project = ResearchProject.objects.create(title="Download Safety", advisor=teacher)
+    ProjectMembership.objects.create(project=project, user=teacher, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    category = authenticate(api_client, teacher).post(
+        "/api/document-categories",
+        {"name": "Download Safety Protocols"},
+    ).data
+    upload = authenticate(api_client, student).post(
+        f"/api/projects/{project.id}/documents",
+        {
+            "file": _file("download.pdf", b"%PDF download"),
+            "title": "Download Safety Document",
+            "categoryId": category["id"],
+        },
+        format="multipart",
+    )
+    document = DocumentRecord.objects.get(pk=upload.data["id"])
+
+    unauthorized = authenticate(api_client, outsider).get(f"/api/documents/{document.id}/download")
+    allowed = authenticate(api_client, student).get(f"/api/documents/{document.id}/download")
+    document.status = DocumentRecord.Status.ARCHIVED
+    document.save(update_fields=["status"])
+    archived = authenticate(api_client, student).get(f"/api/documents/{document.id}/download")
+
+    assert unauthorized.status_code == 403
+    assert allowed.status_code == 200
+    assert allowed.data["filename"] == "download.pdf"
+    assert archived.status_code == 410
+    assert "no longer available" in archived.data["message"]

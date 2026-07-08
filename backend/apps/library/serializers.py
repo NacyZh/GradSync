@@ -11,6 +11,7 @@ from .models import (
     PaperRecord,
     PaperTitleExtractionResult,
 )
+from .document_services import document_action_capabilities
 
 
 class PaperAttachmentSerializer(serializers.ModelSerializer):
@@ -370,6 +371,7 @@ class DocumentRecordSerializer(serializers.ModelSerializer):
     documentFileId = serializers.CharField(source="document_file_id", read_only=True)
     checksumSha256 = serializers.CharField(source="checksum_sha256", read_only=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+    actionCapabilities = serializers.SerializerMethodField()
 
     class Meta:
         model = DocumentRecord
@@ -386,12 +388,36 @@ class DocumentRecordSerializer(serializers.ModelSerializer):
             "documentFileId",
             "checksumSha256",
             "status",
+            "actionCapabilities",
         ]
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "canView": {"type": "boolean"},
+                "canDownload": {"type": "boolean"},
+                "canRename": {"type": "boolean"},
+                "canDelete": {"type": "boolean"},
+                "canUploadGroupWide": {"type": "boolean"},
+            },
+            "required": [
+                "canView",
+                "canDownload",
+                "canRename",
+                "canDelete",
+                "canUploadGroupWide",
+            ],
+        }
+    )
+    def get_actionCapabilities(self, obj):
+        request = self.context.get("request")
+        return document_action_capabilities(getattr(request, "user", None), obj)
 
 
 class DocumentUploadSerializer(serializers.Serializer):
     file = serializers.FileField()
-    title = serializers.CharField(max_length=255)
+    title = serializers.CharField(max_length=255, required=False, allow_blank=True)
     categoryId = serializers.IntegerField()
     description = serializers.CharField(required=False, allow_blank=True)
     visibility = serializers.ChoiceField(
@@ -405,3 +431,17 @@ class DocumentUploadSerializer(serializers.Serializer):
         attrs["upload"] = attrs.pop("file")
         attrs["category_id"] = attrs.pop("categoryId")
         return attrs
+
+
+class DocumentRenameRequestSerializer(StrictFieldsSerializer):
+    newTitle = serializers.CharField(max_length=255, trim_whitespace=True)
+    reason = serializers.CharField(max_length=255, allow_blank=True, required=False)
+
+    def validate(self, attrs):
+        if not attrs["newTitle"].strip():
+            raise serializers.ValidationError({"newTitle": "Document title is required."})
+        return attrs
+
+
+class DocumentDeleteRequestSerializer(StrictFieldsSerializer):
+    reason = serializers.CharField(max_length=255, allow_blank=True, required=False)
