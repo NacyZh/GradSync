@@ -5,6 +5,7 @@ from apps.audit.models import AuditEvent, DownloadEvent
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact
 from tests.factories.accounts import UserFactory
+from tests.factories.collaboration import archived_code_artifact
 from tests.helpers import authenticate
 
 
@@ -144,3 +145,25 @@ def test_non_archive_missing_description_and_duplicate_checksum_are_rejected(api
     assert duplicate.data["message"] == "Code artifact checksum already exists in this project"
     assert missing_description.status_code == 400
     assert invalid.status_code == 400
+
+
+@pytest.mark.django_db
+def test_archived_code_artifact_is_not_downloadable_or_audited(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    student = UserFactory(global_role="student", status="active")
+    project = ResearchProject.objects.create(title="Archived Download", advisor=teacher)
+    ProjectMembership.objects.create(project=project, user=teacher, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    artifact = archived_code_artifact(project=project, created_by=student, name="Archived Source")
+
+    direct_response = authenticate(api_client, student).get(
+        f"/api/code-artifacts/{artifact.id}/download"
+    )
+    version_response = authenticate(api_client, student).post(
+        f"/api/projects/{project.id}/code-artifacts/{artifact.id}/versions/{artifact.versions.first().id}/download/"
+    )
+
+    assert direct_response.status_code == 404
+    assert version_response.status_code == 404
+    assert not DownloadEvent.objects.filter(actor=student, filename__contains="artifact").exists()
+    assert not AuditEvent.objects.filter(actor=student, event_type__contains="downloaded").exists()

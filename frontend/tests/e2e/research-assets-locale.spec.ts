@@ -140,14 +140,14 @@ test('paper import, code download, and locale persistence workflow is reachable'
         results: [{
           id: '1',
           projectId: '1',
-          name: 'Simulator',
+          name: 'Analysis Toolkit',
           status: 'active',
-          latestVersion: { id: '2', artifactId: '1', projectId: '1', versionLabel: 'v1', filename: 'sim.zip', checksumSha256: 'b', status: 'active' },
+          latestVersion: { id: '2', artifactId: '1', projectId: '1', versionLabel: 'v1', filename: 'analysis-toolkit.zip', checksumSha256: 'c', status: 'active' },
         }],
       });
     });
     await page.route('**/api/projects/1/code-artifacts/1/versions/2/download/', async (route) => {
-      await fulfillJson(route, { filename: 'sim.zip', deliveryMode: 'direct_response' });
+      await fulfillJson(route, { filename: 'analysis-toolkit.zip', deliveryMode: 'direct_response' });
     });
     await page.route('**/api/accounts/locale/', async (route) => {
       if (route.request().method() === 'PUT') {
@@ -186,9 +186,9 @@ test('paper import, code download, and locale persistence workflow is reachable'
 
   await page.goto('/projects/1/code');
   await expect(page.getByRole('heading', { name: 'Code repository' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Simulator' })).toBeVisible();
+  await expect(page.getByTestId('code-selected-detail-region').getByRole('heading', { name: 'Analysis Toolkit' })).toBeVisible();
   await page.getByRole('button', { name: 'Download' }).click();
-  await expect(page.getByRole('status')).toContainText('sim.zip');
+  await expect(page.getByRole('status')).toContainText('analysis-toolkit.zip');
 
   await page.getByRole('button', { name: /Language|语言/ }).click();
 });

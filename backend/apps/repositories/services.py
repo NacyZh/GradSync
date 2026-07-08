@@ -1,4 +1,7 @@
+from dataclasses import dataclass
+
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.db import transaction
 from django.utils import timezone
 
@@ -9,6 +12,18 @@ from apps.projects.archive_services import ensure_project_writable
 from .models import CodeArtifact, CodeArtifactVersion
 from .upload_policy import validate_code_import
 
+SEEDED_CODE_SAMPLE_NAME = "Simulator"
+SEEDED_CODE_SAMPLE_SOURCE_PATH_LABEL = "team-library/code/simulator"
+SEEDED_CODE_SAMPLE_STORAGE_KEY = "e2e/sim.zip"
+SEEDED_CODE_SAMPLE_FILENAME = "sim.zip"
+SEEDED_CODE_SAMPLE_CHECKSUM_SHA256 = "b" * 64
+
+
+@dataclass(frozen=True)
+class SeededCodeCleanupResult:
+    matched: int
+    removed: int
+
 
 def _can_share_group_wide(user) -> bool:
     return bool(
@@ -16,6 +31,71 @@ def _can_share_group_wide(user) -> bool:
         or getattr(user, "is_administrator", False)
         or getattr(user, "is_advisor", False)
     )
+
+
+def can_manage_code_artifact(user, artifact: CodeArtifact) -> bool:
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if artifact.status != CodeArtifact.Status.ACTIVE:
+        return False
+    if artifact.project.status != "active":
+        return False
+    if getattr(user, "is_superuser", False) or getattr(user, "is_administrator", False):
+        return True
+    return artifact.project.advisor_id == getattr(user, "id", None)
+
+
+def record_rejected_code_artifact_management_attempt(project, actor, artifact, action: str):
+    return record_event(
+        project,
+        actor,
+        f"code_artifact.{action}.rejected",
+        f"Rejected code artifact {action} for {getattr(artifact, 'id', '')}",
+        artifact,
+    )
+
+
+def is_seeded_code_sample(artifact: CodeArtifact) -> bool:
+    if artifact.name != SEEDED_CODE_SAMPLE_NAME:
+        return False
+    if artifact.source_path_label != SEEDED_CODE_SAMPLE_SOURCE_PATH_LABEL:
+        return False
+    versions = list(artifact.versions.all())
+    if len(versions) != 1:
+        return False
+    version = versions[0]
+    return (
+        version.storage_key == SEEDED_CODE_SAMPLE_STORAGE_KEY
+        and version.filename == SEEDED_CODE_SAMPLE_FILENAME
+        and version.checksum_sha256 == SEEDED_CODE_SAMPLE_CHECKSUM_SHA256
+    )
+
+
+def remove_seeded_code_samples(*, dry_run: bool = False) -> SeededCodeCleanupResult:
+    candidates = CodeArtifact.objects.filter(
+        name=SEEDED_CODE_SAMPLE_NAME,
+        source_path_label=SEEDED_CODE_SAMPLE_SOURCE_PATH_LABEL,
+    ).prefetch_related("versions")
+    matched = [artifact for artifact in candidates if is_seeded_code_sample(artifact)]
+    if dry_run:
+        return SeededCodeCleanupResult(matched=len(matched), removed=0)
+
+    storage_keys = [
+        version.storage_key
+        for artifact in matched
+        for version in artifact.versions.all()
+        if version.storage_key
+    ]
+    storage_keys.append(SEEDED_CODE_SAMPLE_STORAGE_KEY)
+    with transaction.atomic():
+        removed = 0
+        for artifact in matched:
+            artifact.delete()
+            removed += 1
+    for storage_key in dict.fromkeys(storage_keys):
+        if default_storage.exists(storage_key):
+            default_storage.delete(storage_key)
+    return SeededCodeCleanupResult(matched=len(matched), removed=removed)
 
 
 class CodeArtifactService:
@@ -179,3 +259,71 @@ class CodeArtifactService:
             version,
         )
         return version
+
+    def rename_artifact(
+        self,
+        artifact: CodeArtifact,
+        *,
+        name: str,
+        reason: str = "",
+    ) -> CodeArtifact:
+        ensure_project_writable(self.project)
+        if artifact.project_id != self.project.id:
+            raise ValidationError("Code artifact does not belong to this project")
+        if artifact.status != CodeArtifact.Status.ACTIVE:
+            raise ValidationError("Code artifact is no longer active")
+        if not can_manage_code_artifact(self.user, artifact):
+            record_rejected_code_artifact_management_attempt(
+                self.project, self.user, artifact, "rename"
+            )
+            raise PermissionError("You cannot rename this code artifact")
+
+        cleaned_name = name.strip()
+        if not cleaned_name:
+            raise ValidationError("Code artifact name is required")
+        duplicate_exists = CodeArtifact.objects.filter(
+            project=self.project,
+            name=cleaned_name,
+            status=CodeArtifact.Status.ACTIVE,
+        ).exclude(pk=artifact.pk).exists()
+        if duplicate_exists:
+            raise ValidationError("Active code artifact name already exists in this project")
+
+        with transaction.atomic():
+            artifact.name = cleaned_name
+            artifact.save(update_fields=["name", "updated_at"])
+            summary = f"Renamed code artifact {artifact.id}"
+            if reason:
+                summary = f"{summary}: {reason}"
+            record_event(
+                self.project,
+                self.user,
+                "code_artifact.renamed",
+                summary,
+                artifact,
+            )
+        return artifact
+
+    def archive_artifact(self, artifact: CodeArtifact) -> None:
+        ensure_project_writable(self.project)
+        if artifact.project_id != self.project.id:
+            raise ValidationError("Code artifact does not belong to this project")
+        if artifact.status != CodeArtifact.Status.ACTIVE:
+            raise ValidationError("Code artifact is no longer active")
+        if not can_manage_code_artifact(self.user, artifact):
+            record_rejected_code_artifact_management_attempt(
+                self.project, self.user, artifact, "delete"
+            )
+            raise PermissionError("You cannot delete this code artifact")
+
+        with transaction.atomic():
+            artifact.status = CodeArtifact.Status.ARCHIVED
+            artifact.archived_at = timezone.now()
+            artifact.save(update_fields=["status", "archived_at", "updated_at"])
+            record_event(
+                self.project,
+                self.user,
+                "code_artifact.deleted",
+                f"Deleted code artifact {artifact.id}",
+                artifact,
+            )

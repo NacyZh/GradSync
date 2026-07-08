@@ -144,24 +144,24 @@ describe('research assets and locale UI', () => {
           artifact={{
             id: '1',
             projectId: '1',
-            name: 'Simulator',
+            name: 'Analysis Toolkit',
             status: 'active',
             latestVersion: {
               id: '2',
               artifactId: '1',
               projectId: '1',
               versionLabel: 'v1',
-              filename: 'sim.zip',
+              filename: 'analysis-toolkit.zip',
               checksumSha256: 'b',
               status: 'active',
             },
           }}
         />
-        <DownloadStatus descriptor={{ filename: 'sim.zip', deliveryMode: 'direct_response' }} />
+        <DownloadStatus descriptor={{ filename: 'analysis-toolkit.zip', deliveryMode: 'direct_response' }} />
       </>,
     );
-    expect(screen.getByText('Simulator')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('sim.zip');
+    expect(screen.getByText('Analysis Toolkit')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('analysis-toolkit.zip');
   });
 
   it('falls back to localized message catalogs', () => {

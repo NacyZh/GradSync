@@ -179,26 +179,27 @@ class Command(BaseCommand):
         )
         artifact = CodeArtifact.objects.create(
             project=project,
-            name="Simulator",
-            description="Seeded simulator artifact for full-stack download checks.",
-            tags=["simulation"],
-            source_path_label="team-library/code/simulator",
+            name="Analysis Toolkit",
+            description="Reusable analysis toolkit artifact for full-stack download checks.",
+            tags=["analysis", "python"],
+            source_path_label="team-library/code/analysis-toolkit",
             created_by=advisor,
         )
-        archive_bytes = b"GradSync e2e simulator archive\n"
+        archive_bytes = b"GradSync e2e analysis toolkit archive\n"
         CodeArtifactVersion.objects.create(
             artifact=artifact,
             project=project,
             version_label="v1",
-            storage_key="e2e/sim.zip",
-            filename="sim.zip",
+            storage_key="e2e/analysis-toolkit.zip",
+            filename="analysis-toolkit.zip",
             content_type="application/zip",
-            size_bytes=_replace_seed_file("e2e/sim.zip", archive_bytes),
-            checksum_sha256="b" * 64,
-            description="Local folder import for the deterministic e2e simulator.",
-            relative_path_manifest=["README.md", "src/simulator.py"],
+            size_bytes=_replace_seed_file("e2e/analysis-toolkit.zip", archive_bytes),
+            checksum_sha256="c" * 64,
+            description="Local folder import for the deterministic e2e analysis toolkit.",
+            relative_path_manifest=["README.md", "src/analysis.py"],
             imported_by=advisor,
         )
+        call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
 
         self.stdout.write(
             self.style.SUCCESS(

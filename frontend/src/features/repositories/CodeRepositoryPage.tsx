@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { DataState } from '../../shared/ui/DataState';
@@ -8,49 +9,178 @@ import { CodeArtifactActions } from './CodeArtifactActions';
 import { CodeArtifactFilters } from './CodeArtifactFilters';
 import { CodeArtifactImportForm } from './CodeArtifactImportForm';
 import { CodeArtifactVersionPanel } from './CodeArtifactVersionPanel';
-import { useCodeArtifacts, type CodeArtifact } from './api';
+import { useCodeArtifacts, useDeleteCodeArtifact, useRenameCodeArtifact, type CodeArtifact } from './api';
 
 export function CodeRepositoryPage() {
   const projectId = Number(useParams().projectId ?? 0);
   const [query, setQuery] = useState('');
   const [visibility, setVisibility] = useState('');
-  const [selected, setSelected] = useState<CodeArtifact | undefined>();
+  const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [uploadedArtifacts, setUploadedArtifacts] = useState<Record<string, CodeArtifact>>({});
+  const [renamedArtifacts, setRenamedArtifacts] = useState<Record<string, CodeArtifact>>({});
+  const [deletedArtifactIds, setDeletedArtifactIds] = useState<Set<string>>(() => new Set());
   const artifactsQuery = useCodeArtifacts(projectId, query, visibility);
-  const artifacts = artifactsQuery.data?.results ?? [];
+  const renameMutation = useRenameCodeArtifact(projectId);
+  const deleteMutation = useDeleteCodeArtifact(projectId);
+  const artifacts = useMemo(() => {
+    const byId = new Map<string, CodeArtifact>();
+    for (const artifact of artifactsQuery.data?.results ?? []) {
+      byId.set(artifact.id, artifact);
+    }
+    for (const artifact of Object.values(uploadedArtifacts)) {
+      byId.set(artifact.id, artifact);
+    }
+    for (const artifact of Object.values(renamedArtifacts)) {
+      byId.set(artifact.id, artifact);
+    }
+    return Array.from(byId.values()).filter((artifact) => !deletedArtifactIds.has(artifact.id));
+  }, [artifactsQuery.data, deletedArtifactIds, renamedArtifacts, uploadedArtifacts]);
+  const selectedArtifact = artifacts.find((artifact) => artifact.id === selectedId) ?? artifacts[0];
+
+  function selectArtifact(artifact: CodeArtifact) {
+    setSelectedId(artifact.id);
+  }
+
+  function handleArtifactRowKeyDown(event: KeyboardEvent<HTMLButtonElement>, artifact: CodeArtifact) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectArtifact(artifact);
+    }
+  }
+
+  async function renameSelectedArtifact(newName: string, reason?: string) {
+    if (!selectedArtifact) {
+      throw new Error('Select a code artifact before renaming');
+    }
+    const renamed = await renameMutation.mutateAsync({
+      artifactId: selectedArtifact.id,
+      payload: { name: newName, reason },
+    });
+    setRenamedArtifacts((current) => ({ ...current, [renamed.id]: renamed }));
+    return renamed;
+  }
+
+  async function deleteSelectedArtifact() {
+    if (!selectedArtifact) {
+      throw new Error('Select a code artifact before deleting');
+    }
+    const deletedId = selectedArtifact.id;
+    await deleteMutation.mutateAsync(deletedId);
+    setDeletedArtifactIds((current) => {
+      const next = new Set(current);
+      next.add(deletedId);
+      return next;
+    });
+    setRenamedArtifacts((current) => {
+      const next = { ...current };
+      delete next[deletedId];
+      return next;
+    });
+    setUploadedArtifacts((current) => {
+      const next = { ...current };
+      delete next[deletedId];
+      return next;
+    });
+    setSelectedId(undefined);
+  }
+
+  function handleUploadedArtifact(artifact: CodeArtifact) {
+    setUploadedArtifacts((current) => ({ ...current, [artifact.id]: artifact }));
+    setSelectedId(artifact.id);
+  }
+
+  useEffect(() => {
+    if (!artifacts.length) {
+      setSelectedId(undefined);
+      return;
+    }
+    if (!selectedId || !artifacts.some((artifact) => artifact.id === selectedId)) {
+      setSelectedId(artifacts[0].id);
+    }
+  }, [artifacts, selectedId]);
 
   return (
     <PageShell title="Code repository" description="Upload, search, inspect, and download compressed code archives.">
-      <div className="grid gap-4 xl:grid-cols-[minmax(22rem,1fr)_minmax(20rem,0.8fr)]">
-        <section className="panel" aria-label="Code artifacts">
-          <div className="mb-4 grid gap-3">
-            <CodeArtifactFilters value={query} visibility={visibility} onChange={setQuery} onVisibilityChange={setVisibility} />
-            <CodeArtifactImportForm projectId={projectId} />
+      <div
+        data-testid="code-repository-workspace"
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.32fr)]"
+      >
+        <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label="Code repository upload and download region">
+          <CodeArtifactImportForm projectId={projectId} onUploaded={handleUploadedArtifact} />
+          <div data-testid="code-selected-download-region" className="grid min-w-0 gap-3">
+            <CodeArtifactVersionPanel artifact={selectedArtifact} variant="download" />
+            {selectedArtifact ? <CodeArtifactActions projectId={projectId} artifact={selectedArtifact} /> : null}
           </div>
-          {artifactsQuery.isLoading ? <DataState state="loading" title="Loading code" message="Loading project code artifacts." /> : null}
-          {artifactsQuery.error ? <DataState state="error" title="Code search failed" message={artifactsQuery.error.message} /> : null}
-          {!artifactsQuery.isLoading && !artifacts.length ? <DataState state="empty" title="No code artifacts" message="No code artifacts match the current filters." /> : null}
-          <ul className="grid gap-2">
-            {artifacts.map((artifact) => (
-              <li key={artifact.id}>
-                <button
-                  type="button"
-                  aria-label={`Select code artifact ${artifact.name}`}
-                  className="w-full rounded-md border p-3 text-left hover:bg-muted"
-                  onClick={() => setSelected(artifact)}
-                >
-                  <span className="mb-2 flex flex-wrap items-start justify-between gap-2">
-                    <strong>{artifact.name}</strong>
-                    <VisibilityBadge visibility={artifact.visibility} />
-                  </span>
-                  <span className="block text-sm text-muted-foreground">{artifact.description || artifact.latestVersion?.filename || 'No description'}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
         </section>
-        <section className="panel" aria-label="Code artifact detail">
-          <CodeArtifactVersionPanel artifact={selected ?? artifacts[0]} />
-          {(selected ?? artifacts[0]) ? <CodeArtifactActions projectId={projectId} artifact={(selected ?? artifacts[0]) as CodeArtifact} /> : null}
+        <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label="Code repository search and display region">
+          <div className="grid min-w-0 gap-3">
+            <CodeArtifactFilters value={query} visibility={visibility} onChange={setQuery} onVisibilityChange={setVisibility} />
+          </div>
+          {artifactsQuery.isLoading ? (
+            <div data-testid="code-layout-state" className="min-w-0">
+              <DataState state="loading" title="Loading code" message="Loading project code artifacts." />
+            </div>
+          ) : null}
+          {artifactsQuery.error ? (
+            <div data-testid="code-layout-state" className="min-w-0">
+              <DataState state="error" title="Code search failed" message={artifactsQuery.error.message} />
+            </div>
+          ) : null}
+          {!artifactsQuery.isLoading && !artifactsQuery.error && !artifacts.length ? (
+            <div data-testid="code-layout-state" className="min-w-0">
+              <DataState state="empty" title="No code artifacts" message="No code artifacts match the current filters." />
+            </div>
+          ) : null}
+          <div className="grid min-w-0 gap-4 overflow-hidden">
+            <div data-testid="code-selected-detail-region" className="min-w-0">
+              <CodeArtifactVersionPanel artifact={selectedArtifact} />
+              {selectedArtifact ? (
+                <div className="mt-3 min-w-0">
+                  <CodeArtifactActions
+                    projectId={projectId}
+                    artifact={selectedArtifact}
+                    onRename={renameSelectedArtifact}
+                    onDelete={deleteSelectedArtifact}
+                    showDownload={false}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <ul
+              data-testid="code-results-list"
+              className="grid max-h-[32rem] min-w-0 content-start gap-2 overflow-y-auto overflow-x-hidden pr-1"
+              aria-label="Code artifact search results"
+            >
+              {artifacts.map((artifact) => (
+                <li key={artifact.id} className="min-w-0">
+                  <button
+                    type="button"
+                    aria-label={`Select code artifact ${artifact.name}`}
+                    aria-pressed={selectedArtifact?.id === artifact.id}
+                    data-selected={selectedArtifact?.id === artifact.id ? 'true' : 'false'}
+                    data-testid="code-result-row"
+                    className={`grid min-h-16 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-md border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                      selectedArtifact?.id === artifact.id
+                        ? 'border-primary bg-primary/10 shadow-sm'
+                        : 'bg-background hover:bg-muted'
+                    }`}
+                    onClick={() => selectArtifact(artifact)}
+                    onKeyDown={(event) => handleArtifactRowKeyDown(event, artifact)}
+                  >
+                    <span className="grid min-w-0 gap-1">
+                      <strong className="line-clamp-2 min-w-0 break-words text-sm leading-snug">{artifact.name}</strong>
+                      <span className="block min-w-0 truncate text-xs text-muted-foreground">
+                        {artifact.description || artifact.latestVersion?.filename || 'No description'}
+                      </span>
+                    </span>
+                    <span className="max-w-[9rem] shrink-0">
+                      <VisibilityBadge visibility={artifact.visibility} />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       </div>
     </PageShell>

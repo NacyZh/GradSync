@@ -81,6 +81,7 @@ class Command(BaseCommand):
                 project=project, user=user, defaults={"role": role, "status": "active"}
             )
         call_command("remove_seeded_paper_samples", verbosity=options["verbosity"])
+        call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
         parent, _ = Task.objects.get_or_create(
             project=project,
             title="Prepare manuscript methods section",

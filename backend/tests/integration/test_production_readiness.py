@@ -69,6 +69,7 @@ def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
     assert "X-Forwarded-Proto':'https'" in compose
     assert "http://127.0.0.1:8080/healthz/" in compose
     assert "python manage.py remove_seeded_paper_samples" in compose
+    assert "python manage.py remove_seeded_code_samples" in compose
 
 
 def test_production_operational_docs_are_present_and_actionable():
@@ -103,6 +104,7 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "GRADSYNC_BACKEND_SETTINGS: ${{ env.DJANGO_SETTINGS_MODULE }}" in workflow
     assert 'OPENAPI_STRICT_SHAPES: "1"' in workflow
     assert "specs/001-research-group-ops/contracts/openapi.yaml" in workflow
+    assert "specs/007-code-repository-layout/contracts/openapi.yaml" in workflow
     assert "specs/003-research-collab-platform/contracts/openapi.yaml" not in workflow
     assert "production-image:" in workflow
     assert "frontend-e2e:" in workflow

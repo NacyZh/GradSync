@@ -2,6 +2,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import CodeArtifact, CodeArtifactVersion
+from .services import can_manage_code_artifact
 
 
 class CodeArtifactVersionSerializer(serializers.ModelSerializer):
@@ -40,6 +41,7 @@ class CodeArtifactSerializer(serializers.ModelSerializer):
     checksumSha256 = serializers.CharField(source="checksum_sha256", read_only=True)
     archiveFileId = serializers.CharField(source="archive_file_id", read_only=True)
     latestVersion = serializers.SerializerMethodField()
+    actionCapabilities = serializers.SerializerMethodField()
 
     class Meta:
         model = CodeArtifact
@@ -55,12 +57,41 @@ class CodeArtifactSerializer(serializers.ModelSerializer):
             "archiveFileId",
             "status",
             "latestVersion",
+            "actionCapabilities",
         ]
 
     @extend_schema_field(CodeArtifactVersionSerializer(allow_null=True))
     def get_latestVersion(self, obj):
-        version = obj.versions.first()
+        version = obj.versions.filter(status=CodeArtifactVersion.Status.ACTIVE).first()
         return CodeArtifactVersionSerializer(version).data if version else None
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "canView": {"type": "boolean"},
+                "canDownload": {"type": "boolean"},
+                "canRename": {"type": "boolean"},
+                "canDelete": {"type": "boolean"},
+            },
+            "required": ["canView", "canDownload", "canRename", "canDelete"],
+        }
+    )
+    def get_actionCapabilities(self, obj):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        is_active = obj.status == CodeArtifact.Status.ACTIVE
+        has_download = bool(
+            obj.archive_file_id
+            or obj.versions.filter(status=CodeArtifactVersion.Status.ACTIVE).exists()
+        )
+        can_manage = can_manage_code_artifact(user, obj)
+        return {
+            "canView": is_active,
+            "canDownload": is_active and has_download,
+            "canRename": can_manage,
+            "canDelete": can_manage,
+        }
 
 
 class CodeArtifactCreateSerializer(serializers.Serializer):
@@ -74,6 +105,11 @@ class CodeArtifactCreateSerializer(serializers.Serializer):
         attrs = super().to_internal_value(data)
         attrs["source_path_label"] = attrs.pop("sourcePathLabel", "")
         return attrs
+
+
+class CodeArtifactRenameSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255, trim_whitespace=True)
+    reason = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
 
 
 def _split_string_list(value) -> list[str]:

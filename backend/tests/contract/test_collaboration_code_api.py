@@ -1,5 +1,6 @@
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 
 from apps.projects.models import ProjectMembership, ResearchProject
 from tests.factories.accounts import UserFactory
@@ -101,3 +102,72 @@ def test_code_artifact_visibility_and_upload_validation_contract(api_client):
     assert group_wide_response.status_code == 201
     assert [artifact["name"] for artifact in visible_response.data["results"]] == ["Group Code"]
     assert blocked_download.status_code == 403
+
+
+@pytest.mark.django_db
+@override_settings(COLLABORATION_UPLOAD_LIMITS={"code": 8})
+def test_code_artifact_archive_upload_validation_and_capabilities_contract(api_client):
+    advisor = UserFactory(global_role="advisor", status="active")
+    student = UserFactory(global_role="student", status="active")
+    project = ResearchProject.objects.create(title="Archive Upload Contract", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    student_client = authenticate(api_client, student)
+
+    accepted = student_client.post(
+        f"/api/projects/{project.id}/code-artifacts/",
+        {
+            "archive": _archive("source.tgz", b"tgz"),
+            "name": "Source Bundle",
+            "description": "Compressed source bundle",
+        },
+        format="multipart",
+    )
+    missing_description = student_client.post(
+        f"/api/projects/{project.id}/code-artifacts/",
+        {"archive": _archive("missing.zip", b"missing"), "name": "Missing Description"},
+        format="multipart",
+    )
+    oversized = student_client.post(
+        f"/api/projects/{project.id}/code-artifacts/",
+        {
+            "archive": _archive("large.zip", b"123456789"),
+            "name": "Large Bundle",
+            "description": "Too large",
+        },
+        format="multipart",
+    )
+    unsupported = student_client.post(
+        f"/api/projects/{project.id}/code-artifacts/",
+        {
+            "archive": SimpleUploadedFile("source.txt", b"text", content_type="text/plain"),
+            "name": "Unsupported Bundle",
+            "description": "Wrong type",
+        },
+        format="multipart",
+    )
+    duplicate = student_client.post(
+        f"/api/projects/{project.id}/code-artifacts/",
+        {
+            "archive": _archive("source-copy.tgz", b"tgz"),
+            "name": "Duplicate Bundle",
+            "description": "Duplicate checksum",
+        },
+        format="multipart",
+    )
+
+    assert accepted.status_code == 201
+    assert accepted.data["sourcePathLabel"] == "source.tgz"
+    assert accepted.data["actionCapabilities"] == {
+        "canView": True,
+        "canDownload": True,
+        "canRename": False,
+        "canDelete": False,
+    }
+    assert missing_description.status_code == 400
+    assert oversized.status_code == 400
+    assert "size limit" in oversized.data["message"]
+    assert unsupported.status_code == 400
+    assert "compressed archive" in unsupported.data["message"]
+    assert duplicate.status_code == 409
+    assert duplicate.data["message"] == "Code artifact checksum already exists in this project"

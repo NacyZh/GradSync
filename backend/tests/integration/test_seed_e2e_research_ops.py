@@ -39,11 +39,16 @@ def test_seed_e2e_research_ops_creates_deterministic_full_stack_data():
     assert attachment.relative_path
     assert default_storage.exists(attachment.storage_key)
 
-    artifact = CodeArtifact.objects.get(project=project, name="Simulator")
+    artifact = CodeArtifact.objects.get(project=project, name="Analysis Toolkit")
     version = CodeArtifactVersion.objects.get(project=project, artifact=artifact)
     assert version.imported_by == advisor
     assert version.relative_path_manifest
     assert default_storage.exists(version.storage_key)
+    assert not CodeArtifact.objects.filter(
+        project=project,
+        name="Simulator",
+        source_path_label="team-library/code/simulator",
+    ).exists()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -54,6 +59,55 @@ def test_seed_e2e_research_ops_can_run_twice_without_stale_field_errors():
     assert User.objects.count() == 3
     assert ResearchProject.objects.count() == 1
     assert ResourceType.objects.filter(name="Microscope").count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_remove_seeded_code_samples_is_exact_and_repeatable():
+    call_command("seed_e2e_research_ops", skip_migrate=True, verbosity=0)
+    advisor = User.objects.get(email="advisor@example.edu")
+    project = ResearchProject.objects.get(title="Graphene Lab")
+    seeded = CodeArtifact.objects.create(
+        project=project,
+        name="Simulator",
+        source_path_label="team-library/code/simulator",
+        created_by=advisor,
+    )
+    CodeArtifactVersion.objects.create(
+        artifact=seeded,
+        project=project,
+        version_label="v1",
+        storage_key="e2e/sim.zip",
+        filename="sim.zip",
+        checksum_sha256="b" * 64,
+        imported_by=advisor,
+    )
+    preserved = CodeArtifact.objects.create(
+        project=project,
+        name="Simulator",
+        source_path_label="user-uploads/simulator",
+        created_by=advisor,
+    )
+    CodeArtifactVersion.objects.create(
+        artifact=preserved,
+        project=project,
+        version_label="v1",
+        storage_key="user/sim.zip",
+        filename="sim.zip",
+        checksum_sha256="b" * 64,
+        imported_by=advisor,
+    )
+
+    call_command("remove_seeded_code_samples", verbosity=0)
+    call_command("remove_seeded_code_samples", verbosity=0)
+
+    assert not CodeArtifact.objects.filter(pk=seeded.pk).exists()
+    assert CodeArtifact.objects.filter(pk=preserved.pk).exists()
+    visible_names = list(
+        CodeArtifact.objects.filter(project=project, status=CodeArtifact.Status.ACTIVE)
+        .order_by("name")
+        .values_list("name", flat=True)
+    )
+    assert visible_names == ["Analysis Toolkit", "Simulator"]
 
 
 def test_seed_e2e_research_ops_runs_migrations_before_flushing_by_default(monkeypatch):

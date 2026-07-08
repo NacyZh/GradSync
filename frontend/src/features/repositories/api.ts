@@ -29,6 +29,12 @@ export type CodeArtifact = {
   archiveFileId?: string;
   status: string;
   latestVersion?: CodeArtifactVersion | null;
+  actionCapabilities?: {
+    canView: boolean;
+    canDownload: boolean;
+    canRename: boolean;
+    canDelete: boolean;
+  };
 };
 
 export type CodeArtifactPayload = {
@@ -45,6 +51,11 @@ export type CodeArtifactUploadPayload = {
   description: string;
   tags?: string;
   visibility: 'project_members' | 'group_wide';
+};
+
+export type CodeArtifactRenamePayload = {
+  name: string;
+  reason?: string;
 };
 
 export type CodeVersionPayload = {
@@ -73,6 +84,23 @@ export function createCodeArtifact(projectId: number, payload: CodeArtifactPaylo
   return apiRequest<CodeArtifact>(`/api/projects/${projectId}/code-artifacts/`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export function retrieveCodeArtifact(projectId: number, artifactId: string) {
+  return apiRequest<CodeArtifact>(`/api/projects/${projectId}/code-artifacts/${artifactId}/`);
+}
+
+export function renameCodeArtifact(projectId: number, artifactId: string, payload: CodeArtifactRenamePayload) {
+  return apiRequest<CodeArtifact>(`/api/projects/${projectId}/code-artifacts/${artifactId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteCodeArtifact(projectId: number, artifactId: string) {
+  return apiRequest<void>(`/api/projects/${projectId}/code-artifacts/${artifactId}/`, {
+    method: 'DELETE',
   });
 }
 
@@ -118,10 +146,38 @@ export function useCodeArtifacts(projectId: number, query: string, visibility = 
   });
 }
 
+export function useCodeArtifact(projectId: number, artifactId?: string) {
+  return useQuery({
+    queryKey: ['codeArtifact', projectId, artifactId],
+    queryFn: () => retrieveCodeArtifact(projectId, artifactId as string),
+    enabled: Boolean(projectId && artifactId),
+  });
+}
+
 export function useCreateCodeArtifact(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CodeArtifactPayload) => createCodeArtifact(projectId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] }),
+  });
+}
+
+export function useRenameCodeArtifact(projectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ artifactId, payload }: { artifactId: string; payload: CodeArtifactRenamePayload }) =>
+      renameCodeArtifact(projectId, artifactId, payload),
+    onSuccess: (artifact) => {
+      queryClient.setQueryData(['codeArtifact', projectId, artifact.id], artifact);
+      queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] });
+    },
+  });
+}
+
+export function useDeleteCodeArtifact(projectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (artifactId: string) => deleteCodeArtifact(projectId, artifactId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] }),
   });
 }

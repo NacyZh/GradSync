@@ -16,6 +16,7 @@ from apps.projects.models import ResearchProject
 from .models import CodeArtifact, CodeArtifactVersion
 from .serializers import (
     CodeArtifactCreateSerializer,
+    CodeArtifactRenameSerializer,
     CodeArtifactSerializer,
     CodeArtifactUploadSerializer,
     CodeArtifactVersionCreateSerializer,
@@ -33,7 +34,23 @@ def _error_message(exc: DjangoValidationError) -> str:
     return str(exc.messages[0] if exc.messages else exc)
 
 
-class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
+def _is_conflict_message(message: str) -> bool:
+    return any(
+        conflict in message
+        for conflict in [
+            "already exists",
+            "no longer active",
+            "does not belong",
+        ]
+    )
+
+
+class CodeArtifactViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -42,10 +59,23 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
             OpenApiParameter("tag", str, OpenApiParameter.QUERY),
             OpenApiParameter("visibility", str, OpenApiParameter.QUERY),
         ],
-        responses={200: CodeArtifactSerializer(many=True)},
+        responses={
+            200: CodeArtifactSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        },
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        responses={
+            200: CodeArtifactSerializer,
+            403: OpenApiResponse(description="Retrieve forbidden"),
+            404: OpenApiResponse(description="Code artifact not found"),
+        },
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
 
     def get_project(self):
         return get_object_or_404(ResearchProject.objects.all(), pk=self.kwargs["project_id"])
@@ -53,6 +83,7 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
     def get_queryset(self):
         queryset = (
             CodeArtifact.objects.filter(project=self.get_project())
+            .filter(status=CodeArtifact.Status.ACTIVE)
             .filter(visible_asset_q(self.request.user))
             .select_related("archive_file", "project")
             .prefetch_related("versions")
@@ -78,6 +109,8 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
             if "archive" in self.request.data:
                 return CodeArtifactUploadSerializer
             return CodeArtifactCreateSerializer
+        if self.action == "partial_update":
+            return CodeArtifactRenameSerializer
         return CodeArtifactSerializer
 
     @extend_schema(
@@ -87,6 +120,8 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
         },
         responses={
             201: CodeArtifactSerializer,
+            400: OpenApiResponse(description="Code artifact validation failed"),
+            403: OpenApiResponse(description="Code artifact creation forbidden"),
             409: OpenApiResponse(description="Duplicate code artifact"),
         },
     )
@@ -109,18 +144,92 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
             return Response({"message": message}, status=status_code)
         except (PermissionError, DjangoPermissionDenied) as exc:
             raise PermissionDenied(str(exc)) from exc
-        return Response(CodeArtifactSerializer(artifact).data, status=status.HTTP_201_CREATED)
+        return Response(
+            CodeArtifactSerializer(artifact, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @extend_schema(
+        request=CodeArtifactRenameSerializer,
+        responses={
+            200: CodeArtifactSerializer,
+            400: OpenApiResponse(description="Rename validation failed"),
+            403: OpenApiResponse(description="Rename forbidden"),
+            404: OpenApiResponse(description="Code artifact not found"),
+            409: OpenApiResponse(description="Duplicate or unavailable code artifact"),
+        },
+    )
+    def partial_update(self, request, *args, **kwargs):
+        artifact = get_object_or_404(
+            CodeArtifact.objects.select_related("archive_file", "project").prefetch_related(
+                "versions"
+            ),
+            project=self.get_project(),
+            pk=kwargs["pk"],
+        )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            renamed = CodeArtifactService(request.user, self.get_project()).rename_artifact(
+                artifact,
+                **serializer.validated_data,
+            )
+        except DjangoValidationError as exc:
+            message = _error_message(exc)
+            status_code = (
+                status.HTTP_409_CONFLICT
+                if _is_conflict_message(message)
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"message": message}, status=status_code)
+        except (PermissionError, DjangoPermissionDenied) as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(
+            CodeArtifactSerializer(renamed, context=self.get_serializer_context()).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        responses={
+            204: OpenApiResponse(description="Code artifact archived"),
+            403: OpenApiResponse(description="Delete forbidden"),
+            404: OpenApiResponse(description="Code artifact not found"),
+            409: OpenApiResponse(description="Unavailable code artifact"),
+        },
+    )
+    def destroy(self, request, *args, **kwargs):
+        artifact = get_object_or_404(
+            CodeArtifact.objects.select_related("archive_file", "project").prefetch_related(
+                "versions"
+            ),
+            project=self.get_project(),
+            pk=kwargs["pk"],
+        )
+        try:
+            CodeArtifactService(request.user, self.get_project()).archive_artifact(artifact)
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_409_CONFLICT)
+        except (PermissionError, DjangoPermissionDenied) as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         request=CodeArtifactVersionCreateSerializer,
         responses={
             201: CodeArtifactVersionSerializer,
+            400: OpenApiResponse(description="Code version validation failed"),
+            403: OpenApiResponse(description="Code version import forbidden"),
             409: OpenApiResponse(description="Duplicate code version"),
         },
     )
     @action(detail=True, methods=["post"], url_path="versions")
     def versions(self, request, project_id=None, pk=None):
-        artifact = get_object_or_404(CodeArtifact, project=self.get_project(), pk=pk)
+        artifact = get_object_or_404(
+            CodeArtifact,
+            project=self.get_project(),
+            pk=pk,
+            status=CodeArtifact.Status.ACTIVE,
+        )
         serializer = CodeArtifactVersionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -135,6 +244,7 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
         responses={
             200: OpenApiResponse(description="Download descriptor"),
             403: OpenApiResponse(description="Download forbidden"),
+            404: OpenApiResponse(description="Code artifact version not found"),
         }
     )
     @action(
@@ -143,8 +253,18 @@ class CodeArtifactViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewse
         url_path=r"versions/(?P<version_id>[^/.]+)/download",
     )
     def download_version(self, request, project_id=None, pk=None, version_id=None):
-        artifact = get_object_or_404(CodeArtifact, project=self.get_project(), pk=pk)
-        version = get_object_or_404(CodeArtifactVersion, artifact=artifact, pk=version_id)
+        artifact = get_object_or_404(
+            CodeArtifact,
+            project=self.get_project(),
+            pk=pk,
+            status=CodeArtifact.Status.ACTIVE,
+        )
+        version = get_object_or_404(
+            CodeArtifactVersion,
+            artifact=artifact,
+            pk=version_id,
+            status=CodeArtifactVersion.Status.ACTIVE,
+        )
         try:
             return Response(describe_code_download(request.user, version))
         except PermissionError as exc:
@@ -158,6 +278,7 @@ class CodeArtifactDownloadView(views.APIView):
         responses={
             200: OpenApiResponse(description="Download descriptor"),
             403: OpenApiResponse(description="Download forbidden"),
+            404: OpenApiResponse(description="Code artifact not found"),
         }
     )
     def get(self, request, artifact_id):
@@ -166,6 +287,7 @@ class CodeArtifactDownloadView(views.APIView):
                 "versions"
             ),
             pk=artifact_id,
+            status=CodeArtifact.Status.ACTIVE,
         )
         try:
             return Response(describe_code_artifact_download(request.user, artifact))

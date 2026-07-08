@@ -109,8 +109,24 @@ def test_code_artifact_search_under_seeded_scale_uses_pagination(api_client):
                 visibility="project_members",
                 created_by=user,
             )
-            for index in range(250)
+            for index in range(1000)
         ]
+        + [
+            CodeArtifact(
+                project=project,
+                name=f"Archive archived {index}",
+                description=f"Archived searchable archive {index}",
+                tags=["simulation", "archived"],
+                visibility="project_members",
+                status=CodeArtifact.Status.ARCHIVED,
+                created_by=user,
+            )
+            for index in range(25)
+        ]
+    )
+    assert any(
+        list(index.fields) == ["project", "visibility", "status"]
+        for index in CodeArtifact._meta.indexes
     )
 
     client = authenticate(api_client, user)
@@ -120,4 +136,6 @@ def test_code_artifact_search_under_seeded_scale_uses_pagination(api_client):
 
     assert response.status_code == 200
     assert len(response.data["results"]) == 50
+    assert response.data["count"] == 1000
+    assert all(item["status"] == CodeArtifact.Status.ACTIVE for item in response.data["results"])
     assert elapsed < 2
