@@ -103,21 +103,27 @@ describe('frontend source structure contract', () => {
     expect(styleViolations).toEqual([]);
   });
 
-  it('keeps migration notes aligned with moved files', () => {
-    const migrationMap = readFileSync(
-      path.join(root, '..', 'specs/009-frontend-structure-refactor/migration-map.md'),
-      'utf8',
-    );
+  it('keeps tracked architecture notes aligned with moved files', () => {
+    const architectureGuide = readFileSync(path.join(root, '..', 'docs/frontend-architecture.md'), 'utf8');
 
-    for (const targetPath of [
-      'frontend/src/styles/globals.css',
+    for (const documentedPath of [
       'frontend/src/styles/theme.css',
       'frontend/src/shared/lib/utils.ts',
-      'frontend/src/shared/ui/primitives/',
+      'frontend/src/shared/ui/primitives/button.tsx',
       'frontend/src/data/locale/messages.en.ts',
-      'frontend/src/data/locale/messages.zh.ts',
     ]) {
-      expect(migrationMap, `${targetPath} should be in migration map`).toContain(targetPath);
+      expect(architectureGuide, `${documentedPath} should be documented`).toContain(documentedPath);
+    }
+
+    for (const sourcePath of [
+      'src/styles/globals.css',
+      'src/styles/theme.css',
+      'src/shared/lib/utils.ts',
+      'src/shared/ui/primitives/button.tsx',
+      'src/data/locale/messages.en.ts',
+      'src/data/locale/messages.zh.ts',
+    ]) {
+      expect(existsSync(path.join(root, sourcePath)), `${sourcePath} should exist`).toBe(true);
     }
   });
 });
