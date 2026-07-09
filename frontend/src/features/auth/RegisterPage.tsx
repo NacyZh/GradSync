@@ -3,10 +3,10 @@ import { CheckCircle2, MailCheck, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/shared/ui/primitives/button';
+import { Input } from '@/shared/ui/primitives/input';
+import { Label } from '@/shared/ui/primitives/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { register, verifyEmail, type RegisterPayload } from './api';

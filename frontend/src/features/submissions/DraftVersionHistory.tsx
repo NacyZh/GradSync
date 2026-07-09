@@ -1,6 +1,6 @@
 import { FileText } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 
 type Version = {

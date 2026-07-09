@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 
-import { Label } from '@/components/ui/label';
+import { Label } from '@/shared/ui/primitives/label';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import type { DraftVersion, WeeklyReport } from './api';
 import { reviewDraftVersion, reviewWeeklyReport } from './api';

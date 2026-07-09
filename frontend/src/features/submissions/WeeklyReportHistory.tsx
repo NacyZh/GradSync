@@ -1,6 +1,6 @@
 import { CalendarDays } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { WeeklyReport } from './api';

@@ -1,6 +1,6 @@
 import { Languages } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 
 import { useLocalePreference, useUpdateLocalePreference, type Locale } from './api';
 import { useI18n } from './I18nProvider';

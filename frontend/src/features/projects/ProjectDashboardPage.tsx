@@ -3,8 +3,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, RotateCcw } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/shared/ui/primitives/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
 
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';

@@ -1,9 +1,9 @@
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+import { Input } from '@/shared/ui/primitives/input';
+import { Label } from '@/shared/ui/primitives/label';
+import { Textarea } from '@/shared/ui/primitives/textarea';
+import { cn } from '@/shared/lib/utils';
 
 type BaseProps = {
   id: string;

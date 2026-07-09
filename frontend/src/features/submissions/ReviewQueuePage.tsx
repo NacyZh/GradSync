@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { BookOpenCheck, FileSearch, NotebookPen } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/shared/ui/primitives/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/primitives/tabs';
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';

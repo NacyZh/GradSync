@@ -2,8 +2,8 @@ import { FolderOpen, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/shared/ui/primitives/button';
+import { Input } from '@/shared/ui/primitives/input';
 
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';

@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, BellRing, ExternalLink, MailCheck, RotateCcw } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/shared/ui/primitives/badge';
+import { Button } from '@/shared/ui/primitives/button';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { NotificationRecord } from './api';

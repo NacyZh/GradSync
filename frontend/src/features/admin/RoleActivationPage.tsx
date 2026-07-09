@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/shared/ui/primitives/badge';
+import { Button } from '@/shared/ui/primitives/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/primitives/table';
 import { DataState } from '../../shared/ui/DataState';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { PageShell } from '../../shared/ui/PageShell';

@@ -1,7 +1,7 @@
 import { Download } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 
 import { downloadTeacherFeedback, type TeacherFeedback, type WritingVersion } from './api';
 import { StatusBadge } from '../../shared/ui/StatusBadge';

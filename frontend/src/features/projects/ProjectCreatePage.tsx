@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { CalendarRange, UsersRound } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/shared/ui/primitives/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
 
 import { DataState } from '../../shared/ui/DataState';
 import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';

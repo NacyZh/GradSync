@@ -1,6 +1,6 @@
 import { Globe2, LockKeyhole } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/shared/ui/primitives/badge';
 
 export function VisibilityBadge({
   visibility = 'project_members',

@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, Inbox, Loader2 } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/primitives/alert';
+import { Button } from '@/shared/ui/primitives/button';
+import { Skeleton } from '@/shared/ui/primitives/skeleton';
+import { cn } from '@/shared/lib/utils';
 
 type DataStateProps = {
   state: 'loading' | 'empty' | 'filtered-empty' | 'error' | 'success' | 'warning';

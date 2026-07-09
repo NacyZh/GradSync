@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 
 import { useCallback, useRef } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 
 import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui/AppFeedback';
 import { FieldGroup, FormField } from '../../shared/ui/FormField';

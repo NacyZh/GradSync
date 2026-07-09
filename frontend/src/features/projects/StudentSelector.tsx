@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
 
-import { Input } from '@/components/ui/input';
+import { Input } from '@/shared/ui/primitives/input';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { searchStudents, type StudentOption } from './api';
 

@@ -2,14 +2,14 @@ import type { PropsWithChildren } from 'react';
 import { Bell, BookOpen, BriefcaseBusiness, Code2, FileStack, FileText, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, UserCircle, Users } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/shared/ui/primitives/button';
+import { Input } from '@/shared/ui/primitives/input';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+} from '@/shared/ui/primitives/tooltip';
+import { cn } from '@/shared/lib/utils';
 
 import { useAuth } from '../features/auth/AuthProvider';
 import { LanguageSwitcher } from '../features/i18n/LanguageSwitcher';

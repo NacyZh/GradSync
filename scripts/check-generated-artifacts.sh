@@ -15,6 +15,14 @@ find_generated_artifacts() {
     result_action="-print"
   fi
 
+  if [ -d .vite ]; then
+    if [ "$action" = "delete" ]; then
+      rm -rf .vite
+    else
+      echo .vite
+    fi
+  fi
+
   # shellcheck disable=SC2086
   find backend frontend \
     -path 'frontend/node_modules' -prune -o \

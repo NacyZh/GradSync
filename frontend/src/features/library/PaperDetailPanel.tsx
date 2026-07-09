@@ -2,7 +2,7 @@ import { Download, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 
 import { DownloadStatus } from '../../shared/ui/DownloadStatus';
 import { VisibilityBadge } from '../../shared/ui/VisibilityBadge';

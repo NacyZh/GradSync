@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/primitives/alert';
 
 type BookingConflictAlertProps = {
   message: string;

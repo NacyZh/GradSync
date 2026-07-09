@@ -64,6 +64,11 @@ Frontend release checks include Tailwind/shadcn component coverage, role-aware
 workspace navigation tests, full-stack Playwright workflow tests, and production
 layout screenshot checks:
 
+Frontend source ownership and validation guidance:
+
+- `docs/frontend-architecture.md`
+- `docs/frontend-validation.md`
+
 ```bash
 cd frontend
 npm run lint

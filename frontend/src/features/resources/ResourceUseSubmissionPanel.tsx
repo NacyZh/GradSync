@@ -2,10 +2,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardList, Send, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/shared/ui/primitives/button';
+import { Label } from '@/shared/ui/primitives/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
+import { Textarea } from '@/shared/ui/primitives/textarea';
 import { DataState } from '../../shared/ui/DataState';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { StatusBadge } from '../../shared/ui/StatusBadge';

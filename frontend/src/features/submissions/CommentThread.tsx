@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { MessageSquareText } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';

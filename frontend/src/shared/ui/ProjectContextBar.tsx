@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import { Button } from '@/shared/ui/primitives/button';
+import { Skeleton } from '@/shared/ui/primitives/skeleton';
+import { cn } from '@/shared/lib/utils';
 
 import { StatusBadge } from './StatusBadge';
 

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserMinus, UserPlus, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import type { ProjectMembership } from './api';
 import { addProjectMember, removeProjectMember } from './api';

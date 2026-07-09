@@ -2,9 +2,9 @@ import { MessageSquare, Send } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/shared/ui/primitives/button';
+import { Input } from '@/shared/ui/primitives/input';
+import { Textarea } from '@/shared/ui/primitives/textarea';
 
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';

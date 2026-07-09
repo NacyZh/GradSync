@@ -6,13 +6,20 @@ import { DuplicateReviewPanel } from '../../src/features/library/DuplicateReview
 import { PaperDetailPanel } from '../../src/features/library/PaperDetailPanel';
 import { PaperFilters } from '../../src/features/library/PaperFilters';
 import { I18nProvider, useI18n } from '../../src/features/i18n/I18nProvider';
-import { messagesEn } from '../../src/features/i18n/messages.en';
-import { messagesZh } from '../../src/features/i18n/messages.zh';
+import { messagesEn } from '../../src/data/locale/messages.en';
+import { messagesZh } from '../../src/data/locale/messages.zh';
 import { CodeArtifactVersionPanel } from '../../src/features/repositories/CodeArtifactVersionPanel';
 import { DownloadStatus } from '../../src/shared/ui/DownloadStatus';
 import { renderWithClient } from './test-utils';
 
 describe('research assets and locale UI', () => {
+  it('loads locale catalogs from the static data boundary', () => {
+    expect(messagesEn.paperLibrary).toBe('Paper library');
+    expect(messagesZh.paperLibrary).toBe('论文库');
+    expect(messagesEn.paperLibraryDownloadSelectedPaper).toBe('Download selected paper');
+    expect(messagesZh.paperLibraryDownloadSelectedPaper).toBe('下载已选论文');
+  });
+
   it('covers paper-library strings in both locale catalogs without Chinese in English values', () => {
     const paperLibraryKeys = [
       'paperLibrary',

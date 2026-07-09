@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 import {
   Dialog,
   DialogContent,
@@ -6,8 +6,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+} from '@/shared/ui/primitives/dialog';
+import { cn } from '@/shared/lib/utils';
 
 type ConfirmDialogProps = {
   open: boolean;

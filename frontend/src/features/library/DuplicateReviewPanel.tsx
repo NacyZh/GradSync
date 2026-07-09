@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 
 import { useI18n } from '../i18n/I18nProvider';
 import { usePaperImportReview, type PaperImportJob, type PaperRecord } from './api';

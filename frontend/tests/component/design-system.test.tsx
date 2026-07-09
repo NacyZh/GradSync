@@ -3,10 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
-import { Button } from '../../src/components/ui/button';
-import { Input } from '../../src/components/ui/input';
-import { Label } from '../../src/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../../src/components/ui/tooltip';
+import { Button } from '../../src/shared/ui/primitives/button';
+import { Input } from '../../src/shared/ui/primitives/input';
+import { Label } from '../../src/shared/ui/primitives/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../src/shared/ui/primitives/tooltip';
 import { ProjectContextBar } from '../../src/shared/ui/ProjectContextBar';
 import { DataState } from '../../src/shared/ui/DataState';
 import { FeedbackProvider, useFeedback } from '../../src/shared/ui/FeedbackProvider';
@@ -33,6 +33,13 @@ function FeedbackHarness() {
 }
 
 describe('production design system', () => {
+  it('loads reusable primitives from the shared UI primitive boundary', () => {
+    expect(Button).toBeDefined();
+    expect(Input).toBeDefined();
+    expect(Label).toBeDefined();
+    expect(Tooltip).toBeDefined();
+  });
+
   it('renders shadcn-style buttons, labels, fields, badges, and project context', () => {
     renderWithClient(
       <div>

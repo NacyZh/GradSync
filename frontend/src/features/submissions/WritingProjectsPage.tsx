@@ -3,9 +3,9 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/shared/ui/primitives/button';
+import { Input } from '@/shared/ui/primitives/input';
+import { Textarea } from '@/shared/ui/primitives/textarea';
 
 import { DataState } from '../../shared/ui/DataState';
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';

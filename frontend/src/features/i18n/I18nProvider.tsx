@@ -1,7 +1,7 @@
 import { createContext, type PropsWithChildren, useContext, useMemo } from 'react';
 
-import { messagesEn } from './messages.en';
-import { messagesZh } from './messages.zh';
+import { messagesEn } from '@/data/locale/messages.en';
+import { messagesZh } from '@/data/locale/messages.zh';
 
 type Messages = typeof messagesEn;
 export type MessageKey = keyof Messages;

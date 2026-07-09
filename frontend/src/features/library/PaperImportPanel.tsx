@@ -2,7 +2,7 @@ import { FolderOpen, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';

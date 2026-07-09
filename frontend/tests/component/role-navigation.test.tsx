@@ -7,6 +7,8 @@ import { Layout } from '../../src/app/Layout';
 import { AuthProvider, type CurrentUser } from '../../src/features/auth/AuthProvider';
 import { routeWorkspaceBundles } from '../../src/routes';
 import { ProtectedRoute, RoleRoute } from '../../src/routes/ProtectedRoute';
+import { DataState } from '../../src/shared/ui/DataState';
+import { Button } from '../../src/shared/ui/primitives/button';
 import { productionChunkSizeWarningLimit, productionManualChunks } from '../../build-guards';
 import tailwindConfig from '../../tailwind.config';
 import { renderWithClient } from './test-utils';
@@ -133,6 +135,13 @@ describe('role-aware navigation', () => {
     );
 
     expect(await screen.findByText('protected content')).toBeInTheDocument();
+  });
+
+  it('loads route guards with shared UI dependencies from canonical boundaries', () => {
+    expect(ProtectedRoute).toBeTypeOf('function');
+    expect(RoleRoute).toBeTypeOf('function');
+    expect(DataState).toBeTypeOf('function');
+    expect(Button).toBeDefined();
   });
 
   it('redirects users away from disallowed role routes', async () => {

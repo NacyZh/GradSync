@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { LockKeyhole, Trash2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { cancelBooking } from './api';

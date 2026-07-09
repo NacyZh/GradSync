@@ -8,8 +8,8 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
-} from '@/components/ui/toast';
-import { TooltipProvider } from '@/components/ui/tooltip';
+} from '@/shared/ui/primitives/toast';
+import { TooltipProvider } from '@/shared/ui/primitives/tooltip';
 
 import { ConfirmDialog } from './ConfirmDialog';
 

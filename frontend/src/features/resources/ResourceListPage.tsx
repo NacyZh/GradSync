@@ -3,12 +3,12 @@ import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CalendarDays, PlusCircle, Search, SlidersHorizontal, Wrench } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/shared/ui/primitives/badge';
+import { Button } from '@/shared/ui/primitives/button';
+import { Input } from '@/shared/ui/primitives/input';
+import { Label } from '@/shared/ui/primitives/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
+import { Textarea } from '@/shared/ui/primitives/textarea';
 import { useAuth } from '../auth/AuthProvider';
 import { DataState } from '../../shared/ui/DataState';
 import { FormStatus } from '../../shared/ui/FormStatus';

@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { MessageSquarePlus } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/primitives/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';
