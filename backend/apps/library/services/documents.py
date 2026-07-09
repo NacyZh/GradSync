@@ -11,7 +11,7 @@ from apps.common.models import UploadedFile
 from apps.common.project_scope import visible_asset_q
 from apps.projects.archive_services import ensure_project_writable
 
-from .models import DocumentCategory, DocumentRecord
+from ..models import DocumentCategory, DocumentRecord
 
 SEEDED_DOCUMENT_EXAMPLE_TITLE = "Example Protocol"
 SEEDED_DOCUMENT_EXAMPLE_CATEGORY = "Protocols"
@@ -104,7 +104,7 @@ def is_seeded_document_example(document: DocumentRecord) -> bool:
     )
 
 
-def remove_seeded_document_examples(*, dry_run: bool = False) -> SeededDocumentCleanupResult:
+def cleanup_seeded_library_documents(*, dry_run: bool = False) -> SeededDocumentCleanupResult:
     candidates = (
         DocumentRecord.objects.filter(
             title__in=[identity["title"] for identity in SEEDED_DOCUMENT_EXAMPLE_IDENTITIES],

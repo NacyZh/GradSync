@@ -1,12 +1,13 @@
 import pytest
 
-from apps.library.duplicate_services import (
+from apps.library import services as library_services
+from apps.library.models import DuplicateDetectionResult, PaperAttachment, PaperFile, PaperRecord
+from apps.library.services.duplicates import (
     detect_shared_paper_duplicate,
     find_duplicate,
     normalize_doi,
     title_author_year_fingerprint,
 )
-from apps.library.models import DuplicateDetectionResult, PaperAttachment, PaperFile, PaperRecord
 from apps.projects.models import ProjectMembership, ResearchProject
 from tests.factories.accounts import UserFactory
 from tests.factories.collaboration import UploadedFileFactory
@@ -191,3 +192,9 @@ def test_shared_duplicate_detection_accepts_distinct_paper():
     assert decision.decision == DuplicateDetectionResult.Decision.ACCEPTED_NEW
     assert decision.match_basis == DuplicateDetectionResult.MatchBasis.NONE
     assert decision.candidate_paper is None
+
+
+def test_duplicate_services_remain_available_through_library_service_exports():
+    assert library_services.detect_shared_paper_duplicate is detect_shared_paper_duplicate
+    assert library_services.find_duplicate is find_duplicate
+    assert library_services.normalize_doi is normalize_doi

@@ -29,8 +29,12 @@ find_generated_artifacts() {
     \( \
       -path '*/__pycache__' -o \
       -name '*.pyc' -o \
+      -path 'backend/.pytest_cache' -o \
+      -path 'backend/.ruff_cache' -o \
+      -path 'backend/*.egg-info' -o \
       -name '*.tsbuildinfo' -o \
       -path 'backend/e2e.sqlite3' -o \
+      -path 'backend/media/e2e' -o \
       -path 'frontend/dist' -o \
       -path 'frontend/playwright-report' -o \
       -path 'frontend/test-results' -o \

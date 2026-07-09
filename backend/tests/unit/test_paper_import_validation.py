@@ -5,13 +5,14 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from pypdf import PdfWriter
 
-from apps.library.import_services import (
+from apps.library import services as library_services
+from apps.library.models import PaperImportJob, PaperRecord
+from apps.library.services import paper_upload_policy
+from apps.library.services.imports import (
     PaperImportError,
     import_shared_paper_pdf,
     validate_pdf_upload,
 )
-from apps.library.models import PaperImportJob, PaperRecord
-from apps.library.services import paper_upload_policy
 from tests.factories.accounts import UserFactory
 
 
@@ -135,3 +136,9 @@ def test_paper_upload_policy_formats_small_limits_without_ui_drift():
 
     assert policy["maxSizeBytes"] == 1536
     assert policy["displayLabel"] == "1.5 KB"
+
+
+def test_import_services_remain_available_through_library_service_exports():
+    assert library_services.PaperImportError is PaperImportError
+    assert library_services.import_shared_paper_pdf is import_shared_paper_pdf
+    assert library_services.validate_pdf_upload is validate_pdf_upload

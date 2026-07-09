@@ -89,9 +89,9 @@ class Command(BaseCommand):
                 name=name,
                 defaults={"description": description, "created_by": advisor},
             )
-        call_command("remove_seeded_paper_samples", verbosity=options["verbosity"])
-        call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
-        call_command("remove_seeded_document_examples", verbosity=options["verbosity"])
+        call_command("cleanup_seeded_library_papers", verbosity=options["verbosity"])
+        call_command("cleanup_seeded_code_artifacts", verbosity=options["verbosity"])
+        call_command("cleanup_seeded_library_documents", verbosity=options["verbosity"])
         parent, _ = Task.objects.get_or_create(
             project=project,
             title="Prepare manuscript methods section",
@@ -210,8 +210,8 @@ class Command(BaseCommand):
                 "imported_by": student,
             },
         )
-        call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
-        call_command("remove_seeded_document_examples", verbosity=options["verbosity"])
+        call_command("cleanup_seeded_code_artifacts", verbosity=options["verbosity"])
+        call_command("cleanup_seeded_library_documents", verbosity=options["verbosity"])
         self.stdout.write(self.style.SUCCESS(f"Seeded validation project {project.id}"))
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Validation login credentials:"))

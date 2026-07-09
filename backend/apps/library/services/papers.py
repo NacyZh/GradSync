@@ -9,8 +9,8 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 
-from .models import PaperAttachment, PaperImportJob, PaperLibraryActivity, PaperRecord
-from .upload_policy import shared_paper_upload_policy
+from ..models import PaperAttachment, PaperImportJob, PaperLibraryActivity, PaperRecord
+from ..upload_policy import shared_paper_upload_policy
 
 
 class PaperRenameConflict(ValueError):
@@ -128,7 +128,7 @@ def same_title_is_distinguishable(
     publication_year: int | None = None,
     existing_queryset: QuerySet[PaperRecord] | None = None,
 ) -> bool:
-    from .duplicate_services import normalize_title
+    from .duplicates import normalize_title
 
     normalized = normalize_title(title)
     if not normalized:
@@ -194,7 +194,7 @@ def rename_shared_paper(
         )
         raise ValueError("Paper title must be 500 characters or fewer.")
 
-    from .duplicate_services import normalize_title
+    from .duplicates import normalize_title
 
     normalized_title = normalize_title(cleaned_title)
     same_title_queryset = PaperRecord.objects.filter(

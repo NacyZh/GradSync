@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "apps.resources",
     "apps.library",
     "apps.repositories",
+    "apps.operations",
     "apps.notifications",
     "apps.audit",
 ]

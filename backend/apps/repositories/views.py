@@ -9,10 +9,10 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.common.downloads import describe_code_artifact_download, describe_code_download
 from apps.common.project_scope import visible_asset_q
 from apps.projects.models import ResearchProject
 
+from .download_services import describe_code_artifact_download, describe_code_download
 from .models import CodeArtifact, CodeArtifactVersion
 from .serializers import (
     CodeArtifactCreateSerializer,

@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from apps.library.document_services import remove_seeded_document_examples
+from apps.library.services.documents import cleanup_seeded_library_documents
 
 
 class Command(BaseCommand):
@@ -14,7 +14,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        result = remove_seeded_document_examples(dry_run=options["dry_run"])
+        result = cleanup_seeded_library_documents(dry_run=options["dry_run"])
         action = "Matched" if options["dry_run"] else "Removed"
         self.stdout.write(
             self.style.SUCCESS(

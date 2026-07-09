@@ -28,7 +28,7 @@ The local backend container runs migrations and seeds validation accounts on sta
 To refresh the seeded validation data manually, run:
 
 ```bash
-docker compose exec backend python manage.py seed_validation_research_ops
+docker compose exec backend python manage.py seed_research_ops_validation
 ```
 
 Seeded validation accounts:
@@ -55,7 +55,7 @@ code without a matching specification change is not releasable.
 ## Validation
 
 ```bash
-docker compose exec backend pytest
+docker compose exec backend python -m pytest
 docker compose exec frontend npm test
 docker compose exec frontend npm run test:e2e
 ```
@@ -91,7 +91,7 @@ For the research collaboration platform feature, run the command set in
 `specs/003-research-collab-platform/quickstart.md`:
 
 ```bash
-docker compose exec backend pytest
+docker compose exec backend python -m pytest
 docker compose exec frontend npm test
 docker compose exec frontend npm run lint
 docker compose exec frontend npm run test:e2e
@@ -106,7 +106,7 @@ For the paper library workflow feature, run the focused validation set in
 `specs/004-paper-library-workflow/quickstart.md`:
 
 ```bash
-docker compose exec backend pytest backend/tests/unit backend/tests/integration backend/tests/contract
+docker compose exec backend python -m pytest backend/tests/unit backend/tests/integration backend/tests/contract
 cd frontend && npm run test
 cd frontend && npm run test:e2e -- collaboration-paper-library.spec.ts collaboration-accessibility.spec.ts
 sh scripts/check-openapi-contract.sh --strict-shapes specs/004-paper-library-workflow/contracts/openapi.yaml
@@ -123,7 +123,7 @@ For the paper library file actions feature, run the focused validation set in
 `specs/005-paper-library-file-actions/quickstart.md`:
 
 ```bash
-docker compose exec backend pytest backend/tests/unit/test_paper_library_model_rules.py backend/tests/unit/test_paper_import_validation.py backend/tests/contract/test_paper_library_file_actions_api.py
+docker compose exec backend python -m pytest backend/tests/unit/test_paper_library_model_rules.py backend/tests/unit/test_paper_import_validation.py backend/tests/contract/test_paper_library_file_actions_api.py
 cd frontend && npm test -- collaboration-paper-library.test.tsx
 cd frontend && npm run test:e2e -- collaboration-paper-library.spec.ts
 sh scripts/check-openapi-contract.sh --strict-shapes specs/005-paper-library-file-actions/contracts/openapi.yaml

@@ -7,7 +7,6 @@ from django.core.management import call_command
 from django.urls import resolve
 from pypdf import PdfWriter
 
-from apps.library.import_services import import_shared_paper_pdf
 from apps.library.models import DuplicateDetectionResult, PaperImportJob, PaperRecord
 from apps.library.serializers import (
     DuplicateDetectionResultSerializer,
@@ -16,6 +15,7 @@ from apps.library.serializers import (
     PaperTitleExtractionResultSerializer,
     UploadErrorSerializer,
 )
+from apps.library.services.imports import import_shared_paper_pdf
 from tests.factories.accounts import UserFactory
 from tests.helpers import authenticate
 

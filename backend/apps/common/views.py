@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.conf import settings
 from django.db import connection
 from django.http import HttpResponse, JsonResponse
@@ -31,8 +32,8 @@ def readyz(_request):
 
 
 def metrics(_request):
-    from apps.notifications.models import Notification
-    from apps.projects.models import ResearchProject
+    Notification = apps.get_model("notifications", "Notification")
+    ResearchProject = apps.get_model("projects", "ResearchProject")
 
     lines = [
         "# HELP gradsync_projects_total Total GradSync projects.",

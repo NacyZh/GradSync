@@ -86,7 +86,7 @@ def is_seeded_code_sample(artifact: CodeArtifact) -> bool:
     )
 
 
-def remove_seeded_code_samples(*, dry_run: bool = False) -> SeededCodeCleanupResult:
+def cleanup_seeded_code_artifacts(*, dry_run: bool = False) -> SeededCodeCleanupResult:
     seed_names = [identity["name"] for identity in SEEDED_CODE_SAMPLE_IDENTITIES]
     seed_source_labels = [
         identity["source_path_label"] for identity in SEEDED_CODE_SAMPLE_IDENTITIES

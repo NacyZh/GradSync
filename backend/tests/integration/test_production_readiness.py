@@ -68,9 +68,9 @@ def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
     assert "max_connections=${GRADSYNC_POSTGRES_MAX_CONNECTIONS:-40}" in compose
     assert "X-Forwarded-Proto':'https'" in compose
     assert "http://127.0.0.1:8080/healthz/" in compose
-    assert "python manage.py remove_seeded_paper_samples" in compose
-    assert "python manage.py remove_seeded_code_samples" in compose
-    assert "python manage.py remove_seeded_document_examples" in compose
+    assert "python manage.py cleanup_seeded_library_papers" in compose
+    assert "python manage.py cleanup_seeded_code_artifacts" in compose
+    assert "python manage.py cleanup_seeded_library_documents" in compose
 
 
 def test_production_operational_docs_are_present_and_actionable():
@@ -115,6 +115,8 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "needs: [backend, frontend, frontend-e2e]" in workflow
     assert "needs: [backend, frontend, frontend-e2e, production-image]" in workflow
     assert "Check generated artifacts after frontend build" in workflow
+    assert "Clean generated backend artifacts" in workflow
+    assert "Check generated artifacts after backend gates" in workflow
     assert "Clean generated full-stack e2e artifacts" in workflow
     assert "NODE_OPTIONS: --max-old-space-size=1536" in workflow
     assert "Run US4 research assets and locale e2e" not in workflow
@@ -128,6 +130,13 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "ServerAliveInterval=30" in workflow
     assert "ServerAliveCountMax=6" in workflow
     assert "scripts/deploy-production.sh" in workflow
+
+
+def test_full_stack_e2e_config_uses_current_seed_command_names():
+    playwright_config = (REPO_ROOT / "frontend/playwright.config.ts").read_text()
+
+    assert "seed_research_ops_e2e" in playwright_config
+    assert "seed_e2e_research_ops" not in playwright_config
 
 
 def test_deploy_script_fetches_code_and_restarts_stack():

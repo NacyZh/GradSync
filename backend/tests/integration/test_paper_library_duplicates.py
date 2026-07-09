@@ -4,8 +4,8 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from pypdf import PdfWriter
 
-from apps.library.import_services import import_shared_paper_pdf
 from apps.library.models import DuplicateDetectionResult, PaperImportJob, PaperRecord
+from apps.library.services.imports import import_shared_paper_pdf
 from tests.factories.accounts import UserFactory
 
 

@@ -3,9 +3,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.audit.models import AuditEvent, DownloadEvent
 from apps.projects.models import ProjectMembership, ResearchProject
+from apps.repositories.download_services import describe_code_artifact_download
 from apps.repositories.models import CodeArtifact
 from tests.factories.accounts import UserFactory
-from tests.factories.collaboration import archived_code_artifact
+from tests.factories.collaboration import active_code_artifact, archived_code_artifact
 from tests.helpers import authenticate
 
 
@@ -167,3 +168,30 @@ def test_archived_code_artifact_is_not_downloadable_or_audited(api_client):
     assert version_response.status_code == 404
     assert not DownloadEvent.objects.filter(actor=student, filename__contains="artifact").exists()
     assert not AuditEvent.objects.filter(actor=student, event_type__contains="downloaded").exists()
+
+
+@pytest.mark.django_db
+def test_code_artifact_download_service_records_descriptor_and_blocks_outsider():
+    teacher = UserFactory(global_role="advisor", status="active")
+    student = UserFactory(global_role="student", status="active")
+    outsider = UserFactory(global_role="student", status="active")
+    project = ResearchProject.objects.create(title="Service Download", advisor=teacher)
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    artifact = active_code_artifact(project=project, created_by=teacher)
+    version = artifact.versions.first()
+
+    descriptor = describe_code_artifact_download(student, artifact)
+
+    assert descriptor["filename"] == version.filename
+    assert descriptor["deliveryMode"] == "direct_response"
+    assert DownloadEvent.objects.filter(
+        actor=student,
+        target_type="code_artifact_version",
+        target_id=str(version.id),
+    ).exists()
+    assert AuditEvent.objects.filter(
+        actor=student,
+        event_type="code_artifact_version.downloaded",
+    ).exists()
+    with pytest.raises(PermissionError, match="not authorized"):
+        describe_code_artifact_download(outsider, artifact)

@@ -7,7 +7,7 @@ from tests.factories.collaboration import PaperRecordFactory
 pytestmark = pytest.mark.django_db
 
 
-def test_remove_seeded_paper_samples_deletes_validation_and_e2e_seeded_papers():
+def test_cleanup_seeded_library_papers_deletes_validation_and_e2e_seeded_papers():
     seeded_title = PaperRecordFactory(
         title="Graph Neural Methods",
         canonical_title="Graph Neural Methods",
@@ -24,7 +24,7 @@ def test_remove_seeded_paper_samples_deletes_validation_and_e2e_seeded_papers():
         source_path_label="team-library/user-upload",
     )
 
-    call_command("remove_seeded_paper_samples", verbosity=0)
+    call_command("cleanup_seeded_library_papers", verbosity=0)
 
     assert not PaperRecord.objects.filter(pk=seeded_title.pk).exists()
     assert not PaperRecord.objects.filter(pk=seeded_path.pk).exists()

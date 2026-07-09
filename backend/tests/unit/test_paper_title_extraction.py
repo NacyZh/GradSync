@@ -4,8 +4,8 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from pypdf import PdfWriter
 
-from apps.library.import_services import PaperImportError, extract_title_from_pdf_upload
 from apps.library.models import PaperTitleExtractionResult
+from apps.library.services.imports import PaperImportError, extract_title_from_pdf_upload
 
 
 def _pdf_with_metadata(title: str) -> bytes:

@@ -24,7 +24,7 @@ export default defineConfig({
     ? [
         {
           command:
-            `cd ../backend && ${backendPython} manage.py migrate --noinput && ${backendPython} manage.py seed_e2e_research_ops && ${backendPython} manage.py runserver 127.0.0.1:8000 --noreload`,
+            `cd ../backend && ${backendPython} manage.py migrate --noinput && ${backendPython} manage.py seed_research_ops_e2e && ${backendPython} manage.py runserver 127.0.0.1:8000 --noreload`,
           url: 'http://127.0.0.1:8000/healthz/',
           reuseExistingServer: false,
           timeout: 120_000,

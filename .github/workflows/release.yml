@@ -103,6 +103,12 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         run: python -m pytest
+      - name: Clean generated backend artifacts
+        if: always()
+        run: sh scripts/check-generated-artifacts.sh --clean
+      - name: Check generated artifacts after backend gates
+        if: always()
+        run: sh scripts/check-generated-artifacts.sh
 
   frontend:
     runs-on: ubuntu-latest

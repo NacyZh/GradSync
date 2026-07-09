@@ -2,25 +2,25 @@ import pytest
 from django.core.files.storage import default_storage
 from django.core.management import call_command
 
-from apps.accounts.management.commands.seed_e2e_research_ops import Command
 from apps.accounts.models import User
 from apps.common.models import UploadedFile
-from apps.library.document_services import (
+from apps.library.models import DocumentCategory, DocumentRecord, PaperAttachment, PaperRecord
+from apps.library.services.documents import (
     SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
     SEEDED_DOCUMENT_EXAMPLE_ORIGINAL_FILENAME,
     SEEDED_DOCUMENT_EXAMPLE_STORED_NAME,
     SEEDED_DOCUMENT_EXAMPLE_TITLE,
 )
-from apps.library.models import DocumentCategory, DocumentRecord, PaperAttachment, PaperRecord
 from apps.notifications.models import Notification
+from apps.operations.management.commands.seed_research_ops_e2e import Command
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 from apps.resources.models import Booking, ResourceItem, ResourceType
 
 
 @pytest.mark.django_db(transaction=True)
-def test_seed_e2e_research_ops_creates_deterministic_full_stack_data():
-    call_command("seed_e2e_research_ops", skip_migrate=True, verbosity=0)
+def test_seed_research_ops_e2e_creates_deterministic_full_stack_data():
+    call_command("seed_research_ops_e2e", skip_migrate=True, verbosity=0)
 
     assert User.objects.filter(email="admin@gradsync.local", global_role="admin").exists()
     advisor = User.objects.get(email="advisor@example.edu")
@@ -68,9 +68,9 @@ def test_seed_e2e_research_ops_creates_deterministic_full_stack_data():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_seed_e2e_research_ops_can_run_twice_without_stale_field_errors():
-    call_command("seed_e2e_research_ops", skip_migrate=True, verbosity=0)
-    call_command("seed_e2e_research_ops", skip_migrate=True, verbosity=0)
+def test_seed_research_ops_e2e_can_run_twice_without_stale_field_errors():
+    call_command("seed_research_ops_e2e", skip_migrate=True, verbosity=0)
+    call_command("seed_research_ops_e2e", skip_migrate=True, verbosity=0)
 
     assert User.objects.count() == 3
     assert ResearchProject.objects.count() == 1
@@ -79,8 +79,8 @@ def test_seed_e2e_research_ops_can_run_twice_without_stale_field_errors():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_seed_validation_research_ops_does_not_reintroduce_seeded_code_samples():
-    call_command("seed_validation_research_ops", verbosity=0)
+def test_seed_research_ops_validation_does_not_reintroduce_seeded_code_samples():
+    call_command("seed_research_ops_validation", verbosity=0)
 
     assert not CodeArtifact.objects.filter(
         name="Materials simulator",
@@ -99,8 +99,8 @@ def test_seed_validation_research_ops_does_not_reintroduce_seeded_code_samples()
 
 
 @pytest.mark.django_db(transaction=True)
-def test_remove_seeded_code_samples_is_exact_and_repeatable():
-    call_command("seed_e2e_research_ops", skip_migrate=True, verbosity=0)
+def test_cleanup_seeded_code_artifacts_is_exact_and_repeatable():
+    call_command("seed_research_ops_e2e", skip_migrate=True, verbosity=0)
     advisor = User.objects.get(email="advisor@example.edu")
     project = ResearchProject.objects.get(title="Graphene Lab")
     seeded = CodeArtifact.objects.create(
@@ -134,8 +134,8 @@ def test_remove_seeded_code_samples_is_exact_and_repeatable():
         imported_by=advisor,
     )
 
-    call_command("remove_seeded_code_samples", verbosity=0)
-    call_command("remove_seeded_code_samples", verbosity=0)
+    call_command("cleanup_seeded_code_artifacts", verbosity=0)
+    call_command("cleanup_seeded_code_artifacts", verbosity=0)
 
     assert not CodeArtifact.objects.filter(pk=seeded.pk).exists()
     assert CodeArtifact.objects.filter(pk=preserved.pk).exists()
@@ -148,8 +148,8 @@ def test_remove_seeded_code_samples_is_exact_and_repeatable():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_remove_seeded_document_examples_is_exact_and_repeatable():
-    call_command("seed_e2e_research_ops", skip_migrate=True, verbosity=0)
+def test_cleanup_seeded_library_documents_is_exact_and_repeatable():
+    call_command("seed_research_ops_e2e", skip_migrate=True, verbosity=0)
     advisor = User.objects.get(email="advisor@example.edu")
     project = ResearchProject.objects.get(title="Graphene Lab")
     category = DocumentCategory.objects.get(name="Protocols")
@@ -188,8 +188,8 @@ def test_remove_seeded_document_examples_is_exact_and_repeatable():
         created_by=advisor,
     )
 
-    call_command("remove_seeded_document_examples", verbosity=0)
-    call_command("remove_seeded_document_examples", verbosity=0)
+    call_command("cleanup_seeded_library_documents", verbosity=0)
+    call_command("cleanup_seeded_library_documents", verbosity=0)
 
     assert not DocumentRecord.objects.filter(pk=seeded.pk).exists()
     assert not UploadedFile.objects.filter(pk=seeded_file.pk).exists()
@@ -197,7 +197,7 @@ def test_remove_seeded_document_examples_is_exact_and_repeatable():
     assert UploadedFile.objects.filter(pk=preserved_file.pk).exists()
 
 
-def test_seed_e2e_research_ops_runs_migrations_before_flushing_by_default(monkeypatch):
+def test_seed_research_ops_e2e_runs_migrations_before_flushing_by_default(monkeypatch):
     command = Command()
     call_order = []
 
@@ -205,11 +205,11 @@ def test_seed_e2e_research_ops_runs_migrations_before_flushing_by_default(monkey
         call_order.append(name)
 
     monkeypatch.setattr(
-        "apps.accounts.management.commands.seed_e2e_research_ops.call_command",
+        "apps.operations.management.commands.seed_research_ops_e2e.call_command",
         fake_call_command,
     )
     monkeypatch.setattr(
-        "apps.accounts.management.commands.seed_e2e_research_ops.get_user_model",
+        "apps.operations.management.commands.seed_research_ops_e2e.get_user_model",
         lambda: (_ for _ in ()).throw(AssertionError("stop after migration preflight")),
     )
 

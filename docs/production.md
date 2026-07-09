@@ -10,7 +10,7 @@
   `npm run build` from `frontend/`.
 - For the research collaboration platform release gate, run the feature
   quickstart command set:
-  `docker compose exec backend pytest`,
+  `docker compose exec backend python -m pytest`,
   `docker compose exec frontend npm test`,
   `docker compose exec frontend npm run lint`,
   and `docker compose exec frontend npm run test:e2e`.

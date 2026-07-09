@@ -2,8 +2,8 @@ import time
 
 import pytest
 
-from apps.library.duplicate_services import find_duplicate
 from apps.library.models import PaperRecord
+from apps.library.services.duplicates import find_duplicate
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact
 from tests.factories.accounts import UserFactory

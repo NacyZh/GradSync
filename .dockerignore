@@ -11,12 +11,15 @@ frontend/build-guards.d.ts
 frontend/vite.config.js
 frontend/vite.config.d.ts
 backend/e2e.sqlite3
+backend/media/e2e/
 backend/.venv/
 .venv/
 venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+.ruff_cache/
+*.egg-info/
 coverage/
 frontend/coverage/
 htmlcov/

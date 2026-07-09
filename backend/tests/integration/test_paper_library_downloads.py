@@ -2,7 +2,9 @@ import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 
+from apps.library import services as library_services
 from apps.library.models import PaperLibraryActivity, PaperRecord
+from apps.library.services.downloads import prepare_shared_paper_download
 from apps.projects.models import ResearchProject
 from tests.factories.accounts import UserFactory
 from tests.factories.collaboration import UploadedFileFactory
@@ -183,3 +185,7 @@ def test_shared_paper_download_denies_inactive_accounts(api_client):
     )
 
     assert response.status_code == 403
+
+
+def test_download_services_remain_available_through_library_service_exports():
+    assert library_services.prepare_shared_paper_download is prepare_shared_paper_download

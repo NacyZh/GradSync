@@ -1,7 +1,9 @@
 import pytest
 
 from apps.common.models import UploadedFile
-from apps.library.document_services import (
+from apps.library import services as library_services
+from apps.library.models import DocumentRecord
+from apps.library.services.documents import (
     SEEDED_DOCUMENT_EXAMPLE_CHECKSUM_SHA256,
     SEEDED_DOCUMENT_EXAMPLE_ORIGINAL_FILENAME,
     SEEDED_DOCUMENT_EXAMPLE_STORED_NAME,
@@ -13,7 +15,6 @@ from apps.library.document_services import (
     is_seeded_document_example,
     safe_document_title_from_filename,
 )
-from apps.library.models import DocumentRecord
 from tests.factories.accounts import UserFactory
 from tests.factories.collaboration import (
     DocumentCategoryFactory,
@@ -171,3 +172,9 @@ def test_seeded_document_example_matcher_is_exact_and_preserves_similar_document
 
     assert is_seeded_document_example(exact) is True
     assert is_seeded_document_example(similar) is False
+
+
+def test_document_services_remain_available_through_library_service_exports():
+    assert library_services.DocumentService is DocumentService
+    assert library_services.active_document_queryset is active_document_queryset
+    assert library_services.document_action_capabilities is document_action_capabilities

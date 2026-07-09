@@ -14,15 +14,7 @@ from apps.common.file_services import checksum_sha256, store_uploaded_file
 from apps.projects.archive_services import ensure_project_writable
 from apps.projects.models import ResearchProject
 
-from .duplicate_services import (
-    create_duplicate_detection_result,
-    detect_shared_paper_duplicate,
-    find_duplicate,
-    normalize_doi,
-    normalize_title,
-    title_author_year_fingerprint,
-)
-from .models import (
+from ..models import (
     DuplicateDetectionResult,
     PaperFile,
     PaperImportBatch,
@@ -31,12 +23,20 @@ from .models import (
     PaperRecord,
     PaperTitleExtractionResult,
 )
-from .services import (
+from ..upload_policy import shared_paper_oversized_message, shared_paper_upload_limit_bytes
+from .duplicates import (
+    create_duplicate_detection_result,
+    detect_shared_paper_duplicate,
+    find_duplicate,
+    normalize_doi,
+    normalize_title,
+    title_author_year_fingerprint,
+)
+from .papers import (
     canonical_paper_download_filename,
     ensure_active_research_group_user,
     record_paper_library_activity,
 )
-from .upload_policy import shared_paper_oversized_message, shared_paper_upload_limit_bytes
 
 
 class PaperImportError(Exception):

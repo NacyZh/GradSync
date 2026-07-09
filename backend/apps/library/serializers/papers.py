@@ -1,8 +1,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .document_services import document_action_capabilities
-from .models import (
+from ..models import (
     DocumentCategory,
     DocumentRecord,
     DuplicateDetectionResult,
@@ -12,6 +11,7 @@ from .models import (
     PaperRecord,
     PaperTitleExtractionResult,
 )
+from ..services.documents import document_action_capabilities
 
 
 class PaperAttachmentSerializer(serializers.ModelSerializer):

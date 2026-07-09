@@ -10,6 +10,10 @@ frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
 backend/e2e.sqlite3
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/*.egg-info/
+backend/media/e2e/
 *.log
 *.tsbuildinfo
 package-lock.json

@@ -209,8 +209,8 @@ class Command(BaseCommand):
             relative_path_manifest=["README.md", "src/analysis.py"],
             imported_by=advisor,
         )
-        call_command("remove_seeded_code_samples", verbosity=options["verbosity"])
-        call_command("remove_seeded_document_examples", verbosity=options["verbosity"])
+        call_command("cleanup_seeded_code_artifacts", verbosity=options["verbosity"])
+        call_command("cleanup_seeded_library_documents", verbosity=options["verbosity"])
 
         self.stdout.write(
             self.style.SUCCESS(

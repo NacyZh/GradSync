@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from .models import (
+from ..models import (
     DuplicateDetectionResult,
     PaperAttachment,
     PaperFile,
@@ -15,7 +15,7 @@ from .models import (
     PaperLibraryActivity,
     PaperRecord,
 )
-from .services import record_paper_library_activity
+from .papers import record_paper_library_activity
 
 
 @dataclass(frozen=True)
@@ -214,7 +214,7 @@ def review_paper_import(
         )
         return import_job
 
-    from .import_services import create_accepted_paper_from_import
+    from .imports import create_accepted_paper_from_import
 
     paper = create_accepted_paper_from_import(import_job=import_job)
     duplicate_result.review_status = DuplicateDetectionResult.ReviewStatus.CONFIRMED_DISTINCT
