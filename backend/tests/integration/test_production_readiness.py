@@ -114,9 +114,13 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "docker build -f docker/frontend.Dockerfile" in workflow
     assert "needs: [backend, frontend, frontend-e2e]" in workflow
     assert "needs: [backend, frontend, frontend-e2e, production-image]" in workflow
+    assert "Check generated artifacts before backend install" in workflow
+    assert "Clean generated backend install artifacts" in workflow
+    assert "Check generated artifacts after backend install" in workflow
     assert "Check generated artifacts after frontend build" in workflow
     assert "Clean generated backend artifacts" in workflow
     assert "Check generated artifacts after backend gates" in workflow
+    assert "Clean generated backend install artifacts before full-stack e2e" in workflow
     assert "Clean generated full-stack e2e artifacts" in workflow
     assert "NODE_OPTIONS: --max-old-space-size=1536" in workflow
     assert "Run US4 research assets and locale e2e" not in workflow
