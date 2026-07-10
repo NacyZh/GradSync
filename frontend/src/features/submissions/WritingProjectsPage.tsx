@@ -13,6 +13,7 @@ import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
+import { useAuth } from '../auth/AuthProvider';
 import { TeacherFeedbackPanel } from './TeacherFeedbackPanel';
 import { WritingVersionHistory } from './WritingVersionHistory';
 import {
@@ -112,6 +113,7 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
 }
 
 export function WritingProjectsPage() {
+  const { user } = useAuth();
   const projectIdParam = useParams().projectId;
   const projectId = projectIdParam ? Number(projectIdParam) : undefined;
   const [query, setQuery] = useState('');
@@ -121,6 +123,7 @@ export function WritingProjectsPage() {
   const projects = writingQuery.data?.results ?? [];
   const activeProject = projects.find((project) => project.id === selectedProject?.id) ?? projects[0];
   const activeVersion = activeProject?.versions.find((version) => version.id === selectedVersion?.id) ?? activeProject?.versions?.[0];
+  const canCreateWritingProject = !user || user.global_role === 'student';
 
   function selectProject(project: WritingProject) {
     setSelectedProject(project);
@@ -133,7 +136,7 @@ export function WritingProjectsPage() {
         <section className="panel" aria-label="Writing projects">
           <div className="mb-4 grid gap-3">
             <Input aria-label="Search writing projects" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search writing projects" />
-            <WritingProjectCreateForm projectId={projectId} />
+            {canCreateWritingProject ? <WritingProjectCreateForm projectId={projectId} /> : null}
           </div>
           {writingQuery.isLoading ? <DataState state="loading" title="Loading writing projects" message="Loading writing histories." /> : null}
           {writingQuery.error ? <DataState state="error" title="Writing projects failed" message={writingQuery.error.message} /> : null}

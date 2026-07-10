@@ -2,7 +2,12 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.submissions.models import WritingProject
-from tests.factories.shared_workspace import active_student, active_teacher, project_with_members
+from tests.factories.shared_workspace import (
+    active_admin,
+    active_student,
+    active_teacher,
+    project_with_members,
+)
 from tests.helpers import authenticate
 
 
@@ -77,3 +82,45 @@ def test_standalone_writing_denies_unassigned_teacher_without_metadata(api_clien
     assert list_response.data["results"] == []
     assert version_response.status_code == 403
     assert "Private Thesis" not in str(version_response.data)
+
+
+@pytest.mark.django_db
+def test_standalone_writing_create_does_not_require_project_membership(api_client):
+    student = active_student()
+    advisor = active_teacher()
+
+    create_response = authenticate(api_client, student).post(
+        "/api/writing-projects/",
+        {"title": "No Project Thesis", "writingType": WritingProject.WritingType.THESIS},
+        format="json",
+    )
+    list_response = authenticate(api_client, student).get("/api/writing-projects/")
+    advisor_list_response = authenticate(api_client, advisor).get("/api/writing-projects/")
+
+    assert create_response.status_code == 201
+    assert create_response.data["participantRole"] == "student_author"
+    assert create_response.data["title"] == "No Project Thesis"
+    assert [item["title"] for item in list_response.data["results"]] == ["No Project Thesis"]
+    assert [item["title"] for item in advisor_list_response.data["results"]] == [
+        "No Project Thesis"
+    ]
+
+
+@pytest.mark.django_db
+def test_standalone_writing_create_is_student_author_only(api_client):
+    advisor = active_teacher()
+    admin = active_admin()
+
+    advisor_response = authenticate(api_client, advisor).post(
+        "/api/writing-projects/",
+        {"title": "Advisor Created", "writingType": WritingProject.WritingType.MANUSCRIPT},
+        format="json",
+    )
+    admin_response = authenticate(api_client, admin).post(
+        "/api/writing-projects/",
+        {"title": "Admin Created", "writingType": WritingProject.WritingType.MANUSCRIPT},
+        format="json",
+    )
+
+    assert advisor_response.status_code == 403
+    assert admin_response.status_code == 403

@@ -3,10 +3,13 @@ from __future__ import annotations
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 
+from apps.accounts.models import User
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.projects.permissions import is_active_user
 
 from .models import WritingParticipant, WritingProject
+
+STANDALONE_WRITING_ANCHOR_TITLE = "Standalone Writing Workspace"
 
 
 def _is_admin(user) -> bool:
@@ -107,9 +110,44 @@ def require_student_author(user, writing_project: WritingProject) -> None:
         raise PermissionDenied("Only the student author can upload writing versions")
 
 
+def _default_anchor_advisor_for(user):
+    return (
+        User.objects.filter(
+            status=User.Status.ACTIVE,
+            global_role__in=[User.GlobalRole.ADMIN, User.GlobalRole.ADVISOR],
+        )
+        .order_by("id")
+        .first()
+        or user
+    )
+
+
+def _standalone_writing_anchor_project_for(user) -> ResearchProject:
+    advisor = _default_anchor_advisor_for(user)
+    project = (
+        ResearchProject.objects.filter(
+            title=STANDALONE_WRITING_ANCHOR_TITLE,
+            advisor=advisor,
+            status=ResearchProject.Status.ACTIVE,
+        )
+        .order_by("id")
+        .first()
+    )
+    if project:
+        return project
+    return ResearchProject.objects.create(
+        title=STANDALONE_WRITING_ANCHOR_TITLE,
+        description="Storage anchor for standalone writing collaboration records.",
+        advisor=advisor,
+        status=ResearchProject.Status.ACTIVE,
+    )
+
+
 def anchor_project_for_standalone_writing(user) -> ResearchProject:
     if not is_active_user(user):
         raise PermissionDenied("Only active users can create writing projects")
+    if getattr(user, "global_role", None) != User.GlobalRole.STUDENT:
+        raise PermissionDenied("Only students can create writing projects")
     membership = (
         ProjectMembership.objects.select_related("project")
         .filter(
@@ -121,6 +159,6 @@ def anchor_project_for_standalone_writing(user) -> ResearchProject:
         .order_by("project__title", "project_id")
         .first()
     )
-    if not membership:
-        raise PermissionDenied("Writing projects require an active student project")
-    return membership.project
+    if membership:
+        return membership.project
+    return _standalone_writing_anchor_project_for(user)

@@ -108,6 +108,7 @@ test('writing project feedback flow is reachable', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Writing projects', exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Writing projects' })).toBeVisible();
     await expect(page.getByLabel('Search writing projects')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create writing project' })).toHaveCount(0);
     return;
   }
 
