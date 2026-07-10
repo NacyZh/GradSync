@@ -116,8 +116,21 @@ export function renameCodeArtifact(projectId: number, artifactId: string, payloa
   });
 }
 
+export function renameSharedCodeArtifact(artifactId: string, payload: CodeArtifactRenamePayload) {
+  return apiRequest<CodeArtifact>(`/api/library/code/${artifactId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function deleteCodeArtifact(projectId: number, artifactId: string) {
   return apiRequest<void>(`/api/projects/${projectId}/code-artifacts/${artifactId}/`, {
+    method: 'DELETE',
+  });
+}
+
+export function deleteSharedCodeArtifact(artifactId: string) {
+  return apiRequest<void>(`/api/library/code/${artifactId}/`, {
     method: 'DELETE',
   });
 }
@@ -211,10 +224,10 @@ export function useRenameCodeArtifact(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ artifactId, payload }: { artifactId: string; payload: CodeArtifactRenamePayload }) =>
-      renameCodeArtifact(projectId, artifactId, payload),
+      projectId ? renameCodeArtifact(projectId, artifactId, payload) : renameSharedCodeArtifact(artifactId, payload),
     onSuccess: (artifact) => {
       queryClient.setQueryData(['codeArtifact', projectId, artifact.id], artifact);
-      queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] });
+      queryClient.invalidateQueries({ queryKey: projectId ? ['codeArtifacts', projectId] : ['shared-code-artifacts'] });
     },
   });
 }
@@ -222,8 +235,8 @@ export function useRenameCodeArtifact(projectId: number) {
 export function useDeleteCodeArtifact(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (artifactId: string) => deleteCodeArtifact(projectId, artifactId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] }),
+    mutationFn: (artifactId: string) => projectId ? deleteCodeArtifact(projectId, artifactId) : deleteSharedCodeArtifact(artifactId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectId ? ['codeArtifacts', projectId] : ['shared-code-artifacts'] }),
   });
 }
 

@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from apps.audit.services import record_event, record_upload
 from apps.common.file_services import checksum_sha256, store_uploaded_file
+from apps.library.services.papers import ensure_library_maintainer, is_library_maintainer
 from apps.projects.archive_services import ensure_project_writable
 from apps.projects.material_services import externally_shared_q
 from apps.projects.models import ResearchProject
@@ -65,6 +66,14 @@ def can_manage_code_artifact(user, artifact: CodeArtifact) -> bool:
     return artifact.project.advisor_id == getattr(user, "id", None)
 
 
+def can_manage_shared_code_artifact(user, artifact: CodeArtifact) -> bool:
+    if artifact.status != CodeArtifact.Status.ACTIVE:
+        return False
+    if artifact.boundary_classification != CodeArtifact.BoundaryClassification.STANDALONE_SHARED:
+        return False
+    return is_library_maintainer(user)
+
+
 def default_shared_anchor_project_for(user) -> ResearchProject | None:
     queryset = ResearchProject.objects.filter(status=ResearchProject.Status.ACTIVE)
     if getattr(user, "is_superuser", False) or getattr(user, "is_administrator", False):
@@ -97,6 +106,78 @@ def record_rejected_code_artifact_management_attempt(project, actor, artifact, a
         f"Rejected code artifact {action} for {getattr(artifact, 'id', '')}",
         artifact,
     )
+
+
+def rename_shared_code_artifact(
+    *,
+    actor,
+    artifact: CodeArtifact,
+    name: str,
+    reason: str = "",
+) -> CodeArtifact:
+    ensure_library_maintainer(actor)
+    if artifact.boundary_classification != CodeArtifact.BoundaryClassification.STANDALONE_SHARED:
+        raise PermissionError("Project material code must be managed from the source project")
+    if artifact.status != CodeArtifact.Status.ACTIVE:
+        raise ValidationError("Code artifact is no longer active")
+
+    cleaned_name = name.strip()
+    if not cleaned_name:
+        raise ValidationError("Code artifact name is required")
+    duplicate_exists = (
+        CodeArtifact.objects.filter(
+            status=CodeArtifact.Status.ACTIVE,
+        )
+        .filter(externally_shared_q())
+        .filter(name=cleaned_name)
+        .exclude(pk=artifact.pk)
+        .exists()
+    )
+    if duplicate_exists:
+        raise ValidationError("Active shared code artifact name already exists")
+
+    with transaction.atomic():
+        artifact.name = cleaned_name
+        artifact.save(update_fields=["name", "updated_at"])
+        summary = f"Renamed shared code artifact {artifact.id}"
+        if reason:
+            summary = f"{summary}: {reason}"
+        record_event(
+            artifact.project,
+            actor,
+            "code_artifact.renamed",
+            summary,
+            artifact,
+        )
+    return artifact
+
+
+def delete_shared_code_artifact(
+    *,
+    actor,
+    artifact: CodeArtifact,
+    reason: str = "",
+) -> None:
+    ensure_library_maintainer(actor)
+    if artifact.boundary_classification != CodeArtifact.BoundaryClassification.STANDALONE_SHARED:
+        raise PermissionError("Project material code must be managed from the source project")
+    if artifact.status != CodeArtifact.Status.ACTIVE:
+        raise ValidationError("Code artifact is no longer active")
+
+    with transaction.atomic():
+        artifact.status = CodeArtifact.Status.ARCHIVED
+        artifact.archived_at = timezone.now()
+        artifact.save(update_fields=["status", "archived_at", "updated_at"])
+        summary = f"Deleted shared code artifact {artifact.id}"
+        if reason:
+            summary = f"{summary}: {reason}"
+        record_event(
+            artifact.project,
+            actor,
+            "code_artifact.deleted",
+            summary,
+            artifact,
+        )
 
 
 def is_seeded_code_sample(artifact: CodeArtifact) -> bool:

@@ -73,6 +73,16 @@ function renderCodeRepository() {
   );
 }
 
+function renderSharedCodeRepository() {
+  return renderWithClient(
+    <MemoryRouter initialEntries={['/library/code']}>
+      <Routes>
+        <Route path="/library/code" element={<CodeRepositoryPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe('collaboration code library UI', () => {
   it('shows archive upload requirements, search, visibility, and download state', async () => {
     mockFetch((url) => {
@@ -359,5 +369,63 @@ describe('collaboration code library UI', () => {
     await waitFor(() => expect(screen.getByTestId('code-selected-detail-region')).toHaveTextContent('Analysis Pipeline'));
     expect(screen.queryByRole('button', { name: 'Rename code artifact' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete code artifact' })).not.toBeInTheDocument();
+  });
+
+  it('uses shared code rename and delete endpoints for standalone maintainers', async () => {
+    let artifacts = [
+      {
+        ...baseArtifact,
+        actionCapabilities: {
+          canView: true,
+          canDownload: true,
+          canRename: true,
+          canDelete: true,
+        },
+      },
+      {
+        ...baseArtifact,
+        id: '4',
+        name: 'Shared Delete Candidate',
+        actionCapabilities: {
+          canView: true,
+          canDownload: true,
+          canRename: true,
+          canDelete: true,
+        },
+        latestVersion: { ...baseArtifact.latestVersion, id: 'version-4', artifactId: '4', filename: 'delete.zip' },
+      },
+    ];
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    mockFetch((url, init) => {
+      requests.push({ url, init });
+      if (url.endsWith('/api/library/code/3/') && init?.method === 'PATCH') {
+        const renamed = { ...artifacts[0], name: 'Renamed Shared Pipeline' };
+        artifacts = [renamed, artifacts[1]];
+        return { json: renamed };
+      }
+      if (url.endsWith('/api/library/code/4/') && init?.method === 'DELETE') {
+        artifacts = artifacts.filter((artifact) => artifact.id !== '4');
+        return { status: 204 };
+      }
+      return { count: artifacts.length, results: artifacts };
+    });
+
+    renderSharedCodeRepository();
+
+    await waitFor(() => expect(screen.getByTestId('code-selected-detail-region')).toHaveTextContent('Analysis Pipeline'));
+    await userEvent.click(screen.getByRole('button', { name: 'Rename code artifact' }));
+    await userEvent.clear(screen.getByLabelText('New code artifact name'));
+    await userEvent.type(screen.getByLabelText('New code artifact name'), 'Renamed Shared Pipeline');
+    await userEvent.click(screen.getByRole('button', { name: 'Save name' }));
+
+    await waitFor(() => expect(screen.getByTestId('code-selected-detail-region')).toHaveTextContent('Renamed Shared Pipeline'));
+    expect(requests.some((request) => request.url.endsWith('/api/library/code/3/') && request.init?.method === 'PATCH')).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: /Select code artifact Shared Delete Candidate/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete code artifact' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
+
+    await waitFor(() => expect(screen.queryByText('Shared Delete Candidate')).not.toBeInTheDocument());
+    expect(requests.some((request) => request.url.endsWith('/api/library/code/4/') && request.init?.method === 'DELETE')).toBe(true);
   });
 });

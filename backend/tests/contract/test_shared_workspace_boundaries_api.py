@@ -135,3 +135,41 @@ def test_standalone_asset_detail_and_download_contracts(api_client):
     assert code_detail.status_code == 200
     assert document_download.status_code == 200
     assert code_download.status_code == 200
+
+
+@pytest.mark.django_db
+def test_standalone_shared_code_maintainer_can_rename_and_delete(api_client):
+    maintainer = active_teacher()
+    student = active_student()
+    code = standalone_shared_code(name="Shared Code Before")
+    standalone_shared_code(name="Existing Shared Code")
+
+    student_response = authenticate(api_client, student).patch(
+        f"/api/library/code/{code.id}/",
+        {"name": "Student Rename"},
+        format="json",
+    )
+    duplicate_response = authenticate(api_client, maintainer).patch(
+        f"/api/library/code/{code.id}/",
+        {"name": "Existing Shared Code"},
+        format="json",
+    )
+    rename_response = authenticate(api_client, maintainer).patch(
+        f"/api/library/code/{code.id}/",
+        {"name": "Shared Code After"},
+        format="json",
+    )
+    delete_response = authenticate(api_client, maintainer).delete(f"/api/library/code/{code.id}/")
+    list_response = authenticate(api_client, maintainer).get(
+        "/api/library/code/?q=Shared Code After"
+    )
+
+    assert student_response.status_code == 403
+    assert duplicate_response.status_code == 409
+    assert rename_response.status_code == 200
+    assert rename_response.data["name"] == "Shared Code After"
+    assert rename_response.data["actionCapabilities"]["canRename"] is True
+    assert rename_response.data["actionCapabilities"]["canDelete"] is True
+    assert delete_response.status_code == 204
+    assert list_response.status_code == 200
+    assert list_response.data["results"] == []

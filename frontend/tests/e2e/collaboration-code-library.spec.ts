@@ -207,10 +207,10 @@ test('code repository layout remains stable across desktop and narrow widths', a
   }
 });
 
-test('standalone shared code hides project-level rename and delete actions', async ({ page }) => {
-  test.skip(fullStackE2E, 'Mock-mode standalone boundary coverage; API tests cover mutations.');
+test('standalone shared code maintainer can rename and delete artifacts', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mock-mode standalone management coverage; API tests cover full-stack mutations.');
   await mockAuthenticatedApi(page);
-  const artifacts = [
+  let artifacts = [
     codeArtifactFixture({
       id: 'rename-target',
       name: 'Analysis Pipeline',
@@ -244,13 +244,42 @@ test('standalone shared code hides project-level rename and delete actions', asy
   ];
 
   await page.route('**/api/library/code/**', async (route) => {
+    const request = route.request();
+    if (request.url().endsWith('/api/library/code/rename-target/') && request.method() === 'PATCH') {
+      artifacts = [
+        codeArtifactFixture({
+          id: 'rename-target',
+          name: 'Renamed Pipeline',
+          actionCapabilities: {
+            canView: true,
+            canDownload: true,
+            canRename: true,
+            canDelete: true,
+          },
+        }),
+        artifacts[1],
+      ];
+      await fulfillJson(route, artifacts[0]);
+      return;
+    }
+    if (request.url().endsWith('/api/library/code/delete-target/') && request.method() === 'DELETE') {
+      artifacts = artifacts.filter((artifact) => artifact.id !== 'delete-target');
+      await route.fulfill({ status: 204 });
+      return;
+    }
     await fulfillJson(route, { results: artifacts });
   });
 
   await page.goto('/library/code');
   await expect(page.getByTestId('code-selected-detail-region')).toContainText('Analysis Pipeline');
-  await expect(page.getByRole('button', { name: 'Rename code artifact' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Delete code artifact' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Rename code artifact' }).click();
+  await page.getByLabel('New code artifact name').fill('Renamed Pipeline');
+  await page.getByRole('button', { name: 'Save name' }).click();
+  await expect(page.getByTestId('code-selected-detail-region')).toContainText('Renamed Pipeline');
+  await page.getByRole('button', { name: /Select code artifact Delete Candidate/ }).click();
+  await page.getByRole('button', { name: 'Delete code artifact' }).click();
+  await page.getByRole('button', { name: 'Confirm delete' }).click();
+  await expect(page.getByText('Delete Candidate')).toHaveCount(0);
 });
 
 test('non-maintainer cannot see rename or delete actions', async ({ page }) => {

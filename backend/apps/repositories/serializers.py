@@ -4,7 +4,7 @@ from rest_framework import serializers
 from apps.projects.material_services import classify_workspace_record, source_project_payload
 
 from .models import CodeArtifact, CodeArtifactVersion
-from .services import can_manage_code_artifact
+from .services import can_manage_code_artifact, can_manage_shared_code_artifact
 
 
 class CodeArtifactVersionSerializer(serializers.ModelSerializer):
@@ -91,7 +91,10 @@ class CodeArtifactSerializer(serializers.ModelSerializer):
             obj.archive_file_id
             or obj.versions.filter(status=CodeArtifactVersion.Status.ACTIVE).exists()
         )
-        can_manage = can_manage_code_artifact(user, obj)
+        if self.context.get("shared_section"):
+            can_manage = can_manage_shared_code_artifact(user, obj)
+        else:
+            can_manage = can_manage_code_artifact(user, obj)
         return {
             "canView": is_active,
             "canDownload": is_active and has_download,

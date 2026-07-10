@@ -40,17 +40,7 @@ export function CodeRepositoryPage() {
     return Array.from(byId.values()).filter((artifact) => !deletedArtifactIds.has(artifact.id));
   }, [artifactsQuery.data, deletedArtifactIds, renamedArtifacts, uploadedArtifacts]);
   const selectedArtifact = artifacts.find((artifact) => artifact.id === selectedId) ?? artifacts[0];
-  const selectedArtifactForDisplay = standalone && selectedArtifact
-    ? {
-        ...selectedArtifact,
-        actionCapabilities: {
-          canView: selectedArtifact.actionCapabilities?.canView ?? selectedArtifact.status === 'active',
-          canDownload: selectedArtifact.actionCapabilities?.canDownload ?? Boolean(selectedArtifact.archiveFileId || selectedArtifact.latestVersion),
-          canRename: false,
-          canDelete: false,
-        },
-      }
-    : selectedArtifact;
+  const selectedArtifactForDisplay = selectedArtifact;
 
   function selectArtifact(artifact: CodeArtifact) {
     setSelectedId(artifact.id);

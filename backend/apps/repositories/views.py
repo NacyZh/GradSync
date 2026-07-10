@@ -23,7 +23,12 @@ from .serializers import (
     CodeArtifactVersionSerializer,
     CodeUploadPolicySerializer,
 )
-from .services import CodeArtifactService, shared_code_artifact_queryset_for
+from .services import (
+    CodeArtifactService,
+    delete_shared_code_artifact,
+    rename_shared_code_artifact,
+    shared_code_artifact_queryset_for,
+)
 from .upload_policy import code_archive_upload_policy
 
 
@@ -334,9 +339,17 @@ class SharedCodeArtifactListCreateView(generics.GenericAPIView):
             queryset = queryset.filter(tags__icontains=tag)
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = CodeArtifactSerializer(page, many=True, context={"request": request})
+            serializer = CodeArtifactSerializer(
+                page,
+                many=True,
+                context={"request": request, "shared_section": True},
+            )
             return self.get_paginated_response(serializer.data)
-        serializer = CodeArtifactSerializer(queryset, many=True, context={"request": request})
+        serializer = CodeArtifactSerializer(
+            queryset,
+            many=True,
+            context={"request": request, "shared_section": True},
+        )
         return Response(serializer.data)
 
     @extend_schema(
@@ -373,7 +386,10 @@ class SharedCodeArtifactListCreateView(generics.GenericAPIView):
         except (PermissionError, DjangoPermissionDenied) as exc:
             raise PermissionDenied(str(exc)) from exc
         return Response(
-            CodeArtifactSerializer(artifact, context={"request": request}).data,
+            CodeArtifactSerializer(
+                artifact,
+                context={"request": request, "shared_section": True},
+            ).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -386,7 +402,78 @@ class SharedCodeArtifactDetailView(views.APIView):
         artifact = get_object_or_404(
             shared_code_artifact_queryset_for(request.user), pk=artifact_id
         )
-        return Response(CodeArtifactSerializer(artifact, context={"request": request}).data)
+        return Response(
+            CodeArtifactSerializer(
+                artifact,
+                context={"request": request, "shared_section": True},
+            ).data
+        )
+
+    @extend_schema(
+        request=CodeArtifactRenameSerializer,
+        responses={
+            200: CodeArtifactSerializer,
+            400: OpenApiResponse(description="Rename validation failed"),
+            403: OpenApiResponse(description="Rename forbidden"),
+            404: OpenApiResponse(description="Code artifact not found"),
+            409: OpenApiResponse(description="Duplicate or unavailable code artifact"),
+        },
+    )
+    def patch(self, request, artifact_id):
+        artifact = get_object_or_404(
+            shared_code_artifact_queryset_for(request.user), pk=artifact_id
+        )
+        serializer = CodeArtifactRenameSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            renamed = rename_shared_code_artifact(
+                actor=request.user,
+                artifact=artifact,
+                **serializer.validated_data,
+            )
+        except DjangoValidationError as exc:
+            message = _error_message(exc)
+            status_code = (
+                status.HTTP_409_CONFLICT
+                if _is_conflict_message(message) or "already exists" in message
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"message": message}, status=status_code)
+        except (PermissionError, DjangoPermissionDenied) as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(
+            CodeArtifactSerializer(
+                renamed,
+                context={"request": request, "shared_section": True},
+            ).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        responses={
+            204: OpenApiResponse(description="Code artifact archived"),
+            403: OpenApiResponse(description="Delete forbidden"),
+            404: OpenApiResponse(description="Code artifact not found"),
+            409: OpenApiResponse(description="Unavailable code artifact"),
+        },
+    )
+    def delete(self, request, artifact_id):
+        artifact = get_object_or_404(
+            CodeArtifact.objects.select_related("archive_file", "project", "source_project")
+            .prefetch_related("versions"),
+            pk=artifact_id,
+        )
+        try:
+            delete_shared_code_artifact(
+                actor=request.user,
+                artifact=artifact,
+                reason=str(request.data.get("reason", "")) if hasattr(request, "data") else "",
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_409_CONFLICT)
+        except (PermissionError, DjangoPermissionDenied) as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SharedCodeArtifactDownloadView(views.APIView):
