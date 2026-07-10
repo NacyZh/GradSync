@@ -1,6 +1,8 @@
 import time
 
 import pytest
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.utils import timezone
 
 from apps.library.models import DocumentCategory, DocumentRecord
@@ -158,6 +160,9 @@ def test_upload_feedback_and_permitted_download_paths_are_fast(api_client):
     doc_file = UploadedFileFactory(
         owner=advisor, category="document", original_filename="report.pdf"
     )
+    if default_storage.exists(doc_file.stored_name):
+        default_storage.delete(doc_file.stored_name)
+    default_storage.save(doc_file.stored_name, ContentFile(b"%PDF report"))
     document = DocumentRecord.objects.create(
         project=project,
         category=category,
@@ -174,5 +179,5 @@ def test_upload_feedback_and_permitted_download_paths_are_fast(api_client):
     elapsed = time.monotonic() - start
 
     assert response.status_code == 200
-    assert response.data["filename"] == "report.pdf"
+    assert 'filename="report.pdf"' in response["Content-Disposition"]
     assert elapsed < 5

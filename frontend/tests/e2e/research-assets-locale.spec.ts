@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import {
+  fulfillAttachment,
   fulfillJson,
   fullStackE2E,
   loginAs,
@@ -100,7 +101,7 @@ test('paper import, code download, and locale persistence workflow is reachable'
     });
     await page.route('**/api/library/code/**', async (route) => {
       if (route.request().url().includes('/download/')) {
-        await fulfillJson(route, { filename: 'analysis-toolkit.zip', deliveryMode: 'direct_response' });
+        await fulfillAttachment(route, 'analysis-toolkit.zip', Buffer.from('zip'), 'application/zip');
         return;
       }
       await fulfillJson(route, {
@@ -155,7 +156,10 @@ test('paper import, code download, and locale persistence workflow is reachable'
   await page.goto('/library/code');
   await expect(page.getByRole('heading', { name: 'Shared code' })).toBeVisible();
   await expect(page.getByTestId('code-selected-detail-region').getByRole('heading', { name: 'Analysis Toolkit' })).toBeVisible();
+  const codeDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download' }).click();
+  const codeDownload = await codeDownloadPromise;
+  expect(codeDownload.suggestedFilename()).toBe('analysis-toolkit.zip');
   await expect(page.getByRole('status')).toContainText('analysis-toolkit.zip');
 
   await page.getByRole('button', { name: /Language|语言/ }).click();

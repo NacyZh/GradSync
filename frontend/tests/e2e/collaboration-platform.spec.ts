@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { fulfillJson, validPdfBuffer } from './api-mocks';
+import { fulfillAttachment, fulfillJson, validPdfBuffer } from './api-mocks';
 
 const advisorUser = {
   id: 10,
@@ -115,11 +115,11 @@ async function mockCollaborationApi(page: Page) {
       return;
     }
     if (url.endsWith('/api/library/papers/2/download/')) {
-      await fulfillJson(route, { filename: 'Uploaded Graph Paper.pdf', deliveryMode: 'direct_response' });
+      await fulfillAttachment(route, 'Uploaded Graph Paper.pdf', Buffer.from('%PDF-1.4 uploaded'), 'application/pdf');
       return;
     }
     if (url.endsWith('/api/library/papers/1/download/')) {
-      await fulfillJson(route, { filename: 'Group Wide Graph Paper.pdf', deliveryMode: 'direct_response' });
+      await fulfillAttachment(route, 'Group Wide Graph Paper.pdf', Buffer.from('%PDF-1.4 group'), 'application/pdf');
       return;
     }
     if (url.endsWith('/api/library/papers/2/')) {
@@ -176,7 +176,7 @@ async function mockCollaborationApi(page: Page) {
   await page.route('**/api/library/code/**', async (route) => {
     const request = route.request();
     if (request.url().includes('/download')) {
-      await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
+      await fulfillAttachment(route, 'uploaded.zip', Buffer.from('zip'), 'application/zip');
       return;
     }
     if (request.method() === 'POST') {
@@ -195,7 +195,7 @@ async function mockCollaborationApi(page: Page) {
   });
   await page.route('**/api/library/documents/**', async (route) => {
     if (route.request().url().includes('/download/')) {
-      await fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' });
+      await fulfillAttachment(route, 'protocol.pdf', Buffer.from('%PDF-1.4 protocol'), 'application/pdf');
       return;
     }
     if (route.request().method() === 'POST') {
@@ -205,7 +205,9 @@ async function mockCollaborationApi(page: Page) {
     }
     await fulfillJson(route, { results: [{ id: documentUploaded ? '5' : '4', projectId: '1', categoryId: '1', categoryName: 'Protocols', title: documentUploaded ? 'Uploaded Protocol' : 'Microscope Protocol', description: 'Calibration workflow', visibility: 'group_wide', uploaderId: '10', checksumSha256: 'a'.repeat(64), createdAt: '2026-07-03T08:00:00Z', status: 'active' }] });
   });
-  await page.route('**/api/library/documents/*/download/', async (route) => fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' }));
+  await page.route('**/api/library/documents/*/download/', async (route) =>
+    fulfillAttachment(route, 'protocol.pdf', Buffer.from('%PDF-1.4 protocol'), 'application/pdf'),
+  );
   await page.route('**/api/writing-projects/**', async (route) => {
     if (route.request().url().includes('/versions')) {
       await route.fallback();
@@ -219,7 +221,14 @@ async function mockCollaborationApi(page: Page) {
   });
   await page.route('**/api/writing-projects/2/versions', async (route) => fulfillJson(route, { id: '8', writingProjectId: '2', versionNumber: 2, draftFileName: 'revision.tex', fileKind: 'latex_source', status: 'submitted', feedback: [] }, 201));
   await page.route('**/api/writing-versions/6/feedback', async (route) => fulfillJson(route, { id: '9', writingVersionId: '6', reviewerId: '3', comments: 'More notes', status: 'notification_pending', notificationStatus: 'pending' }, 201));
-  await page.route('**/api/teacher-feedback/7/download', async (route) => fulfillJson(route, { filename: 'annotated.docx', deliveryMode: 'direct_response' }));
+  await page.route('**/api/teacher-feedback/7/download', async (route) =>
+    fulfillAttachment(
+      route,
+      'annotated.docx',
+      Buffer.from('notes'),
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ),
+  );
   await page.route('**/api/resources/', async (route) => {
     if (route.request().method() === 'POST') {
       await fulfillJson(route, { id: 12, name: 'New microscope', resourceType: 'Microscope', description: 'Shared imaging station', status: 'active', useInstructions: 'Submit request first.', useSubmissions: [] }, 201);

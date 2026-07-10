@@ -317,6 +317,22 @@ export async function fulfillJson(route: Route, json: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json) });
 }
 
+export async function fulfillAttachment(
+  route: Route,
+  filename: string,
+  body: Buffer | string = 'download',
+  contentType = 'application/octet-stream',
+) {
+  await route.fulfill({
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+    body,
+  });
+}
+
 export async function loginAs(
   page: Page,
   email = 'advisor@example.edu',

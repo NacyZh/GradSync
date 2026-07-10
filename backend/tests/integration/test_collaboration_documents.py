@@ -168,6 +168,6 @@ def test_archived_stale_and_unauthorized_document_downloads_are_blocked(api_clie
 
     assert unauthorized.status_code == 403
     assert allowed.status_code == 200
-    assert allowed.data["filename"] == "download.pdf"
+    assert 'filename="download.pdf"' in allowed["Content-Disposition"]
     assert archived.status_code == 410
     assert "no longer available" in archived.data["message"]
