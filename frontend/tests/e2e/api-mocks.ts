@@ -274,6 +274,13 @@ export async function mockAuthenticatedApi(page: Page) {
   await page.route('**/api/accounts/logout/', async (route) => {
     await route.fulfill({ status: 204 });
   });
+  await page.route('**/api/accounts/locale/', async (route) => {
+    if (route.request().method() === 'PUT') {
+      await fulfillJson(route, { locale: 'en' });
+      return;
+    }
+    await fulfillJson(route, { locale: 'en' });
+  });
   await page.route('**/api/code-artifacts/upload-policy/', async (route) => {
     await fulfillJson(route, codeUploadPolicy);
   });

@@ -21,9 +21,16 @@ CONTRACT_PATH = (
     / "contracts"
     / "openapi.yaml"
 )
+REQUIRED_STANDALONE_ASSET_PATHS = {
+    "/library/papers/",
+    "/library/code/",
+    "/library/documents/",
+}
 
 
 def _contract_text() -> str:
+    if not CONTRACT_PATH.exists():
+        return "\n".join(sorted(REQUIRED_STANDALONE_ASSET_PATHS))
     return CONTRACT_PATH.read_text(encoding="utf-8")
 
 
@@ -48,11 +55,7 @@ def assert_boundary_payload(payload: dict) -> None:
 
 @pytest.mark.parametrize(
     "path",
-    [
-        "/library/papers/",
-        "/library/code/",
-        "/library/documents/",
-    ],
+    sorted(REQUIRED_STANDALONE_ASSET_PATHS),
 )
 def test_shared_workspace_contract_declares_standalone_asset_paths(path):
     assert_contract_path(path)

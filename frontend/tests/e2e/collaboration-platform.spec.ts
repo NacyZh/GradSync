@@ -25,6 +25,15 @@ async function mockCollaborationApi(page: Page) {
 
   await page.route('**/api/accounts/me/', async (route) => fulfillJson(route, currentUser));
   await page.route('**/api/accounts/logout/', async (route) => route.fulfill({ status: 204 }));
+  await page.route('**/api/code-artifacts/upload-policy/', async (route) => {
+    await fulfillJson(route, {
+      category: 'code_archive',
+      maxSizeBytes: 104857600,
+      displayLabel: '100 MB',
+      allowedExtensions: ['.7z', '.bz2', '.gz', '.tar', '.tgz', '.xz', '.zip'],
+      contentTypes: ['application/zip', 'application/gzip', 'application/x-tar'],
+    });
+  });
   await page.route('**/api/accounts/register/', async (route) => {
     await fulfillJson(route, { email: 'student@example.com', status: 'pending_email_verification', requestedRole: 'student' }, 202);
   });
@@ -67,19 +76,6 @@ async function mockCollaborationApi(page: Page) {
     await route.fallback();
   });
   await page.route('**/api/projects/1/members/2/', async (route) => route.fulfill({ status: 204 }));
-  await page.route('**/api/projects/1/papers/**', async (route) => {
-    const request = route.request();
-    if (request.method() === 'POST' && request.url().includes('/download/')) {
-      await fulfillJson(route, { filename: 'uploaded-paper.pdf', deliveryMode: 'direct_response' });
-      return;
-    }
-    if (request.method() === 'POST') {
-      paperUploaded = true;
-      await fulfillJson(route, { id: '2', projectId: '1', title: 'Uploaded Graph Paper', authors: ['Ada Lovelace'], publicationYear: 2026, visibility: 'project_members', status: 'active', attachments: [{ id: '12', filename: 'uploaded-paper.pdf', checksumSha256: 'b'.repeat(64), status: 'active' }] }, 201);
-      return;
-    }
-    await fulfillJson(route, { results: [{ id: paperUploaded ? '2' : '1', projectId: '1', title: paperUploaded ? 'Uploaded Graph Paper' : 'Group Wide Graph Paper', authors: ['Lin Chen'], publicationYear: 2025, visibility: paperUploaded ? 'project_members' : 'group_wide', status: 'active', attachments: [{ id: '11', filename: paperUploaded ? 'uploaded-paper.pdf' : 'graph.pdf', checksumSha256: 'a'.repeat(64), status: 'active' }] }] });
-  });
   await page.route('**/api/library/papers/**', async (route) => {
     const request = route.request();
     const url = request.url();
@@ -177,7 +173,7 @@ async function mockCollaborationApi(page: Page) {
       count: 1,
     });
   });
-  await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
+  await page.route('**/api/library/code/**', async (route) => {
     const request = route.request();
     if (request.url().includes('/download')) {
       await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
@@ -185,12 +181,11 @@ async function mockCollaborationApi(page: Page) {
     }
     if (request.method() === 'POST') {
       codeUploaded = true;
-      await fulfillJson(route, { id: '5', projectId: '1', name: 'Uploaded Archive', description: 'Searchable implementation archive', tags: ['python'], visibility: 'project_members', checksumSha256: 'e'.repeat(64), archiveFileId: '12', status: 'active' }, 201);
+      await fulfillJson(route, { id: '5', projectId: '1', name: 'Uploaded Archive', description: 'Searchable implementation archive', tags: ['python'], visibility: 'group_wide', checksumSha256: 'e'.repeat(64), archiveFileId: '12', status: 'active' }, 201);
       return;
     }
-    await fulfillJson(route, { results: [{ id: codeUploaded ? '5' : '3', projectId: '1', name: codeUploaded ? 'Uploaded Archive' : 'Group Code Archive', description: 'Microscopy analysis archive', tags: ['analysis'], visibility: codeUploaded ? 'project_members' : 'group_wide', checksumSha256: 'c'.repeat(64), archiveFileId: '9', status: 'active' }] });
+    await fulfillJson(route, { results: [{ id: codeUploaded ? '5' : '3', projectId: '1', name: codeUploaded ? 'Uploaded Archive' : 'Group Code Archive', description: 'Microscopy analysis archive', tags: ['analysis'], visibility: 'group_wide', checksumSha256: 'c'.repeat(64), archiveFileId: '9', status: 'active' }] });
   });
-  await page.route('**/api/code-artifacts/*/download', async (route) => fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' }));
   await page.route('**/api/document-categories**', async (route) => {
     await fulfillJson(route, [
       { id: '1', name: 'Protocols', description: 'Lab protocols', status: 'active' },
@@ -198,16 +193,24 @@ async function mockCollaborationApi(page: Page) {
       { id: '3', name: 'Meetings', description: 'Meeting notes', status: 'active' },
     ]);
   });
-  await page.route('**/api/projects/1/documents**', async (route) => {
-    if (route.request().method() === 'POST') {
-      documentUploaded = true;
-      await fulfillJson(route, { id: '5', projectId: '1', categoryId: '1', categoryName: 'Protocols', title: 'Uploaded Protocol', description: 'Shared instructions', visibility: 'project_members', uploaderId: '10', checksumSha256: 'b'.repeat(64), createdAt: '2026-07-03T08:00:00Z', status: 'active' }, 201);
+  await page.route('**/api/library/documents/**', async (route) => {
+    if (route.request().url().includes('/download/')) {
+      await fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' });
       return;
     }
-    await fulfillJson(route, { results: [{ id: documentUploaded ? '5' : '4', projectId: '1', categoryId: '1', categoryName: 'Protocols', title: documentUploaded ? 'Uploaded Protocol' : 'Microscope Protocol', description: 'Calibration workflow', visibility: documentUploaded ? 'project_members' : 'group_wide', uploaderId: '10', checksumSha256: 'a'.repeat(64), createdAt: '2026-07-03T08:00:00Z', status: 'active' }] });
+    if (route.request().method() === 'POST') {
+      documentUploaded = true;
+      await fulfillJson(route, { id: '5', projectId: '1', categoryId: '1', categoryName: 'Protocols', title: 'Uploaded Protocol', description: 'Shared instructions', visibility: 'group_wide', uploaderId: '10', checksumSha256: 'b'.repeat(64), createdAt: '2026-07-03T08:00:00Z', status: 'active' }, 201);
+      return;
+    }
+    await fulfillJson(route, { results: [{ id: documentUploaded ? '5' : '4', projectId: '1', categoryId: '1', categoryName: 'Protocols', title: documentUploaded ? 'Uploaded Protocol' : 'Microscope Protocol', description: 'Calibration workflow', visibility: 'group_wide', uploaderId: '10', checksumSha256: 'a'.repeat(64), createdAt: '2026-07-03T08:00:00Z', status: 'active' }] });
   });
-  await page.route('**/api/documents/*/download', async (route) => fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' }));
-  await page.route('**/api/projects/1/writing-projects/**', async (route) => {
+  await page.route('**/api/library/documents/*/download/', async (route) => fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' }));
+  await page.route('**/api/writing-projects/**', async (route) => {
+    if (route.request().url().includes('/versions')) {
+      await route.fallback();
+      return;
+    }
     if (route.request().method() === 'POST') {
       await fulfillJson(route, { id: '10', projectId: '1', studentId: '5', title: 'New Manuscript', writingType: 'manuscript', status: 'active', versions: [] }, 201);
       return;
@@ -230,7 +233,7 @@ async function mockCollaborationApi(page: Page) {
   await page.route('**/api/resources/7/use-submissions/', async (route) => fulfillJson(route, { id: 22, resourceId: 7, studentId: 10, submissionType: 'request', details: 'Use for calibration', status: 'pending' }, 201));
   await page.route('**/api/resource-use-submissions/21/', async (route) => fulfillJson(route, { id: 21, resourceId: 7, studentId: 15, studentName: 'Student One', submissionType: 'request', details: 'Image samples', status: 'confirmed', decisionNote: 'Approved' }));
   await page.route('**/api/projects/1/notifications/', async (route) => {
-    await fulfillJson(route, { results: [{ id: 31, project_id: 1, event_type: 'teacher_feedback_available', target_type: 'TeacherFeedback', target_id: '17', subject: 'Feedback available', action_path: '/projects/1/writing', status: 'retry_needed', eligible_at: '2026-07-03T09:05:00Z', last_attempt_at: '2026-07-03T09:00:00Z', retry_count: 1, failure_reason: 'SMTP provider unavailable' }] });
+    await fulfillJson(route, { results: [{ id: 31, project_id: 1, event_type: 'teacher_feedback_available', target_type: 'TeacherFeedback', target_id: '17', subject: 'Feedback available', action_path: '/writing', status: 'retry_needed', eligible_at: '2026-07-03T09:05:00Z', last_attempt_at: '2026-07-03T09:00:00Z', retry_count: 1, failure_reason: 'SMTP provider unavailable' }] });
   });
 
   return {
@@ -289,7 +292,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
   });
 
   await test.step('code archive library', async () => {
-    await page.goto('/projects/1/code');
+    await page.goto('/library/code');
     await expect(page.getByTestId('code-selected-detail-region').getByRole('heading', { name: 'Group Code Archive' })).toBeVisible();
     await page.getByLabel('Archive file').setInputFiles({ name: 'uploaded.zip', mimeType: 'application/zip', buffer: Buffer.from('zip') });
     await page.getByLabel('Artifact name').fill('Uploaded Archive');
@@ -299,7 +302,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
   });
 
   await test.step('document categories and document library', async () => {
-    await page.goto('/projects/1/documents');
+    await page.goto('/library/documents');
     await expect(
       page
         .getByTestId('document-selected-detail-region')
@@ -317,7 +320,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
   });
 
   await test.step('writing versions and teacher feedback notification', async () => {
-    await page.goto('/projects/1/writing');
+    await page.goto('/writing');
     await expect(page.getByRole('heading', { name: 'Thesis Chapter' })).toBeVisible();
     await page.getByLabel('Annotated file').setInputFiles({ name: 'annotated.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('notes') });
     await page.getByLabel('Feedback comments').fill('More notes');

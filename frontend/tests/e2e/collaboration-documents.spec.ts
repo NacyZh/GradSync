@@ -8,7 +8,6 @@ import {
   fullStackE2E,
   loginAs,
   mockAuthenticatedApi,
-  nonMaintainerDocumentCapabilities,
 } from './api-mocks';
 
 async function mockDocumentLibrary(page: Page) {
@@ -23,12 +22,16 @@ async function mockDocumentLibrary(page: Page) {
     buildDocumentCategory({ id: '2', name: 'Reports', description: 'Research reports' }),
   ];
   await page.route('**/api/document-categories**', async (route) => fulfillJson(route, categories));
-  await page.route('**/api/documents/*/download', async (route) => {
+  await page.route('**/api/library/documents/*/download/', async (route) => {
     await fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' });
   });
-  await page.route('**/api/projects/1/documents**', async (route) => {
+  await page.route('**/api/library/documents/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+    if (url.pathname.includes('/download/')) {
+      await fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' });
+      return;
+    }
     if (request.method() === 'POST') {
       uploaded = true;
       lastUploadBody = request.postData() ?? '';
@@ -37,7 +40,7 @@ async function mockDocumentLibrary(page: Page) {
         buildDocumentRecord({
           id: '5',
           title: 'Uploaded Protocol',
-          visibility: 'project_members',
+          visibility: 'group_wide',
         }),
         201,
       );
@@ -46,7 +49,7 @@ async function mockDocumentLibrary(page: Page) {
     const selectedCategory = url.searchParams.get('categoryId');
     await fulfillJson(route, {
       results: uploaded
-        ? [buildDocumentRecord({ id: '5', title: 'Uploaded Protocol', visibility: 'project_members' })]
+        ? [buildDocumentRecord({ id: '5', title: 'Uploaded Protocol', visibility: 'group_wide' })]
         : selectedCategory === '2'
           ? []
           : [buildDocumentRecord(), buildLongDocumentRecord()],
@@ -74,9 +77,9 @@ test('document library upload, shared category, search, list, detail, and downlo
   if (fullStackE2E) {
     await loginAs(page);
   }
-  await page.goto('/projects/1/documents');
+  await page.goto('/library/documents');
 
-  await expect(page.getByRole('heading', { name: 'Document library' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Shared documents' })).toBeVisible();
   await expect(page.getByText('Example Protocol')).toBeHidden();
   await expect(page.getByLabel('Document library upload and download region')).toBeVisible();
   await expect(page.getByLabel('Document library search and display region')).toBeVisible();
@@ -94,7 +97,7 @@ test('document library upload, shared category, search, list, detail, and downlo
 
     await page.getByPlaceholder('Search title, category, description').fill('Protocol');
     await page.getByRole('button', { name: 'Category Reports' }).click();
-    await expect(page.getByText('No documents in category')).toBeVisible();
+    await expect(page.getByText('No document search results')).toBeVisible();
     await page.getByRole('button', { name: 'Category Protocols' }).click();
     await expect(page.getByRole('button', { name: /Select document Microscope Protocol/ })).toBeVisible();
   }
@@ -131,68 +134,43 @@ test('document library upload, shared category, search, list, detail, and downlo
   }
 });
 
-test('document library maintainer can rename and delete while non-maintainer actions stay hidden', async ({ page }) => {
-  test.skip(fullStackE2E, 'Mocked maintainer/non-maintainer action coverage uses deterministic fixtures.');
+test('standalone shared documents hide project-level rename and delete actions', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mock-mode standalone boundary coverage; API tests cover mutations.');
 
   await mockAuthenticatedApi(page);
-  let maintainerDocuments = [
-    buildDocumentRecord({ id: '4', title: 'Microscope Protocol' }),
-    buildDocumentRecord({ id: '5', title: 'Delete Candidate' }),
+  const documents = [
+    buildDocumentRecord({
+      id: '4',
+      title: 'Microscope Protocol',
+      actionCapabilities: {
+        canView: true,
+        canDownload: true,
+        canRename: true,
+        canDelete: true,
+        canUploadGroupWide: true,
+      },
+    }),
+    buildDocumentRecord({
+      id: '5',
+      title: 'Delete Candidate',
+      actionCapabilities: {
+        canView: true,
+        canDownload: true,
+        canRename: true,
+        canDelete: true,
+        canUploadGroupWide: true,
+      },
+    }),
   ];
-  const requests: Array<{ method: string; url: string; body: string | null }> = [];
   await page.route('**/api/document-categories**', async (route) =>
     fulfillJson(route, [buildDocumentCategory({ id: '1', name: 'Protocols' })]),
   );
-  await page.route('**/api/projects/1/documents**', async (route) => {
-    const request = route.request();
-    requests.push({ method: request.method(), url: request.url(), body: request.postData() });
-    if (request.method() === 'PATCH') {
-      maintainerDocuments = [
-        buildDocumentRecord({ id: '4', title: 'Renamed Protocol' }),
-        maintainerDocuments[1],
-      ];
-      await fulfillJson(route, maintainerDocuments[0]);
-      return;
-    }
-    if (request.method() === 'DELETE') {
-      maintainerDocuments = maintainerDocuments.filter((document) => document.id !== '5');
-      await route.fulfill({ status: 204 });
-      return;
-    }
-    await fulfillJson(route, { results: maintainerDocuments });
-  });
+  await page.route('**/api/library/documents/**', async (route) => fulfillJson(route, { results: documents }));
 
-  await page.goto('/projects/1/documents');
+  await page.goto('/library/documents');
   await expect(page.getByTestId('document-selected-detail-region')).toContainText('Microscope Protocol');
-  await page.getByRole('button', { name: 'Rename document' }).click();
-  await page.getByLabel('New document title').fill('Renamed Protocol');
-  await page.getByRole('button', { name: 'Save title' }).click();
-  await expect(page.getByTestId('document-selected-detail-region')).toContainText('Renamed Protocol');
-  expect(requests.some((request) => request.method === 'PATCH' && request.body?.includes('Renamed Protocol'))).toBe(true);
-
-  await page.getByRole('button', { name: /Select document Delete Candidate/ }).click();
-  await page.getByRole('button', { name: 'Delete document' }).click();
-  await expect(page.getByText(/Delete Delete Candidate/)).toBeVisible();
-  await page.getByRole('button', { name: 'Confirm delete' }).click();
-  await expect(page.getByRole('button', { name: /Select document Delete Candidate/ })).toBeHidden();
-  expect(requests.some((request) => request.method === 'DELETE')).toBe(true);
-
-  await page.unroute('**/api/projects/1/documents**');
-  await page.route('**/api/projects/1/documents**', async (route) =>
-    fulfillJson(route, {
-      results: [
-        buildDocumentRecord({
-          id: '6',
-          title: 'Read Only Protocol',
-          actionCapabilities: nonMaintainerDocumentCapabilities,
-        }),
-      ],
-    }),
-  );
-  await page.goto('/projects/1/documents');
-  await expect(page.getByTestId('document-selected-detail-region')).toContainText('Read Only Protocol');
-  await expect(page.getByRole('button', { name: 'Rename document' })).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Delete document' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Rename document' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete document' })).toHaveCount(0);
 });
 
 test('document selected download shows errors and no-selection state clearly', async ({ page }) => {
@@ -204,14 +182,16 @@ test('document selected download shows errors and no-selection state clearly', a
   await page.route('**/api/document-categories**', async (route) =>
     fulfillJson(route, [buildDocumentCategory({ id: '1', name: 'Protocols' })]),
   );
-  await page.route('**/api/projects/1/documents**', async (route) =>
-    fulfillJson(route, { results: hasDocument ? [buildDocumentRecord()] : [] }),
+  await page.route('**/api/library/documents/**', async (route) =>
+    route.request().url().includes('/download/')
+      ? fulfillJson(route, { message: 'Document is no longer available' }, 410)
+      : fulfillJson(route, { results: hasDocument ? [buildDocumentRecord()] : [] }),
   );
-  await page.route('**/api/documents/*/download', async (route) =>
+  await page.route('**/api/library/documents/*/download/', async (route) =>
     fulfillJson(route, { message: 'Document is no longer available' }, 410),
   );
 
-  await page.goto('/projects/1/documents');
+  await page.goto('/library/documents');
   await expect(page.getByRole('region', { name: 'Selected document download' })).toContainText('Microscope Protocol');
   await page.getByRole('button', { name: /Download Microscope Protocol/ }).click();
   await expect(page.getByRole('alert')).toContainText('Document is no longer available');
@@ -235,7 +215,7 @@ for (const viewport of [
     if (fullStackE2E) {
       await loginAs(page);
     }
-    await page.goto('/projects/1/documents');
+    await page.goto('/library/documents');
 
     await expect(page.getByLabel('Document library upload and download region')).toBeVisible();
     await expect(page.getByLabel('Document library search and display region')).toBeVisible();

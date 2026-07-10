@@ -73,10 +73,6 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
   let uploaded = false;
 
   if (!fullStackE2E) {
-    await page.route('**/api/code-artifacts/*/download', async (route) => {
-      await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
-    });
-
     await page.route('**/api/library/code/**', async (route) => {
       const request = route.request();
       if (request.url().includes('/download')) {

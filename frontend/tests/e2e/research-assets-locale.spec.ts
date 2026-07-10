@@ -98,42 +98,9 @@ test('paper import, code download, and locale persistence workflow is reachable'
         count: 1,
       });
     });
-    await page.route('**/api/projects/1/papers/**', async (route) => {
-      if (route.request().method() !== 'GET') {
-        await route.fallback();
-        return;
-      }
-      await fulfillJson(route, {
-        results: [{
-          id: '1',
-          projectId: '1',
-          title: 'Graph Neural Methods',
-          authors: ['Lin Chen'],
-          publicationYear: 2026,
-          doi: '10.1000/graph',
-          status: 'active',
-          attachments: [{ id: '1', filename: 'graph.pdf', checksumSha256: 'a', status: 'active' }],
-        }],
-      });
-    });
-    await page.route('**/api/projects/1/papers/imports/', async (route) => {
-      await fulfillJson(route, {
-        id: 'batch-1',
-        projectId: '1',
-        status: 'staged',
-        totalItems: 1,
-        acceptedCount: 0,
-        duplicateCount: 1,
-        errorCount: 0,
-        results: [{ status: 'duplicate', duplicateReason: 'doi', message: 'Duplicate paper detected' }],
-      }, 201);
-    });
-    await page.route('**/api/projects/1/papers/1/download/', async (route) => {
-      await fulfillJson(route, { filename: 'graph.pdf', deliveryMode: 'direct_response' });
-    });
-    await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
-      if (route.request().method() !== 'GET') {
-        await route.fallback();
+    await page.route('**/api/library/code/**', async (route) => {
+      if (route.request().url().includes('/download/')) {
+        await fulfillJson(route, { filename: 'analysis-toolkit.zip', deliveryMode: 'direct_response' });
         return;
       }
       await fulfillJson(route, {
@@ -141,13 +108,14 @@ test('paper import, code download, and locale persistence workflow is reachable'
           id: '1',
           projectId: '1',
           name: 'Analysis Toolkit',
+          description: 'Reusable analysis toolkit',
+          visibility: 'group_wide',
+          checksumSha256: 'c'.repeat(64),
+          archiveFileId: '2',
           status: 'active',
           latestVersion: { id: '2', artifactId: '1', projectId: '1', versionLabel: 'v1', filename: 'analysis-toolkit.zip', checksumSha256: 'c', status: 'active' },
         }],
       });
-    });
-    await page.route('**/api/projects/1/code-artifacts/1/versions/2/download/', async (route) => {
-      await fulfillJson(route, { filename: 'analysis-toolkit.zip', deliveryMode: 'direct_response' });
     });
     await page.route('**/api/accounts/locale/', async (route) => {
       if (route.request().method() === 'PUT') {
@@ -184,8 +152,8 @@ test('paper import, code download, and locale persistence workflow is reachable'
   await page.getByRole('button', { name: /Download Graph Neural Methods/ }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Download started' })).toContainText('Graph Neural Methods.pdf');
 
-  await page.goto('/projects/1/code');
-  await expect(page.getByRole('heading', { name: 'Code repository' })).toBeVisible();
+  await page.goto('/library/code');
+  await expect(page.getByRole('heading', { name: 'Shared code' })).toBeVisible();
   await expect(page.getByTestId('code-selected-detail-region').getByRole('heading', { name: 'Analysis Toolkit' })).toBeVisible();
   await page.getByRole('button', { name: 'Download' }).click();
   await expect(page.getByRole('status')).toContainText('analysis-toolkit.zip');
