@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   buildDocumentCategory,
   buildDocumentRecord,
+  fulfillAttachment,
   fulfillJson,
   fullStackE2E,
   loginAs,
@@ -77,10 +78,12 @@ async function mockPaperLibraryAccessibility(page: Page) {
       return;
     }
     if (url.endsWith('/api/library/papers/1/download/')) {
-      await fulfillJson(route, {
-        filename: 'Accessible Paper Workspace.pdf',
-        deliveryMode: 'direct_response',
-      });
+      await fulfillAttachment(
+        route,
+        'Accessible Paper Workspace.pdf',
+        Buffer.from('%PDF-1.4 accessible'),
+        'application/pdf',
+      );
       return;
     }
     if (url.endsWith('/api/library/papers/1/')) {
@@ -188,7 +191,7 @@ test('document library upload, clear, selector, search, download, rename, and de
     await fulfillJson(route, { results: documents });
   });
   await page.route('**/api/library/documents/*/download/', async (route) =>
-    fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' }),
+    fulfillAttachment(route, 'protocol.pdf', Buffer.from('%PDF-1.4 protocol'), 'application/pdf'),
   );
 
   await page.goto('/library/documents');

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '../../shared/api/client';
-import { downloadFile, type DownloadDescriptor } from '../../shared/api/downloads';
+import { downloadFile } from '../../shared/api/downloads';
 
 export type DocumentCategory = {
   id: string;
