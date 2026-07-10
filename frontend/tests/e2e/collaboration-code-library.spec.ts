@@ -121,7 +121,7 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
   if (fullStackE2E) {
     await loginAs(page);
     await page.goto('/library/code');
-    await expect(page.getByRole('heading', { name: 'Code repository' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Shared code' })).toBeVisible();
     await expect(page.getByTestId('code-selected-detail-region').getByRole('heading', { name: 'Analysis Toolkit' })).toBeVisible();
     await page.getByRole('button', { name: 'Download', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('analysis-toolkit.zip');

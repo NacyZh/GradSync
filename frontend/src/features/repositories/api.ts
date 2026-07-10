@@ -164,7 +164,7 @@ export function downloadCodeVersion(projectId: number, artifactId: string, versi
 
 export function downloadCodeArtifact(projectId: number, artifact: CodeArtifact): Promise<DownloadDescriptor> {
   if (!projectId) {
-    return downloadDescriptor(`/api/library/code/${artifact.id}/download/`);
+    return apiRequest<DownloadDescriptor>(`/api/library/code/${artifact.id}/download/`);
   }
   if (artifact.archiveFileId) {
     return apiRequest<DownloadDescriptor>(`/api/code-artifacts/${artifact.id}/download`);
