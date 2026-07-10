@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework import mixins, status, views, viewsets
+from rest_framework import generics, mixins, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -23,7 +23,7 @@ from .serializers import (
     CodeArtifactVersionSerializer,
     CodeUploadPolicySerializer,
 )
-from .services import CodeArtifactService
+from .services import CodeArtifactService, shared_code_artifact_queryset_for
 from .upload_policy import code_archive_upload_policy
 
 
@@ -308,3 +308,96 @@ class CodeArtifactUploadPolicyView(views.APIView):
     )
     def get(self, request):
         return Response(CodeUploadPolicySerializer(code_archive_upload_policy()).data)
+
+
+class SharedCodeArtifactListCreateView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("tag", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: CodeArtifactSerializer(many=True)},
+    )
+    def get(self, request):
+        queryset = shared_code_artifact_queryset_for(request.user)
+        query = request.query_params.get("q")
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query)
+                | Q(description__icontains=query)
+                | Q(tags__icontains=query)
+            )
+        tag = request.query_params.get("tag")
+        if tag:
+            queryset = queryset.filter(tags__icontains=tag)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = CodeArtifactSerializer(page, many=True, context={"request": request})
+            return self.get_paginated_response(serializer.data)
+        serializer = CodeArtifactSerializer(queryset, many=True, context={"request": request})
+        return Response(serializer.data)
+
+    @extend_schema(
+        request={
+            "application/json": CodeArtifactCreateSerializer,
+            "multipart/form-data": CodeArtifactUploadSerializer,
+        },
+        responses={201: CodeArtifactSerializer},
+    )
+    def post(self, request):
+        serializer_class = (
+            CodeArtifactUploadSerializer
+            if "archive" in request.data
+            else CodeArtifactCreateSerializer
+        )
+        serializer = serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = dict(serializer.validated_data)
+        validated.pop("visibility", None)
+        try:
+            service = CodeArtifactService(request.user, None)
+            if "upload" in validated:
+                artifact = service.upload_standalone_archive(**validated)
+            else:
+                artifact = service.create_standalone_artifact(**validated)
+        except DjangoValidationError as exc:
+            message = _error_message(exc)
+            status_code = (
+                status.HTTP_409_CONFLICT
+                if "checksum already exists" in message
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"message": message}, status=status_code)
+        except (PermissionError, DjangoPermissionDenied) as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(
+            CodeArtifactSerializer(artifact, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SharedCodeArtifactDetailView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: CodeArtifactSerializer})
+    def get(self, request, artifact_id):
+        artifact = get_object_or_404(
+            shared_code_artifact_queryset_for(request.user), pk=artifact_id
+        )
+        return Response(CodeArtifactSerializer(artifact, context={"request": request}).data)
+
+
+class SharedCodeArtifactDownloadView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiResponse(description="Download descriptor")})
+    def get(self, request, artifact_id):
+        artifact = get_object_or_404(
+            shared_code_artifact_queryset_for(request.user), pk=artifact_id
+        )
+        try:
+            return Response(describe_code_artifact_download(request.user, artifact))
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc

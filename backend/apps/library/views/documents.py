@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework import mixins, status, views, viewsets
+from rest_framework import generics, mixins, status, views, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -25,6 +25,7 @@ from ..services import (
     DownloadUnavailable,
     active_document_queryset,
     describe_document_download,
+    shared_document_queryset_for,
 )
 from .papers import _error_message
 
@@ -224,6 +225,83 @@ class DocumentDownloadView(views.APIView):
             DocumentRecord.objects.select_related("project", "document_file"),
             pk=document_id,
         )
+        try:
+            return Response(describe_document_download(request.user, document))
+        except DownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+
+
+class SharedDocumentListCreateView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("categoryId", int, OpenApiParameter.QUERY),
+        ],
+        responses={200: DocumentRecordSerializer(many=True)},
+    )
+    def get(self, request):
+        queryset = shared_document_queryset_for(request.user)
+        query = request.query_params.get("q")
+        if query:
+            queryset = queryset.filter(
+                Q(title__icontains=query)
+                | Q(description__icontains=query)
+                | Q(category__name__icontains=query)
+            )
+        category_id = request.query_params.get("categoryId")
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = DocumentRecordSerializer(page, many=True, context={"request": request})
+            return self.get_paginated_response(serializer.data)
+        serializer = DocumentRecordSerializer(
+            queryset, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        request={"multipart/form-data": DocumentUploadSerializer},
+        responses={201: DocumentRecordSerializer},
+    )
+    def post(self, request):
+        serializer = DocumentUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = dict(serializer.validated_data)
+        validated.pop("visibility", None)
+        try:
+            document = DocumentService(request.user, None).upload_standalone_document(
+                **validated
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(
+            DocumentRecordSerializer(document, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SharedDocumentDetailView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: DocumentRecordSerializer})
+    def get(self, request, document_id):
+        document = get_object_or_404(shared_document_queryset_for(request.user), pk=document_id)
+        return Response(DocumentRecordSerializer(document, context={"request": request}).data)
+
+
+class SharedDocumentDownloadView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiResponse(description="Download descriptor")})
+    def get(self, request, document_id):
+        document = get_object_or_404(shared_document_queryset_for(request.user), pk=document_id)
         try:
             return Response(describe_document_download(request.user, document))
         except DownloadUnavailable as exc:

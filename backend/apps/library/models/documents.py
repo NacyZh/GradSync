@@ -7,6 +7,18 @@ class DocumentCategory(models.Model):
         ACTIVE = "active", "Active"
         ARCHIVED = "archived", "Archived"
 
+    class BoundaryClassification(models.TextChoices):
+        STANDALONE_SHARED = "standalone_shared", "Standalone shared"
+        PROJECT_MATERIAL = "project_material", "Project material"
+        PENDING_REVIEW = "pending_review", "Pending review"
+
+    class ClassificationReason(models.TextChoices):
+        PREVIOUS_FUNCTIONAL_AREA = "previous_functional_area", "Previous functional area"
+        EXPLICIT_PROJECT_SPECIFIC = "explicit_project_specific", "Explicit project-specific"
+        AMBIGUOUS_LEGACY = "ambiguous_legacy", "Ambiguous legacy"
+        MANUAL_REVIEW = "manual_review", "Manual review"
+        SYSTEM_DEFAULT = "system_default", "System default"
+
     name = models.CharField(max_length=120, unique=True)
     description = models.TextField(blank=True)
     created_by = models.ForeignKey(
@@ -37,6 +49,18 @@ class DocumentRecord(models.Model):
         ACTIVE = "active", "Active"
         ARCHIVED = "archived", "Archived"
 
+    class BoundaryClassification(models.TextChoices):
+        STANDALONE_SHARED = "standalone_shared", "Standalone shared"
+        PROJECT_MATERIAL = "project_material", "Project material"
+        PENDING_REVIEW = "pending_review", "Pending review"
+
+    class ClassificationReason(models.TextChoices):
+        PREVIOUS_FUNCTIONAL_AREA = "previous_functional_area", "Previous functional area"
+        EXPLICIT_PROJECT_SPECIFIC = "explicit_project_specific", "Explicit project-specific"
+        AMBIGUOUS_LEGACY = "ambiguous_legacy", "Ambiguous legacy"
+        MANUAL_REVIEW = "manual_review", "Manual review"
+        SYSTEM_DEFAULT = "system_default", "System default"
+
     project = models.ForeignKey(
         "projects.ResearchProject", on_delete=models.CASCADE, related_name="document_records"
     )
@@ -51,6 +75,25 @@ class DocumentRecord(models.Model):
         related_name="document_visibility_changes",
     )
     visibility_changed_at = models.DateTimeField(null=True, blank=True)
+    boundary_classification = models.CharField(
+        max_length=30,
+        choices=BoundaryClassification.choices,
+        default=BoundaryClassification.STANDALONE_SHARED,
+        db_index=True,
+    )
+    source_project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_document_records",
+    )
+    migrated_from_project_nested_area = models.BooleanField(default=False)
+    classification_reason = models.CharField(
+        max_length=40,
+        choices=ClassificationReason.choices,
+        default=ClassificationReason.PREVIOUS_FUNCTIONAL_AREA,
+    )
     category = models.ForeignKey(
         DocumentCategory, on_delete=models.PROTECT, related_name="documents"
     )
@@ -77,4 +120,12 @@ class DocumentRecord(models.Model):
             models.Index(fields=["project", "visibility", "status"], name="library_doc_scope_idx"),
             models.Index(fields=["project", "category", "title"], name="library_doc_category_idx"),
             models.Index(fields=["created_by", "created_at"], name="library_doc_uploader_idx"),
+            models.Index(
+                fields=["boundary_classification", "visibility", "status"],
+                name="library_doc_boundary_idx",
+            ),
+            models.Index(
+                fields=["source_project", "boundary_classification", "status"],
+                name="library_doc_source_idx",
+            ),
         ]

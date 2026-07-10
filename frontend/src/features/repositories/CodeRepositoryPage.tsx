@@ -9,17 +9,21 @@ import { CodeArtifactActions } from './CodeArtifactActions';
 import { CodeArtifactFilters } from './CodeArtifactFilters';
 import { CodeArtifactImportForm } from './CodeArtifactImportForm';
 import { CodeArtifactVersionPanel } from './CodeArtifactVersionPanel';
-import { useCodeArtifacts, useDeleteCodeArtifact, useRenameCodeArtifact, type CodeArtifact } from './api';
+import { useCodeArtifacts, useDeleteCodeArtifact, useRenameCodeArtifact, useSharedCodeArtifacts, type CodeArtifact } from './api';
 
 export function CodeRepositoryPage() {
-  const projectId = Number(useParams().projectId ?? 0);
+  const projectIdParam = useParams().projectId;
+  const projectId = Number(projectIdParam ?? 0);
+  const standalone = !projectIdParam;
   const [query, setQuery] = useState('');
   const [visibility, setVisibility] = useState('');
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [uploadedArtifacts, setUploadedArtifacts] = useState<Record<string, CodeArtifact>>({});
   const [renamedArtifacts, setRenamedArtifacts] = useState<Record<string, CodeArtifact>>({});
   const [deletedArtifactIds, setDeletedArtifactIds] = useState<Set<string>>(() => new Set());
-  const artifactsQuery = useCodeArtifacts(projectId, query, visibility);
+  const projectArtifactsQuery = useCodeArtifacts(projectId, query, visibility);
+  const sharedArtifactsQuery = useSharedCodeArtifacts(query, standalone);
+  const artifactsQuery = standalone ? sharedArtifactsQuery : projectArtifactsQuery;
   const renameMutation = useRenameCodeArtifact(projectId);
   const deleteMutation = useDeleteCodeArtifact(projectId);
   const artifacts = useMemo(() => {
@@ -36,6 +40,17 @@ export function CodeRepositoryPage() {
     return Array.from(byId.values()).filter((artifact) => !deletedArtifactIds.has(artifact.id));
   }, [artifactsQuery.data, deletedArtifactIds, renamedArtifacts, uploadedArtifacts]);
   const selectedArtifact = artifacts.find((artifact) => artifact.id === selectedId) ?? artifacts[0];
+  const selectedArtifactForDisplay = standalone && selectedArtifact
+    ? {
+        ...selectedArtifact,
+        actionCapabilities: {
+          canView: selectedArtifact.actionCapabilities?.canView ?? selectedArtifact.status === 'active',
+          canDownload: selectedArtifact.actionCapabilities?.canDownload ?? Boolean(selectedArtifact.archiveFileId || selectedArtifact.latestVersion),
+          canRename: false,
+          canDelete: false,
+        },
+      }
+    : selectedArtifact;
 
   function selectArtifact(artifact: CodeArtifact) {
     setSelectedId(artifact.id);
@@ -100,21 +115,34 @@ export function CodeRepositoryPage() {
   }, [artifacts, selectedId]);
 
   return (
-    <PageShell title="Code repository" description="Upload, search, inspect, and download compressed code archives.">
+    <PageShell
+      title={standalone ? 'Shared code' : 'Code repository'}
+      description={
+        standalone
+          ? 'Upload, search, inspect, and download group shared code archives.'
+          : 'Upload, search, inspect, and download compressed code archives.'
+      }
+    >
       <div
         data-testid="code-repository-workspace"
         className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.32fr)]"
       >
         <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label="Code repository upload and download region">
-          <CodeArtifactImportForm projectId={projectId} onUploaded={handleUploadedArtifact} />
+          <CodeArtifactImportForm projectId={projectId} onUploaded={handleUploadedArtifact} standalone={standalone} />
           <div data-testid="code-selected-download-region" className="grid min-w-0 gap-3">
-            <CodeArtifactVersionPanel artifact={selectedArtifact} variant="download" />
-            {selectedArtifact ? <CodeArtifactActions projectId={projectId} artifact={selectedArtifact} /> : null}
+            <CodeArtifactVersionPanel artifact={selectedArtifactForDisplay} variant="download" />
+            {selectedArtifactForDisplay ? <CodeArtifactActions projectId={projectId} artifact={selectedArtifactForDisplay} /> : null}
           </div>
         </section>
         <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label="Code repository search and display region">
           <div className="grid min-w-0 gap-3">
-            <CodeArtifactFilters value={query} visibility={visibility} onChange={setQuery} onVisibilityChange={setVisibility} />
+              <CodeArtifactFilters
+                value={query}
+                visibility={visibility}
+                onChange={setQuery}
+                onVisibilityChange={setVisibility}
+                showVisibility={!standalone}
+              />
           </div>
           {artifactsQuery.isLoading ? (
             <div data-testid="code-layout-state" className="min-w-0">
@@ -133,12 +161,12 @@ export function CodeRepositoryPage() {
           ) : null}
           <div className="grid min-w-0 gap-4 overflow-hidden">
             <div data-testid="code-selected-detail-region" className="min-w-0">
-              <CodeArtifactVersionPanel artifact={selectedArtifact} />
-              {selectedArtifact ? (
+              <CodeArtifactVersionPanel artifact={selectedArtifactForDisplay} />
+              {selectedArtifactForDisplay ? (
                 <div className="mt-3 min-w-0">
                   <CodeArtifactActions
                     projectId={projectId}
-                    artifact={selectedArtifact}
+                    artifact={selectedArtifactForDisplay}
                     onRename={renameSelectedArtifact}
                     onDelete={deleteSelectedArtifact}
                     showDownload={false}

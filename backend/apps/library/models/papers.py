@@ -24,6 +24,18 @@ class PaperRecord(models.Model):
         PROJECT_MEMBERS = "project_members", "Project members"
         GROUP_WIDE = "group_wide", "Group-wide"
 
+    class BoundaryClassification(models.TextChoices):
+        STANDALONE_SHARED = "standalone_shared", "Standalone shared"
+        PROJECT_MATERIAL = "project_material", "Project material"
+        PENDING_REVIEW = "pending_review", "Pending review"
+
+    class ClassificationReason(models.TextChoices):
+        PREVIOUS_FUNCTIONAL_AREA = "previous_functional_area", "Previous functional area"
+        EXPLICIT_PROJECT_SPECIFIC = "explicit_project_specific", "Explicit project-specific"
+        AMBIGUOUS_LEGACY = "ambiguous_legacy", "Ambiguous legacy"
+        MANUAL_REVIEW = "manual_review", "Manual review"
+        SYSTEM_DEFAULT = "system_default", "System default"
+
     project = models.ForeignKey(
         "projects.ResearchProject", on_delete=models.CASCADE, related_name="paper_records"
     )
@@ -47,6 +59,25 @@ class PaperRecord(models.Model):
         related_name="paper_visibility_changes",
     )
     visibility_changed_at = models.DateTimeField(null=True, blank=True)
+    boundary_classification = models.CharField(
+        max_length=30,
+        choices=BoundaryClassification.choices,
+        default=BoundaryClassification.STANDALONE_SHARED,
+        db_index=True,
+    )
+    source_project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_paper_records",
+    )
+    migrated_from_project_nested_area = models.BooleanField(default=False)
+    classification_reason = models.CharField(
+        max_length=40,
+        choices=ClassificationReason.choices,
+        default=ClassificationReason.PREVIOUS_FUNCTIONAL_AREA,
+    )
     uploaded_file = models.ForeignKey(
         "common.UploadedFile",
         on_delete=models.PROTECT,
@@ -108,6 +139,14 @@ class PaperRecord(models.Model):
             models.Index(fields=["project", "publication_year"], name="library_paper_year_idx"),
             models.Index(fields=["project", "title"], name="library_paper_title_idx"),
             models.Index(fields=["created_by", "created_at"], name="library_paper_uploader_idx"),
+            models.Index(
+                fields=["boundary_classification", "visibility", "status"],
+                name="library_paper_boundary_idx",
+            ),
+            models.Index(
+                fields=["source_project", "boundary_classification", "status"],
+                name="library_paper_source_idx",
+            ),
             models.Index(
                 fields=["status", "normalized_title"],
                 name="library_paper_shared_title_idx",
@@ -443,4 +482,3 @@ class PaperImportBatch(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-

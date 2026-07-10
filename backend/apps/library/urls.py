@@ -9,6 +9,9 @@ from .views import (
     PaperImportReviewView,
     PaperImportStatusView,
     PaperViewSet,
+    SharedDocumentDetailView,
+    SharedDocumentDownloadView,
+    SharedDocumentListCreateView,
     SharedPaperDetailView,
     SharedPaperDownloadView,
     SharedPaperListCreateView,
@@ -45,6 +48,21 @@ urlpatterns = [
     ),
     path("papers/<int:paper_id>/download", PaperDownloadView.as_view(), name="paper-download"),
     path("library/papers/", SharedPaperListCreateView.as_view(), name="shared-paper-list"),
+    path(
+        "library/documents/",
+        SharedDocumentListCreateView.as_view(),
+        name="shared-document-list",
+    ),
+    path(
+        "library/documents/<int:document_id>/",
+        SharedDocumentDetailView.as_view(),
+        name="shared-document-detail",
+    ),
+    path(
+        "library/documents/<int:document_id>/download/",
+        SharedDocumentDownloadView.as_view(),
+        name="shared-document-download",
+    ),
     path(
         "library/papers/upload-policy/",
         SharedPaperUploadPolicyView.as_view(),

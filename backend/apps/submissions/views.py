@@ -38,7 +38,12 @@ from .serializers import (
     WritingVersionSerializer,
     WritingVersionUploadSerializer,
 )
-from .writing_services import WritingProjectService
+from .writing_participant_services import writing_projects_for_user
+from .writing_services import (
+    WritingProjectService,
+    create_standalone_writing_project,
+    upload_standalone_writing_version,
+)
 
 
 class DraftViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -263,7 +268,55 @@ class WritingProjectViewSet(
         except DjangoPermissionDenied as exc:
             raise PermissionDenied(str(exc)) from exc
         return Response(
-            WritingProjectSerializer(writing_project).data, status=status.HTTP_201_CREATED
+            WritingProjectSerializer(writing_project, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StandaloneWritingProjectViewSet(
+    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return WritingProjectCreateSerializer
+        return WritingProjectSerializer
+
+    def get_queryset(self):
+        queryset = writing_projects_for_user(self.request.user)
+        query = self.request.query_params.get("q") or self.request.query_params.get("search")
+        if query:
+            queryset = apply_text_search(queryset, query, ["title"])
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        return Response(
+            {
+                "results": WritingProjectSerializer(
+                    queryset, many=True, context={"request": request}
+                ).data
+            }
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            writing_project = create_standalone_writing_project(
+                request.user, **serializer.validated_data
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(
+            WritingProjectSerializer(writing_project, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
         )
 
 
@@ -279,11 +332,11 @@ class WritingVersionUploadView(views.APIView):
             WritingProject.objects.select_related("project", "student"),
             pk=writing_project_id,
         )
-        get_object_or_404(projects_visible_to(request.user), pk=writing_project.project_id)
         serializer = WritingVersionUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            version = WritingProjectService(request.user, writing_project.project).upload_version(
+            version = upload_standalone_writing_version(
+                request.user,
                 writing_project=writing_project, **serializer.validated_data
             )
         except DjangoValidationError as exc:
@@ -307,7 +360,6 @@ class TeacherFeedbackSubmitView(views.APIView):
             ),
             pk=writing_version_id,
         )
-        get_object_or_404(projects_visible_to(request.user), pk=version.writing_project.project_id)
         serializer = TeacherFeedbackCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:

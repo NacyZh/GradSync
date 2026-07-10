@@ -18,9 +18,9 @@ function mockFetch(handler: (url: string, init?: RequestInit) => { payload: unkn
 
 function renderWritingProjects() {
   return renderWithClient(
-    <MemoryRouter initialEntries={['/projects/1/writing']}>
+    <MemoryRouter initialEntries={['/writing']}>
       <Routes>
-        <Route path="/projects/:projectId/writing" element={<WritingProjectsPage />} />
+        <Route path="/writing" element={<WritingProjectsPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -37,9 +37,11 @@ describe('collaboration writing UI', () => {
           results: [{
             id: '2',
             projectId: '1',
+            legacyProjectId: '1',
             studentId: '5',
             title: 'Thesis Chapter',
             writingType: 'thesis',
+            participantRole: 'student_author',
             status: 'active',
             versions: [{
               id: '6',
@@ -81,7 +83,7 @@ describe('collaboration writing UI', () => {
       if (init?.method === 'POST' && url.endsWith('/writing-projects/')) {
         return {
           status: 201,
-          payload: { id: '9', projectId: '1', studentId: '5', title: 'New Paper', writingType: 'paper', status: 'active', versions: [] },
+          payload: { id: '9', projectId: '1', legacyProjectId: '1', studentId: '5', title: 'New Paper', writingType: 'paper', participantRole: 'student_author', status: 'active', versions: [] },
         };
       }
       if (init?.method === 'POST' && url.includes('/writing-projects/2/versions')) {
@@ -101,9 +103,11 @@ describe('collaboration writing UI', () => {
           results: [{
             id: '2',
             projectId: '1',
+            legacyProjectId: '1',
             studentId: '5',
             title: 'Existing Thesis',
             writingType: 'thesis',
+            participantRole: 'student_author',
             status: 'active',
             versions: [{ id: '6', writingProjectId: '2', versionNumber: 1, status: 'submitted', draftFileName: 'draft.docx', feedback: [] }],
           }],
@@ -129,5 +133,39 @@ describe('collaboration writing UI', () => {
     await waitFor(() => expect(requests.filter((request) => request.method === 'POST').length).toBeGreaterThanOrEqual(3));
     expect(await screen.findByText('Version uploaded')).toBeInTheDocument();
     expect(await screen.findByText('Feedback saved and notification recorded')).toBeInTheDocument();
+  });
+
+  it('shows reviewer state without student upload controls', async () => {
+    mockFetch(() => ({
+      payload: {
+        results: [{
+          id: '12',
+          projectId: '1',
+          legacyProjectId: '1',
+          studentId: '5',
+          title: 'Reviewable Manuscript',
+          writingType: 'manuscript',
+          participantRole: 'assigned_reviewer',
+          status: 'active',
+          versions: [{ id: '13', writingProjectId: '12', versionNumber: 1, status: 'submitted', draftFileName: 'draft.docx', feedback: [] }],
+        }],
+      },
+    }));
+
+    renderWritingProjects();
+
+    expect(await screen.findByText('Role: assigned reviewer')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Writing version file')).not.toBeInTheDocument();
+    expect(screen.getByText('Version uploads are available to the student author.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Annotated file')).toBeInTheDocument();
+  });
+
+  it('renders an empty standalone writing state without hidden private metadata', async () => {
+    mockFetch(() => ({ payload: { results: [] } }));
+
+    renderWritingProjects();
+
+    expect(await screen.findByText('No writing projects')).toBeInTheDocument();
+    expect(screen.queryByText('Private Boundary Draft')).not.toBeInTheDocument();
   });
 });

@@ -23,7 +23,7 @@ import {
   type WritingVersion,
 } from './api';
 
-function WritingProjectCreateForm({ projectId }: { projectId: number }) {
+function WritingProjectCreateForm({ projectId }: { projectId?: number }) {
   const [title, setTitle] = useState('');
   const [writingType, setWritingType] = useState<WritingProject['writingType']>('thesis');
   const [error, setError] = useState('');
@@ -66,7 +66,7 @@ function WritingProjectCreateForm({ projectId }: { projectId: number }) {
   );
 }
 
-function WritingVersionUploadForm({ projectId, writingProject }: { projectId: number; writingProject?: WritingProject }) {
+function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: number; writingProject?: WritingProject }) {
   const [file, setFile] = useState<File | undefined>();
   const [summary, setSummary] = useState('');
   const [success, setSuccess] = useState('');
@@ -112,7 +112,8 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId: nu
 }
 
 export function WritingProjectsPage() {
-  const projectId = Number(useParams().projectId ?? 0);
+  const projectIdParam = useParams().projectId;
+  const projectId = projectIdParam ? Number(projectIdParam) : undefined;
   const [query, setQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState<WritingProject | undefined>();
   const [selectedVersion, setSelectedVersion] = useState<WritingVersion | undefined>();
@@ -127,7 +128,7 @@ export function WritingProjectsPage() {
   }
 
   return (
-    <PageShell title="Writing projects" description="Manage independent writing histories, version uploads, advisor annotations, and feedback downloads.">
+    <PageShell title="Writing projects" description="Manage standalone student-teacher writing histories, version uploads, advisor annotations, and feedback downloads.">
       <div className="grid gap-4 xl:grid-cols-[minmax(22rem,1fr)_minmax(22rem,0.85fr)]">
         <section className="panel" aria-label="Writing projects">
           <div className="mb-4 grid gap-3">
@@ -153,6 +154,11 @@ export function WritingProjectsPage() {
                   <span className="block text-sm capitalize text-muted-foreground">
                     {project.writingType} · {project.versions.length} version{project.versions.length === 1 ? '' : 's'}
                   </span>
+                  {project.participantRole ? (
+                    <span className="mt-2 block text-sm text-muted-foreground">
+                      Role: {project.participantRole.replaceAll('_', ' ')}
+                    </span>
+                  ) : null}
                 </button>
               </li>
             ))}
@@ -165,7 +171,13 @@ export function WritingProjectsPage() {
                 <h2 className="text-lg font-semibold">{activeProject.title}</h2>
                 <p className="text-sm capitalize text-muted-foreground">{activeProject.writingType}</p>
               </div>
-              <WritingVersionUploadForm projectId={projectId} writingProject={activeProject} />
+              {activeProject.participantRole === 'student_author' || activeProject.participantRole === 'administrator' ? (
+                <WritingVersionUploadForm projectId={projectId} writingProject={activeProject} />
+              ) : (
+                <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                  Version uploads are available to the student author.
+                </p>
+              )}
               <WritingVersionHistory versions={activeProject.versions} selectedVersionId={activeVersion?.id} onSelectVersion={setSelectedVersion} />
               <TeacherFeedbackPanel projectId={projectId} version={activeVersion} />
             </div>

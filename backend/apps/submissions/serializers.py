@@ -136,8 +136,10 @@ class WritingVersionSerializer(serializers.ModelSerializer):
 
 class WritingProjectSerializer(serializers.ModelSerializer):
     projectId = serializers.CharField(source="project_id", read_only=True)
+    legacyProjectId = serializers.CharField(source="legacy_project_id", read_only=True)
     studentId = serializers.CharField(source="student_id", read_only=True)
     writingType = serializers.CharField(source="writing_type")
+    participantRole = serializers.SerializerMethodField()
     versions = WritingVersionSerializer(many=True, read_only=True)
 
     class Meta:
@@ -145,13 +147,28 @@ class WritingProjectSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "projectId",
+            "legacyProjectId",
             "studentId",
             "title",
             "writingType",
+            "participantRole",
             "status",
             "versions",
         ]
-        read_only_fields = ["projectId", "studentId", "status", "versions"]
+        read_only_fields = [
+            "projectId",
+            "legacyProjectId",
+            "studentId",
+            "participantRole",
+            "status",
+            "versions",
+        ]
+
+    def get_participantRole(self, obj):
+        from .writing_participant_services import participant_role_for
+
+        request = self.context.get("request")
+        return participant_role_for(getattr(request, "user", None), obj) if request else ""
 
     def to_internal_value(self, data):
         attrs = super().to_internal_value(data)

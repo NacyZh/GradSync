@@ -20,6 +20,8 @@ export type CodeArtifactVersion = {
 export type CodeArtifact = {
   id: string;
   projectId: string;
+  boundaryType?: 'standalone_shared' | 'project_material';
+  sourceProject?: { id: string; title: string } | null;
   name: string;
   description?: string;
   tags?: string[];
@@ -50,7 +52,7 @@ export type CodeArtifactUploadPayload = {
   name: string;
   description: string;
   tags?: string;
-  visibility: 'project_members' | 'group_wide';
+  visibility?: 'project_members' | 'group_wide';
 };
 
 export type CodeArtifactUploadPolicy = {
@@ -88,6 +90,14 @@ export function listCodeArtifacts(projectId: number, query = '', visibility = ''
   return apiRequest<{ results: CodeArtifact[] }>(`/api/projects/${projectId}/code-artifacts/${suffix}`);
 }
 
+export function listSharedCodeArtifacts(query = '', tag = '') {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  if (tag) params.set('tag', tag);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest<{ count: number; results: CodeArtifact[] }>(`/api/library/code/${suffix}`);
+}
+
 export function createCodeArtifact(projectId: number, payload: CodeArtifactPayload) {
   return apiRequest<CodeArtifact>(`/api/projects/${projectId}/code-artifacts/`, {
     method: 'POST',
@@ -117,9 +127,21 @@ export function uploadCodeArtifact(projectId: number, payload: CodeArtifactUploa
   formData.append('archive', payload.archive);
   formData.append('name', payload.name);
   formData.append('description', payload.description);
-  formData.append('visibility', payload.visibility);
+  if (payload.visibility) formData.append('visibility', payload.visibility);
   if (payload.tags) formData.append('tags', payload.tags);
   return apiRequest<CodeArtifact>(`/api/projects/${projectId}/code-artifacts/`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function uploadSharedCodeArtifact(payload: CodeArtifactUploadPayload) {
+  const formData = new FormData();
+  formData.append('archive', payload.archive);
+  formData.append('name', payload.name);
+  formData.append('description', payload.description);
+  if (payload.tags) formData.append('tags', payload.tags);
+  return apiRequest<CodeArtifact>('/api/library/code/', {
     method: 'POST',
     body: formData,
   });
@@ -141,6 +163,9 @@ export function downloadCodeVersion(projectId: number, artifactId: string, versi
 }
 
 export function downloadCodeArtifact(projectId: number, artifact: CodeArtifact): Promise<DownloadDescriptor> {
+  if (!projectId) {
+    return downloadDescriptor(`/api/library/code/${artifact.id}/download/`);
+  }
   if (artifact.archiveFileId) {
     return apiRequest<DownloadDescriptor>(`/api/code-artifacts/${artifact.id}/download`);
   }
@@ -155,6 +180,14 @@ export function useCodeArtifacts(projectId: number, query: string, visibility = 
     queryKey: ['codeArtifacts', projectId, query, visibility],
     queryFn: () => listCodeArtifacts(projectId, query, visibility),
     enabled: Boolean(projectId),
+  });
+}
+
+export function useSharedCodeArtifacts(query: string, enabled = true) {
+  return useQuery({
+    queryKey: ['shared-code-artifacts', query],
+    queryFn: () => listSharedCodeArtifacts(query),
+    enabled,
   });
 }
 
@@ -199,6 +232,14 @@ export function useCodeArtifactUpload(projectId: number) {
   return useMutation({
     mutationFn: (payload: CodeArtifactUploadPayload) => uploadCodeArtifact(projectId, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['codeArtifacts', projectId] }),
+  });
+}
+
+export function useSharedCodeArtifactUpload() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CodeArtifactUploadPayload) => uploadSharedCodeArtifact(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shared-code-artifacts'] }),
   });
 }
 

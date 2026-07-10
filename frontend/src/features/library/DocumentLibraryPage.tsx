@@ -16,11 +16,14 @@ import { VisibilityBadge } from '../../shared/ui/VisibilityBadge';
 import { useAuth } from '../auth/AuthProvider';
 import {
   downloadDocument,
+  downloadSharedDocument,
   useDeleteDocument,
   useDocumentCategories,
   useDocumentUpload,
   useDocuments,
   useRenameDocument,
+  useSharedDocumentUpload,
+  useSharedDocuments,
   type DocumentCategory,
   type DocumentRecord,
 } from './documentApi';
@@ -92,11 +95,13 @@ function DocumentUploadForm({
   selectedCategory,
   onUploaded,
   canUploadGroupWide,
+  standalone = false,
 }: {
   projectId: number;
   selectedCategory?: DocumentCategory;
   onUploaded: (document: DocumentRecord) => void;
   canUploadGroupWide: boolean;
+  standalone?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | undefined>();
@@ -105,6 +110,8 @@ function DocumentUploadForm({
   const [visibility, setVisibility] = useState<'project_members' | 'group_wide'>('project_members');
   const [complete, setComplete] = useState(false);
   const uploadMutation = useDocumentUpload(projectId);
+  const sharedUploadMutation = useSharedDocumentUpload();
+  const activeUploadMutation = standalone ? sharedUploadMutation : uploadMutation;
 
   function clearFile() {
     setFile(undefined);
@@ -118,12 +125,12 @@ function DocumentUploadForm({
     event.preventDefault();
     if (!file || !selectedCategory) return;
     setComplete(false);
-    const uploaded = await uploadMutation.mutateAsync({
+    const uploaded = await activeUploadMutation.mutateAsync({
       file,
       title,
       categoryId: selectedCategory.id,
       description,
-      visibility: canUploadGroupWide && visibility === 'group_wide' ? 'group_wide' : undefined,
+      visibility: !standalone && canUploadGroupWide && visibility === 'group_wide' ? 'group_wide' : undefined,
     });
     onUploaded(uploaded);
     setFile(undefined);
@@ -191,7 +198,7 @@ function DocumentUploadForm({
       </p>
       <Input aria-label="Document title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Optional title" />
       <Textarea aria-label="Document description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional description" />
-      {canUploadGroupWide ? (
+      {!standalone && canUploadGroupWide ? (
         <select
           aria-label="Document visibility"
           className="min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -202,15 +209,15 @@ function DocumentUploadForm({
           <option value="group_wide">Group wide</option>
         </select>
       ) : null}
-      <Button type="submit" disabled={!file || !selectedCategory || uploadMutation.isPending}>Upload document</Button>
-      {uploadMutation.isPending ? <UploadProgress label="Uploading document" value={65} /> : null}
-      {uploadMutation.error ? <p role="alert" className="min-w-0 break-words text-sm font-medium text-destructive">{uploadMutation.error.message}</p> : null}
+      <Button type="submit" disabled={!file || !selectedCategory || activeUploadMutation.isPending}>Upload document</Button>
+      {activeUploadMutation.isPending ? <UploadProgress label="Uploading document" value={65} /> : null}
+      {activeUploadMutation.error ? <p role="alert" className="min-w-0 break-words text-sm font-medium text-destructive">{activeUploadMutation.error.message}</p> : null}
       {complete ? <p role="status" className="text-sm font-medium text-success">Upload complete</p> : null}
     </form>
   );
 }
 
-function SelectedDownloadPanel({ document }: { document?: DocumentRecord }) {
+function SelectedDownloadPanel({ document, standalone = false }: { document?: DocumentRecord; standalone?: boolean }) {
   const [status, setStatus] = useState<{ filename: string; deliveryMode: 'direct_response' | 'signed_url' } | undefined>();
   const [error, setError] = useState<string | undefined>();
 
@@ -223,7 +230,7 @@ function SelectedDownloadPanel({ document }: { document?: DocumentRecord }) {
     if (!document) return;
     setError(undefined);
     try {
-      setStatus(await downloadDocument(document.id));
+      setStatus(await (standalone ? downloadSharedDocument(document.id) : downloadDocument(document.id)));
     } catch (err) {
       setError(getErrorMessage(err, 'Download unavailable'));
     }
@@ -405,7 +412,9 @@ function DocumentDetailPanel({
 
 export function DocumentLibraryPage() {
   const { user } = useAuth();
-  const projectId = Number(useParams().projectId ?? 0);
+  const projectIdParam = useParams().projectId;
+  const projectId = Number(projectIdParam ?? 0);
+  const standalone = !projectIdParam;
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [selectedId, setSelectedId] = useState<string | undefined>();
@@ -415,7 +424,9 @@ export function DocumentLibraryPage() {
   const categoriesQuery = useDocumentCategories();
   const categories = categoriesQuery.data ?? [];
   const selectedCategory = categories.find((category) => category.id === categoryId);
-  const documentsQuery = useDocuments(projectId, query, categoryId, '');
+  const projectDocumentsQuery = useDocuments(projectId, query, categoryId, '');
+  const sharedDocumentsQuery = useSharedDocuments(query, categoryId, standalone);
+  const documentsQuery = standalone ? sharedDocumentsQuery : projectDocumentsQuery;
   const renameMutation = useRenameDocument(projectId);
   const deleteMutation = useDeleteDocument(projectId);
   const documents = useMemo(() => {
@@ -441,7 +452,27 @@ export function DocumentLibraryPage() {
       || documents.some((document) => document.actionCapabilities?.canUploadGroupWide),
   );
   const selectedDocument = documents.find((document) => document.id === selectedId);
-  const emptyTitle = categoryId ? 'No documents in category' : query ? 'No document search results' : 'No documents';
+  const selectedDocumentForDisplay = standalone && selectedDocument
+    ? {
+        ...selectedDocument,
+        actionCapabilities: {
+          canView: selectedDocument.actionCapabilities?.canView ?? selectedDocument.status === 'active',
+          canDownload: selectedDocument.actionCapabilities?.canDownload ?? Boolean(selectedDocument.documentFileId),
+          canRename: false,
+          canDelete: false,
+          canUploadGroupWide: false,
+        },
+      }
+    : selectedDocument;
+  const emptyTitle = standalone
+    ? query
+      ? 'No document search results'
+      : 'No documents'
+    : categoryId
+      ? 'No documents in category'
+      : query
+        ? 'No document search results'
+        : 'No documents';
 
   function selectDocument(document: DocumentRecord) {
     setSelectedId(document.id);
@@ -512,7 +543,14 @@ export function DocumentLibraryPage() {
   }, [documents, selectedId]);
 
   return (
-    <PageShell title="Document library" description="Browse categorized work documents, upload files, search metadata, and download permitted records.">
+    <PageShell
+      title={standalone ? 'Shared documents' : 'Document library'}
+      description={
+        standalone
+          ? 'Browse, upload, search, and download group shared documents.'
+          : 'Browse categorized work documents, upload files, search metadata, and download permitted records.'
+      }
+    >
       <div
         data-testid="document-library-workspace"
         className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.32fr)]"
@@ -523,8 +561,9 @@ export function DocumentLibraryPage() {
             selectedCategory={selectedCategory}
             onUploaded={handleUploadedDocument}
             canUploadGroupWide={canUploadGroupWide}
+            standalone={standalone}
           />
-          <SelectedDownloadPanel document={selectedDocument} />
+          <SelectedDownloadPanel document={selectedDocumentForDisplay} standalone={standalone} />
         </section>
         <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label="Document library search and display region">
           <CategorySelector categories={categories} selectedCategoryId={categoryId} onSelect={setCategoryId} />
@@ -558,7 +597,7 @@ export function DocumentLibraryPage() {
           <div className="grid min-w-0 gap-4 overflow-hidden">
             <div data-testid="document-selected-detail-region" className="min-w-0">
               <DocumentDetailPanel
-                document={selectedDocument}
+                document={selectedDocumentForDisplay}
                 onRename={renameSelectedDocument}
                 onDelete={deleteSelectedDocument}
               />

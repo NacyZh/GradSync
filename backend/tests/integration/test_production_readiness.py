@@ -89,6 +89,16 @@ def test_production_operational_docs_are_present_and_actionable():
         assert "Acceptance" in text or "Validation" in text or "Gate" in text
 
 
+def test_shared_workspace_boundary_release_checks_are_documented():
+    readiness_script = (REPO_ROOT / "scripts/check-production-readiness.sh").read_text()
+    production_docs = (REPO_ROOT / "docs/production.md").read_text()
+
+    assert "reclassify_workspace_boundaries --dry-run" in readiness_script
+    assert "reclassify_workspace_boundaries --dry-run" in production_docs
+    assert "*_pending_review" in production_docs
+    assert "/projects/:id/papers|code|documents|writing" in production_docs
+
+
 def test_release_workflow_deploys_by_ssh_with_protected_environment():
     workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text()
 

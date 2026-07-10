@@ -1,7 +1,11 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import ProjectMembership, ResearchProject
+from .material_services import (
+    project_material_capabilities,
+    project_material_display_name,
+)
+from .models import ProjectMaterial, ProjectMembership, ResearchProject
 from .services import ProjectService
 
 
@@ -86,6 +90,61 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         if starts_on and ends_on and ends_on < starts_on:
             raise serializers.ValidationError("Project end date cannot be before start date")
         return attrs
+
+
+class ProjectMaterialSerializer(serializers.ModelSerializer):
+    materialType = serializers.CharField(source="material_type", read_only=True)
+    backingRecordId = serializers.CharField(source="backing_record_id", read_only=True)
+    sourceProject = serializers.SerializerMethodField()
+    visibility = serializers.CharField(source="visibility_state", read_only=True)
+    classificationState = serializers.CharField(source="classification_state", read_only=True)
+    displayName = serializers.SerializerMethodField()
+    actionCapabilities = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectMaterial
+        fields = [
+            "id",
+            "materialType",
+            "backingRecordId",
+            "sourceProject",
+            "visibility",
+            "classificationState",
+            "displayName",
+            "actionCapabilities",
+        ]
+
+    def get_sourceProject(self, obj):
+        return {"id": str(obj.source_project_id), "title": obj.source_project.title}
+
+    def get_displayName(self, obj):
+        return project_material_display_name(obj)
+
+    def get_actionCapabilities(self, obj):
+        request = self.context.get("request")
+        return project_material_capabilities(getattr(request, "user", None), obj)
+
+
+class ProjectMaterialCreateSerializer(serializers.Serializer):
+    materialType = serializers.ChoiceField(choices=ProjectMaterial.MaterialType.values)
+    file = serializers.FileField()
+    title = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    visibility = serializers.ChoiceField(
+        choices=ProjectMaterial.VisibilityState.values,
+        required=False,
+        default=ProjectMaterial.VisibilityState.PROJECT_ONLY,
+    )
+
+    def to_internal_value(self, data):
+        attrs = super().to_internal_value(data)
+        attrs["material_type"] = attrs.pop("materialType")
+        attrs["upload"] = attrs.pop("file")
+        return attrs
+
+
+class ProjectMaterialVisibilitySerializer(serializers.Serializer):
+    visibility = serializers.ChoiceField(choices=ProjectMaterial.VisibilityState.values)
+    reason = serializers.CharField(required=False, allow_blank=True)
 
 
 class ProjectDashboardSerializer(ProjectSerializer):

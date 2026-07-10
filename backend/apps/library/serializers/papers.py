@@ -1,6 +1,8 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from apps.projects.material_services import classify_workspace_record, source_project_payload
+
 from ..models import (
     DocumentCategory,
     DocumentRecord,
@@ -59,6 +61,8 @@ class PaperRecordSerializer(serializers.ModelSerializer):
     attachments = PaperAttachmentSerializer(many=True, read_only=True)
     viewerAvailable = serializers.SerializerMethodField()
     actionCapabilities = serializers.SerializerMethodField()
+    boundaryType = serializers.SerializerMethodField()
+    sourceProject = serializers.SerializerMethodField()
 
     class Meta:
         model = PaperRecord
@@ -84,6 +88,8 @@ class PaperRecordSerializer(serializers.ModelSerializer):
             "tags",
             "keywords",
             "visibility",
+            "boundaryType",
+            "sourceProject",
             "checksumSha256",
             "uploadedFileId",
             "importSource",
@@ -124,6 +130,15 @@ class PaperRecordSerializer(serializers.ModelSerializer):
             "canDownload": can_download,
             "canView": obj.status == PaperRecord.Status.ACTIVE,
         }
+
+    def get_boundaryType(self, obj) -> str:
+        classification = classify_workspace_record(obj)
+        if classification.boundary_type == "pending_review":
+            return "project_material"
+        return classification.boundary_type
+
+    def get_sourceProject(self, obj):
+        return source_project_payload(obj)
 
 
 class PaperUploadPolicySerializer(serializers.Serializer):
@@ -372,6 +387,8 @@ class DocumentRecordSerializer(serializers.ModelSerializer):
     checksumSha256 = serializers.CharField(source="checksum_sha256", read_only=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     actionCapabilities = serializers.SerializerMethodField()
+    boundaryType = serializers.SerializerMethodField()
+    sourceProject = serializers.SerializerMethodField()
 
     class Meta:
         model = DocumentRecord
@@ -379,6 +396,8 @@ class DocumentRecordSerializer(serializers.ModelSerializer):
             "id",
             "projectId",
             "visibility",
+            "boundaryType",
+            "sourceProject",
             "uploaderId",
             "createdAt",
             "categoryId",
@@ -413,6 +432,15 @@ class DocumentRecordSerializer(serializers.ModelSerializer):
     def get_actionCapabilities(self, obj):
         request = self.context.get("request")
         return document_action_capabilities(getattr(request, "user", None), obj)
+
+    def get_boundaryType(self, obj) -> str:
+        classification = classify_workspace_record(obj)
+        if classification.boundary_type == "pending_review":
+            return "project_material"
+        return classification.boundary_type
+
+    def get_sourceProject(self, obj):
+        return source_project_payload(obj)
 
 
 class DocumentUploadSerializer(serializers.Serializer):

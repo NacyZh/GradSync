@@ -16,6 +16,9 @@
   and `docker compose exec frontend npm run test:e2e`.
 - Run `sh scripts/check-generated-artifacts.sh` before frontend build artifacts
   are produced and before opening the release review.
+- Run `python manage.py reclassify_workspace_boundaries --dry-run` and review
+  counts for standalone shared, project material, and pending-review records
+  before applying the shared workspace boundary migrations.
 - Copy `.env.production.example` to `.env.production` and replace every
   placeholder secret before starting the stack.
 - Start with `scripts/deploy-production.sh` for production deploys. On
@@ -69,8 +72,9 @@ The deploy script performs:
 7. Start PostgreSQL and Redis one at a time and wait for health checks.
 8. Run migrations.
 9. Start the backend, wait for health, and run `python manage.py check --deploy`
-   plus `check_production_readiness --skip-repo-files` inside the running
-   backend container.
+   plus `python manage.py reclassify_workspace_boundaries --dry-run` and
+   `check_production_readiness --skip-repo-files` inside the running backend
+   container.
 10. Start frontend, worker, and scheduler one at a time.
 11. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
 12. Watch backend logs, worker logs, queue depth, notification failures, and
@@ -156,6 +160,46 @@ notification, or admin surfaces.
 3. If a migration must be reverted, stop writers, restore the latest known-good
    backup, deploy the previous image tags, and run readiness checks.
 4. Record the incident timeline and failed checks before retrying the release.
+
+### Shared Workspace Boundary Migration
+
+Before release, run:
+
+```bash
+cd backend
+python manage.py reclassify_workspace_boundaries --dry-run
+python manage.py migrate --plan
+```
+
+Review these counts before approving migration:
+
+- `*_standalone_shared`: records exposed in standalone papers, code, or
+  documents sections.
+- `*_project_material`: records retained as project-owned materials.
+- `*_pending_review`: ambiguous legacy records that must remain hidden from
+  standalone shared sections until manually reviewed.
+
+Expected behavior:
+
+- Previous functional-area papers, code, and documents stay or become
+  standalone shared only when already classified as safe.
+- Explicit project materials keep project ownership and source-project context.
+- Ambiguous records stay `pending_review` and do not become group-wide.
+- Writing histories preserve versions, feedback, annotated files,
+  notifications, student ownership, and default participant rows.
+
+Rollback rehearsal:
+
+1. Stop writers before reverting a migration or restoring a backup.
+2. Restore the latest known-good PostgreSQL backup and keep uploaded files
+   intact; do not delete files referenced by classification or writing records.
+3. Redeploy the previous backend/frontend image tags.
+4. Run `python manage.py reclassify_workspace_boundaries --dry-run` again and
+   compare counts with the pre-release evidence.
+5. Smoke-test `/library/papers`, `/library/code`, `/library/documents`,
+   `/writing`, `/projects/:id/materials`, and old
+   `/projects/:id/papers|code|documents|writing` links for redirect/guidance
+   without private metadata leakage.
 
 ## Backup And Restore
 

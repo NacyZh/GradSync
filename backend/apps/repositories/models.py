@@ -12,6 +12,18 @@ class CodeArtifact(models.Model):
         SUPERSEDED = "superseded", "Superseded"
         ARCHIVED = "archived", "Archived"
 
+    class BoundaryClassification(models.TextChoices):
+        STANDALONE_SHARED = "standalone_shared", "Standalone shared"
+        PROJECT_MATERIAL = "project_material", "Project material"
+        PENDING_REVIEW = "pending_review", "Pending review"
+
+    class ClassificationReason(models.TextChoices):
+        PREVIOUS_FUNCTIONAL_AREA = "previous_functional_area", "Previous functional area"
+        EXPLICIT_PROJECT_SPECIFIC = "explicit_project_specific", "Explicit project-specific"
+        AMBIGUOUS_LEGACY = "ambiguous_legacy", "Ambiguous legacy"
+        MANUAL_REVIEW = "manual_review", "Manual review"
+        SYSTEM_DEFAULT = "system_default", "System default"
+
     project = models.ForeignKey(
         "projects.ResearchProject", on_delete=models.CASCADE, related_name="code_artifacts"
     )
@@ -32,6 +44,25 @@ class CodeArtifact(models.Model):
         related_name="code_artifact_visibility_changes",
     )
     visibility_changed_at = models.DateTimeField(null=True, blank=True)
+    boundary_classification = models.CharField(
+        max_length=30,
+        choices=BoundaryClassification.choices,
+        default=BoundaryClassification.STANDALONE_SHARED,
+        db_index=True,
+    )
+    source_project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_code_artifacts",
+    )
+    migrated_from_project_nested_area = models.BooleanField(default=False)
+    classification_reason = models.CharField(
+        max_length=40,
+        choices=ClassificationReason.choices,
+        default=ClassificationReason.PREVIOUS_FUNCTIONAL_AREA,
+    )
     archive_file = models.ForeignKey(
         "common.UploadedFile",
         on_delete=models.PROTECT,
@@ -52,6 +83,14 @@ class CodeArtifact(models.Model):
             models.Index(fields=["project", "visibility", "status"], name="repo_code_scope_idx"),
             models.Index(fields=["project", "name"], name="repo_code_name_idx"),
             models.Index(fields=["created_by", "created_at"], name="repo_code_uploader_idx"),
+            models.Index(
+                fields=["boundary_classification", "visibility", "status"],
+                name="repo_code_boundary_idx",
+            ),
+            models.Index(
+                fields=["source_project", "boundary_classification", "status"],
+                name="repo_code_source_idx",
+            ),
         ]
 
 

@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     DraftViewSet,
     InlineCommentViewSet,
+    StandaloneWritingProjectViewSet,
     TeacherFeedbackDownloadView,
     TeacherFeedbackSubmitView,
     WeeklyReportViewSet,
@@ -12,12 +13,17 @@ from .views import (
 )
 
 router = DefaultRouter()
+standalone_router = DefaultRouter()
+standalone_router.register(
+    "writing-projects", StandaloneWritingProjectViewSet, basename="standalone-writing"
+)
 router.register("drafts", DraftViewSet, basename="project-drafts")
 router.register("reports", WeeklyReportViewSet, basename="project-reports")
 router.register("comments", InlineCommentViewSet, basename="project-comments")
 router.register("writing-projects", WritingProjectViewSet, basename="project-writing")
 
 urlpatterns = [
+    path("", include(standalone_router.urls)),
     path("projects/<int:project_id>/", include(router.urls)),
     path(
         "writing-projects/<int:writing_project_id>/versions",

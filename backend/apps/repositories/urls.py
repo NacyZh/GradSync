@@ -1,7 +1,14 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import CodeArtifactDownloadView, CodeArtifactUploadPolicyView, CodeArtifactViewSet
+from .views import (
+    CodeArtifactDownloadView,
+    CodeArtifactUploadPolicyView,
+    CodeArtifactViewSet,
+    SharedCodeArtifactDetailView,
+    SharedCodeArtifactDownloadView,
+    SharedCodeArtifactListCreateView,
+)
 
 router = DefaultRouter(trailing_slash=True)
 router.register(
@@ -20,6 +27,21 @@ urlpatterns = [
         "code-artifacts/<int:artifact_id>/download",
         CodeArtifactDownloadView.as_view(),
         name="code-artifact-download",
+    ),
+    path(
+        "library/code/",
+        SharedCodeArtifactListCreateView.as_view(),
+        name="shared-code-list",
+    ),
+    path(
+        "library/code/<int:artifact_id>/",
+        SharedCodeArtifactDetailView.as_view(),
+        name="shared-code-detail",
+    ),
+    path(
+        "library/code/<int:artifact_id>/download/",
+        SharedCodeArtifactDownloadView.as_view(),
+        name="shared-code-download",
     ),
     path("", include(router.urls)),
 ]

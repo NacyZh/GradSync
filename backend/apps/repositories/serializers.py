@@ -1,6 +1,8 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from apps.projects.material_services import classify_workspace_record, source_project_payload
+
 from .models import CodeArtifact, CodeArtifactVersion
 from .services import can_manage_code_artifact
 
@@ -42,6 +44,8 @@ class CodeArtifactSerializer(serializers.ModelSerializer):
     archiveFileId = serializers.CharField(source="archive_file_id", read_only=True)
     latestVersion = serializers.SerializerMethodField()
     actionCapabilities = serializers.SerializerMethodField()
+    boundaryType = serializers.SerializerMethodField()
+    sourceProject = serializers.SerializerMethodField()
 
     class Meta:
         model = CodeArtifact
@@ -53,6 +57,8 @@ class CodeArtifactSerializer(serializers.ModelSerializer):
             "tags",
             "sourcePathLabel",
             "visibility",
+            "boundaryType",
+            "sourceProject",
             "checksumSha256",
             "archiveFileId",
             "status",
@@ -92,6 +98,15 @@ class CodeArtifactSerializer(serializers.ModelSerializer):
             "canRename": can_manage,
             "canDelete": can_manage,
         }
+
+    def get_boundaryType(self, obj) -> str:
+        classification = classify_workspace_record(obj)
+        if classification.boundary_type == "pending_review":
+            return "project_material"
+        return classification.boundary_type
+
+    def get_sourceProject(self, obj):
+        return source_project_payload(obj)
 
 
 class CodeArtifactCreateSerializer(serializers.Serializer):

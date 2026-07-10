@@ -1,4 +1,11 @@
-from .documents import DocumentCategoryView, DocumentDownloadView, DocumentViewSet
+from .documents import (
+    DocumentCategoryView,
+    DocumentDownloadView,
+    DocumentViewSet,
+    SharedDocumentDetailView,
+    SharedDocumentDownloadView,
+    SharedDocumentListCreateView,
+)
 from .downloads import PaperDownloadView, SharedPaperDownloadView
 from .imports import PaperImportReviewView, PaperImportStatusView
 from .papers import (
@@ -16,6 +23,9 @@ __all__ = [
     "PaperImportReviewView",
     "PaperImportStatusView",
     "PaperViewSet",
+    "SharedDocumentDetailView",
+    "SharedDocumentDownloadView",
+    "SharedDocumentListCreateView",
     "SharedPaperDetailView",
     "SharedPaperDownloadView",
     "SharedPaperListCreateView",

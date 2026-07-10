@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit.services import record_event, record_upload
@@ -10,6 +11,9 @@ from apps.common.file_services import store_uploaded_file
 from apps.common.models import UploadedFile
 from apps.common.project_scope import visible_asset_q
 from apps.projects.archive_services import ensure_project_writable
+from apps.projects.material_services import externally_shared_q
+from apps.projects.models import ResearchProject
+from apps.projects.permissions import is_active_user
 
 from ..models import DocumentCategory, DocumentRecord
 
@@ -65,6 +69,29 @@ def active_document_queryset(user, project):
         DocumentRecord.objects.filter(project=project, status=DocumentRecord.Status.ACTIVE)
         .filter(visible_asset_q(user))
         .select_related("category", "document_file", "project")
+        .distinct()
+    )
+
+
+def default_shared_anchor_project_for(user) -> ResearchProject | None:
+    queryset = ResearchProject.objects.filter(status=ResearchProject.Status.ACTIVE)
+    if getattr(user, "is_superuser", False) or getattr(user, "is_administrator", False):
+        return queryset.order_by("id").first()
+    return (
+        queryset.filter(Q(advisor=user) | Q(memberships__user=user, memberships__status="active"))
+        .distinct()
+        .order_by("id")
+        .first()
+    )
+
+
+def shared_document_queryset_for(user):
+    if not is_active_user(user):
+        raise PermissionDenied("Active account required for the shared document library.")
+    return (
+        DocumentRecord.objects.filter(status=DocumentRecord.Status.ACTIVE)
+        .filter(externally_shared_q())
+        .select_related("category", "document_file", "project", "source_project")
         .distinct()
     )
 
@@ -218,6 +245,49 @@ class DocumentService:
             created_by=self.user,
         )
         record_upload(self.project, self.user, document, "document")
+        return document
+
+    @transaction.atomic
+    def upload_standalone_document(
+        self,
+        *,
+        upload,
+        title: str = "",
+        category_id: int,
+        description: str = "",
+    ) -> DocumentRecord:
+        if not is_active_user(self.user):
+            raise PermissionDenied("Active account required for the shared document library.")
+        anchor_project = self.project or default_shared_anchor_project_for(self.user)
+        if anchor_project is None:
+            raise ValidationError("A workspace project is required before uploading documents")
+        category = DocumentCategory.objects.filter(
+            pk=category_id, status=DocumentCategory.Status.ACTIVE
+        ).first()
+        if category is None:
+            raise ValidationError("Document category is required")
+
+        uploaded_file = store_uploaded_file(
+            upload=upload,
+            category=UploadedFile.Category.DOCUMENT,
+            owner=self.user,
+        )
+        document = DocumentRecord.objects.create(
+            project=anchor_project,
+            visibility=DocumentRecord.Visibility.GROUP_WIDE,
+            visibility_changed_by=self.user,
+            visibility_changed_at=timezone.now(),
+            boundary_classification=DocumentRecord.BoundaryClassification.STANDALONE_SHARED,
+            source_project=None,
+            classification_reason=DocumentRecord.ClassificationReason.PREVIOUS_FUNCTIONAL_AREA,
+            category=category,
+            title=title.strip() or safe_document_title_from_filename(upload.name),
+            description=description,
+            document_file=uploaded_file,
+            checksum_sha256=uploaded_file.checksum_sha256,
+            created_by=self.user,
+        )
+        record_upload(anchor_project, self.user, document, "document")
         return document
 
     def rename_document(

@@ -1,5 +1,22 @@
 import { apiRequest } from '../../shared/api/client';
 
+export type ProjectMaterial = {
+  id: string;
+  materialType: 'paper' | 'document' | 'code';
+  backingRecordId: string;
+  sourceProject: { id: string; title: string };
+  visibility: 'project-only' | 'group-wide';
+  classificationState: 'active' | 'pending_review' | 'archived';
+  displayName?: string;
+  actionCapabilities: {
+    canView: boolean;
+    canDownload: boolean;
+    canRename?: boolean;
+    canDelete?: boolean;
+    canChangeVisibility: boolean;
+  };
+};
+
 export type Project = {
   id: number;
   title: string;
@@ -82,4 +99,27 @@ export type StudentOption = {
 
 export function searchStudents(query: string) {
   return apiRequest<StudentOption[]>(`/api/accounts/students/?q=${encodeURIComponent(query)}`);
+}
+
+export function listProjectMaterials(projectId: number) {
+  return apiRequest<{ count: number; results: ProjectMaterial[] }>(`/api/projects/${projectId}/materials/`);
+}
+
+export function createProjectMaterial(projectId: number, payload: { materialType: ProjectMaterial['materialType']; file: File; title?: string; visibility: ProjectMaterial['visibility'] }) {
+  const formData = new FormData();
+  formData.append('materialType', payload.materialType);
+  formData.append('file', payload.file);
+  formData.append('visibility', payload.visibility);
+  if (payload.title) formData.append('title', payload.title);
+  return apiRequest<ProjectMaterial>(`/api/projects/${projectId}/materials/`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function updateProjectMaterialVisibility(projectId: number, materialId: string, payload: { visibility: ProjectMaterial['visibility']; reason?: string }) {
+  return apiRequest<ProjectMaterial>(`/api/projects/${projectId}/materials/${materialId}/visibility/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
 }

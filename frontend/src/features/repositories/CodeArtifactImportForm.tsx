@@ -8,7 +8,7 @@ import { Input } from '@/shared/ui/primitives/input';
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
-import { useCodeArtifactUpload, useCodeArtifactUploadPolicy, type CodeArtifact } from './api';
+import { useCodeArtifactUpload, useCodeArtifactUploadPolicy, useSharedCodeArtifactUpload, type CodeArtifact } from './api';
 
 const DEFAULT_ARCHIVE_EXTENSIONS = ['.zip', '.tar', '.gz', '.tgz', '.bz2', '.xz', '.7z'];
 const DEFAULT_ARCHIVE_CONTENT_TYPES = ['application/zip', 'application/gzip', 'application/x-tar'];
@@ -41,9 +41,10 @@ function errorMessage(err: unknown) {
 type CodeArtifactImportFormProps = {
   projectId: number;
   onUploaded?: (artifact: CodeArtifact) => void;
+  standalone?: boolean;
 };
 
-export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactImportFormProps) {
+export function CodeArtifactImportForm({ projectId, onUploaded, standalone = false }: CodeArtifactImportFormProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
@@ -53,6 +54,8 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useCodeArtifactUpload(projectId);
+  const sharedUploadMutation = useSharedCodeArtifactUpload();
+  const activeUploadMutation = standalone ? sharedUploadMutation : uploadMutation;
   const uploadPolicyQuery = useCodeArtifactUploadPolicy();
   const allowedArchiveExtensions = uploadPolicyQuery.data?.allowedExtensions ?? DEFAULT_ARCHIVE_EXTENSIONS;
   const archiveContentTypes = uploadPolicyQuery.data?.contentTypes ?? DEFAULT_ARCHIVE_CONTENT_TYPES;
@@ -68,7 +71,7 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
       : archive && uploadPolicyQuery.data?.maxSizeBytes && archive.size > uploadPolicyQuery.data.maxSizeBytes
         ? `Choose an archive no larger than ${uploadPolicyQuery.data.displayLabel}.`
       : '';
-  const canUpload = Boolean(archive && !archiveError && name.trim() && description.trim() && !uploadMutation.isPending);
+  const canUpload = Boolean(archive && !archiveError && name.trim() && description.trim() && !activeUploadMutation.isPending);
   const visibleError = archiveError || error;
 
   function chooseArchive() {
@@ -93,12 +96,12 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
     setError('');
     setUploadComplete(false);
     try {
-      const uploadedArtifact = await uploadMutation.mutateAsync({
+      const uploadedArtifact = await activeUploadMutation.mutateAsync({
         archive: selectedArchive,
         name,
         description,
         tags,
-        visibility,
+        visibility: standalone ? undefined : visibility,
       });
       setUploadComplete(true);
       onUploaded?.(uploadedArtifact);
@@ -164,17 +167,19 @@ export function CodeArtifactImportForm({ projectId, onUploaded }: CodeArtifactIm
         placeholder="Searchable archive description"
         required
       />
-      <select
-        aria-label="Code archive visibility"
-        className="min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-        value={visibility}
-        onChange={(event) => setVisibility(event.target.value as 'project_members' | 'group_wide')}
-      >
-        <option value="project_members">Project members</option>
-        <option value="group_wide">Group wide</option>
-      </select>
+      {!standalone ? (
+        <select
+          aria-label="Code archive visibility"
+          className="min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={visibility}
+          onChange={(event) => setVisibility(event.target.value as 'project_members' | 'group_wide')}
+        >
+          <option value="project_members">Project members</option>
+          <option value="group_wide">Group wide</option>
+        </select>
+      ) : null}
       <Button type="submit" disabled={!canUpload}>Upload archive</Button>
-      {uploadMutation.isPending ? <UploadProgress label="Uploading archive" value={65} /> : null}
+      {activeUploadMutation.isPending ? <UploadProgress label="Uploading archive" value={65} /> : null}
       <LocalizedValidation message={visibleError} />
       {uploadComplete ? <p role="status" className="text-sm font-medium text-success">Upload complete</p> : null}
     </form>

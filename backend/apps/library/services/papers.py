@@ -8,6 +8,7 @@ from django.db.models import Q, QuerySet
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.projects.material_services import externally_shared_q
 
 from ..models import PaperAttachment, PaperImportJob, PaperLibraryActivity, PaperRecord
 from ..upload_policy import shared_paper_upload_policy
@@ -61,8 +62,9 @@ def shared_paper_queryset_for(user) -> QuerySet[PaperRecord]:
     ensure_active_research_group_user(user)
     return (
         PaperRecord.objects.filter(status=PaperRecord.Status.ACTIVE)
+        .filter(externally_shared_q())
         .exclude(Q(status=PaperRecord.Status.DELETED) | Q(status=PaperRecord.Status.INVALID))
-        .select_related("project", "uploaded_file", "created_by")
+        .select_related("project", "source_project", "uploaded_file", "created_by")
         .prefetch_related("attachments")
         .distinct()
     )

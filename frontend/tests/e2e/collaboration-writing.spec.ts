@@ -45,16 +45,18 @@ test('writing project feedback flow is reachable', async ({ page }) => {
       );
     });
 
-    await page.route('**/api/projects/1/writing-projects/**', async (route) => {
+    await page.route('**/api/writing-projects/', async (route) => {
       if (route.request().method() === 'POST') {
         await fulfillJson(
           route,
           {
             id: '10',
             projectId: '1',
+            legacyProjectId: '1',
             studentId: '5',
             title: 'New Manuscript',
             writingType: 'manuscript',
+            participantRole: 'student_author',
             status: 'active',
             versions: [],
           },
@@ -67,9 +69,11 @@ test('writing project feedback flow is reachable', async ({ page }) => {
           {
             id: '2',
             projectId: '1',
+            legacyProjectId: '1',
             studentId: '5',
             title: 'Thesis Chapter',
             writingType: 'thesis',
+            participantRole: 'student_author',
             status: 'active',
             versions: [
               {
@@ -100,14 +104,14 @@ test('writing project feedback flow is reachable', async ({ page }) => {
 
   if (fullStackE2E) {
     await loginAs(page);
-    await page.goto('/projects/1/writing');
+    await page.goto('/writing');
     await expect(page.getByRole('heading', { name: 'Writing projects', exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Writing projects' })).toBeVisible();
     await expect(page.getByLabel('Search writing projects')).toBeVisible();
     return;
   }
 
-  await page.goto('/projects/1/writing');
+  await page.goto('/writing');
   await expect(page.getByRole('heading', { name: 'Writing projects', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Thesis Chapter' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Version 1/ })).toBeVisible();

@@ -7,11 +7,12 @@ type CodeArtifactFiltersProps = {
   visibility: string;
   onChange: (value: string) => void;
   onVisibilityChange: (value: string) => void;
+  showVisibility?: boolean;
 };
 
-export function CodeArtifactFilters({ value, visibility, onChange, onVisibilityChange }: CodeArtifactFiltersProps) {
+export function CodeArtifactFilters({ value, visibility, onChange, onVisibilityChange, showVisibility = true }: CodeArtifactFiltersProps) {
   return (
-    <div className="grid gap-2 md:grid-cols-[minmax(16rem,1fr)_12rem]">
+    <div className={showVisibility ? 'grid gap-2 md:grid-cols-[minmax(16rem,1fr)_12rem]' : 'grid gap-2'}>
       <label className="block">
         <span className="sr-only">Search code artifacts</span>
         <span className="relative block">
@@ -19,6 +20,7 @@ export function CodeArtifactFilters({ value, visibility, onChange, onVisibilityC
           <Input className="pl-9" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Search name, description, tag" />
         </span>
       </label>
+      {showVisibility ? (
       <label className="block">
         <span className="sr-only">Visibility filter</span>
         <select
@@ -32,6 +34,7 @@ export function CodeArtifactFilters({ value, visibility, onChange, onVisibilityC
           <option value="group_wide">Group wide</option>
         </select>
       </label>
+      ) : null}
     </div>
   );
 }

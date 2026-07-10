@@ -3,6 +3,7 @@ from pathlib import PurePath
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 
+from apps.audit.boundary_events import record_boundary_event
 from apps.audit.services import record_event, record_upload
 from apps.common.file_services import store_uploaded_file
 from apps.common.models import UploadedFile
@@ -10,6 +11,11 @@ from apps.common.project_scope import ProjectScopedService
 from apps.projects.archive_services import ensure_project_writable
 
 from .models import WritingProject, WritingVersion
+from .writing_participant_services import (
+    anchor_project_for_standalone_writing,
+    ensure_default_writing_participants,
+    require_student_author,
+)
 
 
 def _file_kind(filename: str) -> str:
@@ -38,10 +44,12 @@ class WritingProjectService(ProjectScopedService):
         self._require_student_member()
         writing_project = WritingProject.objects.create(
             project=self.project,
+            legacy_project=self.project,
             student=self.user,
             title=title,
             writing_type=writing_type,
         )
+        ensure_default_writing_participants(writing_project)
         record_event(
             self.project,
             self.user,
@@ -88,3 +96,80 @@ class WritingProjectService(ProjectScopedService):
             version,
         )
         return version
+
+
+@transaction.atomic
+def create_standalone_writing_project(user, *, title: str, writing_type: str) -> WritingProject:
+    project = anchor_project_for_standalone_writing(user)
+    ensure_project_writable(project)
+    writing_project = WritingProject.objects.create(
+        project=project,
+        legacy_project=project,
+        student=user,
+        title=title,
+        writing_type=writing_type,
+        migrated_from_project_nested_area=False,
+    )
+    ensure_default_writing_participants(writing_project)
+    record_event(
+        project,
+        user,
+        "writing_project.created",
+        f"Created standalone writing project {writing_project.title}",
+        writing_project,
+    )
+    record_boundary_event(
+        actor=user,
+        resource=writing_project,
+        boundary_type="standalone_writing",
+        visibility_state="not_applicable",
+        source_project=project,
+        action="create",
+        outcome="success",
+    )
+    return writing_project
+
+
+@transaction.atomic
+def upload_standalone_writing_version(
+    user, *, writing_project: WritingProject, upload, summary: str = ""
+) -> WritingVersion:
+    require_student_author(user, writing_project)
+    ensure_project_writable(writing_project.project)
+    if writing_project.status != WritingProject.Status.ACTIVE:
+        raise PermissionDenied("Closed writing projects cannot receive new versions")
+
+    locked_project = WritingProject.objects.select_for_update().get(pk=writing_project.pk)
+    latest = locked_project.versions.order_by("-version_number").first()
+    uploaded_file = store_uploaded_file(
+        upload=upload,
+        category=UploadedFile.Category.WRITING,
+        owner=user,
+    )
+    version = WritingVersion.objects.create(
+        writing_project=locked_project,
+        version_number=(latest.version_number + 1 if latest else 1),
+        submitted_by=user,
+        draft_file=uploaded_file,
+        file_kind=_file_kind(uploaded_file.original_filename),
+        summary=summary,
+    )
+    record_upload(locked_project.project, user, version, "writing_version")
+    record_event(
+        locked_project.project,
+        user,
+        "writing_version.uploaded",
+        f"Uploaded writing version {version.version_number}",
+        version,
+    )
+    record_boundary_event(
+        actor=user,
+        resource=locked_project,
+        boundary_type="standalone_writing",
+        visibility_state="not_applicable",
+        source_project=locked_project.legacy_project or locked_project.project,
+        action="upload",
+        outcome="success",
+        metadata={"versionId": version.id},
+    )
+    return version

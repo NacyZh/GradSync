@@ -13,6 +13,8 @@ export type DocumentCategory = {
 export type DocumentRecord = {
   id: string;
   projectId: string;
+  boundaryType?: 'standalone_shared' | 'project_material';
+  sourceProject?: { id: string; title: string } | null;
   visibility: 'project_members' | 'group_wide';
   uploaderId: string;
   createdAt: string;
@@ -65,6 +67,14 @@ export function listDocuments(projectId: number, query = '', categoryId = '', vi
   return apiRequest<{ results: DocumentRecord[] }>(`/api/projects/${projectId}/documents${suffix}`);
 }
 
+export function listSharedDocuments(query = '', categoryId = '') {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  if (categoryId) params.set('categoryId', categoryId);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest<{ count: number; results: DocumentRecord[] }>(`/api/library/documents/${suffix}`);
+}
+
 export function uploadDocument(projectId: number, payload: DocumentUploadPayload) {
   const formData = new FormData();
   formData.append('file', payload.file);
@@ -78,8 +88,24 @@ export function uploadDocument(projectId: number, payload: DocumentUploadPayload
   });
 }
 
+export function uploadSharedDocument(payload: DocumentUploadPayload) {
+  const formData = new FormData();
+  formData.append('file', payload.file);
+  formData.append('categoryId', payload.categoryId);
+  if (payload.title?.trim()) formData.append('title', payload.title.trim());
+  if (payload.description) formData.append('description', payload.description);
+  return apiRequest<DocumentRecord>('/api/library/documents/', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 export function retrieveDocument(projectId: number, documentId: string) {
   return apiRequest<DocumentRecord>(`/api/projects/${projectId}/documents/${documentId}`);
+}
+
+export function retrieveSharedDocument(documentId: string) {
+  return apiRequest<DocumentRecord>(`/api/library/documents/${documentId}/`);
 }
 
 export function renameDocument(projectId: number, documentId: string, payload: DocumentRenamePayload) {
@@ -99,6 +125,10 @@ export function downloadDocument(documentId: string) {
   return apiRequest<DownloadDescriptor>(`/api/documents/${documentId}/download`);
 }
 
+export function downloadSharedDocument(documentId: string) {
+  return apiRequest<DownloadDescriptor>(`/api/library/documents/${documentId}/download/`);
+}
+
 export function useDocumentCategories() {
   return useQuery({
     queryKey: ['documentCategories'],
@@ -111,6 +141,14 @@ export function useDocuments(projectId: number, query: string, categoryId: strin
     queryKey: ['documents', projectId, query, categoryId, visibility],
     queryFn: () => listDocuments(projectId, query, categoryId, visibility),
     enabled: Boolean(projectId),
+  });
+}
+
+export function useSharedDocuments(query: string, categoryId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['shared-documents', query, categoryId],
+    queryFn: () => listSharedDocuments(query, categoryId),
+    enabled,
   });
 }
 
@@ -127,6 +165,14 @@ export function useDocumentUpload(projectId: number) {
   return useMutation({
     mutationFn: (payload: DocumentUploadPayload) => uploadDocument(projectId, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents', projectId] }),
+  });
+}
+
+export function useSharedDocumentUpload() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: DocumentUploadPayload) => uploadSharedDocument(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shared-documents'] }),
   });
 }
 

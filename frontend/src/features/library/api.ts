@@ -6,6 +6,8 @@ import { downloadDescriptor, downloadFile, fetchDownloadBlobUrl } from '../../sh
 export type PaperRecord = {
   id: string;
   projectId: string;
+  boundaryType?: 'standalone_shared' | 'project_material';
+  sourceProject?: { id: string; title: string } | null;
   title: string;
   canonicalTitle?: string;
   titleSource?: 'embedded_metadata' | 'first_page_visible_text' | 'legacy' | string;
@@ -373,3 +375,11 @@ export function usePaperImport(projectId: number) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['papers', projectId] }),
   });
 }
+
+export {
+  listSharedDocuments,
+  retrieveSharedDocument,
+  uploadSharedDocument,
+  useSharedDocumentUpload,
+  useSharedDocuments,
+} from './documentApi';

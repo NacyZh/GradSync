@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactElement } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import { HomePage } from '../app/HomePage';
 import { Layout } from '../app/Layout';
@@ -14,6 +14,7 @@ export const routeWorkspaceBundles = {
   profile: () => import('../features/auth/ProfilePage'),
   projectCreate: () => import('../features/projects/ProjectCreatePage'),
   projectDashboard: () => import('../features/projects/ProjectDashboardPage'),
+  projectMaterials: () => import('../features/projects/ProjectMaterialsPage'),
   draftSubmission: () => import('../features/submissions/DraftSubmissionPage'),
   weeklyReport: () => import('../features/submissions/WeeklyReportPage'),
   reviewQueue: () => import('../features/submissions/ReviewQueuePage'),
@@ -29,6 +30,7 @@ const RoleActivationPage = lazy(async () => ({ default: (await routeWorkspaceBun
 const ProfilePage = lazy(async () => ({ default: (await routeWorkspaceBundles.profile()).ProfilePage }));
 const ProjectCreatePage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectCreate()).ProjectCreatePage }));
 const ProjectDashboardPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectDashboard()).ProjectDashboardPage }));
+const ProjectMaterialsPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectMaterials()).ProjectMaterialsPage }));
 const DraftSubmissionPage = lazy(async () => ({ default: (await routeWorkspaceBundles.draftSubmission()).DraftSubmissionPage }));
 const WeeklyReportPage = lazy(async () => ({ default: (await routeWorkspaceBundles.weeklyReport()).WeeklyReportPage }));
 const ReviewQueuePage = lazy(async () => ({ default: (await routeWorkspaceBundles.reviewQueue()).ReviewQueuePage }));
@@ -102,6 +104,10 @@ export const router = createBrowserRouter([
     element: protectedPage(<ProjectDashboardPage />),
   },
   {
+    path: '/projects/:projectId/materials',
+    element: protectedPage(<ProjectMaterialsPage />),
+  },
+  {
     path: '/projects/:projectId/drafts',
     element: protectedPage(<DraftSubmissionPage />),
   },
@@ -114,8 +120,12 @@ export const router = createBrowserRouter([
     element: protectedPage(<ReviewQueuePage />),
   },
   {
-    path: '/projects/:projectId/writing',
+    path: '/writing',
     element: protectedPage(<WritingProjectsPage />),
+  },
+  {
+    path: '/projects/:projectId/writing',
+    element: protectedPage(<Navigate to="/writing" replace />),
   },
   {
     path: '/projects/:projectId/resources',
@@ -123,19 +133,27 @@ export const router = createBrowserRouter([
   },
   {
     path: '/projects/:projectId/papers',
-    element: protectedPage(<PaperLibraryPage />),
+    element: protectedPage(<Navigate to="/library/papers" replace />),
   },
   {
     path: '/library/papers',
     element: protectedPage(<PaperLibraryPage />),
   },
   {
-    path: '/projects/:projectId/documents',
+    path: '/library/documents',
     element: protectedPage(<DocumentLibraryPage />),
   },
   {
-    path: '/projects/:projectId/code',
+    path: '/library/code',
     element: protectedPage(<CodeRepositoryPage />),
+  },
+  {
+    path: '/projects/:projectId/documents',
+    element: protectedPage(<Navigate to="/library/documents" replace />),
+  },
+  {
+    path: '/projects/:projectId/code',
+    element: protectedPage(<Navigate to="/library/code" replace />),
   },
   {
     path: '/resources',

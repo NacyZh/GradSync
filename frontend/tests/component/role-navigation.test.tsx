@@ -102,6 +102,22 @@ describe('role-aware navigation', () => {
     expect(screen.getByRole('link', { name: 'Resources' })).toBeInTheDocument();
   });
 
+  it('routes papers code and documents to standalone shared sections', async () => {
+    mockCurrentUser({
+      id: 30,
+      email: 'student@test.local',
+      name: 'Student',
+      global_role: 'student',
+      status: 'active',
+    });
+    renderLayout();
+
+    await screen.findByText('student');
+    expect(screen.getByRole('link', { name: 'Papers' })).toHaveAttribute('href', '/library/papers');
+    expect(screen.getByRole('link', { name: 'Code' })).toHaveAttribute('href', '/library/code');
+    expect(screen.getByRole('link', { name: 'Documents' })).toHaveAttribute('href', '/library/documents');
+  });
+
   it('toggles the persisted theme from the workspace shell', async () => {
     const user = userEvent.setup();
     mockCurrentUser({
@@ -179,6 +195,7 @@ describe('role-aware navigation', () => {
       'profile',
       'projectCreate',
       'projectDashboard',
+      'projectMaterials',
       'draftSubmission',
       'weeklyReport',
       'reviewQueue',

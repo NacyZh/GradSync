@@ -77,7 +77,7 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
       await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
     });
 
-    await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
+    await page.route('**/api/library/code/**', async (route) => {
       const request = route.request();
       if (request.url().includes('/download')) {
         await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
@@ -124,7 +124,7 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
 
   if (fullStackE2E) {
     await loginAs(page);
-    await page.goto('/projects/1/code');
+    await page.goto('/library/code');
     await expect(page.getByRole('heading', { name: 'Code repository' })).toBeVisible();
     await expect(page.getByTestId('code-selected-detail-region').getByRole('heading', { name: 'Analysis Toolkit' })).toBeVisible();
     await page.getByRole('button', { name: 'Download', exact: true }).click();
@@ -132,7 +132,7 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
     return;
   }
 
-  await page.goto('/projects/1/code');
+  await page.goto('/library/code');
   await expect(page.getByTestId('code-selected-detail-region').getByRole('heading', { name: 'Group Code Archive' })).toBeVisible();
   await expect(page.getByTestId('code-selected-detail-region').getByText('group wide', { exact: true })).toBeVisible();
 
@@ -168,7 +168,7 @@ test('code repository layout remains stable across desktop and narrow widths', a
   await mockAuthenticatedApi(page);
 
   if (!fullStackE2E) {
-    await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
+    await page.route('**/api/library/code/**', async (route) => {
       if (route.request().url().includes('/download')) {
         await fulfillJson(route, { filename: 'long-code.zip', deliveryMode: 'direct_response' });
         return;
@@ -203,7 +203,7 @@ test('code repository layout remains stable across desktop and narrow widths', a
 
   for (const width of [1440, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto('/projects/1/code');
+    await page.goto('/library/code');
     await expect(page.getByTestId('code-repository-workspace')).toBeVisible();
     await expect(page.getByLabel('Code repository upload and download region')).toBeVisible();
     await expect(page.getByLabel('Code repository search and display region')).toBeVisible();
@@ -211,10 +211,10 @@ test('code repository layout remains stable across desktop and narrow widths', a
   }
 });
 
-test('maintainer can rename and delete code artifacts', async ({ page }) => {
-  test.skip(fullStackE2E, 'Mock-mode workflow coverage; full-stack rename/delete is covered by API tests.');
+test('standalone shared code hides project-level rename and delete actions', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mock-mode standalone boundary coverage; API tests cover mutations.');
   await mockAuthenticatedApi(page);
-  let artifacts = [
+  const artifacts = [
     codeArtifactFixture({
       id: 'rename-target',
       name: 'Analysis Pipeline',
@@ -247,45 +247,24 @@ test('maintainer can rename and delete code artifacts', async ({ page }) => {
     }),
   ];
 
-  await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
-    const request = route.request();
-    if (request.method() === 'PATCH') {
-      artifacts = [{ ...artifacts[0], name: 'Renamed Pipeline' }, artifacts[1]];
-      await fulfillJson(route, artifacts[0]);
-      return;
-    }
-    if (request.method() === 'DELETE') {
-      artifacts = artifacts.filter((artifact) => artifact.id !== 'delete-target');
-      await route.fulfill({ status: 204 });
-      return;
-    }
+  await page.route('**/api/library/code/**', async (route) => {
     await fulfillJson(route, { results: artifacts });
   });
 
-  await page.goto('/projects/1/code');
+  await page.goto('/library/code');
   await expect(page.getByTestId('code-selected-detail-region')).toContainText('Analysis Pipeline');
-  await page.getByRole('button', { name: 'Rename code artifact' }).click();
-  await page.getByLabel('New code artifact name').fill('Renamed Pipeline');
-  await page.getByRole('button', { name: 'Save name' }).click();
-  await expect(page.getByTestId('code-selected-detail-region')).toContainText('Renamed Pipeline');
-  await expect(page.getByTestId('code-results-list')).toContainText('Renamed Pipeline');
-
-  await page.getByRole('button', { name: /Select code artifact Delete Candidate/ }).click();
-  await page.getByRole('button', { name: 'Delete code artifact' }).click();
-  await expect(page.getByText(/Delete Delete Candidate/)).toBeVisible();
-  await page.getByRole('button', { name: 'Confirm delete' }).click();
-  await expect(page.getByText('Delete Candidate')).toHaveCount(0);
-  await expect(page.getByTestId('code-selected-detail-region')).toContainText('Renamed Pipeline');
+  await expect(page.getByRole('button', { name: 'Rename code artifact' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete code artifact' })).toHaveCount(0);
 });
 
 test('non-maintainer cannot see rename or delete actions', async ({ page }) => {
   test.skip(fullStackE2E, 'Mock-mode permission visibility coverage; full-stack permissions are covered by API tests.');
   await mockAuthenticatedApi(page);
-  await page.route('**/api/projects/1/code-artifacts/**', async (route) => {
+  await page.route('**/api/library/code/**', async (route) => {
     await fulfillJson(route, { results: [codeArtifactFixture({ name: 'Read Only Archive' })] });
   });
 
-  await page.goto('/projects/1/code');
+  await page.goto('/library/code');
 
   await expect(page.getByTestId('code-selected-detail-region')).toContainText('Read Only Archive');
   await expect(page.getByRole('button', { name: 'Rename code artifact' })).toHaveCount(0);

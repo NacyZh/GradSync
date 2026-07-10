@@ -3,11 +3,15 @@ from dataclasses import dataclass
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit.services import record_event, record_upload
 from apps.common.file_services import checksum_sha256, store_uploaded_file
 from apps.projects.archive_services import ensure_project_writable
+from apps.projects.material_services import externally_shared_q
+from apps.projects.models import ResearchProject
+from apps.projects.permissions import is_active_user
 
 from .models import CodeArtifact, CodeArtifactVersion
 from .upload_policy import validate_code_import
@@ -59,6 +63,30 @@ def can_manage_code_artifact(user, artifact: CodeArtifact) -> bool:
     if getattr(user, "is_superuser", False) or getattr(user, "is_administrator", False):
         return True
     return artifact.project.advisor_id == getattr(user, "id", None)
+
+
+def default_shared_anchor_project_for(user) -> ResearchProject | None:
+    queryset = ResearchProject.objects.filter(status=ResearchProject.Status.ACTIVE)
+    if getattr(user, "is_superuser", False) or getattr(user, "is_administrator", False):
+        return queryset.order_by("id").first()
+    return (
+        queryset.filter(Q(advisor=user) | Q(memberships__user=user, memberships__status="active"))
+        .distinct()
+        .order_by("id")
+        .first()
+    )
+
+
+def shared_code_artifact_queryset_for(user):
+    if not is_active_user(user):
+        raise PermissionError("Active account required for the shared code library.")
+    return (
+        CodeArtifact.objects.filter(status=CodeArtifact.Status.ACTIVE)
+        .filter(externally_shared_q())
+        .select_related("archive_file", "project", "source_project")
+        .prefetch_related("versions")
+        .distinct()
+    )
 
 
 def record_rejected_code_artifact_management_attempt(project, actor, artifact, action: str):
@@ -227,6 +255,100 @@ class CodeArtifactService:
             imported_by=self.user,
         )
         record_upload(self.project, self.user, artifact, "code_artifact")
+        return artifact
+
+    @transaction.atomic
+    def create_standalone_artifact(
+        self,
+        *,
+        name: str,
+        description: str = "",
+        tags=None,
+        source_path_label: str = "",
+    ) -> CodeArtifact:
+        if not is_active_user(self.user):
+            raise PermissionError("Active account required for the shared code library.")
+        anchor_project = self.project or default_shared_anchor_project_for(self.user)
+        if anchor_project is None:
+            raise ValidationError("A workspace project is required before creating code artifacts")
+        artifact = CodeArtifact.objects.create(
+            project=anchor_project,
+            name=name,
+            description=description,
+            tags=tags or [],
+            source_path_label=source_path_label,
+            visibility=CodeArtifact.Visibility.GROUP_WIDE,
+            visibility_changed_by=self.user,
+            visibility_changed_at=timezone.now(),
+            boundary_classification=CodeArtifact.BoundaryClassification.STANDALONE_SHARED,
+            source_project=None,
+            classification_reason=CodeArtifact.ClassificationReason.PREVIOUS_FUNCTIONAL_AREA,
+            created_by=self.user,
+        )
+        record_event(
+            anchor_project,
+            self.user,
+            "code_artifact.created",
+            f"Created shared code artifact {artifact.id}",
+            artifact,
+        )
+        return artifact
+
+    @transaction.atomic
+    def upload_standalone_archive(
+        self,
+        *,
+        upload,
+        name: str,
+        description: str,
+        tags=None,
+    ) -> CodeArtifact:
+        if not is_active_user(self.user):
+            raise PermissionError("Active account required for the shared code library.")
+        anchor_project = self.project or default_shared_anchor_project_for(self.user)
+        if anchor_project is None:
+            raise ValidationError("A workspace project is required before uploading code artifacts")
+        if not description or not description.strip():
+            raise ValidationError("Code artifact description is required")
+        checksum = checksum_sha256(upload)
+        if CodeArtifact.objects.filter(
+            checksum_sha256=checksum,
+            status=CodeArtifact.Status.ACTIVE,
+            boundary_classification=CodeArtifact.BoundaryClassification.STANDALONE_SHARED,
+        ).exists():
+            raise ValidationError("Code artifact checksum already exists in shared code")
+
+        uploaded_file = store_uploaded_file(upload=upload, category="code", owner=self.user)
+        artifact = CodeArtifact.objects.create(
+            project=anchor_project,
+            name=name,
+            description=description,
+            tags=tags or [],
+            source_path_label=uploaded_file.original_filename,
+            visibility=CodeArtifact.Visibility.GROUP_WIDE,
+            visibility_changed_by=self.user,
+            visibility_changed_at=timezone.now(),
+            boundary_classification=CodeArtifact.BoundaryClassification.STANDALONE_SHARED,
+            source_project=None,
+            classification_reason=CodeArtifact.ClassificationReason.PREVIOUS_FUNCTIONAL_AREA,
+            archive_file=uploaded_file,
+            checksum_sha256=uploaded_file.checksum_sha256,
+            created_by=self.user,
+        )
+        CodeArtifactVersion.objects.create(
+            artifact=artifact,
+            project=anchor_project,
+            version_label="",
+            description=description,
+            storage_key=uploaded_file.stored_name,
+            filename=uploaded_file.original_filename,
+            relative_path_manifest=[uploaded_file.original_filename],
+            content_type=uploaded_file.content_type,
+            size_bytes=uploaded_file.size_bytes,
+            checksum_sha256=uploaded_file.checksum_sha256,
+            imported_by=self.user,
+        )
+        record_upload(anchor_project, self.user, artifact, "code_artifact")
         return artifact
 
     @transaction.atomic

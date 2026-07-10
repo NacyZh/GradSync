@@ -23,6 +23,9 @@ function getErrorMessage(err: unknown, fallback: string) {
 }
 
 function paperSourceLabel(paper: PaperRecord, fallback: string) {
+  if (paper.sourceProject?.title) {
+    return `Source: ${paper.sourceProject.title}`;
+  }
   return paper.titleSource?.replaceAll('_', ' ') || fallback;
 }
 

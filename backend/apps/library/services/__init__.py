@@ -14,6 +14,7 @@ from .documents import (
     document_action_capabilities,
     is_seeded_document_example,
     safe_document_title_from_filename,
+    shared_document_queryset_for,
 )
 from .downloads import (
     DownloadUnavailable,
@@ -122,6 +123,7 @@ __all__ = [
     "safe_document_title_from_filename",
     "same_title_is_distinguishable",
     "shared_paper_queryset_for",
+    "shared_document_queryset_for",
     "title_author_year_fingerprint",
     "validate_pdf_upload",
 ]

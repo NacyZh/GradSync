@@ -16,10 +16,11 @@ async function mockCollaborationPages(page: Page) {
     return;
   }
   await page.route('**/api/document-categories**', async (route) => fulfillJson(route, [{ id: '1', name: 'Protocols', description: 'Lab protocols', status: 'active' }]));
-  await page.route('**/api/projects/1/papers/**', async (route) => fulfillJson(route, { results: [{ id: '1', projectId: '1', title: 'Group Wide Graph Paper', authors: ['Lin Chen'], publicationYear: 2025, visibility: 'group_wide', status: 'active', attachments: [{ id: '11', filename: 'graph.pdf', checksumSha256: 'a'.repeat(64), status: 'active' }] }] }));
-  await page.route('**/api/projects/1/code-artifacts/**', async (route) => fulfillJson(route, { results: [{ id: '3', projectId: '1', name: 'Group Code Archive', description: 'Microscopy analysis archive', tags: ['analysis'], visibility: 'group_wide', checksumSha256: 'c'.repeat(64), archiveFileId: '9', status: 'active' }] }));
-  await page.route('**/api/projects/1/documents**', async (route) => fulfillJson(route, { results: [{ id: '4', projectId: '1', categoryId: '1', categoryName: 'Protocols', title: 'Microscope Protocol', description: 'Calibration workflow', visibility: 'group_wide', uploaderId: '10', checksumSha256: 'a'.repeat(64), createdAt: '2026-07-03T08:00:00Z', status: 'active' }] }));
-  await page.route('**/api/projects/1/writing-projects/**', async (route) => fulfillJson(route, { results: [{ id: '2', projectId: '1', studentId: '5', title: 'Thesis Chapter', writingType: 'thesis', status: 'active', versions: [{ id: '6', writingProjectId: '2', versionNumber: 1, draftFileName: 'chapter.docx', fileKind: 'word', status: 'feedback_available', feedback: [] }] }] }));
+  await page.route('**/api/library/papers/**', async (route) => fulfillJson(route, { results: [{ id: '1', projectId: '1', title: 'Group Wide Graph Paper', authors: ['Lin Chen'], publicationYear: 2025, visibility: 'group_wide', boundaryType: 'standalone_shared', sourceProject: null, status: 'active', attachments: [{ id: '11', filename: 'graph.pdf', checksumSha256: 'a'.repeat(64), status: 'active' }] }] }));
+  await page.route('**/api/library/code/**', async (route) => fulfillJson(route, { results: [{ id: '3', projectId: '1', name: 'Group Code Archive', description: 'Microscopy analysis archive', tags: ['analysis'], visibility: 'group_wide', boundaryType: 'standalone_shared', sourceProject: null, checksumSha256: 'c'.repeat(64), archiveFileId: '9', status: 'active', actionCapabilities: { canView: true, canDownload: true, canRename: false, canDelete: false } }] }));
+  await page.route('**/api/library/documents/**', async (route) => fulfillJson(route, { results: [{ id: '4', projectId: '1', categoryId: '1', categoryName: 'Protocols', title: 'Microscope Protocol', description: 'Calibration workflow', visibility: 'group_wide', boundaryType: 'standalone_shared', sourceProject: null, uploaderId: '10', checksumSha256: 'a'.repeat(64), createdAt: '2026-07-03T08:00:00Z', status: 'active', actionCapabilities: { canView: true, canDownload: true, canRename: false, canDelete: false, canUploadGroupWide: false } }] }));
+  await page.route('**/api/writing-projects/**', async (route) => fulfillJson(route, { results: [{ id: '2', projectId: '1', legacyProjectId: '1', studentId: '5', title: 'Thesis Chapter', writingType: 'thesis', participantRole: 'student_author', status: 'active', versions: [{ id: '6', writingProjectId: '2', versionNumber: 1, draftFileName: 'chapter.docx', fileKind: 'word', status: 'feedback_available', feedback: [] }] }] }));
+  await page.route('**/api/projects/1/materials/**', async (route) => fulfillJson(route, { count: 1, results: [{ id: '44', materialType: 'document', backingRecordId: '4', displayName: 'Microscope Protocol', sourceProject: { id: '1', title: 'Graphene Lab' }, visibility: 'group-wide', classificationState: 'active', actionCapabilities: { canView: true, canDownload: true, canChangeVisibility: true } }] }));
   await page.route('**/api/resources/', async (route) => fulfillJson(route, { results: [{ id: 7, name: 'Confocal microscope', resourceType: 'Microscope', description: 'Shared imaging station', status: 'active', useInstructions: 'Submit request first.', useSubmissions: [] }] }));
   await page.route('**/api/resource-items/', async (route) => fulfillJson(route, { results: [{ id: 41, resourceTypeId: 1, name: 'Confocal microscope', status: 'available', available: true }] }));
   await page.route('**/api/resource-types/', async (route) => fulfillJson(route, { results: [{ id: 1, name: 'Microscope', scope: 'global', fieldSchema: [], status: 'active' }] }));
@@ -167,7 +168,7 @@ test('document library upload, clear, selector, search, download, rename, and de
       buildDocumentCategory({ id: '2', name: 'Reports' }),
     ]),
   );
-  await page.route('**/api/projects/1/documents**', async (route) => {
+  await page.route('**/api/library/documents/**', async (route) => {
     const request = route.request();
     if (request.method() === 'PATCH') {
       documents = [
@@ -186,11 +187,11 @@ test('document library upload, clear, selector, search, download, rename, and de
     }
     await fulfillJson(route, { results: documents });
   });
-  await page.route('**/api/documents/*/download', async (route) =>
+  await page.route('**/api/library/documents/*/download/', async (route) =>
     fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' }),
   );
 
-  await page.goto('/projects/1/documents');
+  await page.goto('/library/documents');
 
   await expect(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Category Protocols' })).toBeVisible();
@@ -223,24 +224,6 @@ test('document library upload, clear, selector, search, download, rename, and de
   await page.getByRole('button', { name: /Download Microscope Protocol/ }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status')).toContainText('protocol.pdf');
-
-  await page.getByRole('button', { name: 'Rename document' }).focus();
-  await expect(page.locator(':focus-visible').first()).toBeVisible();
-  await page.keyboard.press('Enter');
-  await page.getByLabel('New document title').focus();
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
-  await page.keyboard.type('Keyboard Renamed Protocol');
-  await page.getByRole('button', { name: 'Save title' }).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByTestId('document-selected-detail-region')).toContainText('Keyboard Renamed Protocol');
-
-  await page.getByRole('button', { name: 'Delete document' }).focus();
-  await expect(page.locator(':focus-visible').first()).toBeVisible();
-  await page.keyboard.press('Enter');
-  await expect(page.getByText(/Delete Keyboard Renamed Protocol/)).toBeVisible();
-  await page.getByRole('button', { name: 'Confirm delete' }).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('region', { name: 'Selected document download' })).toContainText('No document selected');
   await expectNoLayoutOverflow(page);
 });
 
@@ -254,7 +237,7 @@ for (const viewport of [
     if (fullStackE2E) {
       await loginAs(page);
     }
-    for (const path of ['/projects/1', '/projects/1/papers', '/projects/1/code', '/projects/1/documents', '/projects/1/writing', '/projects/1/resources']) {
+    for (const path of ['/projects/1', '/library/papers', '/library/code', '/library/documents', '/writing', '/projects/1/materials', '/projects/1/papers', '/projects/1/code', '/projects/1/documents', '/projects/1/writing', '/projects/1/resources']) {
       await page.goto(path);
       await expect(page.getByRole('banner')).toBeVisible();
       await expect(page.getByRole('main')).toBeVisible();

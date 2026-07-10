@@ -61,9 +61,11 @@ export type WritingVersion = {
 export type WritingProject = {
   id: string;
   projectId: string;
+  legacyProjectId?: string | null;
   studentId: string;
   title: string;
   writingType: 'thesis' | 'manuscript' | 'paper' | 'other';
+  participantRole?: 'student_author' | 'bound_advisor' | 'assigned_reviewer' | 'administrator' | '';
   status: 'active' | 'closed' | 'archived';
   versions: WritingVersion[];
 };
@@ -133,15 +135,19 @@ export function updateCommentStatus(projectId: number, commentId: number, status
   });
 }
 
-export function listWritingProjects(projectId: number, query = '') {
+function writingProjectsPath(projectId?: number) {
+  return projectId ? `/api/projects/${projectId}/writing-projects/` : '/api/writing-projects/';
+}
+
+export function listWritingProjects(projectId?: number, query = '') {
   const params = new URLSearchParams();
   if (query) params.set('q', query);
   const suffix = params.toString() ? `?${params.toString()}` : '';
-  return apiRequest<{ results: WritingProject[] }>(`/api/projects/${projectId}/writing-projects/${suffix}`);
+  return apiRequest<{ results: WritingProject[] }>(`${writingProjectsPath(projectId)}${suffix}`);
 }
 
-export function createWritingProject(projectId: number, payload: { title: string; writingType: WritingProject['writingType'] }) {
-  return apiRequest<WritingProject>(`/api/projects/${projectId}/writing-projects/`, {
+export function createWritingProject(projectId: number | undefined, payload: { title: string; writingType: WritingProject['writingType'] }) {
+  return apiRequest<WritingProject>(writingProjectsPath(projectId), {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -171,34 +177,33 @@ export function downloadTeacherFeedback(feedbackId: string) {
   return apiRequest<DownloadDescriptor>(`/api/teacher-feedback/${feedbackId}/download`);
 }
 
-export function useWritingProjects(projectId: number, query = '') {
+export function useWritingProjects(projectId?: number, query = '') {
   return useQuery({
-    queryKey: ['writingProjects', projectId, query],
+    queryKey: ['writingProjects', projectId ?? 'standalone', query],
     queryFn: () => listWritingProjects(projectId, query),
-    enabled: Boolean(projectId),
   });
 }
 
-export function useCreateWritingProject(projectId: number) {
+export function useCreateWritingProject(projectId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: { title: string; writingType: WritingProject['writingType'] }) => createWritingProject(projectId, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId ?? 'standalone'] }),
   });
 }
 
-export function useUploadWritingVersion(projectId: number, writingProjectId: string) {
+export function useUploadWritingVersion(projectId: number | undefined, writingProjectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: { file: File; summary?: string }) => uploadWritingVersion(writingProjectId, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId ?? 'standalone'] }),
   });
 }
 
-export function useSubmitTeacherFeedback(projectId: number, writingVersionId: string) {
+export function useSubmitTeacherFeedback(projectId: number | undefined, writingVersionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: { annotatedFile: File; comments?: string }) => submitTeacherFeedback(writingVersionId, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId ?? 'standalone'] }),
   });
 }

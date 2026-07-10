@@ -112,12 +112,20 @@ class WritingProject(models.Model):
     project = models.ForeignKey(
         "projects.ResearchProject", on_delete=models.CASCADE, related_name="writing_projects"
     )
+    legacy_project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="legacy_writing_projects",
+    )
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="writing_projects"
     )
     title = models.CharField(max_length=255)
     writing_type = models.CharField(max_length=30, choices=WritingType.choices)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    migrated_from_project_nested_area = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -126,10 +134,51 @@ class WritingProject(models.Model):
         indexes = [
             models.Index(fields=["project", "student", "status"], name="sub_writing_scope_idx"),
             models.Index(fields=["project", "title"], name="sub_writing_title_idx"),
+            models.Index(fields=["student", "status"], name="sub_writing_student_idx"),
+            models.Index(fields=["legacy_project", "status"], name="sub_writing_legacy_idx"),
         ]
 
     def __str__(self) -> str:
         return self.title
+
+
+class WritingParticipant(models.Model):
+    class Role(models.TextChoices):
+        STUDENT_AUTHOR = "student_author", "Student author"
+        BOUND_ADVISOR = "bound_advisor", "Bound advisor"
+        ASSIGNED_REVIEWER = "assigned_reviewer", "Assigned reviewer"
+        ADMINISTRATOR = "administrator", "Administrator"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REMOVED = "removed", "Removed"
+
+    writing_project = models.ForeignKey(
+        WritingProject, on_delete=models.CASCADE, related_name="participants"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="writing_participations"
+    )
+    participant_role = models.CharField(max_length=30, choices=Role.choices)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_writing_participants",
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    removed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["writing_project", "user", "status"],
+                name="sub_wpart_project_user_idx",
+            ),
+            models.Index(fields=["user", "participant_role", "status"], name="sub_wpart_role_idx"),
+        ]
 
 
 class WritingVersion(models.Model):

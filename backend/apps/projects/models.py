@@ -60,3 +60,82 @@ class ProjectMembership(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id}:{self.project_id}:{self.role}"
+
+
+class ProjectMaterial(models.Model):
+    class MaterialType(models.TextChoices):
+        PAPER = "paper", "Paper"
+        DOCUMENT = "document", "Document"
+        CODE = "code", "Code"
+
+    class VisibilityState(models.TextChoices):
+        PROJECT_ONLY = "project-only", "Project-only"
+        GROUP_WIDE = "group-wide", "Group-wide"
+
+    class ClassificationState(models.TextChoices):
+        ACTIVE = "active", "Active"
+        PENDING_REVIEW = "pending_review", "Pending review"
+        ARCHIVED = "archived", "Archived"
+
+    class ClassificationReason(models.TextChoices):
+        PREVIOUS_FUNCTIONAL_AREA = "previous_functional_area", "Previous functional area"
+        EXPLICIT_PROJECT_SPECIFIC = "explicit_project_specific", "Explicit project-specific"
+        AMBIGUOUS_LEGACY = "ambiguous_legacy", "Ambiguous legacy"
+        MANUAL_REVIEW = "manual_review", "Manual review"
+
+    source_project = models.ForeignKey(
+        ResearchProject, on_delete=models.CASCADE, related_name="materials"
+    )
+    material_type = models.CharField(max_length=20, choices=MaterialType.choices)
+    backing_record_id = models.PositiveIntegerField()
+    visibility_state = models.CharField(
+        max_length=20,
+        choices=VisibilityState.choices,
+        default=VisibilityState.PROJECT_ONLY,
+    )
+    classification_state = models.CharField(
+        max_length=20,
+        choices=ClassificationState.choices,
+        default=ClassificationState.ACTIVE,
+    )
+    classification_reason = models.CharField(
+        max_length=40,
+        choices=ClassificationReason.choices,
+        default=ClassificationReason.EXPLICIT_PROJECT_SPECIFIC,
+    )
+    visibility_changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="project_material_visibility_changes",
+    )
+    visibility_changed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_project_materials",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=[
+                    "source_project",
+                    "material_type",
+                    "visibility_state",
+                    "classification_state",
+                ],
+                name="projects_mat_scope_idx",
+            ),
+            models.Index(
+                fields=["material_type", "visibility_state", "classification_state"],
+                name="projects_mat_discovery_idx",
+            ),
+            models.Index(
+                fields=["visibility_changed_by", "visibility_changed_at"],
+                name="projects_mat_vis_actor_idx",
+            ),
+        ]

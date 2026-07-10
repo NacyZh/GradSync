@@ -12,7 +12,7 @@ import { UploadProgress } from '../../shared/ui/UploadProgress';
 import { FeedbackDownloadList } from './WritingVersionHistory';
 import { useSubmitTeacherFeedback, type WritingVersion } from './api';
 
-export function TeacherFeedbackPanel({ projectId, version }: { projectId: number; version?: WritingVersion }) {
+export function TeacherFeedbackPanel({ projectId, version }: { projectId?: number; version?: WritingVersion }) {
   const [comments, setComments] = useState('');
   const [annotatedFile, setAnnotatedFile] = useState<File | undefined>();
   const [success, setSuccess] = useState('');
