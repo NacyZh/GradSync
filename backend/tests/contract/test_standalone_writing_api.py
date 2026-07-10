@@ -56,7 +56,7 @@ def test_standalone_writing_list_create_version_feedback_contract(api_client):
     assert feedback_response.status_code == 201
     assert feedback_response.data["status"] == "notification_pending"
     assert download_response.status_code == 200
-    assert download_response.data["filename"] == "annotated.docx"
+    assert 'filename="annotated.docx"' in download_response["Content-Disposition"]
 
 
 @pytest.mark.django_db

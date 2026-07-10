@@ -122,19 +122,48 @@ def test_standalone_document_and_code_create_omit_visibility_selection(api_clien
 @pytest.mark.django_db
 def test_standalone_asset_detail_and_download_contracts(api_client):
     user = active_student()
-    document = standalone_shared_document(title="Downloadable Document")
-    code = standalone_shared_code(name="Downloadable Code")
+    project_with_members(students=[user])
+    category = DocumentCategory.objects.create(
+        name="Downloadable Shared Protocols",
+        created_by=active_teacher(),
+    )
 
     client = authenticate(api_client, user)
-    document_detail = client.get(f"/api/library/documents/{document.id}/")
-    code_detail = client.get(f"/api/library/code/{code.id}/")
-    document_download = client.get(f"/api/library/documents/{document.id}/download/")
-    code_download = client.get(f"/api/library/code/{code.id}/download/")
+    document_create = client.post(
+        "/api/library/documents/",
+        {
+            "file": _pdf("downloadable-document.pdf"),
+            "title": "Downloadable Document",
+            "categoryId": category.id,
+            "description": "Downloadable document",
+        },
+        format="multipart",
+    )
+    code_create = client.post(
+        "/api/library/code/",
+        {
+            "archive": _archive("downloadable-code.zip"),
+            "name": "Downloadable Code",
+            "description": "Downloadable code",
+        },
+        format="multipart",
+    )
 
+    document_id = document_create.data["id"]
+    code_id = code_create.data["id"]
+    document_detail = client.get(f"/api/library/documents/{document_id}/")
+    code_detail = client.get(f"/api/library/code/{code_id}/")
+    document_download = client.get(f"/api/library/documents/{document_id}/download/")
+    code_download = client.get(f"/api/library/code/{code_id}/download/")
+
+    assert document_create.status_code == 201
+    assert code_create.status_code == 201
     assert document_detail.status_code == 200
     assert code_detail.status_code == 200
     assert document_download.status_code == 200
+    assert 'filename="downloadable-document.pdf"' in document_download["Content-Disposition"]
     assert code_download.status_code == 200
+    assert 'filename="downloadable-code.zip"' in code_download["Content-Disposition"]
 
 
 @pytest.mark.django_db

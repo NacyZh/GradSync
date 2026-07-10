@@ -23,13 +23,27 @@ async function mockDocumentLibrary(page: Page) {
   ];
   await page.route('**/api/document-categories**', async (route) => fulfillJson(route, categories));
   await page.route('**/api/library/documents/*/download/', async (route) => {
-    await fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' });
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename="protocol.pdf"',
+      },
+      body: Buffer.from('document'),
+    });
   });
   await page.route('**/api/library/documents/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     if (url.pathname.includes('/download/')) {
-      await fulfillJson(route, { filename: 'protocol.pdf', deliveryMode: 'direct_response' });
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename="protocol.pdf"',
+        },
+        body: Buffer.from('document'),
+      });
       return;
     }
     if (request.method() === 'POST') {
@@ -126,10 +140,14 @@ test('document library upload, shared category, search, list, detail, and downlo
     expect(documentMocks?.lastUploadBody()).not.toContain('name="title"');
   }
 
-  await page.getByRole('button', { name: /Download/ }).click();
   if (fullStackE2E) {
+    await page.getByRole('button', { name: /Download/ }).click();
     await expect(page.getByRole('region', { name: 'Selected document download' })).toContainText('uploaded-document');
   } else {
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Download/ }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('protocol.pdf');
     await expect(page.getByText(/protocol.pdf/)).toBeVisible();
   }
 });

@@ -8,6 +8,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.common.downloads import storage_file_download_response
 from apps.projects.models import ResearchProject
 
 from ..models import DocumentCategory, DocumentRecord
@@ -216,7 +217,7 @@ class DocumentDownloadView(views.APIView):
 
     @extend_schema(
         responses={
-            200: OpenApiResponse(description="Download descriptor"),
+            200: OpenApiResponse(description="Document file download"),
             403: OpenApiResponse(description="Download forbidden"),
         }
     )
@@ -226,7 +227,12 @@ class DocumentDownloadView(views.APIView):
             pk=document_id,
         )
         try:
-            return Response(describe_document_download(request.user, document))
+            describe_document_download(request.user, document)
+            return storage_file_download_response(
+                document.document_file.stored_name,
+                filename=document.document_file.original_filename,
+                content_type=document.document_file.content_type or "application/octet-stream",
+            )
         except DownloadUnavailable as exc:
             return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
         except PermissionError as exc:
@@ -299,11 +305,16 @@ class SharedDocumentDetailView(views.APIView):
 class SharedDocumentDownloadView(views.APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses={200: OpenApiResponse(description="Download descriptor")})
+    @extend_schema(responses={200: OpenApiResponse(description="Document file download")})
     def get(self, request, document_id):
         document = get_object_or_404(shared_document_queryset_for(request.user), pk=document_id)
         try:
-            return Response(describe_document_download(request.user, document))
+            describe_document_download(request.user, document)
+            return storage_file_download_response(
+                document.document_file.stored_name,
+                filename=document.document_file.original_filename,
+                content_type=document.document_file.content_type or "application/octet-stream",
+            )
         except DownloadUnavailable as exc:
             return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
         except PermissionError as exc:

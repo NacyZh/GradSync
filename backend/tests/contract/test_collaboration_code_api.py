@@ -43,7 +43,7 @@ def test_code_artifact_upload_list_and_download_contract(api_client):
     assert list_response.status_code == 200
     assert list_response.data["results"][0]["name"] == "Simulation Toolkit"
     assert download_response.status_code == 200
-    assert download_response.data["filename"] == "source.zip"
+    assert 'filename="source.zip"' in download_response["Content-Disposition"]
 
 
 @pytest.mark.django_db

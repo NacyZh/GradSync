@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '../../shared/api/client';
-import type { DownloadDescriptor } from '../../shared/api/downloads';
+import { downloadFile, type DownloadDescriptor } from '../../shared/api/downloads';
 
 export type DraftVersion = {
   id: number;
@@ -173,8 +173,8 @@ export function submitTeacherFeedback(writingVersionId: string, payload: { annot
   });
 }
 
-export function downloadTeacherFeedback(feedbackId: string) {
-  return apiRequest<DownloadDescriptor>(`/api/teacher-feedback/${feedbackId}/download`);
+export function downloadTeacherFeedback(feedbackId: string, fallbackFilename = 'teacher-feedback') {
+  return downloadFile(`/api/teacher-feedback/${feedbackId}/download`, fallbackFilename);
 }
 
 export function useWritingProjects(projectId?: number, query = '') {

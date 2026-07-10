@@ -76,7 +76,14 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
     await page.route('**/api/library/code/**', async (route) => {
       const request = route.request();
       if (request.url().includes('/download')) {
-        await fulfillJson(route, { filename: 'uploaded.zip', deliveryMode: 'direct_response' });
+        await route.fulfill({
+          status: 200,
+          headers: {
+            'Content-Type': 'application/zip',
+            'Content-Disposition': 'attachment; filename="uploaded.zip"',
+          },
+          body: Buffer.from('zip'),
+        });
         return;
       }
       if (request.method() === 'POST') {
@@ -156,7 +163,10 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
   await expect(page.getByText('Upload complete')).toBeVisible();
   await expect(page.getByTestId('code-selected-detail-region')).toContainText('Uploaded Archive');
 
+  const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download', exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('uploaded.zip');
   await expect(page.getByText(/uploaded.zip/)).toBeVisible();
 });
 
@@ -166,7 +176,14 @@ test('code repository layout remains stable across desktop and narrow widths', a
   if (!fullStackE2E) {
     await page.route('**/api/library/code/**', async (route) => {
       if (route.request().url().includes('/download')) {
-        await fulfillJson(route, { filename: 'long-code.zip', deliveryMode: 'direct_response' });
+        await route.fulfill({
+          status: 200,
+          headers: {
+            'Content-Type': 'application/zip',
+            'Content-Disposition': 'attachment; filename="long-code.zip"',
+          },
+          body: Buffer.from('zip'),
+        });
         return;
       }
       await fulfillJson(route, {

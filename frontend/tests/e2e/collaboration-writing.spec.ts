@@ -9,7 +9,14 @@ test('writing project feedback flow is reachable', async ({ page }) => {
 
   if (!fullStackE2E) {
     await page.route('**/api/teacher-feedback/7/download', async (route) => {
-      await fulfillJson(route, { filename: 'annotated.docx', deliveryMode: 'direct_response' });
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Disposition': 'attachment; filename="annotated.docx"',
+        },
+        body: Buffer.from('annotated feedback'),
+      });
     });
 
     await page.route('**/api/writing-projects/2/versions', async (route) => {
@@ -137,6 +144,9 @@ test('writing project feedback flow is reachable', async ({ page }) => {
   await expect(page.getByText('Feedback saved and notification recorded')).toBeVisible();
   expect(feedbackSubmitted).toBe(true);
 
+  const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: /Download annotated file/ }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('annotated.docx');
   await expect(page.getByText(/annotated.docx/)).toBeVisible();
 });

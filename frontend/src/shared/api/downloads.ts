@@ -32,10 +32,10 @@ async function errorMessageFromResponse(response: Response) {
   return `Request failed with ${response.status}`;
 }
 
-export async function downloadFile(path: string, fallbackFilename = 'download.pdf'): Promise<DownloadDescriptor> {
+export async function downloadFile(path: string, fallbackFilename = 'download.pdf', method = 'GET'): Promise<DownloadDescriptor> {
   const response = await fetch(apiUrl(path), {
     credentials: 'include',
-    method: 'GET',
+    method,
   });
 
   if (response.status === 401) {

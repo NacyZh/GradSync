@@ -53,7 +53,7 @@ def test_writing_project_version_feedback_and_download_contract(api_client):
     assert feedback_response.data["status"] == "notification_pending"
     assert feedback_response.data["notificationStatus"] == "pending"
     assert download_response.status_code == 200
-    assert download_response.data["filename"] == "annotated.docx"
+    assert 'filename="annotated.docx"' in download_response["Content-Disposition"]
 
 
 @pytest.mark.django_db

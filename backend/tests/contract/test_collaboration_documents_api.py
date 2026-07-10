@@ -49,7 +49,7 @@ def test_document_category_upload_search_and_download_contract(api_client):
     assert list_response.status_code == 200
     assert list_response.data["results"][0]["title"] == "Microscope Protocol"
     assert download_response.status_code == 200
-    assert download_response.data["filename"] == "protocol.pdf"
+    assert 'filename="protocol.pdf"' in download_response["Content-Disposition"]
 
 
 @pytest.mark.django_db

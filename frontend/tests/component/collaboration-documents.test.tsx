@@ -41,6 +41,9 @@ const baseDocument = {
 function mockFetch(handler: (url: string, init?: RequestInit) => unknown | MockResponse) {
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const payload = handler(String(input), init);
+    if (payload instanceof Response) {
+      return payload;
+    }
     const response = payload as MockResponse;
     const status =
       response && typeof response === 'object' && 'status' in response && typeof response.status === 'number'
@@ -66,9 +69,17 @@ function renderDocuments() {
 
 describe('collaboration document library UI', () => {
   it('uses papers-style upload/download and search/display regions', async () => {
+    const createObjectURL = vi.fn(() => 'blob:document-download');
+    const revokeObjectURL = vi.fn();
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
     mockFetch((url) => {
       if (url.includes('/download')) {
-        return { filename: 'protocol.pdf', deliveryMode: 'direct_response' };
+        return new Response(new Blob(['document']), {
+          status: 200,
+          headers: { 'Content-Disposition': 'attachment; filename="protocol.pdf"' },
+        });
       }
       if (url.includes('/document-categories')) {
         return categories;
@@ -92,6 +103,8 @@ describe('collaboration document library UI', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Download Microscope Protocol/ }));
     expect(await screen.findByText(/protocol.pdf/)).toBeInTheDocument();
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
   });
 
   it('uses the shared category selector for list filtering and upload destination', async () => {

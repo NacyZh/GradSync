@@ -55,8 +55,7 @@ def test_code_artifact_create_version_conflict_and_download_authorization(api_cl
     download_response = client.post(
         f"/api/projects/{project.id}/code-artifacts/{artifact_id}/versions/{version_response.data['id']}/download/"
     )
-    assert download_response.status_code == 200
-    assert download_response.data["filename"] == "sim.zip"
+    assert download_response.status_code == 410
 
     outsider_response = authenticate(api_client, outsider).post(
         f"/api/projects/{project.id}/code-artifacts/{artifact_id}/versions/{version_response.data['id']}/download/"

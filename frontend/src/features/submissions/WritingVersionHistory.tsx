@@ -56,8 +56,8 @@ export function FeedbackDownloadList({ feedback }: { feedback: TeacherFeedback[]
     setError('');
     setDownloadMessage('');
     try {
-      const descriptor = await downloadTeacherFeedback(item.id);
-      setDownloadMessage(`Download ready: ${descriptor.filename}`);
+      const descriptor = await downloadTeacherFeedback(item.id, item.annotatedFileName ?? 'teacher-feedback');
+      setDownloadMessage(`Download started: ${descriptor.filename}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Download failed');
     }

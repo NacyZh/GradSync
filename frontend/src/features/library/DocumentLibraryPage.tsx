@@ -230,7 +230,7 @@ function SelectedDownloadPanel({ document, standalone = false }: { document?: Do
     if (!document) return;
     setError(undefined);
     try {
-      setStatus(await (standalone ? downloadSharedDocument(document.id) : downloadDocument(document.id)));
+      setStatus(await (standalone ? downloadSharedDocument(document.id, document.title) : downloadDocument(document.id, document.title)));
     } catch (err) {
       setError(getErrorMessage(err, 'Download unavailable'));
     }

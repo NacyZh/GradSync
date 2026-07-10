@@ -8,6 +8,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.common.downloads import DownloadUnavailable, storage_file_download_response
 from apps.common.search import apply_text_search
 from apps.projects.services import projects_visible_to
 
@@ -393,9 +394,14 @@ class TeacherFeedbackDownloadView(views.APIView):
         )
         project = feedback.writing_version.writing_project.project
         try:
-            descriptor = TeacherFeedbackService(request.user, project).describe_feedback_download(
-                feedback
-            )
+            TeacherFeedbackService(request.user, project).describe_feedback_download(feedback)
         except DjangoPermissionDenied as exc:
             raise PermissionDenied(str(exc)) from exc
-        return Response(descriptor)
+        try:
+            return storage_file_download_response(
+                feedback.annotated_file.stored_name,
+                filename=feedback.annotated_file.original_filename,
+                content_type=feedback.annotated_file.content_type or "application/octet-stream",
+            )
+        except DownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)

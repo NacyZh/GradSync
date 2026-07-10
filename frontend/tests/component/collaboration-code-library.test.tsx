@@ -85,9 +85,17 @@ function renderSharedCodeRepository() {
 
 describe('collaboration code library UI', () => {
   it('shows archive upload requirements, search, visibility, and download state', async () => {
+    const createObjectURL = vi.fn(() => 'blob:code-download');
+    const revokeObjectURL = vi.fn();
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
     mockFetch((url) => {
       if (url.includes('/download')) {
-        return { filename: 'analysis.zip', deliveryMode: 'direct_response' };
+        return new Response(new Blob(['zip']), {
+          status: 200,
+          headers: { 'Content-Disposition': 'attachment; filename="analysis.zip"' },
+        });
       }
       return {
         results: [baseArtifact],
@@ -103,6 +111,8 @@ describe('collaboration code library UI', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Download/ }));
     expect((await screen.findAllByText(/analysis.zip/)).length).toBeGreaterThan(0);
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
   });
 
   it('uses papers-style layout regions and selects the first artifact by default', async () => {

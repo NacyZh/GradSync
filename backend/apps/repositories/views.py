@@ -9,6 +9,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.common.downloads import DownloadUnavailable, storage_file_download_response
 from apps.common.project_scope import visible_asset_q
 from apps.projects.models import ResearchProject
 
@@ -273,9 +274,16 @@ class CodeArtifactViewSet(
             status=CodeArtifactVersion.Status.ACTIVE,
         )
         try:
-            return Response(describe_code_download(request.user, version))
+            describe_code_download(request.user, version)
+            return storage_file_download_response(
+                version.storage_key,
+                filename=version.filename,
+                content_type=version.content_type or "application/octet-stream",
+            )
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc
+        except DownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
 
 
 class CodeArtifactDownloadView(views.APIView):
@@ -297,9 +305,26 @@ class CodeArtifactDownloadView(views.APIView):
             status=CodeArtifact.Status.ACTIVE,
         )
         try:
-            return Response(describe_code_artifact_download(request.user, artifact))
+            describe_code_artifact_download(request.user, artifact)
+            if artifact.archive_file_id:
+                return storage_file_download_response(
+                    artifact.archive_file.stored_name,
+                    filename=artifact.archive_file.original_filename,
+                    content_type=artifact.archive_file.content_type
+                    or "application/octet-stream",
+                )
+            version = artifact.versions.filter(status=CodeArtifactVersion.Status.ACTIVE).first()
+            if version is None:
+                raise PermissionError("No active archive is available for this code artifact")
+            return storage_file_download_response(
+                version.storage_key,
+                filename=version.filename,
+                content_type=version.content_type or "application/octet-stream",
+            )
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc
+        except DownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
 
 
 class CodeArtifactUploadPolicyView(views.APIView):
@@ -485,6 +510,23 @@ class SharedCodeArtifactDownloadView(views.APIView):
             shared_code_artifact_queryset_for(request.user), pk=artifact_id
         )
         try:
-            return Response(describe_code_artifact_download(request.user, artifact))
+            describe_code_artifact_download(request.user, artifact)
+            if artifact.archive_file_id:
+                return storage_file_download_response(
+                    artifact.archive_file.stored_name,
+                    filename=artifact.archive_file.original_filename,
+                    content_type=artifact.archive_file.content_type
+                    or "application/octet-stream",
+                )
+            version = artifact.versions.filter(status=CodeArtifactVersion.Status.ACTIVE).first()
+            if version is None:
+                raise PermissionError("No active archive is available for this code artifact")
+            return storage_file_download_response(
+                version.storage_key,
+                filename=version.filename,
+                content_type=version.content_type or "application/octet-stream",
+            )
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc
+        except DownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '../../shared/api/client';
-import { downloadDescriptor, type DownloadDescriptor } from '../../shared/api/downloads';
+import { downloadFile, type DownloadDescriptor } from '../../shared/api/downloads';
 
 export type CodeArtifactVersion = {
   id: string;
@@ -172,15 +172,20 @@ export function importCodeVersion(projectId: number, artifactId: string, payload
 }
 
 export function downloadCodeVersion(projectId: number, artifactId: string, versionId: string) {
-  return downloadDescriptor(`/api/projects/${projectId}/code-artifacts/${artifactId}/versions/${versionId}/download/`);
+  return downloadFile(
+    `/api/projects/${projectId}/code-artifacts/${artifactId}/versions/${versionId}/download/`,
+    'code-artifact.zip',
+    'POST',
+  );
 }
 
 export function downloadCodeArtifact(projectId: number, artifact: CodeArtifact): Promise<DownloadDescriptor> {
+  const fallbackFilename = artifact.latestVersion?.filename || `${artifact.name}.zip`;
   if (!projectId) {
-    return apiRequest<DownloadDescriptor>(`/api/library/code/${artifact.id}/download/`);
+    return downloadFile(`/api/library/code/${artifact.id}/download/`, fallbackFilename);
   }
   if (artifact.archiveFileId) {
-    return apiRequest<DownloadDescriptor>(`/api/code-artifacts/${artifact.id}/download`);
+    return downloadFile(`/api/code-artifacts/${artifact.id}/download`, fallbackFilename);
   }
   if (artifact.latestVersion) {
     return downloadCodeVersion(projectId, artifact.id, artifact.latestVersion.id);

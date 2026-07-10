@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '../../shared/api/client';
-import type { DownloadDescriptor } from '../../shared/api/downloads';
+import { downloadFile, type DownloadDescriptor } from '../../shared/api/downloads';
 
 export type DocumentCategory = {
   id: string;
@@ -121,12 +121,12 @@ export function deleteDocument(projectId: number, documentId: string) {
   });
 }
 
-export function downloadDocument(documentId: string) {
-  return apiRequest<DownloadDescriptor>(`/api/documents/${documentId}/download`);
+export function downloadDocument(documentId: string, fallbackFilename = 'document') {
+  return downloadFile(`/api/documents/${documentId}/download`, fallbackFilename);
 }
 
-export function downloadSharedDocument(documentId: string) {
-  return apiRequest<DownloadDescriptor>(`/api/library/documents/${documentId}/download/`);
+export function downloadSharedDocument(documentId: string, fallbackFilename = 'document') {
+  return downloadFile(`/api/library/documents/${documentId}/download/`, fallbackFilename);
 }
 
 export function useDocumentCategories() {

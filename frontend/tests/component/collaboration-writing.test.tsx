@@ -6,9 +6,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { WritingProjectsPage } from '../../src/features/submissions/WritingProjectsPage';
 import { renderWithClient } from './test-utils';
 
-function mockFetch(handler: (url: string, init?: RequestInit) => { payload: unknown; status?: number }) {
+function mockFetch(handler: (url: string, init?: RequestInit) => { payload: unknown; status?: number } | Response) {
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const { payload, status = 200 } = handler(String(input), init);
+    const result = handler(String(input), init);
+    if (result instanceof Response) {
+      return result;
+    }
+    const { payload, status = 200 } = result;
     return new Response(JSON.stringify(payload), {
       status,
       headers: { 'Content-Type': 'application/json' },
@@ -28,9 +32,17 @@ function renderWritingProjects() {
 
 describe('collaboration writing UI', () => {
   it('shows writing project list, version history, feedback state, and annotated download', async () => {
+    const createObjectURL = vi.fn(() => 'blob:feedback-download');
+    const revokeObjectURL = vi.fn();
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
     mockFetch((url) => {
       if (url.includes('/teacher-feedback/7/download')) {
-        return { payload: { filename: 'annotated.docx', deliveryMode: 'direct_response' } };
+        return new Response(new Blob(['feedback']), {
+          status: 200,
+          headers: { 'Content-Disposition': 'attachment; filename="annotated.docx"' },
+        });
       }
       return {
         payload: {
@@ -74,6 +86,8 @@ describe('collaboration writing UI', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Download annotated file/ }));
     expect(await screen.findByText(/annotated.docx/)).toBeInTheDocument();
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
   });
 
   it('creates a writing project, uploads a version, and submits teacher feedback', async () => {

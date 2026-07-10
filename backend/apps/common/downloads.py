@@ -26,6 +26,8 @@ def storage_file_download_response(
     filename: str,
     content_type: str = "application/octet-stream",
 ) -> FileResponse:
+    if not default_storage.exists(storage_key):
+        raise DownloadUnavailable("File is no longer available")
     return FileResponse(
         default_storage.open(storage_key, "rb"),
         as_attachment=True,
