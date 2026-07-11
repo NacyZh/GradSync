@@ -203,6 +203,12 @@ Rollback rehearsal:
 
 ## Backup And Restore
 
+Production database, backup, media, and Redis volumes use explicit names from
+`.env.production`. Keep those names unchanged across repository moves and
+CI/CD deployments. Changing `GRADSYNC_POSTGRES_VOLUME_NAME` or
+`GRADSYNC_MEDIA_VOLUME_NAME` attaches an empty volume and makes existing data
+appear lost. Never deploy with `docker compose down --volumes`.
+
 Create backups with:
 
 ```bash
@@ -218,6 +224,18 @@ POSTGRES_USER=gradsync POSTGRES_DB=gradsync ./scripts/postgres-restore.sh backup
 Use `POSTGRES_BACKUP_RETENTION_DAYS` to control local backup retention. Store
 off-host encrypted copies according to the deployment environment's retention
 policy.
+
+Uploaded files are separate from PostgreSQL and must be backed up separately:
+
+```bash
+./scripts/media-backup.sh
+./scripts/media-restore.sh backups/media/gradsync-media-TIMESTAMP.tar.gz
+```
+
+Use `MEDIA_BACKUP_RETENTION_DAYS` for local retention and copy both the database
+dump and matching media archive to durable off-host storage. A production
+restore is complete only after both artifacts have been restored and download
+smoke tests pass.
 
 ### Paper Library Backup And Restore Validation
 

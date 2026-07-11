@@ -201,8 +201,27 @@ def test_env_template_names_operational_launch_inputs():
         "BACKEND_IMAGE",
         "FRONTEND_IMAGE",
         "DEPLOY_SSH_KEY_SECRET_NAME",
+        "GRADSYNC_POSTGRES_VOLUME_NAME",
+        "GRADSYNC_MEDIA_VOLUME_NAME",
+        "MEDIA_BACKUP_RETENTION_DAYS",
     ]:
         assert name in env_template
+
+
+def test_production_storage_survives_compose_project_changes():
+    compose = (REPO_ROOT / "docker-compose.prod.yml").read_text()
+
+    assert "GRADSYNC_POSTGRES_VOLUME_NAME" in compose
+    assert "GRADSYNC_MEDIA_VOLUME_NAME" in compose
+    assert "backend_media:/app/backend/media" in compose
+
+
+def test_media_backup_and_restore_scripts_are_operational():
+    backup = (REPO_ROOT / "scripts/media-backup.sh").read_text()
+    restore = (REPO_ROOT / "scripts/media-restore.sh").read_text()
+
+    assert "tar -C /app/backend/media -czf - ." in backup
+    assert "tar -xzf - -C /app/backend/media" in restore
 
 
 def test_production_settings_expose_operational_readiness_env_names():

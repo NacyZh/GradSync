@@ -134,12 +134,15 @@ describe('collaboration writing UI', () => {
 
     renderWritingProjects();
     expect((await screen.findAllByText('Existing Thesis')).length).toBeGreaterThan(1);
+    expect(screen.getByRole('button', { name: 'Choose writing version file' })).toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Writing project title'), 'New Paper');
     await userEvent.selectOptions(screen.getByLabelText('Writing type'), 'paper');
     await userEvent.click(screen.getByRole('button', { name: 'Create writing project' }));
 
     await userEvent.upload(screen.getByLabelText('Writing version file'), new File(['tex'], 'revision.tex', { type: 'text/x-tex' }));
+    expect(screen.getByText('Selected file: revision.tex')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear writing version file' })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Version summary'), 'Revision');
     await userEvent.click(screen.getByRole('button', { name: 'Upload version' }));
 

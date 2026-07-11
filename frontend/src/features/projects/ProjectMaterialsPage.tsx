@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileUp } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { FileUp, FolderOpen, X } from 'lucide-react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
@@ -25,6 +25,12 @@ export function ProjectMaterialsPage() {
   const [visibility, setVisibility] = useState<ProjectMaterial['visibility']>('project-only');
   const [file, setFile] = useState<File | undefined>();
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function clearFile() {
+    setFile(undefined);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
   const materialsQuery = useQuery({
     queryKey: ['projectMaterials', projectId],
     queryFn: () => listProjectMaterials(projectId),
@@ -36,7 +42,7 @@ export function ProjectMaterialsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projectMaterials', projectId] });
       setTitle('');
-      setFile(undefined);
+      clearFile();
     },
   });
   const visibilityMutation = useMutation({
@@ -82,7 +88,20 @@ export function ProjectMaterialsPage() {
               <option value="project-only">Project-only</option>
               <option value="group-wide">Group-wide</option>
             </select>
-            <Input aria-label="Material file" type="file" onChange={(event) => setFile(event.target.files?.[0])} required />
+            <input ref={fileInputRef} className="hidden" aria-label="Material file" type="file" onChange={(event) => setFile(event.target.files?.[0])} required />
+            <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Button type="button" variant="outline" className="min-w-0" onClick={() => fileInputRef.current?.click()} aria-label={file ? 'Reselect material file' : 'Choose material file'}>
+                <FolderOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{file ? 'Reselect file' : 'Choose file'}</span>
+              </Button>
+              {file ? (
+                <Button type="button" variant="ghost" className="min-w-0" onClick={clearFile} aria-label="Clear material file">
+                  <X className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">Clear</span>
+                </Button>
+              ) : null}
+            </div>
+            {file ? <p className="min-w-0 truncate text-sm text-muted-foreground">Selected file: {file.name}</p> : null}
             <Button type="submit" disabled={!file || createMutation.isPending}>
               <FileUp className="h-4 w-4" aria-hidden="true" />
               Upload material

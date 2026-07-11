@@ -198,10 +198,16 @@ services:
       - data
 
 volumes:
+  # Explicit names keep production data attached even if the repository path or
+  # Compose project name changes between CI/CD deployments.
   postgres_data:
+    name: ${GRADSYNC_POSTGRES_VOLUME_NAME:-gradsync-production-postgres-data}
   postgres_backups:
+    name: ${GRADSYNC_POSTGRES_BACKUP_VOLUME_NAME:-gradsync-production-postgres-backups}
   backend_media:
+    name: ${GRADSYNC_MEDIA_VOLUME_NAME:-gradsync-production-media}
   redis_data:
+    name: ${GRADSYNC_REDIS_VOLUME_NAME:-gradsync-production-redis}
 
 networks:
   app:

@@ -108,4 +108,16 @@ describe('project materials UI', () => {
     expect(await screen.findByText('Analysis Code')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Set group-wide' })).not.toBeInTheDocument();
   });
+
+  it('uses the shared file picker pattern and clears a selected material', async () => {
+    mockFetch(() => ({ payload: { count: 0, results: [] } }));
+    renderProjectMaterials();
+
+    expect(await screen.findByRole('button', { name: 'Choose material file' })).toBeInTheDocument();
+    await userEvent.upload(screen.getByLabelText('Material file'), new File(['notes'], 'notes.md', { type: 'text/markdown' }));
+    expect(screen.getByText('Selected file: notes.md')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear material file' }));
+    expect(screen.queryByText('Selected file: notes.md')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload material' })).toBeDisabled();
+  });
 });

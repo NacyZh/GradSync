@@ -138,6 +138,14 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
                 issues.append(
                     "production compose must support registry-published backend and frontend images"
                 )
+            for volume_name in (
+                "GRADSYNC_POSTGRES_VOLUME_NAME",
+                "GRADSYNC_MEDIA_VOLUME_NAME",
+            ):
+                if volume_name not in compose_text:
+                    issues.append(
+                        f"production compose must use a stable {volume_name} volume name"
+                    )
         for relative_doc in REQUIRED_OPERATIONAL_DOCS:
             if not (repo_root / relative_doc).exists():
                 issues.append(f"{relative_doc} is missing")

@@ -1,5 +1,5 @@
-import { FileText, FileUp, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { FileText, FileUp, FolderOpen, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -75,7 +75,13 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
   const [summary, setSummary] = useState('');
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useUploadWritingVersion(projectId, writingProject?.id ?? '');
+
+  function clearFile() {
+    setFile(undefined);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -84,7 +90,7 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
     setError('');
     try {
       await uploadMutation.mutateAsync({ file, summary });
-      setFile(undefined);
+      clearFile();
       setSummary('');
       setSuccess('Version uploaded');
     } catch (err) {
@@ -95,7 +101,9 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
   return (
     <form className="grid gap-3 rounded-md border p-3" onSubmit={onSubmit} noValidate>
       <UploadRequirements title="Word or LaTeX version upload" extensions={['.doc', '.docx', '.tex', '.zip', '.tar', '.gz', '.tgz']} maxSizeLabel="50 MB" />
-      <Input
+      <input
+        ref={fileInputRef}
+        className="hidden"
         aria-label="Writing version file"
         type="file"
         accept=".doc,.docx,.tex,.zip,.tar,.gz,.tgz,application/zip,application/gzip,application/x-tar"
@@ -103,6 +111,26 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
         disabled={!writingProject}
         required
       />
+      <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <Button
+          type="button"
+          variant="outline"
+          className="min-w-0"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!writingProject}
+          aria-label={file ? 'Reselect writing version file' : 'Choose writing version file'}
+        >
+          <FolderOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">{file ? 'Reselect file' : 'Choose file'}</span>
+        </Button>
+        {file ? (
+          <Button type="button" variant="ghost" className="min-w-0" onClick={clearFile} aria-label="Clear writing version file">
+            <X className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">Clear</span>
+          </Button>
+        ) : null}
+      </div>
+      {file ? <p className="min-w-0 truncate text-sm text-muted-foreground">Selected file: {file.name}</p> : null}
       <Textarea aria-label="Version summary" value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="Version summary" />
       <Button type="submit" disabled={!writingProject || !file || uploadMutation.isPending}>
         <FileUp className="h-4 w-4" aria-hidden="true" />
