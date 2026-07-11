@@ -90,7 +90,7 @@ export function ProjectMaterialsPage() {
             </select>
             <input ref={fileInputRef} className="hidden" aria-label="Material file" type="file" onChange={(event) => setFile(event.target.files?.[0])} required />
             <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <Button type="button" variant="outline" className="min-w-0" onClick={() => fileInputRef.current?.click()} aria-label={file ? 'Reselect material file' : 'Choose material file'}>
+              <Button type="button" variant="outline" className="min-w-0" onClick={() => fileInputRef.current?.click()} aria-label={file ? 'Reselect material' : 'Choose material'}>
                 <FolderOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="truncate">{file ? 'Reselect file' : 'Choose file'}</span>
               </Button>

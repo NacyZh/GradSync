@@ -113,7 +113,7 @@ describe('project materials UI', () => {
     mockFetch(() => ({ payload: { count: 0, results: [] } }));
     renderProjectMaterials();
 
-    expect(await screen.findByRole('button', { name: 'Choose material file' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Choose material' })).toBeInTheDocument();
     await userEvent.upload(screen.getByLabelText('Material file'), new File(['notes'], 'notes.md', { type: 'text/markdown' }));
     expect(screen.getByText('Selected file: notes.md')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Clear material file' }));

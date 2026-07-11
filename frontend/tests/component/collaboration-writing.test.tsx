@@ -134,7 +134,7 @@ describe('collaboration writing UI', () => {
 
     renderWritingProjects();
     expect((await screen.findAllByText('Existing Thesis')).length).toBeGreaterThan(1);
-    expect(screen.getByRole('button', { name: 'Choose writing version file' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose version' })).toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Writing project title'), 'New Paper');
     await userEvent.selectOptions(screen.getByLabelText('Writing type'), 'paper');

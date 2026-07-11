@@ -118,7 +118,7 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
           className="min-w-0"
           onClick={() => fileInputRef.current?.click()}
           disabled={!writingProject}
-          aria-label={file ? 'Reselect writing version file' : 'Choose writing version file'}
+          aria-label={file ? 'Reselect version' : 'Choose version'}
         >
           <FolderOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="truncate">{file ? 'Reselect file' : 'Choose file'}</span>
