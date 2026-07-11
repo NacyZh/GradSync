@@ -15,6 +15,8 @@ services:
       && python manage.py cleanup_seeded_library_documents"
     mem_limit: ${GRADSYNC_MIGRATE_MEM_LIMIT:-256m}
     restart: "no"
+    volumes:
+      - backend_media:/app/backend/media
     depends_on:
       db:
         condition: service_healthy
@@ -46,6 +48,8 @@ services:
         --error-logfile -
     mem_limit: ${GRADSYNC_BACKEND_MEM_LIMIT:-256m}
     restart: unless-stopped
+    volumes:
+      - backend_media:/app/backend/media
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -106,6 +110,8 @@ services:
         --prefetch-multiplier="$${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}"
     mem_limit: ${GRADSYNC_WORKER_MEM_LIMIT:-256m}
     restart: unless-stopped
+    volumes:
+      - backend_media:/app/backend/media
     depends_on:
       backend:
         condition: service_healthy
@@ -194,6 +200,7 @@ services:
 volumes:
   postgres_data:
   postgres_backups:
+  backend_media:
   redis_data:
 
 networks:

@@ -153,6 +153,19 @@ export function createWritingProject(projectId: number | undefined, payload: { t
   });
 }
 
+export function renameWritingProject(projectId: number | undefined, writingProjectId: string, payload: { title: string }) {
+  return apiRequest<WritingProject>(`${writingProjectsPath(projectId)}${writingProjectId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteWritingProject(projectId: number | undefined, writingProjectId: string) {
+  return apiRequest<void>(`${writingProjectsPath(projectId)}${writingProjectId}/`, {
+    method: 'DELETE',
+  });
+}
+
 export function uploadWritingVersion(writingProjectId: string, payload: { file: File; summary?: string }) {
   const formData = new FormData();
   formData.append('file', payload.file);
@@ -192,6 +205,22 @@ export function useCreateWritingProject(projectId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: { title: string; writingType: WritingProject['writingType'] }) => createWritingProject(projectId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId ?? 'standalone'] }),
+  });
+}
+
+export function useRenameWritingProject(projectId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ writingProjectId, title }: { writingProjectId: string; title: string }) => renameWritingProject(projectId, writingProjectId, { title }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId ?? 'standalone'] }),
+  });
+}
+
+export function useDeleteWritingProject(projectId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (writingProjectId: string) => deleteWritingProject(projectId, writingProjectId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['writingProjects', projectId ?? 'standalone'] }),
   });
 }

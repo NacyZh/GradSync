@@ -99,7 +99,7 @@ describe('collaboration writing UI', () => {
     expect(anchorClick).toHaveBeenCalled();
   });
 
-  it('creates a writing project, uploads a version, and submits teacher feedback', async () => {
+  it('creates a writing project and uploads a version as the student author', async () => {
     const requests: RequestInit[] = [];
     mockFetch((url, init) => {
       requests.push(init ?? {});
@@ -113,12 +113,6 @@ describe('collaboration writing UI', () => {
         return {
           status: 201,
           payload: { id: '10', writingProjectId: '2', versionNumber: 2, status: 'submitted', draftFileName: 'revision.tex', feedback: [] },
-        };
-      }
-      if (init?.method === 'POST' && url.includes('/writing-versions/6/feedback')) {
-        return {
-          status: 201,
-          payload: { id: '11', writingVersionId: '6', reviewerId: '3', comments: 'Looks good', status: 'notification_pending', notificationStatus: 'pending' },
         };
       }
       return {
@@ -149,12 +143,47 @@ describe('collaboration writing UI', () => {
     await userEvent.type(screen.getByLabelText('Version summary'), 'Revision');
     await userEvent.click(screen.getByRole('button', { name: 'Upload version' }));
 
+    await waitFor(() => expect(requests.filter((request) => request.method === 'POST').length).toBeGreaterThanOrEqual(2));
+    expect(await screen.findByText('Version uploaded')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Annotated file')).not.toBeInTheDocument();
+  });
+
+  it('submits teacher feedback as an assigned reviewer with an English file picker', async () => {
+    const requests: RequestInit[] = [];
+    mockFetch((url, init) => {
+      requests.push(init ?? {});
+      if (init?.method === 'POST' && url.includes('/writing-versions/6/feedback')) {
+        return {
+          status: 201,
+          payload: { id: '11', writingVersionId: '6', reviewerId: '3', comments: 'Looks good', status: 'notification_pending', notificationStatus: 'pending' },
+        };
+      }
+      return {
+        payload: {
+          results: [{
+            id: '2',
+            projectId: '1',
+            legacyProjectId: '1',
+            studentId: '5',
+            title: 'Reviewable Thesis',
+            writingType: 'thesis',
+            participantRole: 'assigned_reviewer',
+            status: 'active',
+            versions: [{ id: '6', writingProjectId: '2', versionNumber: 1, status: 'under_review', draftFileName: 'draft.docx', feedback: [] }],
+          }],
+        },
+      };
+    });
+
+    renderWritingProjects();
+    expect(await screen.findByRole('button', { name: 'Choose annotated file' })).toBeInTheDocument();
+
     await userEvent.upload(screen.getByLabelText('Annotated file'), new File(['notes'], 'annotated.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+    expect(screen.getByText('Selected file: annotated.docx')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Feedback comments'), 'Looks good');
     await userEvent.click(screen.getByRole('button', { name: 'Submit feedback' }));
 
-    await waitFor(() => expect(requests.filter((request) => request.method === 'POST').length).toBeGreaterThanOrEqual(3));
-    expect(await screen.findByText('Version uploaded')).toBeInTheDocument();
+    await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
     expect(await screen.findByText('Feedback saved and notification recorded')).toBeInTheDocument();
   });
 
@@ -177,10 +206,67 @@ describe('collaboration writing UI', () => {
 
     renderWritingProjects();
 
-    expect(await screen.findByText('Role: assigned reviewer')).toBeInTheDocument();
+    expect(await screen.findByText('assigned reviewer')).toBeInTheDocument();
     expect(screen.queryByLabelText('Writing version file')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     expect(screen.getByText('Version uploads are available to the student author.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Annotated file')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose annotated file' })).toBeInTheDocument();
+  });
+
+  it('renames and deletes a writing project as the student author', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockFetch((url, init) => {
+      if (init?.method === 'PATCH' && url.includes('/writing-projects/2/')) {
+        return {
+          payload: {
+            id: '2',
+            projectId: '1',
+            legacyProjectId: '1',
+            studentId: '5',
+            title: 'Renamed Thesis',
+            writingType: 'thesis',
+            participantRole: 'student_author',
+            status: 'active',
+            versions: [],
+          },
+        };
+      }
+      if (init?.method === 'DELETE' && url.includes('/writing-projects/2/')) {
+        return new Response(null, { status: 204 });
+      }
+      return {
+        payload: {
+          results: [{
+            id: '2',
+            projectId: '1',
+            legacyProjectId: '1',
+            studentId: '5',
+            title: 'Original Thesis',
+            writingType: 'thesis',
+            participantRole: 'student_author',
+            status: 'active',
+            versions: [],
+          }],
+        },
+      };
+    });
+
+    renderWritingProjects();
+    expect(await screen.findByRole('heading', { name: 'Original Thesis' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    await userEvent.clear(screen.getByLabelText('Rename writing project'));
+    await userEvent.type(screen.getByLabelText('Rename writing project'), 'Renamed Thesis');
+    await userEvent.click(screen.getByRole('button', { name: 'Save rename' }));
+
+    expect(await screen.findByRole('heading', { name: 'Renamed Thesis' })).toBeInTheDocument();
+    expect(screen.getByText('Writing project renamed')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(confirm).toHaveBeenCalled();
+    expect(await screen.findByText('Writing project deleted')).toBeInTheDocument();
   });
 
   it('selects a writing project from notification deep links', async () => {
@@ -192,7 +278,7 @@ describe('collaboration writing UI', () => {
             projectId: '1',
             legacyProjectId: '1',
             studentId: '5',
-            title: 'First Draft',
+            title: '1',
             writingType: 'thesis',
             participantRole: 'student_author',
             status: 'active',
@@ -215,6 +301,7 @@ describe('collaboration writing UI', () => {
 
     renderWritingProjects('/writing?writingProjectId=12');
 
+    expect(await screen.findByText('Writing project 1')).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Linked Manuscript' })).toBeInTheDocument();
     expect(screen.getByText('Version 1')).toBeInTheDocument();
   });

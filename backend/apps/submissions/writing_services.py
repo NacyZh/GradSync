@@ -1,6 +1,6 @@
 from pathlib import PurePath
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 
 from apps.audit.boundary_events import record_boundary_event
@@ -11,7 +11,7 @@ from apps.common.models import UploadedFile
 from apps.common.project_scope import ProjectScopedService
 from apps.projects.archive_services import ensure_project_writable
 
-from .models import WritingProject, WritingVersion
+from .models import WritingParticipant, WritingProject, WritingVersion
 from .writing_participant_services import (
     anchor_project_for_standalone_writing,
     can_review_writing_project,
@@ -28,6 +28,71 @@ def _file_kind(filename: str) -> str:
     if suffix == ".tex":
         return WritingVersion.FileKind.LATEX_SOURCE
     return WritingVersion.FileKind.LATEX_ARCHIVE
+
+
+def _can_manage_writing_project(user, writing_project: WritingProject) -> bool:
+    role = participant_role_for(user, writing_project)
+    return role in {
+        WritingParticipant.Role.STUDENT_AUTHOR,
+        WritingParticipant.Role.ADMINISTRATOR,
+    }
+
+
+def _require_manage_writing_project(user, writing_project: WritingProject) -> None:
+    if not _can_manage_writing_project(user, writing_project):
+        raise PermissionDenied("Only the student author can manage this writing project")
+    if writing_project.status == WritingProject.Status.ARCHIVED:
+        raise PermissionDenied("Archived writing projects cannot be changed")
+
+
+def rename_writing_project(user, writing_project: WritingProject, *, title: str) -> WritingProject:
+    _require_manage_writing_project(user, writing_project)
+    ensure_project_writable(writing_project.project)
+    normalized_title = title.strip()
+    if not normalized_title:
+        raise ValidationError("Writing project title is required")
+    writing_project.title = normalized_title
+    writing_project.save(update_fields=["title", "updated_at"])
+    record_event(
+        writing_project.project,
+        user,
+        "writing_project.renamed",
+        f"Renamed writing project {writing_project.id}",
+        writing_project,
+    )
+    record_boundary_event(
+        actor=user,
+        resource=writing_project,
+        boundary_type="standalone_writing",
+        visibility_state="not_applicable",
+        source_project=writing_project.legacy_project or writing_project.project,
+        action="rename",
+        outcome="success",
+    )
+    return writing_project
+
+
+def archive_writing_project(user, writing_project: WritingProject) -> None:
+    _require_manage_writing_project(user, writing_project)
+    ensure_project_writable(writing_project.project)
+    writing_project.status = WritingProject.Status.ARCHIVED
+    writing_project.save(update_fields=["status", "updated_at"])
+    record_event(
+        writing_project.project,
+        user,
+        "writing_project.archived",
+        f"Archived writing project {writing_project.id}",
+        writing_project,
+    )
+    record_boundary_event(
+        actor=user,
+        resource=writing_project,
+        boundary_type="standalone_writing",
+        visibility_state="not_applicable",
+        source_project=writing_project.legacy_project or writing_project.project,
+        action="archive",
+        outcome="success",
+    )
 
 
 class WritingProjectService(ProjectScopedService):

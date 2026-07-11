@@ -1,4 +1,4 @@
-import { FileUp, Plus } from 'lucide-react';
+import { FileText, FileUp, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Textarea } from '@/shared/ui/primitives/textarea';
 
+import { getErrorMessage } from '../../shared/api/errors';
 import { DataState } from '../../shared/ui/DataState';
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { PageShell } from '../../shared/ui/PageShell';
@@ -18,6 +19,8 @@ import { TeacherFeedbackPanel } from './TeacherFeedbackPanel';
 import { WritingVersionHistory } from './WritingVersionHistory';
 import {
   useCreateWritingProject,
+  useDeleteWritingProject,
+  useRenameWritingProject,
   useUploadWritingVersion,
   useWritingProjects,
   type WritingProject,
@@ -38,7 +41,7 @@ function WritingProjectCreateForm({ projectId }: { projectId?: number }) {
       setTitle('');
       setWritingType('thesis');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Writing project creation failed');
+      setError(getErrorMessage(err));
     }
   }
 
@@ -85,7 +88,7 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
       setSummary('');
       setSuccess('Version uploaded');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Version upload failed');
+      setError(getErrorMessage(err));
     }
   }
 
@@ -112,6 +115,16 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
   );
 }
 
+function formatWritingProjectTitle(project: WritingProject) {
+  const title = project.title.trim();
+  if (!title) return `Writing project ${project.id}`;
+  return /^\d+$/.test(title) ? `Writing project ${title}` : title;
+}
+
+function formatLabel(value: string | undefined) {
+  return value ? value.replaceAll('_', ' ') : '';
+}
+
 export function WritingProjectsPage() {
   const { user } = useAuth();
   const projectIdParam = useParams().projectId;
@@ -121,17 +134,74 @@ export function WritingProjectsPage() {
   const [query, setQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState<WritingProject | undefined>();
   const [selectedVersion, setSelectedVersion] = useState<WritingVersion | undefined>();
+  const [renamedProjects, setRenamedProjects] = useState<Record<string, WritingProject>>({});
+  const [archivedProjectIds, setArchivedProjectIds] = useState<Set<string>>(() => new Set());
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [managementError, setManagementError] = useState('');
+  const [managementMessage, setManagementMessage] = useState('');
   const writingQuery = useWritingProjects(projectId, query);
-  const projects = writingQuery.data?.results ?? [];
+  const renameMutation = useRenameWritingProject(projectId);
+  const deleteMutation = useDeleteWritingProject(projectId);
+  const projects = (writingQuery.data?.results ?? [])
+    .map((project) => renamedProjects[project.id] ?? project)
+    .filter((project) => !archivedProjectIds.has(project.id));
   const activeProject = projects.find((project) => project.id === selectedProject?.id)
     ?? projects.find((project) => project.id === requestedWritingProjectId)
     ?? projects[0];
   const activeVersion = activeProject?.versions.find((version) => version.id === selectedVersion?.id) ?? activeProject?.versions?.[0];
   const canCreateWritingProject = !user || user.global_role === 'student';
+  const canManageActiveProject = activeProject?.participantRole === 'student_author'
+    || activeProject?.participantRole === 'administrator';
 
   function selectProject(project: WritingProject) {
     setSelectedProject(project);
     setSelectedVersion(project.versions[0]);
+    setIsRenaming(false);
+    setManagementError('');
+    setManagementMessage('');
+  }
+
+  function startRename(project: WritingProject) {
+    setRenameTitle(project.title);
+    setIsRenaming(true);
+    setManagementError('');
+    setManagementMessage('');
+  }
+
+  async function saveRename() {
+    if (!activeProject) return;
+    setManagementError('');
+    setManagementMessage('');
+    try {
+      const renamed = await renameMutation.mutateAsync({
+        writingProjectId: activeProject.id,
+        title: renameTitle,
+      });
+      setRenamedProjects((current) => ({ ...current, [renamed.id]: renamed }));
+      setSelectedProject(renamed);
+      setIsRenaming(false);
+      setManagementMessage('Writing project renamed');
+    } catch (err) {
+      setManagementError(getErrorMessage(err));
+    }
+  }
+
+  async function deleteActiveProject() {
+    if (!activeProject) return;
+    if (!window.confirm(`Delete ${formatWritingProjectTitle(activeProject)}?`)) return;
+    setManagementError('');
+    setManagementMessage('');
+    try {
+      await deleteMutation.mutateAsync(activeProject.id);
+      setArchivedProjectIds((current) => new Set(current).add(activeProject.id));
+      setSelectedProject(undefined);
+      setSelectedVersion(undefined);
+      setIsRenaming(false);
+      setManagementMessage('Writing project deleted');
+    } catch (err) {
+      setManagementError(getErrorMessage(err));
+    }
   }
 
   return (
@@ -150,33 +220,81 @@ export function WritingProjectsPage() {
               <li key={project.id}>
                 <button
                   type="button"
-                  aria-label={`Select writing project ${project.title}`}
-                  className="w-full rounded-md border p-3 text-left hover:bg-muted"
+                  aria-label={`Select writing project ${formatWritingProjectTitle(project)}`}
+                  className="w-full rounded-md border p-3 text-left hover:bg-muted data-[selected=true]:border-primary data-[selected=true]:bg-muted/60"
+                  data-selected={activeProject?.id === project.id}
                   onClick={() => selectProject(project)}
                 >
-                  <span className="mb-2 flex flex-wrap items-start justify-between gap-2">
-                    <strong>{project.title}</strong>
-                    <StatusBadge status={project.status} />
-                  </span>
-                  <span className="block text-sm capitalize text-muted-foreground">
-                    {project.writingType} · {project.versions.length} version{project.versions.length === 1 ? '' : 's'}
-                  </span>
-                  {project.participantRole ? (
-                    <span className="mt-2 block text-sm text-muted-foreground">
-                      Role: {project.participantRole.replaceAll('_', ' ')}
+                  <span className="mb-2 flex min-w-0 items-start gap-3">
+                    <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-background">
+                      <FileText className="h-4 w-4" aria-hidden="true" />
                     </span>
-                  ) : null}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-start justify-between gap-2">
+                        <strong className="min-w-0 break-words">{formatWritingProjectTitle(project)}</strong>
+                        <StatusBadge status={project.status} />
+                      </span>
+                      <span className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span className="rounded-md border px-2 py-1 capitalize">{formatLabel(project.writingType)}</span>
+                        <span className="rounded-md border px-2 py-1">
+                          {project.versions.length} version{project.versions.length === 1 ? '' : 's'}
+                        </span>
+                        {project.participantRole ? (
+                          <span className="rounded-md border px-2 py-1 capitalize">
+                            {formatLabel(project.participantRole)}
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
+                  </span>
                 </button>
               </li>
             ))}
           </ul>
         </section>
         <section className="panel" aria-label="Writing project detail">
+          <LocalizedValidation message={managementError} />
+          {managementMessage ? <p role="status" className="mb-3 text-sm font-medium text-success">{managementMessage}</p> : null}
           {activeProject ? (
             <div className="grid gap-4">
               <div>
-                <h2 className="text-lg font-semibold">{activeProject.title}</h2>
-                <p className="text-sm capitalize text-muted-foreground">{activeProject.writingType}</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="min-w-0 break-words text-lg font-semibold">{formatWritingProjectTitle(activeProject)}</h2>
+                    <p className="text-sm capitalize text-muted-foreground">{formatLabel(activeProject.writingType)}</p>
+                  </div>
+                  {canManageActiveProject ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => startRename(activeProject)}>
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        Rename
+                      </Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={deleteActiveProject} disabled={deleteMutation.isPending}>
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        Delete
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+                {isRenaming ? (
+                  <div className="mt-3 grid gap-2 rounded-md border p-3">
+                    <Input
+                      aria-label="Rename writing project"
+                      value={renameTitle}
+                      onChange={(event) => setRenameTitle(event.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" onClick={saveRename} disabled={!renameTitle.trim() || renameMutation.isPending}>
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        Save rename
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setIsRenaming(false)}>
+                        <X className="h-4 w-4" aria-hidden="true" />
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               {activeProject.participantRole === 'student_author' ? (
                 <WritingVersionUploadForm projectId={projectId} writingProject={activeProject} />
@@ -186,7 +304,7 @@ export function WritingProjectsPage() {
                 </p>
               )}
               <WritingVersionHistory versions={activeProject.versions} selectedVersionId={activeVersion?.id} onSelectVersion={setSelectedVersion} />
-              <TeacherFeedbackPanel projectId={projectId} version={activeVersion} />
+              <TeacherFeedbackPanel participantRole={activeProject.participantRole} projectId={projectId} version={activeVersion} />
             </div>
           ) : (
             <DataState state="empty" title="Select writing project" message="Writing project details appear after a project is selected." />

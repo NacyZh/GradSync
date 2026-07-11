@@ -35,6 +35,7 @@ from .serializers import (
     TeacherFeedbackSerializer,
     WeeklyReportSerializer,
     WritingProjectCreateSerializer,
+    WritingProjectRenameSerializer,
     WritingProjectSerializer,
     WritingVersionSerializer,
     WritingVersionUploadSerializer,
@@ -42,8 +43,10 @@ from .serializers import (
 from .writing_participant_services import writing_projects_for_user
 from .writing_services import (
     WritingProjectService,
+    archive_writing_project,
     create_standalone_writing_project,
     record_writing_version_download,
+    rename_writing_project,
     require_writing_version_download_access,
     upload_standalone_writing_version,
 )
@@ -64,6 +67,8 @@ class DraftViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.Gene
         status_filter = self.request.query_params.get("status")
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+        else:
+            queryset = queryset.exclude(status=WritingProject.Status.ARCHIVED)
         return queryset
 
     def perform_create(self, serializer):
@@ -220,7 +225,11 @@ def _error_message(exc: DjangoValidationError) -> str:
 
 
 class WritingProjectViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
 ):
     permission_classes = [IsAuthenticated]
 
@@ -232,6 +241,8 @@ class WritingProjectViewSet(
     def get_serializer_class(self):
         if self.action == "create":
             return WritingProjectCreateSerializer
+        if self.action in {"partial_update", "update"}:
+            return WritingProjectRenameSerializer
         return WritingProjectSerializer
 
     def get_queryset(self):
@@ -255,6 +266,8 @@ class WritingProjectViewSet(
         status_filter = self.request.query_params.get("status")
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+        else:
+            queryset = queryset.exclude(status=WritingProject.Status.ARCHIVED)
         return queryset
 
     def create(self, request, *args, **kwargs):
@@ -275,15 +288,45 @@ class WritingProjectViewSet(
             status=status.HTTP_201_CREATED,
         )
 
+    def partial_update(self, request, *args, **kwargs):
+        writing_project = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            renamed = rename_writing_project(
+                request.user, writing_project, title=serializer.validated_data["title"]
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(WritingProjectSerializer(renamed, context={"request": request}).data)
+
+    def update(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            archive_writing_project(request.user, self.get_object())
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class StandaloneWritingProjectViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
 ):
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
         if self.action == "create":
             return WritingProjectCreateSerializer
+        if self.action in {"partial_update", "update"}:
+            return WritingProjectRenameSerializer
         return WritingProjectSerializer
 
     def get_queryset(self):
@@ -294,6 +337,8 @@ class StandaloneWritingProjectViewSet(
         status_filter = self.request.query_params.get("status")
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+        else:
+            queryset = queryset.exclude(status=WritingProject.Status.ARCHIVED)
         return queryset
 
     def list(self, request, *args, **kwargs):
@@ -321,6 +366,30 @@ class StandaloneWritingProjectViewSet(
             WritingProjectSerializer(writing_project, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+    def partial_update(self, request, *args, **kwargs):
+        writing_project = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            renamed = rename_writing_project(
+                request.user, writing_project, title=serializer.validated_data["title"]
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(WritingProjectSerializer(renamed, context={"request": request}).data)
+
+    def update(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            archive_writing_project(request.user, self.get_object())
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class WritingVersionUploadView(views.APIView):

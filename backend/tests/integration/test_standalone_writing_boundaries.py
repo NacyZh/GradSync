@@ -114,3 +114,40 @@ def test_only_student_author_uploads_versions_and_assigned_reviewer_submits_feed
     assert writing.title not in str(blocked_feedback.data)
     assert writing.title not in str(blocked_project_reviewer_feedback.data)
     assert writing.title not in str(blocked_project_reviewer_download.data)
+
+
+@pytest.mark.django_db
+def test_student_author_renames_and_archives_writing_project(api_client):
+    student = active_student()
+    reviewer = active_teacher()
+    writing = writing_item(student=student, title="Original Title")
+    WritingParticipant.objects.create(
+        writing_project=writing,
+        user=reviewer,
+        participant_role=WritingParticipant.Role.ASSIGNED_REVIEWER,
+    )
+
+    blocked_rename = authenticate(api_client, reviewer).patch(
+        f"/api/writing-projects/{writing.id}/",
+        {"title": "Reviewer Rename"},
+        format="json",
+    )
+    renamed = authenticate(api_client, student).patch(
+        f"/api/writing-projects/{writing.id}/",
+        {"title": "Renamed Thesis"},
+        format="json",
+    )
+    blocked_archive = authenticate(api_client, reviewer).delete(
+        f"/api/writing-projects/{writing.id}/"
+    )
+    archived = authenticate(api_client, student).delete(f"/api/writing-projects/{writing.id}/")
+    active_list = authenticate(api_client, student).get("/api/writing-projects/")
+    archived_list = authenticate(api_client, student).get("/api/writing-projects/?status=archived")
+
+    assert blocked_rename.status_code == 403
+    assert renamed.status_code == 200
+    assert renamed.data["title"] == "Renamed Thesis"
+    assert blocked_archive.status_code == 403
+    assert archived.status_code == 204
+    assert active_list.data["results"] == []
+    assert [item["title"] for item in archived_list.data["results"]] == ["Renamed Thesis"]

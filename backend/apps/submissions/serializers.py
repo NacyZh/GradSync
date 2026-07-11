@@ -186,6 +186,10 @@ class WritingProjectCreateSerializer(serializers.Serializer):
         return attrs
 
 
+class WritingProjectRenameSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=255)
+
+
 class WritingVersionUploadSerializer(serializers.Serializer):
     file = serializers.FileField()
     summary = serializers.CharField(required=False, allow_blank=True)
