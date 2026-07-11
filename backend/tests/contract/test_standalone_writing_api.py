@@ -37,6 +37,9 @@ def test_standalone_writing_list_create_version_feedback_contract(api_client):
         {"file": _docx(), "summary": "First standalone draft"},
         format="multipart",
     )
+    version_download_response = authenticate(api_client, advisor).get(
+        f"/api/writing-versions/{version_response.data['id']}/download"
+    )
     feedback_response = authenticate(api_client, advisor).post(
         f"/api/writing-versions/{version_response.data['id']}/feedback",
         {"annotatedFile": _docx("annotated.docx", b"notes"), "comments": "Revise intro"},
@@ -53,6 +56,8 @@ def test_standalone_writing_list_create_version_feedback_contract(api_client):
     assert [item["title"] for item in list_response.data["results"]] == ["Standalone Thesis"]
     assert version_response.status_code == 201
     assert version_response.data["versionNumber"] == 1
+    assert version_download_response.status_code == 200
+    assert 'filename="draft.docx"' in version_download_response["Content-Disposition"]
     assert feedback_response.status_code == 201
     assert feedback_response.data["status"] == "notification_pending"
     assert download_response.status_code == 200

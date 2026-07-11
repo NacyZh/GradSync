@@ -8,7 +8,7 @@ from apps.notifications.tasks import deliver_due_notifications
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.resources.models import ResourceItem, ResourceType, ResourceUseSubmission
 from apps.resources.services import ResourceInventoryService
-from apps.submissions.models import TeacherFeedback, WritingProject
+from apps.submissions.models import TeacherFeedback, WritingParticipant, WritingProject
 from tests.factories.accounts import UserFactory
 from tests.helpers import authenticate
 
@@ -35,6 +35,11 @@ def test_email_failure_preserves_feedback_and_records_retry_needed_with_masking(
         student=student,
         title="Chapter",
         writing_type=WritingProject.WritingType.THESIS,
+    )
+    WritingParticipant.objects.create(
+        writing_project=writing_project,
+        user=teacher,
+        participant_role=WritingParticipant.Role.BOUND_ADVISOR,
     )
     version_response = authenticate(api_client, student).post(
         f"/api/writing-projects/{writing_project.id}/versions",

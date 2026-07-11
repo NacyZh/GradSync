@@ -4,6 +4,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 
 from apps.audit.boundary_events import record_boundary_event
+from apps.audit.models import DownloadEvent
 from apps.audit.services import record_event, record_upload
 from apps.common.file_services import store_uploaded_file
 from apps.common.models import UploadedFile
@@ -13,7 +14,9 @@ from apps.projects.archive_services import ensure_project_writable
 from .models import WritingProject, WritingVersion
 from .writing_participant_services import (
     anchor_project_for_standalone_writing,
+    can_review_writing_project,
     ensure_default_writing_participants,
+    participant_role_for,
     require_student_author,
 )
 
@@ -173,3 +176,61 @@ def upload_standalone_writing_version(
         metadata={"versionId": version.id},
     )
     return version
+
+
+def require_writing_version_download_access(user, version: WritingVersion) -> None:
+    writing_project = version.writing_project
+    if not participant_role_for(user, writing_project):
+        record_boundary_event(
+            actor=user,
+            resource=None,
+            boundary_type="standalone_writing",
+            visibility_state="not_applicable",
+            source_project=writing_project.project,
+            action="download",
+            outcome="denied",
+            metadata={"writingVersionId": version.id, "redaction": "[masked]"},
+        )
+        raise PermissionDenied("You are not authorized to download this writing version")
+
+
+@transaction.atomic
+def record_writing_version_download(user, version: WritingVersion) -> dict:
+    require_writing_version_download_access(user, version)
+    writing_project = version.writing_project
+    if (
+        can_review_writing_project(user, writing_project)
+        and version.status == WritingVersion.Status.SUBMITTED
+    ):
+        version.status = WritingVersion.Status.UNDER_REVIEW
+        version.save(update_fields=["status"])
+    event = DownloadEvent.objects.create(
+        project=writing_project.project,
+        actor=user,
+        target_type="writing_version_uploaded_file",
+        target_id=str(version.draft_file_id),
+        filename=version.draft_file.original_filename,
+        checksum_sha256=version.draft_file.checksum_sha256,
+        delivery_mode=DownloadEvent.DeliveryMode.DIRECT_RESPONSE,
+    )
+    record_event(
+        writing_project.project,
+        user,
+        "writing_version.downloaded",
+        f"Downloaded writing version file {version.draft_file_id}",
+        event,
+    )
+    record_boundary_event(
+        actor=user,
+        resource=writing_project,
+        boundary_type="standalone_writing",
+        visibility_state="not_applicable",
+        source_project=writing_project.legacy_project or writing_project.project,
+        action="download",
+        outcome="success",
+        metadata={"writingVersionId": version.id},
+    )
+    return {
+        "filename": version.draft_file.original_filename,
+        "deliveryMode": "direct_response",
+    }

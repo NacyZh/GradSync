@@ -3,7 +3,12 @@ import { useState } from 'react';
 
 import { Button } from '@/shared/ui/primitives/button';
 
-import { downloadTeacherFeedback, type TeacherFeedback, type WritingVersion } from './api';
+import {
+  downloadTeacherFeedback,
+  downloadWritingVersion,
+  type TeacherFeedback,
+  type WritingVersion,
+} from './api';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 
 type WritingVersionHistoryProps = {
@@ -13,34 +18,55 @@ type WritingVersionHistoryProps = {
 };
 
 export function WritingVersionHistory({ versions, onSelectVersion, selectedVersionId }: WritingVersionHistoryProps) {
+  const [downloadMessage, setDownloadMessage] = useState('');
+  const [error, setError] = useState('');
+
   if (!versions.length) {
     return <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No versions uploaded.</p>;
   }
 
+  async function onDownloadVersion(version: WritingVersion) {
+    setError('');
+    setDownloadMessage('');
+    try {
+      const descriptor = await downloadWritingVersion(version.id, version.draftFileName ?? 'writing-version');
+      setDownloadMessage(`Download started: ${descriptor.filename}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Version download failed');
+    }
+  }
+
   return (
-    <ol className="grid gap-2" aria-label="Writing version history">
-      {versions.map((version) => (
-        <li key={version.id}>
-          <button
-            type="button"
-            className="w-full rounded-md border p-3 text-left hover:bg-muted data-[selected=true]:border-primary"
-            data-selected={version.id === selectedVersionId}
-            onClick={() => onSelectVersion(version)}
-          >
-            <span className="mb-2 flex flex-wrap items-start justify-between gap-2">
-              <strong>Version {version.versionNumber}</strong>
-              <StatusBadge status={version.status} />
-            </span>
-            <span className="block text-sm text-muted-foreground">
-              {version.draftFileName ?? 'Draft file'} · {(version.fileKind ?? 'writing').replaceAll('_', ' ')}
-            </span>
-            {version.feedback?.length ? (
-              <span className="mt-2 block text-sm font-medium">Feedback available for version {version.versionNumber}</span>
-            ) : null}
-          </button>
-        </li>
-      ))}
-    </ol>
+    <div className="grid gap-2">
+      <ol className="grid gap-2" aria-label="Writing version history">
+        {versions.map((version) => (
+          <li key={version.id} className="rounded-md border p-3 data-[selected=true]:border-primary" data-selected={version.id === selectedVersionId}>
+            <button
+              type="button"
+              className="w-full text-left hover:text-primary"
+              onClick={() => onSelectVersion(version)}
+            >
+              <span className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                <strong>Version {version.versionNumber}</strong>
+                <StatusBadge status={version.status} />
+              </span>
+              <span className="block text-sm text-muted-foreground">
+                {version.draftFileName ?? 'Draft file'} · {(version.fileKind ?? 'writing').replaceAll('_', ' ')}
+              </span>
+              {version.feedback?.length ? (
+                <span className="mt-2 block text-sm font-medium">Feedback available for version {version.versionNumber}</span>
+              ) : null}
+            </button>
+            <Button className="mt-3" type="button" variant="outline" onClick={() => onDownloadVersion(version)}>
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Download draft file
+            </Button>
+          </li>
+        ))}
+      </ol>
+      {downloadMessage ? <p role="status" className="text-sm font-medium text-success">{downloadMessage}</p> : null}
+      {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
+    </div>
   );
 }
 

@@ -43,22 +43,11 @@ def participant_role_for(user, writing_project: WritingProject) -> str:
 
 def can_review_writing_project(user, writing_project: WritingProject) -> bool:
     role = participant_role_for(user, writing_project)
-    if role in {
+    return role in {
         WritingParticipant.Role.BOUND_ADVISOR,
         WritingParticipant.Role.ASSIGNED_REVIEWER,
         WritingParticipant.Role.ADMINISTRATOR,
-    }:
-        return True
-
-    project = writing_project.project
-    return bool(
-        project
-        and project.memberships.filter(
-            user=user,
-            status=ProjectMembership.Status.ACTIVE,
-            role__in=[ProjectMembership.Role.ADVISOR, ProjectMembership.Role.REVIEWER],
-        ).exists()
-    )
+    }
 
 
 def ensure_default_writing_participants(writing_project: WritingProject) -> None:

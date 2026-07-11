@@ -22,8 +22,9 @@ function filenameFromContentDisposition(header: string | null): string | undefin
 }
 
 async function errorMessageFromResponse(response: Response) {
-  const payload = await response.json().catch(() => ({})) as Partial<{ message: string; fields: Record<string, string[]> }>;
+  const payload = await response.json().catch(() => ({})) as Partial<{ detail: string; message: string; fields: Record<string, string[]> }>;
   if (payload.message) return payload.message;
+  if (payload.detail) return payload.detail;
   if (payload.fields) {
     return Object.entries(payload.fields)
       .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
@@ -43,7 +44,7 @@ export async function downloadFile(path: string, fallbackFilename = 'download.pd
   }
 
   if (!response.ok) {
-    throw { message: await errorMessageFromResponse(response) };
+    throw new Error(await errorMessageFromResponse(response));
   }
 
   const filename = filenameFromContentDisposition(response.headers.get('Content-Disposition')) ?? fallbackFilename;
@@ -76,7 +77,7 @@ export async function fetchDownloadBlobUrl(path: string): Promise<string> {
   }
 
   if (!response.ok) {
-    throw { message: await errorMessageFromResponse(response) };
+    throw new Error(await errorMessageFromResponse(response));
   }
 
   return URL.createObjectURL(await response.blob());

@@ -96,7 +96,7 @@ class TeacherFeedbackService(ProjectScopedService):
         )
         return feedback
 
-    def describe_feedback_download(self, feedback: TeacherFeedback) -> dict:
+    def require_feedback_download_access(self, feedback: TeacherFeedback):
         writing_project = feedback.writing_version.writing_project
         if writing_project.project_id != self.project.id:
             raise PermissionDenied("Feedback does not belong to this project")
@@ -113,7 +113,10 @@ class TeacherFeedbackService(ProjectScopedService):
                 metadata={"feedbackId": feedback.id, "redaction": "[masked]"},
             )
             raise PermissionDenied("You are not authorized to download this feedback")
+        return writing_project
 
+    def record_feedback_download(self, feedback: TeacherFeedback) -> dict:
+        writing_project = self.require_feedback_download_access(feedback)
         event = DownloadEvent.objects.create(
             project=self.project,
             actor=self.user,
@@ -141,3 +144,6 @@ class TeacherFeedbackService(ProjectScopedService):
             metadata={"feedbackId": feedback.id},
         )
         return _download_descriptor(feedback.annotated_file.original_filename)
+
+    def describe_feedback_download(self, feedback: TeacherFeedback) -> dict:
+        return self.record_feedback_download(feedback)

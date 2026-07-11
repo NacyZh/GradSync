@@ -173,6 +173,10 @@ export function submitTeacherFeedback(writingVersionId: string, payload: { annot
   });
 }
 
+export function downloadWritingVersion(versionId: string, fallbackFilename = 'writing-version') {
+  return downloadFile(`/api/writing-versions/${versionId}/download`, fallbackFilename);
+}
+
 export function downloadTeacherFeedback(feedbackId: string, fallbackFilename = 'teacher-feedback') {
   return downloadFile(`/api/teacher-feedback/${feedbackId}/download`, fallbackFilename);
 }

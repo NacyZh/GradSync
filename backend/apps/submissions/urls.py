@@ -9,6 +9,7 @@ from .views import (
     TeacherFeedbackSubmitView,
     WeeklyReportViewSet,
     WritingProjectViewSet,
+    WritingVersionDownloadView,
     WritingVersionUploadView,
 )
 
@@ -44,6 +45,16 @@ urlpatterns = [
         "writing-versions/<int:writing_version_id>/feedback/",
         TeacherFeedbackSubmitView.as_view(),
         name="teacher-feedback-submit-slash",
+    ),
+    path(
+        "writing-versions/<int:writing_version_id>/download",
+        WritingVersionDownloadView.as_view(),
+        name="writing-version-download",
+    ),
+    path(
+        "writing-versions/<int:writing_version_id>/download/",
+        WritingVersionDownloadView.as_view(),
+        name="writing-version-download-slash",
     ),
     path(
         "teacher-feedback/<int:feedback_id>/download",

@@ -43,6 +43,8 @@ from .writing_participant_services import writing_projects_for_user
 from .writing_services import (
     WritingProjectService,
     create_standalone_writing_project,
+    record_writing_version_download,
+    require_writing_version_download_access,
     upload_standalone_writing_version,
 )
 
@@ -374,12 +376,48 @@ class TeacherFeedbackSubmitView(views.APIView):
         return Response(TeacherFeedbackSerializer(feedback).data, status=status.HTTP_201_CREATED)
 
 
+class WritingVersionDownloadView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Writing version file download"),
+            403: OpenApiResponse(description="Download forbidden"),
+            410: OpenApiResponse(description="Writing version file is unavailable"),
+        }
+    )
+    def get(self, request, writing_version_id):
+        version = get_object_or_404(
+            WritingVersion.objects.select_related(
+                "draft_file",
+                "writing_project__project",
+                "writing_project__legacy_project",
+                "writing_project__student",
+            ),
+            pk=writing_version_id,
+        )
+        try:
+            require_writing_version_download_access(request.user, version)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        try:
+            response = storage_file_download_response(
+                version.draft_file.stored_name,
+                filename=version.draft_file.original_filename,
+                content_type=version.draft_file.content_type or "application/octet-stream",
+            )
+        except DownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
+        record_writing_version_download(request.user, version)
+        return response
+
+
 class TeacherFeedbackDownloadView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
         responses={
-            200: OpenApiResponse(description="Download descriptor"),
+            200: OpenApiResponse(description="Annotated feedback file download"),
             403: OpenApiResponse(description="Download forbidden"),
         }
     )
@@ -393,15 +431,18 @@ class TeacherFeedbackDownloadView(views.APIView):
             pk=feedback_id,
         )
         project = feedback.writing_version.writing_project.project
+        service = TeacherFeedbackService(request.user, project)
         try:
-            TeacherFeedbackService(request.user, project).describe_feedback_download(feedback)
+            service.require_feedback_download_access(feedback)
         except DjangoPermissionDenied as exc:
             raise PermissionDenied(str(exc)) from exc
         try:
-            return storage_file_download_response(
+            response = storage_file_download_response(
                 feedback.annotated_file.stored_name,
                 filename=feedback.annotated_file.original_filename,
                 content_type=feedback.annotated_file.content_type or "application/octet-stream",
             )
         except DownloadUnavailable as exc:
             return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
+        service.record_feedback_download(feedback)
+        return response

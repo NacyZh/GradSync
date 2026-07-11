@@ -1,7 +1,7 @@
 import { FileUp, Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
@@ -115,13 +115,17 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
 export function WritingProjectsPage() {
   const { user } = useAuth();
   const projectIdParam = useParams().projectId;
+  const [searchParams] = useSearchParams();
   const projectId = projectIdParam ? Number(projectIdParam) : undefined;
+  const requestedWritingProjectId = searchParams.get('writingProjectId');
   const [query, setQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState<WritingProject | undefined>();
   const [selectedVersion, setSelectedVersion] = useState<WritingVersion | undefined>();
   const writingQuery = useWritingProjects(projectId, query);
   const projects = writingQuery.data?.results ?? [];
-  const activeProject = projects.find((project) => project.id === selectedProject?.id) ?? projects[0];
+  const activeProject = projects.find((project) => project.id === selectedProject?.id)
+    ?? projects.find((project) => project.id === requestedWritingProjectId)
+    ?? projects[0];
   const activeVersion = activeProject?.versions.find((version) => version.id === selectedVersion?.id) ?? activeProject?.versions?.[0];
   const canCreateWritingProject = !user || user.global_role === 'student';
 
@@ -174,7 +178,7 @@ export function WritingProjectsPage() {
                 <h2 className="text-lg font-semibold">{activeProject.title}</h2>
                 <p className="text-sm capitalize text-muted-foreground">{activeProject.writingType}</p>
               </div>
-              {activeProject.participantRole === 'student_author' || activeProject.participantRole === 'administrator' ? (
+              {activeProject.participantRole === 'student_author' ? (
                 <WritingVersionUploadForm projectId={projectId} writingProject={activeProject} />
               ) : (
                 <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
+from apps.projects.models import ProjectMembership
 from apps.submissions.models import WritingParticipant
 from tests.factories.shared_workspace import (
     active_admin,
@@ -57,11 +58,18 @@ def test_only_student_author_uploads_versions_and_assigned_reviewer_submits_feed
     student = active_student()
     reviewer = active_teacher()
     different_teacher = active_teacher()
+    unassigned_project_reviewer = active_teacher()
     writing = writing_item(student=student)
     WritingParticipant.objects.create(
         writing_project=writing,
         user=reviewer,
         participant_role=WritingParticipant.Role.ASSIGNED_REVIEWER,
+    )
+    ProjectMembership.objects.create(
+        project=writing.project,
+        user=unassigned_project_reviewer,
+        role=ProjectMembership.Role.REVIEWER,
+        status=ProjectMembership.Status.ACTIVE,
     )
 
     blocked_version = authenticate(api_client, reviewer).post(
@@ -74,6 +82,12 @@ def test_only_student_author_uploads_versions_and_assigned_reviewer_submits_feed
         {"file": _docx("student.docx")},
         format="multipart",
     )
+    allowed_version_download = authenticate(api_client, reviewer).get(
+        f"/api/writing-versions/{version.data['id']}/download"
+    )
+    blocked_project_reviewer_download = authenticate(api_client, unassigned_project_reviewer).get(
+        f"/api/writing-versions/{version.data['id']}/download"
+    )
     allowed_feedback = authenticate(api_client, reviewer).post(
         f"/api/writing-versions/{version.data['id']}/feedback",
         {"annotatedFile": _docx("annotated.docx"), "comments": "Reviewed"},
@@ -84,9 +98,19 @@ def test_only_student_author_uploads_versions_and_assigned_reviewer_submits_feed
         {"annotatedFile": _docx("hidden.docx"), "comments": "No access"},
         format="multipart",
     )
+    blocked_project_reviewer_feedback = authenticate(api_client, unassigned_project_reviewer).post(
+        f"/api/writing-versions/{version.data['id']}/feedback",
+        {"annotatedFile": _docx("project-reviewer.docx"), "comments": "Project access only"},
+        format="multipart",
+    )
 
     assert blocked_version.status_code == 403
     assert version.status_code == 201
+    assert allowed_version_download.status_code == 200
+    assert blocked_project_reviewer_download.status_code == 403
     assert allowed_feedback.status_code == 201
     assert blocked_feedback.status_code == 403
+    assert blocked_project_reviewer_feedback.status_code == 403
     assert writing.title not in str(blocked_feedback.data)
+    assert writing.title not in str(blocked_project_reviewer_feedback.data)
+    assert writing.title not in str(blocked_project_reviewer_download.data)

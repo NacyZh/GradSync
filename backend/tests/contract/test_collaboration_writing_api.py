@@ -32,6 +32,9 @@ def test_writing_project_version_feedback_and_download_contract(api_client):
         {"file": _docx(), "summary": "First complete draft"},
         format="multipart",
     )
+    version_download_response = authenticate(api_client, teacher).get(
+        f"/api/writing-versions/{version_response.data['id']}/download"
+    )
     feedback_response = authenticate(api_client, teacher).post(
         f"/api/writing-versions/{version_response.data['id']}/feedback",
         {
@@ -49,6 +52,8 @@ def test_writing_project_version_feedback_and_download_contract(api_client):
     assert version_response.status_code == 201
     assert version_response.data["versionNumber"] == 1
     assert version_response.data["fileKind"] == "word"
+    assert version_download_response.status_code == 200
+    assert 'filename="draft.docx"' in version_download_response["Content-Disposition"]
     assert feedback_response.status_code == 201
     assert feedback_response.data["status"] == "notification_pending"
     assert feedback_response.data["notificationStatus"] == "pending"

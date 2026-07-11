@@ -1,10 +1,16 @@
 import pytest
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.audit.models import AuditEvent, DownloadEvent
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
-from apps.submissions.models import TeacherFeedback, WritingProject, WritingVersion
+from apps.submissions.models import (
+    TeacherFeedback,
+    WritingParticipant,
+    WritingProject,
+    WritingVersion,
+)
 from tests.factories.accounts import UserFactory
 from tests.helpers import authenticate
 
@@ -76,12 +82,21 @@ def test_feedback_authorization_validation_notification_and_download_audit(api_c
         title="Chapter",
         writing_type=WritingProject.WritingType.THESIS,
     )
+    WritingParticipant.objects.create(
+        writing_project=writing_project,
+        user=teacher,
+        participant_role=WritingParticipant.Role.BOUND_ADVISOR,
+    )
     upload_response = authenticate(api_client, student).post(
         f"/api/writing-projects/{writing_project.id}/versions",
         {"file": _upload("chapter.docx", b"chapter")},
         format="multipart",
     )
     version = WritingVersion.objects.get(pk=upload_response.data["id"])
+    draft_download = authenticate(api_client, teacher).get(
+        f"/api/writing-versions/{version.id}/download"
+    )
+    version.refresh_from_db()
 
     invalid = authenticate(api_client, teacher).post(
         f"/api/writing-versions/{version.id}/feedback",
@@ -100,6 +115,9 @@ def test_feedback_authorization_validation_notification_and_download_audit(api_c
         f"/api/teacher-feedback/{feedback_response.data['id']}/download"
     )
 
+    assert draft_download.status_code == 200
+    assert 'filename="chapter.docx"' in draft_download["Content-Disposition"]
+    assert version.status == WritingVersion.Status.UNDER_REVIEW
     assert invalid.status_code == 400
     assert feedback_response.status_code == 201
     feedback = TeacherFeedback.objects.get(pk=feedback_response.data["id"])
@@ -113,4 +131,91 @@ def test_feedback_authorization_validation_notification_and_download_audit(api_c
     assert AuditEvent.objects.filter(event_type="feedback.submitted", actor=teacher).exists()
     assert AuditEvent.objects.filter(
         event_type="teacher_feedback.downloaded", actor=student
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_missing_feedback_file_returns_gone_without_success_download_audit(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    student = UserFactory(global_role="student", status="active")
+    project = ResearchProject.objects.create(title="Missing Feedback", advisor=teacher)
+    ProjectMembership.objects.create(project=project, user=teacher, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    writing_project = WritingProject.objects.create(
+        project=project,
+        student=student,
+        title="Chapter",
+        writing_type=WritingProject.WritingType.THESIS,
+    )
+    WritingParticipant.objects.create(
+        writing_project=writing_project,
+        user=teacher,
+        participant_role=WritingParticipant.Role.BOUND_ADVISOR,
+    )
+    version_response = authenticate(api_client, student).post(
+        f"/api/writing-projects/{writing_project.id}/versions",
+        {"file": _upload("chapter.docx", b"chapter")},
+        format="multipart",
+    )
+    feedback_response = authenticate(api_client, teacher).post(
+        f"/api/writing-versions/{version_response.data['id']}/feedback",
+        {"annotatedFile": _upload("annotated.docx", b"notes"), "comments": "Actionable notes"},
+        format="multipart",
+    )
+    feedback = TeacherFeedback.objects.get(pk=feedback_response.data["id"])
+    if default_storage.exists(feedback.annotated_file.stored_name):
+        default_storage.delete(feedback.annotated_file.stored_name)
+
+    download = authenticate(api_client, student).get(
+        f"/api/teacher-feedback/{feedback.id}/download"
+    )
+
+    assert download.status_code == 410
+    assert not DownloadEvent.objects.filter(
+        actor=student, target_id=str(feedback.annotated_file_id)
+    ).exists()
+    assert not AuditEvent.objects.filter(
+        event_type="teacher_feedback.downloaded", actor=student
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_missing_writing_version_file_returns_gone_without_success_download_audit(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    student = UserFactory(global_role="student", status="active")
+    project = ResearchProject.objects.create(title="Missing Draft", advisor=teacher)
+    ProjectMembership.objects.create(project=project, user=teacher, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    writing_project = WritingProject.objects.create(
+        project=project,
+        student=student,
+        title="Chapter",
+        writing_type=WritingProject.WritingType.THESIS,
+    )
+    WritingParticipant.objects.create(
+        writing_project=writing_project,
+        user=teacher,
+        participant_role=WritingParticipant.Role.BOUND_ADVISOR,
+    )
+    version_response = authenticate(api_client, student).post(
+        f"/api/writing-projects/{writing_project.id}/versions",
+        {"file": _upload("chapter.docx", b"chapter")},
+        format="multipart",
+    )
+    version = WritingVersion.objects.get(pk=version_response.data["id"])
+    if default_storage.exists(version.draft_file.stored_name):
+        default_storage.delete(version.draft_file.stored_name)
+
+    download = authenticate(api_client, teacher).get(
+        f"/api/writing-versions/{version.id}/download"
+    )
+    version.refresh_from_db()
+
+    assert download.status_code == 410
+    assert version.status == WritingVersion.Status.SUBMITTED
+    assert not DownloadEvent.objects.filter(
+        actor=teacher, target_id=str(version.draft_file_id)
+    ).exists()
+    assert not AuditEvent.objects.filter(
+        event_type="writing_version.downloaded", actor=teacher
     ).exists()

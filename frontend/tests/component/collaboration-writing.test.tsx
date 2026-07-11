@@ -20,9 +20,9 @@ function mockFetch(handler: (url: string, init?: RequestInit) => { payload: unkn
   }) as typeof fetch;
 }
 
-function renderWritingProjects() {
+function renderWritingProjects(initialEntry = '/writing') {
   return renderWithClient(
-    <MemoryRouter initialEntries={['/writing']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/writing" element={<WritingProjectsPage />} />
       </Routes>
@@ -38,6 +38,12 @@ describe('collaboration writing UI', () => {
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
     mockFetch((url) => {
+      if (url.includes('/writing-versions/6/download')) {
+        return new Response(new Blob(['draft']), {
+          status: 200,
+          headers: { 'Content-Disposition': 'attachment; filename="chapter.docx"' },
+        });
+      }
       if (url.includes('/teacher-feedback/7/download')) {
         return new Response(new Blob(['feedback']), {
           status: 200,
@@ -83,6 +89,9 @@ describe('collaboration writing UI', () => {
     expect(screen.getByText('Version 2')).toBeInTheDocument();
     expect(screen.getByText('Feedback available for version 2')).toBeInTheDocument();
     expect(screen.getByText('Revise section two')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Download draft file/ }));
+    expect(await screen.findByText('Download started: chapter.docx')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Download annotated file/ }));
     expect(await screen.findByText(/annotated.docx/)).toBeInTheDocument();
@@ -172,6 +181,88 @@ describe('collaboration writing UI', () => {
     expect(screen.queryByLabelText('Writing version file')).not.toBeInTheDocument();
     expect(screen.getByText('Version uploads are available to the student author.')).toBeInTheDocument();
     expect(screen.getByLabelText('Annotated file')).toBeInTheDocument();
+  });
+
+  it('selects a writing project from notification deep links', async () => {
+    mockFetch(() => ({
+      payload: {
+        results: [
+          {
+            id: '11',
+            projectId: '1',
+            legacyProjectId: '1',
+            studentId: '5',
+            title: 'First Draft',
+            writingType: 'thesis',
+            participantRole: 'student_author',
+            status: 'active',
+            versions: [],
+          },
+          {
+            id: '12',
+            projectId: '1',
+            legacyProjectId: '1',
+            studentId: '5',
+            title: 'Linked Manuscript',
+            writingType: 'manuscript',
+            participantRole: 'student_author',
+            status: 'active',
+            versions: [{ id: '13', writingProjectId: '12', versionNumber: 1, status: 'feedback_available', draftFileName: 'linked.docx', feedback: [] }],
+          },
+        ],
+      },
+    }));
+
+    renderWritingProjects('/writing?writingProjectId=12');
+
+    expect(await screen.findByRole('heading', { name: 'Linked Manuscript' })).toBeInTheDocument();
+    expect(screen.getByText('Version 1')).toBeInTheDocument();
+  });
+
+  it('shows backend feedback download errors', async () => {
+    mockFetch((url) => {
+      if (url.includes('/teacher-feedback/7/download')) {
+        return new Response(JSON.stringify({ message: 'File is no longer available' }), {
+          status: 410,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return {
+        payload: {
+          results: [{
+            id: '2',
+            projectId: '1',
+            legacyProjectId: '1',
+            studentId: '5',
+            title: 'Thesis Chapter',
+            writingType: 'thesis',
+            participantRole: 'student_author',
+            status: 'active',
+            versions: [{
+              id: '6',
+              writingProjectId: '2',
+              versionNumber: 1,
+              draftFileName: 'chapter.docx',
+              status: 'feedback_available',
+              feedback: [{
+                id: '7',
+                writingVersionId: '6',
+                reviewerId: '3',
+                comments: 'Revise section two',
+                status: 'notification_pending',
+                annotatedFileName: 'annotated.docx',
+              }],
+            }],
+          }],
+        },
+      };
+    });
+
+    renderWritingProjects();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Download annotated file/ }));
+
+    expect(await screen.findByText('File is no longer available')).toBeInTheDocument();
   });
 
   it('renders an empty standalone writing state without hidden private metadata', async () => {
