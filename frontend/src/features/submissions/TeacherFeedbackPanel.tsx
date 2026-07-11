@@ -83,7 +83,7 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
           required
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} aria-label="Choose annotated file">
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} aria-label="Choose feedback file">
             <FileUp className="h-4 w-4" aria-hidden="true" />
             Choose file
           </Button>

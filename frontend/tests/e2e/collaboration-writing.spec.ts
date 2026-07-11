@@ -80,7 +80,7 @@ test('writing project feedback flow is reachable', async ({ page }) => {
             studentId: '5',
             title: 'Thesis Chapter',
             writingType: 'thesis',
-            participantRole: 'student_author',
+            participantRole: uploaded ? 'assigned_reviewer' : 'student_author',
             status: 'active',
             versions: [
               {
@@ -131,8 +131,8 @@ test('writing project feedback flow is reachable', async ({ page }) => {
   });
   await page.getByLabel('Version summary').fill('Second pass');
   await page.getByRole('button', { name: 'Upload version' }).click();
-  await expect(page.getByText('Version uploaded')).toBeVisible();
   expect(uploaded).toBe(true);
+  await expect(page.getByRole('button', { name: 'Choose feedback file' })).toBeVisible();
 
   await page.getByLabel('Annotated file').setInputFiles({
     name: 'annotated.docx',

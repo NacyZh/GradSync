@@ -98,7 +98,9 @@ describe('collaboration document library UI', () => {
     );
     expect(screen.getByPlaceholderText('Search title, category, description')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Category Protocols' })).toBeInTheDocument();
-    expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Microscope Protocol');
+    await waitFor(() =>
+      expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Microscope Protocol'),
+    );
     expect(screen.getByRole('button', { name: /Select document Microscope Protocol/ })).toHaveAttribute('aria-pressed', 'true');
 
     await userEvent.click(screen.getByRole('button', { name: /Download Microscope Protocol/ }));

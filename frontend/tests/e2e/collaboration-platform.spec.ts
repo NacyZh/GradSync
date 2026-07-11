@@ -217,9 +217,11 @@ async function mockCollaborationApi(page: Page) {
       await fulfillJson(route, { id: '10', projectId: '1', studentId: '5', title: 'New Manuscript', writingType: 'manuscript', status: 'active', versions: [] }, 201);
       return;
     }
-    await fulfillJson(route, { results: [{ id: '2', projectId: '1', studentId: '5', title: 'Thesis Chapter', writingType: 'thesis', status: 'active', versions: [{ id: '6', writingProjectId: '2', versionNumber: 1, draftFileName: 'chapter.docx', fileKind: 'word', status: 'feedback_available', feedback: [{ id: '7', writingVersionId: '6', reviewerId: '3', comments: 'Revise section two', status: 'notification_pending', annotatedFileName: 'annotated.docx', notificationStatus: 'pending' }] }] }] });
+    await fulfillJson(route, { results: [{ id: '2', projectId: '1', studentId: '5', title: 'Thesis Chapter', writingType: 'thesis', participantRole: 'assigned_reviewer', status: 'active', versions: [{ id: '6', writingProjectId: '2', versionNumber: 1, draftFileName: 'chapter.docx', fileKind: 'word', status: 'feedback_available', feedback: [{ id: '7', writingVersionId: '6', reviewerId: '3', comments: 'Revise section two', status: 'notification_pending', annotatedFileName: 'annotated.docx', notificationStatus: 'pending' }] }] }] });
   });
-  await page.route('**/api/writing-projects/2/versions', async (route) => fulfillJson(route, { id: '8', writingProjectId: '2', versionNumber: 2, draftFileName: 'revision.tex', fileKind: 'latex_source', status: 'submitted', feedback: [] }, 201));
+  await page.route('**/api/writing-projects/2/versions', async (route) => {
+    await fulfillJson(route, { id: '8', writingProjectId: '2', versionNumber: 2, draftFileName: 'revision.tex', fileKind: 'latex_source', status: 'submitted', feedback: [] }, 201);
+  });
   await page.route('**/api/writing-versions/6/feedback', async (route) => fulfillJson(route, { id: '9', writingVersionId: '6', reviewerId: '3', comments: 'More notes', status: 'notification_pending', notificationStatus: 'pending' }, 201));
   await page.route('**/api/teacher-feedback/7/download', async (route) =>
     fulfillAttachment(

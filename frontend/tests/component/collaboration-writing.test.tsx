@@ -176,7 +176,7 @@ describe('collaboration writing UI', () => {
     });
 
     renderWritingProjects();
-    expect(await screen.findByRole('button', { name: 'Choose annotated file' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Choose feedback file' })).toBeInTheDocument();
 
     await userEvent.upload(screen.getByLabelText('Annotated file'), new File(['notes'], 'annotated.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
     expect(screen.getByText('Selected file: annotated.docx')).toBeInTheDocument();
@@ -211,7 +211,7 @@ describe('collaboration writing UI', () => {
     expect(screen.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     expect(screen.getByText('Version uploads are available to the student author.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Choose annotated file' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose feedback file' })).toBeInTheDocument();
   });
 
   it('renames and deletes a writing project as the student author', async () => {
