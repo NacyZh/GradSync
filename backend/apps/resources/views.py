@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -144,6 +144,13 @@ class StandaloneBookingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(resource_item_id=resource_item_id)
         return queryset
 
+    @extend_schema(
+        request=BookingSerializer,
+        responses={
+            201: BookingSerializer,
+            409: OpenApiResponse(description="Booking capacity or version conflict"),
+        },
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -220,6 +227,13 @@ class BookingViewSet(StandaloneBookingViewSet):
         response["Link"] = '</api/bookings/>; rel="successor-version"'
         return response
 
+    @extend_schema(
+        request=BookingSerializer,
+        responses={
+            201: BookingSerializer,
+            409: OpenApiResponse(description="Booking capacity or version conflict"),
+        },
+    )
     def create(self, request, *args, **kwargs):
         payload = request.data.copy()
         aliases = {
