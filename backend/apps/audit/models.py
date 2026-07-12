@@ -16,6 +16,7 @@ class AuditEvent(models.Model):
     event_type = models.CharField(max_length=80)
     target_type = models.CharField(max_length=80, blank=True)
     target_id = models.CharField(max_length=80, blank=True)
+    target_snapshot = models.JSONField(default=dict, blank=True)
     summary = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 

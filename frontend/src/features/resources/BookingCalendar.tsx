@@ -44,7 +44,7 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
     enabled: hasValidWindow,
   });
   const availability = availabilityQuery.data ?? [];
-  const unavailable = availability.filter((resource) => !resource.available);
+  const unavailable = availability.filter((resource) => (resource.availableQuantity ?? resource.totalQuantity) < 1);
 
   function updateWindow(nextStartsAt = startsAt, nextEndsAt = endsAt) {
     const nextStartsAtMs = new Date(nextStartsAt).getTime();
@@ -107,7 +107,7 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
       {unavailable.length ? (
         <BookingConflictAlert
           title="Conflicts in this window"
-          message={`${unavailable.length} resource${unavailable.length === 1 ? '' : 's'} already have overlapping project bookings. Choose another time or resource.`}
+          message={`${unavailable.length} resource${unavailable.length === 1 ? '' : 's'} have no remaining capacity. Choose another time or resource.`}
           role="status"
         />
       ) : null}
@@ -125,7 +125,8 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
 
 function AvailabilityRow({ resource }: { resource: ResourceItem }) {
   const conflicts = resource.conflictingBookingCount ?? 0;
-  const statusLabel = resource.available ? 'Available' : 'Unavailable';
+  const available = (resource.availableQuantity ?? resource.totalQuantity) > 0;
+  const statusLabel = available ? `${resource.availableQuantity ?? resource.totalQuantity} available` : 'Unavailable';
 
   return (
     <li>
@@ -136,7 +137,7 @@ function AvailabilityRow({ resource }: { resource: ResourceItem }) {
         </p>
         {conflicts ? <small className="text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'}</small> : null}
       </div>
-      <span className={`status-pill ${resource.available ? 'available' : 'unavailable'}`}>
+      <span className={`status-pill ${available ? 'available' : 'unavailable'}`}>
         {statusLabel}
         {conflicts ? ` · ${conflicts} conflict${conflicts === 1 ? '' : 's'}` : ''}
       </span>

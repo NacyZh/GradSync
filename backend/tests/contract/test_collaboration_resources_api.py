@@ -16,6 +16,7 @@ def test_resource_inventory_crud_and_student_blocking_contract(api_client):
         {
             "name": "Confocal microscope",
             "resourceType": "Microscope",
+            "totalQuantity": 3,
             "description": "Shared imaging instrument",
             "useInstructions": "Submit a use request before access.",
         },
@@ -23,12 +24,12 @@ def test_resource_inventory_crud_and_student_blocking_contract(api_client):
     )
     student_create_response = authenticate(api_client, student).post(
         "/api/resources/",
-        {"name": "Student-created resource", "resourceType": "Bench"},
+        {"name": "Student-created resource", "resourceType": "Bench", "totalQuantity": 1},
         format="json",
     )
     update_response = authenticate(api_client, teacher).patch(
         f"/api/resources/{create_response.data['id']}/",
-        {"status": "unavailable", "useInstructions": "Temporarily offline."},
+        {"version": 1, "status": "unavailable", "useInstructions": "Temporarily offline."},
         format="json",
     )
     delete_response = authenticate(api_client, teacher).delete(
@@ -40,10 +41,30 @@ def test_resource_inventory_crud_and_student_blocking_contract(api_client):
     assert create_response.status_code == 201
     assert create_response.data["resourceType"] == "Microscope"
     assert create_response.data["status"] == "active"
+    assert create_response.data["totalQuantity"] == 3
     assert student_create_response.status_code == 403
     assert update_response.status_code == 200
     assert update_response.data["status"] == "unavailable"
     assert delete_response.status_code == 204
+
+
+@pytest.mark.django_db
+def test_resource_item_compatibility_endpoint_is_read_only_and_does_not_leak_history(api_client):
+    student = UserFactory(global_role="student", status="active")
+    resource_type = ResourceType.objects.create(name="Instrument")
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Spectrometer")
+
+    blocked = authenticate(api_client, student).post(
+        "/api/resource-items/",
+        {"resourceTypeId": resource_type.id, "name": "Unauthorized"},
+        format="json",
+    )
+    listed = authenticate(api_client, student).get("/api/resources/")
+
+    assert blocked.status_code == 405
+    assert listed.status_code == 200
+    item = next(row for row in listed.data["results"] if row["id"] == resource.id)
+    assert "useSubmissions" not in item
 
 
 @pytest.mark.django_db

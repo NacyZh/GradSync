@@ -129,7 +129,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/projects/:projectId/resources',
-    element: protectedPage(<ResourceListPage />),
+    element: protectedPage(<Navigate to="/resources" replace />),
   },
   {
     path: '/projects/:projectId/papers',

@@ -78,6 +78,20 @@ check_paper_library_spec_review_artifacts() {
   fi
 }
 
+check_shared_resource_source_artifacts() {
+  # Django migration source is intentional, reviewable source. Generated schema
+  # exports and test/build reports remain covered by find_generated_artifacts.
+  for path in \
+    backend/apps/resources/migrations/0003_shared_resource_inventory.py \
+    backend/apps/audit/migrations/0004_target_snapshot.py
+  do
+    if [ -e "$path" ] && [ ! -f "$path" ]; then
+      echo "Expected migration source file but found a non-file artifact: $path" >&2
+      exit 1
+    fi
+  done
+}
+
 if [ "${1:-}" = "--clean" ]; then
   find_generated_artifacts delete
 elif [ "${1:-}" != "" ]; then
@@ -94,3 +108,4 @@ if [ -n "$found" ]; then
 fi
 
 check_paper_library_spec_review_artifacts
+check_shared_resource_source_artifacts

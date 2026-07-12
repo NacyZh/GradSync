@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardList, Send, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -10,7 +10,7 @@ import { DataState } from '../../shared/ui/DataState';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { LaboratoryResource, ResourceUseSubmission } from './api';
-import { createResourceUseSubmission, decideResourceUseSubmission } from './api';
+import { createResourceUseSubmission, decideResourceUseSubmission, listResourceUseSubmissions } from './api';
 
 type ResourceUseSubmissionPanelProps = {
   resources: LaboratoryResource[];
@@ -21,10 +21,11 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
   const queryClient = useQueryClient();
   const [resourceId, setResourceId] = useState(resources[0]?.id ? String(resources[0].id) : '');
   const [submissionType, setSubmissionType] = useState<ResourceUseSubmission['submissionType']>('request');
-  const submissions = useMemo(
-    () => resources.flatMap((resource) => (resource.useSubmissions ?? []).map((submission) => ({ ...submission, resourceName: resource.name }))),
-    [resources],
-  );
+  const submissionsQuery = useQuery({ queryKey: ['resource-use-submissions'], queryFn: listResourceUseSubmissions });
+  const submissions = useMemo(() => (submissionsQuery.data?.results ?? []).map((submission) => ({
+    ...submission,
+    resourceName: resources.find((resource) => resource.id === submission.resourceId)?.name ?? `Resource #${submission.resourceId}`,
+  })), [resources, submissionsQuery.data]);
   const pendingSubmissions = submissions.filter((submission) => submission.status === 'pending');
   const activeResources = useMemo(
     () => resources.filter((resource) => resource.status !== 'retired'),
@@ -46,7 +47,7 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
         submissionType: payload.submissionType,
         details: payload.details,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['laboratory-resources'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['resource-use-submissions'] }),
   });
   const decisionMutation = useMutation({
     mutationFn: (payload: { submissionId: number; status: 'confirmed' | 'rejected'; decisionNote?: string }) =>
@@ -54,7 +55,7 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
         status: payload.status,
         decisionNote: payload.decisionNote,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['laboratory-resources'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['resource-use-submissions'] }),
   });
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {

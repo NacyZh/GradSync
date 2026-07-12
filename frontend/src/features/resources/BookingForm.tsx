@@ -20,7 +20,6 @@ import type { ResourceItem, ResourceType } from './api';
 import { createBooking } from './api';
 
 type BookingFormProps = {
-  projectId?: number;
   resources?: ResourceItem[];
   resourceTypes?: ResourceType[];
   defaultStartsAt?: string;
@@ -28,7 +27,7 @@ type BookingFormProps = {
   disabled?: boolean;
 };
 
-export function BookingForm({ projectId, resources = [], resourceTypes = [], defaultStartsAt = '', defaultEndsAt = '', disabled = false }: BookingFormProps) {
+export function BookingForm({ resources = [], resourceTypes = [], defaultStartsAt = '', defaultEndsAt = '', disabled = false }: BookingFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const { notify } = useAppFeedback();
   const availableResources = useMemo(
@@ -47,8 +46,8 @@ export function BookingForm({ projectId, resources = [], resourceTypes = [], def
     }
   }, [availableResources, selectedResourceId]);
   const mutation = useMutation({
-    mutationFn: (payload: { resourceItemId: number; starts_at: string; ends_at: string; purpose?: string }) => createBooking(projectId ?? 0, payload),
-    onSuccess: () => notify('Booking confirmed', 'success'),
+    mutationFn: (payload: { resourceId: number; startsAt: string; endsAt: string; quantity: number; purpose?: string }) => createBooking(payload),
+    onSuccess: (booking) => notify(booking.status === 'pending' ? 'Booking submitted for approval' : 'Booking confirmed', 'success'),
     onError: (error) => notify(error.message, 'error'),
   });
 
@@ -72,9 +71,10 @@ export function BookingForm({ projectId, resources = [], resourceTypes = [], def
       return;
     }
     mutation.mutate({
-      resourceItemId: Number(form.get('resourceId')),
-      starts_at: startsAt,
-      ends_at: endsAt,
+      resourceId: Number(form.get('resourceId')),
+      startsAt,
+      endsAt,
+      quantity: Number(form.get('quantity')),
       purpose: String(form.get('purpose') ?? ''),
     });
   }
@@ -91,7 +91,11 @@ export function BookingForm({ projectId, resources = [], resourceTypes = [], def
           <CalendarPlus className="h-4 w-4" aria-hidden="true" />
           Reserve resource
         </h2>
-        <p className="text-sm text-muted-foreground">Create a project-scoped booking with a future time window.</p>
+        <p className="text-sm text-muted-foreground">Reserve shared inventory for a future time window.</p>
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="bookingQuantity">Quantity</Label>
+        <Input id="bookingQuantity" name="quantity" type="number" min="1" defaultValue="1" required disabled={disabled} />
       </div>
       {disabled ? <DataState state="warning" title="Select a valid window" message="Resolve the availability window before submitting a booking." /> : null}
       {availableResources.length === 0 ? (
@@ -124,7 +128,7 @@ export function BookingForm({ projectId, resources = [], resourceTypes = [], def
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="bookingPurpose">Purpose</Label>
-        <Textarea id="bookingPurpose" name="purpose" placeholder="Project work, experiment, or meeting need" disabled={disabled} />
+        <Textarea id="bookingPurpose" name="purpose" placeholder="Experiment, meeting, or research need" disabled={disabled} />
       </div>
       <Button type="submit" disabled={disabled || mutation.isPending || availableResources.length === 0}>
         <CalendarPlus className="h-4 w-4" aria-hidden="true" />

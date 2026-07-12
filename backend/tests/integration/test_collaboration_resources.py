@@ -17,17 +17,22 @@ def test_inventory_starts_empty_and_teacher_admin_manage_resources(api_client):
 
     student_create = authenticate(api_client, student).post(
         "/api/resources/",
-        {"name": "Student bench", "resourceType": "Bench"},
+        {"name": "Student bench", "resourceType": "Bench", "totalQuantity": 1},
         format="json",
     )
     created = authenticate(api_client, teacher).post(
         "/api/resources/",
-        {"name": "PCR workstation", "resourceType": "Instrument", "description": "Amplifier"},
+        {
+            "name": "PCR workstation",
+            "resourceType": "Instrument",
+            "totalQuantity": 2,
+            "description": "Amplifier",
+        },
         format="json",
     )
     updated = authenticate(api_client, admin).patch(
         f"/api/resources/{created.data['id']}/",
-        {"status": "unavailable", "description": "Service window"},
+        {"version": 1, "status": "unavailable", "description": "Service window"},
         format="json",
     )
     deleted = authenticate(api_client, teacher).delete(f"/api/resources/{created.data['id']}/")
@@ -36,10 +41,10 @@ def test_inventory_starts_empty_and_teacher_admin_manage_resources(api_client):
     assert created.status_code == 201
     assert updated.status_code == 200
     assert deleted.status_code == 204
-    assert ResourceItem.objects.get(pk=created.data["id"]).status == ResourceItem.Status.RETIRED
+    assert not ResourceItem.objects.filter(pk=created.data["id"]).exists()
     assert AuditEvent.objects.filter(event_type="resource.created", actor=teacher).exists()
     assert AuditEvent.objects.filter(event_type="resource.updated", actor=admin).exists()
-    assert AuditEvent.objects.filter(event_type="resource.retired", actor=teacher).exists()
+    assert AuditEvent.objects.filter(event_type="resource.deleted", actor=teacher).exists()
 
 
 @pytest.mark.django_db

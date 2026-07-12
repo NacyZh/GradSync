@@ -8,12 +8,10 @@ import { DataState } from '../../shared/ui/DataState';
 import { cancelBooking } from './api';
 
 export function BookingActions({
-  projectId,
   bookingId,
   startsAt,
   compact = false,
 }: {
-  projectId?: number;
   bookingId?: number;
   startsAt?: string;
   compact?: boolean;
@@ -24,7 +22,7 @@ export function BookingActions({
     [startsAt],
   );
   const mutation = useMutation({
-    mutationFn: () => cancelBooking(projectId ?? 0, bookingId ?? 0),
+    mutationFn: () => cancelBooking(bookingId ?? 0),
     onSuccess: () => notify('Booking cancelled', 'success'),
     onError: (error) => notify(error.message, 'error'),
   });
@@ -36,7 +34,7 @@ export function BookingActions({
     }
     const ok = await confirm({
       title: 'Cancel booking?',
-      message: 'This will release the reservation and notify affected project members.',
+      message: 'This will release the reserved shared capacity.',
       actionLabel: 'Cancel booking',
     });
     if (ok) mutation.mutate();

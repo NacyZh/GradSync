@@ -4,6 +4,10 @@ from django.db import models
 
 
 class ResourceType(models.Model):
+    class ConfirmationPolicy(models.TextChoices):
+        IMMEDIATE = "immediate", "Immediate"
+        APPROVAL_REQUIRED = "approval_required", "Approval required"
+
     class Scope(models.TextChoices):
         GLOBAL = "global", "Global"
         PROJECT = "project", "Project"
@@ -20,6 +24,11 @@ class ResourceType(models.Model):
     field_schema = models.JSONField(default=list, blank=True)
     eligibility_policy = models.JSONField(default=dict, blank=True)
     booking_policy = models.JSONField(default=dict, blank=True)
+    confirmation_policy = models.CharField(
+        max_length=24,
+        choices=ConfirmationPolicy.choices,
+        default=ConfirmationPolicy.IMMEDIATE,
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -51,8 +60,15 @@ class ResourceItem(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     location = models.CharField(max_length=255, blank=True)
+    total_quantity = models.PositiveIntegerField(default=1)
     field_values = models.JSONField(default=dict, blank=True)
     availability_policy = models.JSONField(default=dict, blank=True)
+    confirmation_policy_override = models.CharField(
+        max_length=24,
+        choices=ResourceType.ConfirmationPolicy.choices,
+        null=True,
+        blank=True,
+    )
     manager = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -62,13 +78,29 @@ class ResourceItem(models.Model):
     )
     use_instructions = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AVAILABLE)
+    version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(total_quantity__gte=1),
+                name="resources_item_quantity_gte_1",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["resource_type", "status"], name="resources_r_resourc_9d31f5_idx")
+        ]
+
+    @property
+    def effective_confirmation_policy(self):
+        return self.confirmation_policy_override or self.resource_type.confirmation_policy
 
     def clean(self):
+        if self.total_quantity < 1:
+            raise ValidationError({"total_quantity": "Resource quantity must be at least 1"})
         schema = self.resource_type.field_schema or []
         values = self.field_values or {}
         schema_by_key = {field.get("key"): field for field in schema if field.get("key")}
@@ -121,12 +153,19 @@ class ResourceUseSubmission(models.Model):
 
 class Booking(models.Model):
     class Status(models.TextChoices):
-        RESERVED = "reserved", "Reserved"
+        PENDING = "pending", "Pending"
+        CONFIRMED = "confirmed", "Confirmed"
+        RESERVED = "reserved", "Reserved (legacy)"
+        REJECTED = "rejected", "Rejected"
         CANCELLED = "cancelled", "Cancelled"
         COMPLETED = "completed", "Completed"
 
     project = models.ForeignKey(
-        "projects.ResearchProject", on_delete=models.CASCADE, related_name="bookings"
+        "projects.ResearchProject",
+        on_delete=models.SET_NULL,
+        related_name="bookings",
+        null=True,
+        blank=True,
     )
     resource_item = models.ForeignKey(
         ResourceItem, on_delete=models.PROTECT, related_name="bookings"
@@ -134,8 +173,42 @@ class Booking(models.Model):
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.RESERVED)
+    quantity = models.PositiveIntegerField(default=1)
+    confirmation_policy = models.CharField(
+        max_length=24,
+        choices=ResourceType.ConfirmationPolicy.choices,
+        default=ResourceType.ConfirmationPolicy.IMMEDIATE,
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.CONFIRMED)
     purpose = models.TextField(blank=True)
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_resource_bookings",
+    )
+    decision_note = models.TextField(blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=1), name="booking_quantity_gte_1"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(ends_at__gt=models.F("starts_at")),
+                name="booking_end_after_start",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["resource_item", "status", "starts_at", "ends_at"],
+                name="booking_overlap_idx",
+            ),
+            models.Index(fields=["requested_by", "status"], name="booking_requester_idx"),
+        ]

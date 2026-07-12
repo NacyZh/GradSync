@@ -295,3 +295,26 @@ Alert on backend or frontend healthcheck failures, database readiness failures,
 Redis readiness failures, worker absence, scheduler absence, pending
 notifications above the expected reminder window, repeated notification delivery
 failures, and elevated 5xx responses grouped by request ID.
+# Shared resource inventory migration and rollback (Feature 012)
+
+Feature 012 uses an expand-and-switch rollout. Apply the additive audit and
+resource migrations before deploying the canonical inventory UI. The migration
+defaults every legacy resource to quantity `1`, every resource type to immediate
+confirmation, and preserves all existing booking/use history.
+
+Before release, operators must:
+
+1. confirm a current database backup and tested restore procedure;
+2. run `manage.py migrate --plan` and record pre/post resource, booking,
+   use-submission, and audit counts;
+3. smoke-test resource create/edit/delete/retire plus legacy entry points;
+4. verify deletion snapshots retain resource identity, actor, action, outcome,
+   and timestamp; and
+5. obtain Product, Testing, and Development acceptance or a governed release
+   exception.
+
+Application rollback restores the prior application and compatibility handlers
+without reversing the additive columns. Do not drop quantity, policy, version,
+or audit snapshot data. Django migration source files are reviewed source code;
+caches, compiled files, generated schemas, reports, and build outputs remain
+forbidden generated artifacts.

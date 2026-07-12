@@ -29,11 +29,43 @@ export function writingFixture(overrides: Partial<Record<string, string | number
   };
 }
 
-export function resourceFixture(overrides: Partial<Record<string, string | number>> = {}) {
+export function resourceFixture(overrides: Partial<Record<string, string | number | null>> = {}) {
   return {
     id: 1,
     name: 'Microscope',
-    status: 'available',
+    resourceTypeId: 1,
+    resourceType: 'Microscope',
+    totalQuantity: 3,
+    availableQuantity: 3,
+    status: 'active',
+    confirmationPolicyOverride: null,
+    effectiveConfirmationPolicy: 'immediate',
+    version: 1,
+    ...overrides,
+  };
+}
+
+export function resourceConflictFixture(overrides: Partial<Record<string, string | number | boolean>> = {}) {
+  return {
+    code: 'resource_has_history',
+    detail: 'Resource has retained history',
+    canRetire: true,
+    ...overrides,
+  };
+}
+
+export function resourceBookingFixture(overrides: Partial<Record<string, string | number | null>> = {}) {
+  return {
+    id: 1,
+    resourceId: 1,
+    requestedById: 2,
+    startsAt: '2026-07-12T08:00:00Z',
+    endsAt: '2026-07-12T09:00:00Z',
+    quantity: 1,
+    status: 'confirmed',
+    confirmationPolicy: 'immediate',
+    reviewerId: null,
+    version: 1,
     ...overrides,
   };
 }

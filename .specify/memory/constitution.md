@@ -73,11 +73,6 @@ scope exclusions. Ambiguous questions MUST be recorded in the specification
 appendix or clarification section, and the clarification loop MUST be closed
 before entering the plan phase.
 
-The initial specification MUST be reviewed and accepted by product, testing, and
-development stakeholders before `/speckit-plan` proceeds. If this review is not
-represented by a project workflow artifact, the plan MUST record the missing
-review as a release risk and cannot proceed to implementation until resolved.
-
 Rationale: Specifications must be complete enough to drive implementation and
 CI validation without relying on hidden oral context.
 

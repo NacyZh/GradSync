@@ -150,13 +150,11 @@ class ProjectMaterialVisibilitySerializer(serializers.Serializer):
 class ProjectDashboardSerializer(ProjectSerializer):
     current_tasks = serializers.SerializerMethodField()
     pending_reviews = serializers.SerializerMethodField()
-    upcoming_bookings = serializers.SerializerMethodField()
 
     class Meta(ProjectSerializer.Meta):
         fields = ProjectSerializer.Meta.fields + [
             "current_tasks",
             "pending_reviews",
-            "upcoming_bookings",
         ]
 
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
@@ -195,14 +193,6 @@ class ProjectDashboardSerializer(ProjectSerializer):
                 }
             )
         return sorted(pending, key=lambda item: item["submitted_at"], reverse=True)[:10]
-
-    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
-    def get_upcoming_bookings(self, obj):
-        from apps.resources.serializers import BookingSerializer
-
-        return BookingSerializer(
-            obj.bookings.filter(status="reserved").order_by("starts_at")[:10], many=True
-        ).data
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
