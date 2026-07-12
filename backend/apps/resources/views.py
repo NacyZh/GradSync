@@ -100,7 +100,10 @@ class ResourceItemViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             conflicting_booking_count=Count(
                 "bookings",
                 filter=Q(
-                    bookings__status=Booking.Status.RESERVED,
+                    bookings__status__in=[
+                        Booking.Status.RESERVED,
+                        Booking.Status.CONFIRMED,
+                    ],
                     bookings__starts_at__lt=ends_at,
                     bookings__ends_at__gt=starts_at,
                 ),
@@ -136,10 +139,16 @@ class StandaloneBookingViewSet(viewsets.ModelViewSet):
         )
         status_filter = self.request.query_params.get("status")
         if status_filter:
-            queryset = queryset.filter(status=status_filter)
+            if status_filter == Booking.Status.RESERVED:
+                queryset = queryset.filter(
+                    status__in=[Booking.Status.RESERVED, Booking.Status.CONFIRMED]
+                )
+            else:
+                queryset = queryset.filter(status=status_filter)
         resource_item_id = self.request.query_params.get(
             "resourceId"
-        ) or self.request.query_params.get("resource_item_id")
+        ) or self.request.query_params.get("resourceItemId")
+        resource_item_id = resource_item_id or self.request.query_params.get("resource_item_id")
         if resource_item_id:
             queryset = queryset.filter(resource_item_id=resource_item_id)
         return queryset

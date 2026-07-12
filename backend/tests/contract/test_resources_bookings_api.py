@@ -1,4 +1,5 @@
 import pytest
+from django.utils import timezone
 
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.resources.models import ResourceItem, ResourceType
@@ -33,12 +34,15 @@ def test_resource_list_and_booking_create(api_client):
     resources_response = authenticate(api_client, student).get("/api/resource-items/")
     assert resources_response.status_code == 200
 
+    starts_at = timezone.now() + timezone.timedelta(days=2)
+    ends_at = starts_at + timezone.timedelta(hours=1)
+
     booking_response = api_client.post(
         f"/api/projects/{project.id}/bookings/",
         {
             "resourceItemId": resource.id,
-            "starts_at": "2026-06-26T10:00:00Z",
-            "ends_at": "2026-06-26T11:00:00Z",
+            "starts_at": starts_at.isoformat(),
+            "ends_at": ends_at.isoformat(),
         },
         format="json",
     )
