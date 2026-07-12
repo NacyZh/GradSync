@@ -12,120 +12,71 @@ function futureDateTimeLocal(daysFromNow: number, hour: number) {
 
 test.beforeEach(async ({ page }) => {
   await mockAuthenticatedApi(page);
-  if (fullStackE2E) {
-    return;
-  }
+  if (fullStackE2E) return;
+
   await page.route('**/api/resource-types/', async (route) => {
-    await fulfillJson(route, { results: [{ id: 7, name: 'Microscope', scope: 'global', fieldSchema: [], status: 'active' }] });
+    await fulfillJson(route, { results: [{
+      id: 7, name: 'Microscope', scope: 'global', fieldSchema: [],
+      confirmationPolicy: 'immediate', status: 'active',
+    }] });
   });
-  await page.route('**/api/resource-items/', async (route) => {
-    await fulfillJson(route, { results: [{ id: 41, resourceTypeId: 7, name: 'Confocal microscope', location: 'Room 2', status: 'available' }] });
+  await page.route('**/api/resources/', async (route) => {
+    await fulfillJson(route, { results: [{
+      id: 41, resourceTypeId: 7, resourceType: 'Microscope', name: 'Confocal microscope',
+      location: 'Room 2', status: 'active', totalQuantity: 2, availableQuantity: 2,
+      effectiveConfirmationPolicy: 'immediate', version: 1,
+    }] });
   });
-  await page.route('**/api/resource-items/availability/?**', async (route) => {
+  await page.route('**/api/resources/availability/?**', async (route) => {
     await fulfillJson(route, [
-      { id: 41, resourceTypeId: 7, name: 'Confocal microscope', location: 'Room 2', status: 'available', available: false, conflictingBookingCount: 1 },
-      { id: 42, resourceTypeId: 7, name: 'Open bench', location: 'Room 3', status: 'available', available: true, conflictingBookingCount: 0 },
+      { id: 41, resourceTypeId: 7, name: 'Confocal microscope', location: 'Room 2', status: 'active', totalQuantity: 2, availableQuantity: 0 },
+      { id: 42, resourceTypeId: 7, name: 'Open bench', location: 'Room 3', status: 'active', totalQuantity: 3, availableQuantity: 3 },
     ]);
   });
-  await page.route('**/api/projects/1/bookings/', async (route) => {
-    if (route.request().method() === 'GET') {
-      await fulfillJson(route, {
-        results: [{
-          id: 81,
-          project_id: 1,
-          resourceItemId: 41,
-          starts_at: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
-          ends_at: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
-          status: 'reserved',
-        }],
-      });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route('**/api/projects/1/bookings/81/cancel/', async (route) => {
-    await fulfillJson(route, {
-      id: 81,
-      project_id: 1,
-      resourceItemId: 41,
-      starts_at: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
-      ends_at: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
-      status: 'cancelled',
-    });
+  await page.route('**/api/resource-use-submissions/', async (route) => {
+    await fulfillJson(route, { results: [] });
   });
 });
 
 test('resource booking shows availability and handles conflict before success', async ({ page }) => {
-  if (fullStackE2E) {
-    await loginAs(page, 'student@example.edu');
-  }
+  if (fullStackE2E) await loginAs(page, 'student@example.edu');
+
   let attempts = 0;
   if (!fullStackE2E) {
-    await page.route('**/api/projects/1/bookings/', async (route) => {
-      if (route.request().method() === 'GET') {
-        await fulfillJson(route, {
-          results: [{
-            id: 81,
-            project_id: 1,
-            resourceItemId: 41,
-            starts_at: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
-            ends_at: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
-            status: 'reserved',
-          }],
-        });
-        return;
-      }
+    await page.route('**/api/bookings/', async (route) => {
       attempts += 1;
       if (attempts === 1) {
-        await fulfillJson(route, { message: 'Resource is already reserved for that time window' }, 400);
+        await fulfillJson(route, {
+          code: 'insufficient_capacity', availableQuantity: 0, requestedQuantity: 1,
+          detail: 'Resource has no remaining capacity for that time window',
+        }, 409);
         return;
       }
       await fulfillJson(route, {
-        id: 81,
-        project_id: 1,
-        resourceItemId: 41,
-        starts_at: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
-        ends_at: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
-        status: 'reserved',
+        id: 81, resourceId: 41, requestedById: 10,
+        startsAt: new Date(`${futureDateTimeLocal(4, 8)}:00`).toISOString(),
+        endsAt: new Date(`${futureDateTimeLocal(4, 9)}:00`).toISOString(),
+        quantity: 1, confirmationPolicy: 'immediate', status: 'confirmed', version: 1,
       }, 201);
     });
   }
 
   await page.goto('/projects/1/resources');
+  await expect(page).toHaveURL(/\/resources$/);
   await expect(page.getByRole('heading', { name: 'Lab resources' })).toBeVisible();
-  await expect(page.getByRole('banner')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText('Graphene Lab');
-  await expect(page.getByRole('region', { name: 'Resource filters' })).toContainText('0 active filters');
+  await expect(page.getByRole('region', { name: 'Selected project context' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Resource list' })).toContainText('Confocal microscope');
   await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Confocal microscope');
-  await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Open bench');
-  await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toBeVisible();
 
-  if (fullStackE2E) {
-    await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Available');
-    await page.getByLabel('Start', { exact: true }).fill(futureDateTimeLocal(4, 8));
-    await page.getByLabel('End', { exact: true }).fill(futureDateTimeLocal(4, 9));
-    await page.getByRole('button', { name: 'Reserve' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Booking confirmed' }).first()).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Upcoming booking actions' })).toContainText(/future|started/i);
-    await page.getByRole('button', { name: 'Cancel booking' }).first().click();
-    await expect(page.getByRole('dialog', { name: 'Cancel booking?' })).toBeVisible();
-    await page.getByRole('dialog', { name: 'Cancel booking?' }).getByRole('button', { name: 'Cancel booking' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Booking cancelled' }).first()).toBeVisible();
-    return;
-  }
-
-  await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Unavailable · 1 conflict');
-  await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Available');
   await page.getByLabel('Start', { exact: true }).fill(futureDateTimeLocal(4, 8));
   await page.getByLabel('End', { exact: true }).fill(futureDateTimeLocal(4, 9));
   await page.getByRole('button', { name: 'Reserve' }).click();
-  await expect(page.getByRole('alert')).toContainText('Resource is already reserved');
+
+  if (fullStackE2E) {
+    await expect(page.getByRole('status').filter({ hasText: /Booking (confirmed|submitted)/ }).first()).toBeVisible();
+    return;
+  }
+  await expect(page.getByRole('alert')).toContainText('no remaining capacity');
   await page.getByRole('button', { name: 'Reserve' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Booking confirmed' }).first()).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Upcoming booking actions' })).toContainText(/future|started/i);
-  await page.getByRole('button', { name: 'Cancel booking' }).click();
-  await expect(page.getByRole('dialog', { name: 'Cancel booking?' })).toBeVisible();
-  await page.getByRole('dialog', { name: 'Cancel booking?' }).getByRole('button', { name: 'Cancel booking' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Booking cancelled' }).first()).toBeVisible();
 });

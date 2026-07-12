@@ -41,7 +41,7 @@ const workspaceCases: ViewportCase[] = [
     height: 900,
     path: '/projects/1/resources',
     theme: 'light',
-    requiredRegions: ['Selected project context', 'Resource filters', 'Resource list', 'Booking calendar'],
+    requiredRegions: ['Resource filters', 'Resource list', 'Booking calendar'],
   },
 ];
 
@@ -73,18 +73,24 @@ test.describe('production workspace layout', () => {
       await expect(page.getByRole('banner')).toBeVisible();
       await expect(page.getByRole('main')).toBeVisible();
       await expect(page.getByRole('complementary', { name: 'Workspace navigation' })).toBeVisible();
-      await expect(page.getByRole('region', { name: 'Selected project context' })).toBeVisible();
+      const hasProjectContext = viewport.requiredRegions.includes('Selected project context');
+      if (hasProjectContext) {
+        await expect(page.getByRole('region', { name: 'Selected project context' })).toBeVisible();
+      } else {
+        await expect(page.getByRole('region', { name: 'Selected project context' })).toHaveCount(0);
+      }
 
       await setTheme(page, viewport.theme);
       for (const region of viewport.requiredRegions) {
         await expect(page.locator(`[aria-label="${region}"]`).first()).toBeVisible();
       }
 
-      await expectVisibleLandmarksDoNotOverlap(page, [
+      const shellLandmarks = [
         page.getByRole('banner'),
         page.getByRole('complementary', { name: 'Workspace navigation' }),
-        page.getByRole('region', { name: 'Selected project context' }),
-      ]);
+      ];
+      if (hasProjectContext) shellLandmarks.push(page.getByRole('region', { name: 'Selected project context' }));
+      await expectVisibleLandmarksDoNotOverlap(page, shellLandmarks);
 
       await page.screenshot({
         path: testInfo.outputPath(`${viewport.name}.png`),

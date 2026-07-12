@@ -313,23 +313,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ResourceItem"
-    post:
-      summary: Create a resource item
-      operationId: createResourceItem
-      tags: [Resources]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ResourceItemCreate"
-      responses:
-        "201":
-          description: Resource item created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ResourceItem"
   /projects/{projectId}/bookings:
     get:
       summary: List project bookings
