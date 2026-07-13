@@ -62,55 +62,6 @@ export type Booking = {
   version: number;
 };
 
-export type ResourceUseSubmission = {
-  id: number;
-  resourceId: number;
-  studentId: number;
-  studentName?: string;
-  submissionType: 'request' | 'use_record';
-  details: string;
-  status: 'pending' | 'confirmed' | 'rejected';
-  reviewerId?: number | null;
-  decisionNote?: string;
-  submitted_at?: string;
-  decided_at?: string | null;
-};
-
-function normalizeResourceUseSubmission(value: unknown): ResourceUseSubmission | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const item = value as Record<string, unknown>;
-  const resourceId = item.resourceId ?? item.resource_item_id;
-  const studentId = item.studentId ?? item.student_id;
-  const studentName = item.studentName ?? item.student_name;
-  const submissionType = item.submissionType ?? item.submission_type;
-  const decisionNote = item.decisionNote ?? item.decision_note;
-  const reviewerId = item.reviewerId ?? item.reviewer_id;
-  if (
-    typeof item.id !== 'number'
-    || typeof resourceId !== 'number'
-    || typeof studentId !== 'number'
-    || (studentName !== undefined && typeof studentName !== 'string')
-    || (submissionType !== 'request' && submissionType !== 'use_record')
-    || typeof item.details !== 'string'
-    || (item.status !== 'pending' && item.status !== 'confirmed' && item.status !== 'rejected')
-  ) {
-    return undefined;
-  }
-  return {
-    id: item.id,
-    resourceId,
-    studentId,
-    studentName,
-    submissionType,
-    details: item.details,
-    status: item.status,
-    reviewerId: typeof reviewerId === 'number' ? reviewerId : null,
-    decisionNote: typeof decisionNote === 'string' ? decisionNote : undefined,
-    submitted_at: typeof item.submitted_at === 'string' ? item.submitted_at : undefined,
-    decided_at: typeof item.decided_at === 'string' || item.decided_at === null ? item.decided_at : undefined,
-  };
-}
-
 export type LaboratoryResource = {
   id: number;
   name: string;
@@ -126,7 +77,6 @@ export type LaboratoryResource = {
   confirmationPolicyOverride?: ConfirmationPolicy | null;
   effectiveConfirmationPolicy: ConfirmationPolicy;
   version: number;
-  useSubmissions?: ResourceUseSubmission[];
   currentUsePeriods?: Array<{ bookingId: number; startsAt: string; endsAt: string; quantity: number }>;
 };
 
@@ -178,20 +128,6 @@ export function retireLaboratoryResource(resourceId: number, version: number) {
   });
 }
 
-export function createResourceUseSubmission(resourceId: number, payload: { submissionType: ResourceUseSubmission['submissionType']; details: string }) {
-  return apiRequest<ResourceUseSubmission>(`/api/resources/${resourceId}/use-submissions/`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function decideResourceUseSubmission(submissionId: number, payload: { status: 'confirmed' | 'rejected'; decisionNote?: string }) {
-  return apiRequest<ResourceUseSubmission>(`/api/resource-use-submissions/${submissionId}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
-  });
-}
-
 export function listResourceAvailability(startsAt: string, endsAt: string) {
   const params = new URLSearchParams({
     startsAt: new Date(startsAt).toISOString(),
@@ -232,15 +168,4 @@ export function decideBooking(bookingId: number, approve: boolean, decisionNote 
   return apiRequest<Booking>(`/api/bookings/${bookingId}/${approve ? 'approve' : 'reject'}/`, {
     method: 'POST', body: JSON.stringify({ decisionNote }),
   });
-}
-
-export function listResourceUseSubmissions() {
-  return apiRequest<{ results: unknown[] }>('/api/resource-use-submissions/')
-    .then((page) => {
-      const results = page?.results?.map(normalizeResourceUseSubmission);
-      if (!page || !Array.isArray(page.results) || results?.some((item) => !item)) {
-        throw new Error('Resource use records do not match the current API contract.');
-      }
-      return { ...page, results: results as ResourceUseSubmission[] };
-    });
 }

@@ -16,7 +16,6 @@ test.beforeEach(async ({ page }) => {
         description: 'Shared imaging station',
         status: 'active',
         useInstructions: 'Submit request first.',
-        useSubmissions: [],
       }, 201);
       return;
     }
@@ -28,45 +27,52 @@ test.beforeEach(async ({ page }) => {
         description: 'Shared imaging station',
         status: 'active',
         useInstructions: 'Submit request first.',
-        useSubmissions: [{
-          id: 21,
-          resourceId: 7,
-          studentId: 15,
-          studentName: 'Student One',
-          submissionType: 'request',
-          details: 'Image samples',
-          status: 'pending',
-        }],
       }],
     });
   });
-  await page.route('**/api/resources/7/use-submissions/', async (route) => {
-    await fulfillJson(route, {
-      id: 22,
-      resourceId: 7,
-      studentId: 10,
-      submissionType: 'request',
-      details: 'Use for calibration',
-      status: 'pending',
-    }, 201);
-  });
-  await page.route('**/api/resource-use-submissions/', async (route) => {
-    await fulfillJson(route, { results: [{
-      id: 21, resourceId: 7, studentId: 15, studentName: 'Student One',
-      submissionType: 'request', details: 'Image samples', status: 'pending',
-    }] });
-  });
-  await page.route('**/api/resource-use-submissions/21/', async (route) => {
-    await fulfillJson(route, {
-      id: 21,
-      resourceId: 7,
-      studentId: 15,
-      studentName: 'Student One',
-      submissionType: 'request',
-      details: 'Image samples',
-      status: 'confirmed',
-      decisionNote: 'Approved',
-    });
+  await page.route('**/api/bookings**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/api/bookings/21/approve/')) {
+      await fulfillJson(route, { id: 21, status: 'confirmed' });
+      return;
+    }
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      await fulfillJson(route, {
+        id: 22,
+        resourceId: body.resourceId,
+        resourceName: 'Confocal microscope',
+        requestedById: 10,
+        startsAt: body.startsAt,
+        endsAt: body.endsAt,
+        quantity: body.quantity,
+        origin: 'staff_direct',
+        confirmationPolicy: 'approval_required',
+        status: 'confirmed',
+        purpose: body.purpose,
+        version: 1,
+      }, 201);
+      return;
+    }
+    if (url.searchParams.get('reviewQueue') === 'true') {
+      await fulfillJson(route, { results: [{
+        id: 21,
+        resourceId: 7,
+        resourceName: 'Confocal microscope',
+        requestedById: 15,
+        requesterName: 'Student One',
+        startsAt: '2099-01-01T09:00:00Z',
+        endsAt: '2099-01-01T10:00:00Z',
+        quantity: 1,
+        origin: 'student_request',
+        confirmationPolicy: 'approval_required',
+        status: 'pending',
+        purpose: 'Image samples',
+        version: 1,
+      }] });
+      return;
+    }
+    await fulfillJson(route, { results: [] });
   });
 });
 
@@ -80,7 +86,7 @@ test('resource inventory and use submissions are role separated', async ({ page 
   await expect(page.getByRole('region', { name: 'Resource list' })).toContainText('Confocal microscope');
   await expect(page.getByRole('form', { name: 'Submit resource use' })).toBeVisible();
   if (fullStackE2E) {
-    await expect(page.getByLabel('Use details')).toBeVisible();
+    await expect(page.getByLabel('Start')).toBeVisible();
     return;
   }
 
@@ -93,10 +99,13 @@ test('resource inventory and use submissions are role separated', async ({ page 
   await page.getByRole('button', { name: 'Create resource' }).click();
   await expect(page.getByRole('dialog', { name: 'Create resource' })).toHaveCount(0);
 
-  await page.getByLabel('Use details').fill('Use for calibration');
-  await page.getByRole('button', { name: 'Submit use request' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Use submission pending' }).first()).toBeVisible();
+  const useForm = page.getByRole('form', { name: 'Submit resource use' });
+  await useForm.getByLabel('Start').fill('2099-01-02T09:00');
+  await useForm.getByLabel('End').fill('2099-01-02T10:00');
+  await useForm.getByLabel('Purpose').fill('Use for calibration');
+  await useForm.getByRole('button', { name: 'Record use' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Use recorded' }).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Confirm submission' }).click();
+  await page.getByRole('button', { name: 'Approve request' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Submission confirmed' }).first()).toBeVisible();
 });

@@ -133,12 +133,26 @@ describe('collaboration resources UI', () => {
     expect(useForm.compareDocumentPosition(submissions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('normalizes legacy use-record data without showing a contract error', async () => {
+  it('renders booking review queue without reading legacy use-submission records', async () => {
     mockFetch((url) => {
       if (url.includes('/api/accounts/me/')) return { id: 10, global_role: 'advisor', status: 'active' };
       if (url.endsWith('/api/resources/')) return { results: [resource()] };
-      if (url.includes('/api/resource-use-submissions/')) {
-        return { results: [{ id: 9, resource_item_id: 2, student_id: 11, submission_type: 'request', details: 'Legacy row', status: 'pending' }] };
+      if (url.includes('/api/bookings/?reviewQueue=true')) {
+        return { results: [{
+          id: 9,
+          resourceId: 2,
+          resourceName: 'Confocal microscope',
+          requestedById: 11,
+          requesterName: 'Student One',
+          startsAt: '2099-01-01T09:00:00Z',
+          endsAt: '2099-01-01T10:00:00Z',
+          quantity: 1,
+          origin: 'student_request',
+          confirmationPolicy: 'approval_required',
+          status: 'pending',
+          purpose: 'Booking queue row',
+          version: 1,
+        }] };
       }
       if (url.includes('/resource-types')) return { results: [] };
       return { results: [] };
@@ -147,7 +161,7 @@ describe('collaboration resources UI', () => {
     renderResources();
 
     expect((await screen.findAllByText('Confocal microscope')).length).toBeGreaterThan(0);
-    expect(await screen.findByText('Legacy row')).toBeInTheDocument();
+    expect(await screen.findByText('Booking queue row')).toBeInTheDocument();
     expect(screen.queryByText('Use records unavailable')).not.toBeInTheDocument();
   });
 });

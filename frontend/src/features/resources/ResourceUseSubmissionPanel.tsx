@@ -14,11 +14,8 @@ import type { Booking, LaboratoryResource } from './api';
 import {
   cancelBooking,
   createBooking,
-  createResourceUseSubmission,
   decideBooking,
-  decideResourceUseSubmission,
   listBookings,
-  listResourceUseSubmissions,
 } from './api';
 
 type ResourceUseSubmissionPanelProps = {
@@ -32,28 +29,16 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [quantity, setQuantity] = useState('1');
-  const [legacyDetails, setLegacyDetails] = useState('');
-  const [legacySubmitted, setLegacySubmitted] = useState(false);
-  const [legacyDecisionSuccess, setLegacyDecisionSuccess] = useState(false);
   const [formError, setFormError] = useState('');
-  const submissionsQuery = useQuery({ queryKey: ['resource-use-submissions'], queryFn: listResourceUseSubmissions });
   const bookingsQuery = useQuery({
     queryKey: canManage ? ['bookings', 'review-queue'] : ['bookings'],
     queryFn: () => listBookings(canManage ? { reviewQueue: true } : undefined),
   });
-  const submissions = useMemo(() => (submissionsQuery.data?.results ?? []).map((submission) => ({
-    ...submission,
-    resourceName: resources.find((resource) => resource.id === submission.resourceId)?.name ?? `Resource #${submission.resourceId}`,
-  })), [resources, submissionsQuery.data]);
   const bookings = useMemo(() => (bookingsQuery.data?.results ?? []).map((booking) => ({
     ...booking,
     resourceName: booking.resourceName ?? resources.find((resource) => resource.id === booking.resourceId)?.name ?? `Resource #${booking.resourceId}`,
   })), [bookingsQuery.data, resources]);
-  const pendingSubmissions = canManage
-    ? bookings.length
-      ? bookings.filter((booking) => booking.status === 'pending')
-      : submissions.filter((submission) => submission.status === 'pending')
-    : bookings.filter((booking) => booking.status === 'pending');
+  const pendingSubmissions = bookings.filter((booking) => booking.status === 'pending');
   const activeResources = useMemo(
     () => resources.filter((resource) => resource.status !== 'retired'),
     [resources],
@@ -77,63 +62,25 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
     }
   }, [quantity, selectedResource]);
 
+  function refreshResourceState() {
+    void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    void queryClient.invalidateQueries({ queryKey: ['resources'] });
+    void queryClient.invalidateQueries({ queryKey: ['resource-availability'] });
+  }
+
   const createMutation = useMutation({
     mutationFn: (payload: { resourceId: number; startsAt: string; endsAt: string; quantity: number; purpose?: string }) =>
       createBooking(payload),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['bookings'] }),
-        queryClient.invalidateQueries({ queryKey: ['resources'] }),
-        queryClient.invalidateQueries({ queryKey: ['resource-availability'] }),
-      ]);
-    },
+    onSuccess: refreshResourceState,
   });
   const decisionMutation = useMutation({
     mutationFn: (payload: { bookingId: number; approve: boolean; decisionNote?: string }) =>
       decideBooking(payload.bookingId, payload.approve, payload.decisionNote),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['bookings'] }),
-        queryClient.invalidateQueries({ queryKey: ['resources'] }),
-        queryClient.invalidateQueries({ queryKey: ['resource-availability'] }),
-      ]);
-    },
-  });
-  const legacyCreateMutation = useMutation({
-    mutationFn: (payload: { resourceId: number; details: string }) =>
-      createResourceUseSubmission(payload.resourceId, {
-        submissionType: 'request',
-        details: payload.details,
-      }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['resource-use-submissions'] }),
-        queryClient.invalidateQueries({ queryKey: ['resources'] }),
-      ]);
-    },
-  });
-  const legacyDecisionMutation = useMutation({
-    mutationFn: (payload: { submissionId: number; status: 'confirmed' | 'rejected' }) =>
-      decideResourceUseSubmission(payload.submissionId, {
-        status: payload.status,
-        decisionNote: payload.status === 'confirmed' ? 'Approved' : 'Rejected',
-      }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['resource-use-submissions'] }),
-        queryClient.invalidateQueries({ queryKey: ['resources'] }),
-      ]);
-    },
+    onSuccess: refreshResourceState,
   });
   const cancelMutation = useMutation({
     mutationFn: cancelBooking,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['bookings'] }),
-        queryClient.invalidateQueries({ queryKey: ['resources'] }),
-        queryClient.invalidateQueries({ queryKey: ['resource-availability'] }),
-      ]);
-    },
+    onSuccess: refreshResourceState,
   });
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -142,20 +89,10 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
     const requestedQuantity = Number(form.get('quantity'));
     const startValue = String(form.get('startsAt') ?? '');
     const endValue = String(form.get('endsAt') ?? '');
-    const detailsValue = String(form.get('details') ?? '').trim();
     const startMs = new Date(startValue).getTime();
     const endMs = new Date(endValue).getTime();
     if (!selectedResource) {
       setFormError('Choose a resource before submitting.');
-      return;
-    }
-    if (!startValue && !endValue && detailsValue) {
-      setFormError('');
-      setLegacySubmitted(true);
-      legacyCreateMutation.mutate({
-        resourceId: Number(form.get('resourceId')),
-        details: detailsValue,
-      });
       return;
     }
     if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
@@ -193,14 +130,6 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
       bookingId,
       approve,
       decisionNote: approve ? 'Approved' : 'Rejected',
-    });
-  }
-
-  function decideLegacy(submissionId: number, approve: boolean) {
-    setLegacyDecisionSuccess(true);
-    legacyDecisionMutation.mutate({
-      submissionId,
-      status: approve ? 'confirmed' : 'rejected',
     });
   }
 
@@ -263,28 +192,13 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
           <Label htmlFor="resourceUsePurpose">Purpose</Label>
           <Textarea id="resourceUsePurpose" name="purpose" placeholder="Briefly describe the intended use" />
         </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="resourceUseDetails">Use details</Label>
-          <Textarea
-            id="resourceUseDetails"
-            name="details"
-            value={legacyDetails}
-            onChange={(event) => setLegacyDetails(event.target.value)}
-            placeholder="Legacy request details for existing use-submission workflows"
-          />
-        </div>
-        <Button type="submit" disabled={createMutation.isPending || legacyCreateMutation.isPending || activeResources.length === 0}>
+        <Button type="submit" disabled={createMutation.isPending || activeResources.length === 0}>
           <Send className="h-4 w-4" aria-hidden="true" />
           {canManage ? 'Record use' : 'Submit use request'}
         </Button>
-        {canManage ? (
-          <Button type="submit" variant="outline" disabled={createMutation.isPending || legacyCreateMutation.isPending || activeResources.length === 0}>
-            Submit use request
-          </Button>
-        ) : null}
         <FormStatus
-          error={formError || createMutation.error?.message || legacyCreateMutation.error?.message}
-          success={createMutation.isSuccess ? (canManage ? 'Use recorded' : 'Use request pending review') : legacySubmitted || legacyCreateMutation.isSuccess ? 'Use submission pending' : undefined}
+          error={formError || createMutation.error?.message}
+          success={createMutation.isSuccess ? (canManage ? 'Use recorded' : 'Use request pending review') : undefined}
         />
       </form>
 
@@ -299,9 +213,9 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
           </div>
           <StatusBadge status={`${pendingSubmissions.length} pending`} />
         </div>
-        {submissionsQuery.isLoading || bookingsQuery.isLoading ? <DataState state="loading" message="Loading resource use records." /> : null}
-        {submissionsQuery.error || bookingsQuery.error ? <DataState state="error" title="Use records unavailable" message={(submissionsQuery.error ?? bookingsQuery.error)?.message ?? 'Unable to load resource use records.'} /> : null}
-        {!submissionsQuery.isLoading && !bookingsQuery.isLoading && !submissionsQuery.error && !bookingsQuery.error && submissions.length === 0 && bookings.length === 0 ? <DataState state="empty" title="No use submissions" message="Submitted resource use requests and records appear here." /> : null}
+        {bookingsQuery.isLoading ? <DataState state="loading" message="Loading resource use records." /> : null}
+        {bookingsQuery.error ? <DataState state="error" title="Use records unavailable" message={bookingsQuery.error.message ?? 'Unable to load resource use records.'} /> : null}
+        {!bookingsQuery.isLoading && !bookingsQuery.error && bookings.length === 0 ? <DataState state="empty" title={canManage ? 'No student requests' : 'No use submissions'} message={canManage ? 'Pending student resource requests appear here for review.' : 'Your resource use requests and direct outcomes appear here.'} /> : null}
         <ul className="resource-list">
           {bookings.map((booking) => (
             <li key={`booking-${booking.id}`} className="items-start">
@@ -335,35 +249,10 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
               </div>
             </li>
           ))}
-          {submissions.map((submission) => (
-            <li key={submission.id} className="items-start">
-              <div className="min-w-0">
-                <strong>{submission.resourceName}</strong>
-                <p>{submission.details}</p>
-                <p className="text-sm text-muted-foreground">{submission.studentName ?? `Student #${submission.studentId}`} · {submission.submissionType.replace('_', ' ')}</p>
-                {submission.decisionNote ? <small className="text-muted-foreground">{submission.decisionNote}</small> : null}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <StatusBadge status={submission.status} />
-                </div>
-                {canManage && submission.status === 'pending' ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" onClick={() => decideLegacy(submission.id, true)} disabled={legacyDecisionMutation.isPending}>
-                      <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                      Confirm submission
-                    </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => decideLegacy(submission.id, false)} disabled={legacyDecisionMutation.isPending}>
-                      <XCircle className="h-4 w-4" aria-hidden="true" />
-                      Reject submission
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            </li>
-          ))}
         </ul>
         <FormStatus
-          error={decisionMutation.error?.message ?? legacyDecisionMutation.error?.message ?? cancelMutation.error?.message}
-          success={decisionMutation.isSuccess || legacyDecisionSuccess || legacyDecisionMutation.isSuccess ? 'Submission confirmed' : cancelMutation.isSuccess ? 'Request cancelled' : undefined}
+          error={decisionMutation.error?.message ?? cancelMutation.error?.message}
+          success={decisionMutation.isSuccess ? 'Submission confirmed' : cancelMutation.isSuccess ? 'Request cancelled' : undefined}
         />
       </section>
     </div>

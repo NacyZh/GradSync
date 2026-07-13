@@ -33,9 +33,6 @@ test.beforeEach(async ({ page }) => {
       { id: 42, resourceTypeId: 7, name: 'Open bench', location: 'Room 3', status: 'active', totalQuantity: 3, availableQuantity: 3 },
     ]);
   });
-  await page.route('**/api/resource-use-submissions/', async (route) => {
-    await fulfillJson(route, { results: [] });
-  });
 });
 
 test('resource booking shows availability and handles conflict before success', async ({ page }) => {

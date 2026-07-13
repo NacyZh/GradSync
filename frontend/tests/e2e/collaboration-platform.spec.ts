@@ -233,16 +233,40 @@ async function mockCollaborationApi(page: Page) {
   );
   await page.route('**/api/resources/', async (route) => {
     if (route.request().method() === 'POST') {
-      await fulfillJson(route, { id: 12, name: 'New microscope', resourceType: 'Microscope', description: 'Shared imaging station', status: 'active', useInstructions: 'Submit request first.', useSubmissions: [] }, 201);
+      await fulfillJson(route, { id: 12, name: 'New microscope', resourceType: 'Microscope', description: 'Shared imaging station', status: 'active', useInstructions: 'Submit request first.' }, 201);
       return;
     }
-    await fulfillJson(route, { results: [{ id: 7, name: 'Confocal microscope', resourceType: 'Microscope', description: 'Shared imaging station', status: 'active', useInstructions: 'Submit request first.', useSubmissions: [{ id: 21, resourceId: 7, studentId: 15, studentName: 'Student One', submissionType: 'request', details: 'Image samples', status: 'pending' }] }] });
+    await fulfillJson(route, { results: [{ id: 7, name: 'Confocal microscope', resourceType: 'Microscope', description: 'Shared imaging station', status: 'active', useInstructions: 'Submit request first.' }] });
   });
   await page.route('**/api/resource-items/', async (route) => fulfillJson(route, { results: [{ id: 41, resourceTypeId: 1, name: 'Confocal microscope', status: 'available', available: true }] }));
   await page.route('**/api/resource-types/', async (route) => fulfillJson(route, { results: [{ id: 1, name: 'Microscope', scope: 'global', fieldSchema: [], status: 'active' }] }));
   await page.route('**/api/projects/1/bookings/', async (route) => fulfillJson(route, { results: [] }));
-  await page.route('**/api/resources/7/use-submissions/', async (route) => fulfillJson(route, { id: 22, resourceId: 7, studentId: 10, submissionType: 'request', details: 'Use for calibration', status: 'pending' }, 201));
-  await page.route('**/api/resource-use-submissions/21/', async (route) => fulfillJson(route, { id: 21, resourceId: 7, studentId: 15, studentName: 'Student One', submissionType: 'request', details: 'Image samples', status: 'confirmed', decisionNote: 'Approved' }));
+  await page.route('**/api/bookings**', async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      await fulfillJson(route, {
+        id: 22,
+        resourceId: body.resourceId,
+        resourceName: 'Confocal microscope',
+        requestedById: 10,
+        startsAt: body.startsAt,
+        endsAt: body.endsAt,
+        quantity: body.quantity,
+        origin: 'staff_direct',
+        confirmationPolicy: 'approval_required',
+        status: 'confirmed',
+        purpose: body.purpose,
+        version: 1,
+      }, 201);
+      return;
+    }
+    if (url.searchParams.get('reviewQueue') === 'true') {
+      await fulfillJson(route, { results: [] });
+      return;
+    }
+    await fulfillJson(route, { results: [] });
+  });
   await page.route('**/api/projects/1/notifications/', async (route) => {
     await fulfillJson(route, { results: [{ id: 31, project_id: 1, event_type: 'teacher_feedback_available', target_type: 'TeacherFeedback', target_id: '17', subject: 'Feedback available', action_path: '/writing', status: 'retry_needed', eligible_at: '2026-07-03T09:05:00Z', last_attempt_at: '2026-07-03T09:00:00Z', retry_count: 1, failure_reason: 'SMTP provider unavailable' }] });
   });
@@ -342,9 +366,12 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
   await test.step('laboratory resource inventory and student use', async () => {
     await page.goto('/projects/1/resources');
     await expect(page.getByRole('region', { name: 'Resource list' })).toContainText('Confocal microscope');
-    await page.getByLabel('Use details').fill('Use for calibration');
-    await page.getByRole('button', { name: 'Submit use request' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Use submission pending' }).first()).toBeVisible();
+    const useForm = page.getByRole('form', { name: 'Submit resource use' });
+    await useForm.getByLabel('Start').fill('2099-01-02T09:00');
+    await useForm.getByLabel('End').fill('2099-01-02T10:00');
+    await useForm.getByLabel('Purpose').fill('Use for calibration');
+    await useForm.getByRole('button', { name: 'Record use' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Use recorded' }).first()).toBeVisible();
   });
 
   await test.step('notification degradation status', async () => {

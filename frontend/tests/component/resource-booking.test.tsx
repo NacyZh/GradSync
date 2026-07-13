@@ -84,7 +84,6 @@ describe('resource booking UI', () => {
   it('submits a pending student resource use request with time and quantity', async () => {
     const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith('/api/resource-use-submissions/')) return jsonResponse({ results: [] });
       if (url.endsWith('/api/bookings/') && (!init || init.method === 'GET')) return jsonResponse({ results: [] });
       if (url.endsWith('/api/bookings/') && init?.method === 'POST') {
         const body = JSON.parse(String(init.body));
@@ -171,7 +170,6 @@ describe('resource booking UI', () => {
     const endsAt = new Date(`${futureDateTimeLocal(3, 11)}:00`).toISOString();
     const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith('/api/resource-use-submissions/')) return jsonResponse({ results: [] });
       if (url.endsWith('/api/bookings/') && (!init || init.method === 'GET')) {
         return jsonResponse({ results: [{
           id: 101,
@@ -225,7 +223,6 @@ describe('resource booking UI', () => {
     const endsAt = new Date(`${futureDateTimeLocal(4, 11)}:00`).toISOString();
     const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith('/api/resource-use-submissions/')) return jsonResponse({ results: [] });
       if (url.includes('/api/bookings/?reviewQueue=true') && (!init || init.method === 'GET')) {
         return jsonResponse({ results: [{
           id: 205,
@@ -281,7 +278,6 @@ describe('resource booking UI', () => {
   it('records advisor direct use immediately and blocks already-ended periods', async () => {
     const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith('/api/resource-use-submissions/')) return jsonResponse({ results: [] });
       if (url.includes('/api/bookings/?reviewQueue=true') && (!init || init.method === 'GET')) return jsonResponse({ results: [] });
       if (url.endsWith('/api/bookings/') && init?.method === 'POST') {
         const body = JSON.parse(String(init.body));
