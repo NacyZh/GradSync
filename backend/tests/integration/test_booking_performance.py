@@ -74,4 +74,6 @@ def test_resource_availability_handles_1000_resources_with_bounded_queries(
 
     assert response.status_code == 200
     assert len(response.json()["results"]) == 1000
-    assert response.json()["results"][0]["availableQuantity"] == 2
+    availability_by_id = {item["id"]: item for item in response.json()["results"]}
+    assert availability_by_id[resources[0].id]["availableQuantity"] == 2
+    assert availability_by_id[resources[-1].id]["availableQuantity"] == 3
