@@ -43,7 +43,6 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
     queryKey: ['resource-availability', startsAt, endsAt],
     queryFn: () => listResourceAvailability(startsAt, endsAt),
     enabled: hasValidWindow,
-    refetchInterval: hasValidWindow ? 5000 : false,
     refetchOnWindowFocus: true,
     placeholderData: (previous) => previous,
   });

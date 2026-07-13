@@ -340,7 +340,7 @@ describe('resource booking UI', () => {
     expect(await screen.findByText('Use recorded')).toBeInTheDocument();
   });
 
-  it('refreshes availability every five seconds while preserving observed data', async () => {
+  it('refreshes availability from user events without timer polling', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -379,7 +379,9 @@ describe('resource booking UI', () => {
     expect(screen.getByText(/1 allocated · 3 available/)).toBeInTheDocument();
 
     await vi.advanceTimersByTimeAsync(5100);
+    expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/resources/availability/'))).toHaveLength(1);
 
-    await waitFor(() => expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/resources/availability/')).length).toBeGreaterThanOrEqual(2));
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/resources/availability/')).length).toBe(2));
   });
 });

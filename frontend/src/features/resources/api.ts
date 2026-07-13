@@ -76,16 +76,39 @@ export type ResourceUseSubmission = {
   decided_at?: string | null;
 };
 
-function isResourceUseSubmission(value: unknown): value is ResourceUseSubmission {
-  if (!value || typeof value !== 'object') return false;
+function normalizeResourceUseSubmission(value: unknown): ResourceUseSubmission | undefined {
+  if (!value || typeof value !== 'object') return undefined;
   const item = value as Record<string, unknown>;
-  return typeof item.id === 'number'
-    && typeof item.resourceId === 'number'
-    && typeof item.studentId === 'number'
-    && (item.studentName === undefined || typeof item.studentName === 'string')
-    && (item.submissionType === 'request' || item.submissionType === 'use_record')
-    && typeof item.details === 'string'
-    && (item.status === 'pending' || item.status === 'confirmed' || item.status === 'rejected');
+  const resourceId = item.resourceId ?? item.resource_item_id;
+  const studentId = item.studentId ?? item.student_id;
+  const studentName = item.studentName ?? item.student_name;
+  const submissionType = item.submissionType ?? item.submission_type;
+  const decisionNote = item.decisionNote ?? item.decision_note;
+  const reviewerId = item.reviewerId ?? item.reviewer_id;
+  if (
+    typeof item.id !== 'number'
+    || typeof resourceId !== 'number'
+    || typeof studentId !== 'number'
+    || (studentName !== undefined && typeof studentName !== 'string')
+    || (submissionType !== 'request' && submissionType !== 'use_record')
+    || typeof item.details !== 'string'
+    || (item.status !== 'pending' && item.status !== 'confirmed' && item.status !== 'rejected')
+  ) {
+    return undefined;
+  }
+  return {
+    id: item.id,
+    resourceId,
+    studentId,
+    studentName,
+    submissionType,
+    details: item.details,
+    status: item.status,
+    reviewerId: typeof reviewerId === 'number' ? reviewerId : null,
+    decisionNote: typeof decisionNote === 'string' ? decisionNote : undefined,
+    submitted_at: typeof item.submitted_at === 'string' ? item.submitted_at : undefined,
+    decided_at: typeof item.decided_at === 'string' || item.decided_at === null ? item.decided_at : undefined,
+  };
 }
 
 export type LaboratoryResource = {
@@ -214,9 +237,10 @@ export function decideBooking(bookingId: number, approve: boolean, decisionNote 
 export function listResourceUseSubmissions() {
   return apiRequest<{ results: unknown[] }>('/api/resource-use-submissions/')
     .then((page) => {
-      if (!page || !Array.isArray(page.results) || !page.results.every(isResourceUseSubmission)) {
+      const results = page?.results?.map(normalizeResourceUseSubmission);
+      if (!page || !Array.isArray(page.results) || results?.some((item) => !item)) {
         throw new Error('Resource use records do not match the current API contract.');
       }
-      return { ...page, results: page.results };
+      return { ...page, results: results as ResourceUseSubmission[] };
     });
 }

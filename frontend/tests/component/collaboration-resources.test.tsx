@@ -133,7 +133,7 @@ describe('collaboration resources UI', () => {
     expect(useForm.compareDocumentPosition(submissions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('rejects legacy use-record data without crashing the resource workspace', async () => {
+  it('normalizes legacy use-record data without showing a contract error', async () => {
     mockFetch((url) => {
       if (url.includes('/api/accounts/me/')) return { id: 10, global_role: 'advisor', status: 'active' };
       if (url.endsWith('/api/resources/')) return { results: [resource()] };
@@ -147,7 +147,7 @@ describe('collaboration resources UI', () => {
     renderResources();
 
     expect((await screen.findAllByText('Confocal microscope')).length).toBeGreaterThan(0);
-    expect(await screen.findByText('Use records unavailable')).toBeInTheDocument();
-    expect(screen.getByText(/current API contract/i)).toBeInTheDocument();
+    expect(await screen.findByText('Legacy row')).toBeInTheDocument();
+    expect(screen.queryByText('Use records unavailable')).not.toBeInTheDocument();
   });
 });
