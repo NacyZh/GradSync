@@ -84,9 +84,12 @@ test('resource inventory and use submissions are role separated', async ({ page 
   await page.goto('/projects/1/resources');
   await expect(page.getByRole('heading', { name: 'Lab resources' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Resource list' })).toContainText('Confocal microscope');
-  await expect(page.getByRole('form', { name: 'Submit resource use' })).toBeVisible();
+  const useForm = page.getByRole('form', { name: 'Submit resource use' });
+  await expect(useForm).toBeVisible();
   if (fullStackE2E) {
-    await expect(page.getByLabel('Start')).toBeVisible();
+    await expect(useForm.getByLabel('Use resource')).toBeVisible();
+    await expect(useForm.getByLabel('Purpose')).toBeVisible();
+    await expect(useForm.getByRole('button', { name: 'Record use' })).toBeVisible();
     return;
   }
 
@@ -99,7 +102,6 @@ test('resource inventory and use submissions are role separated', async ({ page 
   await page.getByRole('button', { name: 'Create resource' }).click();
   await expect(page.getByRole('dialog', { name: 'Create resource' })).toHaveCount(0);
 
-  const useForm = page.getByRole('form', { name: 'Submit resource use' });
   await useForm.getByLabel('Start').fill('2099-01-02T09:00');
   await useForm.getByLabel('End').fill('2099-01-02T10:00');
   await useForm.getByLabel('Purpose').fill('Use for calibration');
