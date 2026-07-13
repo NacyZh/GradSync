@@ -111,4 +111,22 @@ describe('collaboration resources UI', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
+
+  it('rejects legacy use-record data without crashing the resource workspace', async () => {
+    mockFetch((url) => {
+      if (url.includes('/api/accounts/me/')) return { id: 10, global_role: 'advisor', status: 'active' };
+      if (url.endsWith('/api/resources/')) return { results: [resource()] };
+      if (url.includes('/api/resource-use-submissions/')) {
+        return { results: [{ id: 9, resource_item_id: 2, student_id: 11, submission_type: 'request', details: 'Legacy row', status: 'pending' }] };
+      }
+      if (url.includes('/resource-types')) return { results: [] };
+      return { results: [] };
+    });
+
+    renderResources();
+
+    expect((await screen.findAllByText('Confocal microscope')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Use records unavailable')).toBeInTheDocument();
+    expect(screen.getByText(/current API contract/i)).toBeInTheDocument();
+  });
 });

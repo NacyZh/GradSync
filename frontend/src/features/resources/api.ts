@@ -62,6 +62,18 @@ export type ResourceUseSubmission = {
   decided_at?: string | null;
 };
 
+function isResourceUseSubmission(value: unknown): value is ResourceUseSubmission {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Record<string, unknown>;
+  return typeof item.id === 'number'
+    && typeof item.resourceId === 'number'
+    && typeof item.studentId === 'number'
+    && (item.studentName === undefined || typeof item.studentName === 'string')
+    && (item.submissionType === 'request' || item.submissionType === 'use_record')
+    && typeof item.details === 'string'
+    && (item.status === 'pending' || item.status === 'confirmed' || item.status === 'rejected');
+}
+
 export type LaboratoryResource = {
   id: number;
   name: string;
@@ -180,5 +192,11 @@ export function decideBooking(bookingId: number, approve: boolean, decisionNote 
 }
 
 export function listResourceUseSubmissions() {
-  return apiRequest<{ results: ResourceUseSubmission[] }>('/api/resource-use-submissions/');
+  return apiRequest<{ results: unknown[] }>('/api/resource-use-submissions/')
+    .then((page) => {
+      if (!page || !Array.isArray(page.results) || !page.results.every(isResourceUseSubmission)) {
+        throw new Error('Resource use records do not match the current API contract.');
+      }
+      return { ...page, results: page.results };
+    });
 }

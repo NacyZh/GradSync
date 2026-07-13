@@ -136,7 +136,9 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
           </div>
           <StatusBadge status={`${pendingSubmissions.length} pending`} />
         </div>
-        {submissions.length === 0 ? <DataState state="empty" title="No use submissions" message="Submitted resource use requests and records appear here." /> : null}
+        {submissionsQuery.isLoading ? <DataState state="loading" message="Loading resource use records." /> : null}
+        {submissionsQuery.error ? <DataState state="error" title="Use records unavailable" message={submissionsQuery.error.message} /> : null}
+        {!submissionsQuery.isLoading && !submissionsQuery.error && submissions.length === 0 ? <DataState state="empty" title="No use submissions" message="Submitted resource use requests and records appear here." /> : null}
         <ul className="resource-list">
           {submissions.map((submission) => (
             <li key={submission.id} className="items-start">
