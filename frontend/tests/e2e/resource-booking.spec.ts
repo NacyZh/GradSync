@@ -145,7 +145,11 @@ test('student submits and cancels a resource use request', async ({ page }) => {
   await expect(page.getByRole('status').filter({ hasText: 'Use request pending review' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Resource use submissions' })).toContainText('pending');
 
-  await page.getByRole('button', { name: 'Cancel request' }).click();
+  await page
+    .getByRole('region', { name: 'Resource use submissions' })
+    .getByRole('button', { name: 'Cancel request' })
+    .first()
+    .click();
   await expect(page.getByRole('status').filter({ hasText: 'Request cancelled' })).toBeVisible();
 });
 

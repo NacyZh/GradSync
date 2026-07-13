@@ -141,6 +141,7 @@ export function useDocuments(projectId: number, query: string, categoryId: strin
     queryKey: ['documents', projectId, query, categoryId, visibility],
     queryFn: () => listDocuments(projectId, query, categoryId, visibility),
     enabled: Boolean(projectId),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -149,6 +150,7 @@ export function useSharedDocuments(query: string, categoryId: string, enabled = 
     queryKey: ['shared-documents', query, categoryId],
     queryFn: () => listSharedDocuments(query, categoryId),
     enabled,
+    placeholderData: (previous) => previous,
   });
 }
 

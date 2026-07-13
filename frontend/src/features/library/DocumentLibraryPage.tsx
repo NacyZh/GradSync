@@ -452,18 +452,19 @@ export function DocumentLibraryPage() {
       || documents.some((document) => document.actionCapabilities?.canUploadGroupWide),
   );
   const selectedDocument = documents.find((document) => document.id === selectedId);
-  const selectedDocumentForDisplay = standalone && selectedDocument
+  const displayDocument = selectedDocument ?? (!selectedId ? documents[0] : undefined);
+  const selectedDocumentForDisplay = standalone && displayDocument
     ? {
-        ...selectedDocument,
+        ...displayDocument,
         actionCapabilities: {
-          canView: selectedDocument.actionCapabilities?.canView ?? selectedDocument.status === 'active',
-          canDownload: selectedDocument.actionCapabilities?.canDownload ?? Boolean(selectedDocument.documentFileId),
+          canView: displayDocument.actionCapabilities?.canView ?? displayDocument.status === 'active',
+          canDownload: displayDocument.actionCapabilities?.canDownload ?? Boolean(displayDocument.documentFileId),
           canRename: false,
           canDelete: false,
           canUploadGroupWide: false,
         },
       }
-    : selectedDocument;
+    : displayDocument;
   const emptyTitle = standalone
     ? query
       ? 'No document search results'
