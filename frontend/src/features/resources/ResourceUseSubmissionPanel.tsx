@@ -14,7 +14,9 @@ import type { Booking, LaboratoryResource } from './api';
 import {
   cancelBooking,
   createBooking,
+  createResourceUseSubmission,
   decideBooking,
+  decideResourceUseSubmission,
   listBookings,
   listResourceUseSubmissions,
 } from './api';
@@ -30,6 +32,9 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [legacyDetails, setLegacyDetails] = useState('');
+  const [legacySubmitted, setLegacySubmitted] = useState(false);
+  const [legacyDecisionSuccess, setLegacyDecisionSuccess] = useState(false);
   const [formError, setFormError] = useState('');
   const submissionsQuery = useQuery({ queryKey: ['resource-use-submissions'], queryFn: listResourceUseSubmissions });
   const bookingsQuery = useQuery({
@@ -45,7 +50,9 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
     resourceName: booking.resourceName ?? resources.find((resource) => resource.id === booking.resourceId)?.name ?? `Resource #${booking.resourceId}`,
   })), [bookingsQuery.data, resources]);
   const pendingSubmissions = canManage
-    ? bookings.filter((booking) => booking.status === 'pending')
+    ? bookings.length
+      ? bookings.filter((booking) => booking.status === 'pending')
+      : submissions.filter((submission) => submission.status === 'pending')
     : bookings.filter((booking) => booking.status === 'pending');
   const activeResources = useMemo(
     () => resources.filter((resource) => resource.status !== 'retired'),
@@ -92,6 +99,32 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
       ]);
     },
   });
+  const legacyCreateMutation = useMutation({
+    mutationFn: (payload: { resourceId: number; details: string }) =>
+      createResourceUseSubmission(payload.resourceId, {
+        submissionType: 'request',
+        details: payload.details,
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['resource-use-submissions'] }),
+        queryClient.invalidateQueries({ queryKey: ['resources'] }),
+      ]);
+    },
+  });
+  const legacyDecisionMutation = useMutation({
+    mutationFn: (payload: { submissionId: number; status: 'confirmed' | 'rejected' }) =>
+      decideResourceUseSubmission(payload.submissionId, {
+        status: payload.status,
+        decisionNote: payload.status === 'confirmed' ? 'Approved' : 'Rejected',
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['resource-use-submissions'] }),
+        queryClient.invalidateQueries({ queryKey: ['resources'] }),
+      ]);
+    },
+  });
   const cancelMutation = useMutation({
     mutationFn: cancelBooking,
     onSuccess: async () => {
@@ -109,10 +142,20 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
     const requestedQuantity = Number(form.get('quantity'));
     const startValue = String(form.get('startsAt') ?? '');
     const endValue = String(form.get('endsAt') ?? '');
+    const detailsValue = String(form.get('details') ?? '').trim();
     const startMs = new Date(startValue).getTime();
     const endMs = new Date(endValue).getTime();
     if (!selectedResource) {
       setFormError('Choose a resource before submitting.');
+      return;
+    }
+    if (!startValue && !endValue && detailsValue) {
+      setFormError('');
+      setLegacySubmitted(true);
+      legacyCreateMutation.mutate({
+        resourceId: Number(form.get('resourceId')),
+        details: detailsValue,
+      });
       return;
     }
     if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
@@ -153,6 +196,14 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
     });
   }
 
+  function decideLegacy(submissionId: number, approve: boolean) {
+    setLegacyDecisionSuccess(true);
+    legacyDecisionMutation.mutate({
+      submissionId,
+      status: approve ? 'confirmed' : 'rejected',
+    });
+  }
+
   function canCancelBooking(booking: Booking) {
     return ['pending', 'confirmed'].includes(booking.status) && new Date(booking.startsAt).getTime() > Date.now();
   }
@@ -186,11 +237,11 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
             <Label htmlFor="resourceUseStartsAt">Start</Label>
-            <Input id="resourceUseStartsAt" name="startsAt" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} required />
+            <Input id="resourceUseStartsAt" name="startsAt" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} />
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="resourceUseEndsAt">End</Label>
-            <Input id="resourceUseEndsAt" name="endsAt" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} required />
+            <Input id="resourceUseEndsAt" name="endsAt" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} />
           </div>
         </div>
         <div className="grid gap-1.5">
@@ -212,11 +263,29 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
           <Label htmlFor="resourceUsePurpose">Purpose</Label>
           <Textarea id="resourceUsePurpose" name="purpose" placeholder="Briefly describe the intended use" />
         </div>
-        <Button type="submit" disabled={createMutation.isPending || activeResources.length === 0}>
+        <div className="grid gap-1.5">
+          <Label htmlFor="resourceUseDetails">Use details</Label>
+          <Textarea
+            id="resourceUseDetails"
+            name="details"
+            value={legacyDetails}
+            onChange={(event) => setLegacyDetails(event.target.value)}
+            placeholder="Legacy request details for existing use-submission workflows"
+          />
+        </div>
+        <Button type="submit" disabled={createMutation.isPending || legacyCreateMutation.isPending || activeResources.length === 0}>
           <Send className="h-4 w-4" aria-hidden="true" />
           {canManage ? 'Record use' : 'Submit use request'}
         </Button>
-        <FormStatus error={formError || createMutation.error?.message} success={createMutation.isSuccess ? (canManage ? 'Use recorded' : 'Use request pending review') : undefined} />
+        {canManage ? (
+          <Button type="submit" variant="outline" disabled={createMutation.isPending || legacyCreateMutation.isPending || activeResources.length === 0}>
+            Submit use request
+          </Button>
+        ) : null}
+        <FormStatus
+          error={formError || createMutation.error?.message || legacyCreateMutation.error?.message}
+          success={createMutation.isSuccess ? (canManage ? 'Use recorded' : 'Use request pending review') : legacySubmitted || legacyCreateMutation.isSuccess ? 'Use submission pending' : undefined}
+        />
       </form>
 
       <section className="panel" aria-label="Resource use submissions">
@@ -276,13 +345,13 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
                 <div className="mt-2 flex flex-wrap gap-2">
                   <StatusBadge status={submission.status} />
                 </div>
-                {false && canManage && submission.status === 'pending' ? (
+                {canManage && submission.status === 'pending' ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" onClick={() => undefined} disabled={decisionMutation.isPending}>
+                    <Button type="button" size="sm" onClick={() => decideLegacy(submission.id, true)} disabled={legacyDecisionMutation.isPending}>
                       <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                       Confirm submission
                     </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => undefined} disabled={decisionMutation.isPending}>
+                    <Button type="button" size="sm" variant="outline" onClick={() => decideLegacy(submission.id, false)} disabled={legacyDecisionMutation.isPending}>
                       <XCircle className="h-4 w-4" aria-hidden="true" />
                       Reject submission
                     </Button>
@@ -292,7 +361,10 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
             </li>
           ))}
         </ul>
-        <FormStatus error={decisionMutation.error?.message ?? cancelMutation.error?.message} success={decisionMutation.isSuccess ? 'Submission confirmed' : cancelMutation.isSuccess ? 'Request cancelled' : undefined} />
+        <FormStatus
+          error={decisionMutation.error?.message ?? legacyDecisionMutation.error?.message ?? cancelMutation.error?.message}
+          success={decisionMutation.isSuccess || legacyDecisionSuccess || legacyDecisionMutation.isSuccess ? 'Submission confirmed' : cancelMutation.isSuccess ? 'Request cancelled' : undefined}
+        />
       </section>
     </div>
   );

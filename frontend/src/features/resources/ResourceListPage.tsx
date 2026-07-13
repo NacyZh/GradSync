@@ -76,14 +76,17 @@ export function ResourceListPage() {
   function openEdit(resource: LaboratoryResource) { setEditing(resource); setInventoryOpen(true); }
   function save(payload: ResourceWrite & { version?: number }) {
     if (editing && payload.version) updateMutation.mutate({ id: editing.id, payload: { ...payload, version: payload.version } });
-    else createMutation.mutate(payload);
+    else {
+      setInventoryOpen(false);
+      createMutation.mutate(payload);
+    }
   }
 
   return (
     <PageShell
       title="Lab resources"
       description="Search shared research-group resources and manage real inventory."
-      actions={<><Badge variant="secondary">{filtered.length} visible</Badge>{canManage ? <Button onClick={openCreate}><PlusCircle className="h-4 w-4" />Create resource</Button> : null}</>}
+      actions={<><Badge variant="secondary">{filtered.length} visible</Badge>{canManage && !inventoryOpen ? <Button onClick={openCreate}><PlusCircle className="h-4 w-4" />Create resource</Button> : null}</>}
       className="resource-workspace"
     >
       <section className="panel" aria-label="Resource filters">

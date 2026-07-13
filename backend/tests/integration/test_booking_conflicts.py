@@ -37,7 +37,11 @@ def test_overlapping_booking_is_rejected():
 def test_student_cancel_releases_future_capacity_for_requested_window():
     student = UserFactory(global_role="student", status="active")
     resource = ResourceItem.objects.create(
-        resource_type=ResourceType.objects.create(name="seat", field_schema=[]),
+        resource_type=ResourceType.objects.create(
+            name="seat",
+            field_schema=[],
+            confirmation_policy=ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED,
+        ),
         name="Seat",
         total_quantity=1,
     )
@@ -66,7 +70,11 @@ def test_concurrent_approval_and_direct_use_do_not_exceed_capacity():
     manager = UserFactory(global_role="advisor", status="active")
     student = UserFactory(global_role="student", status="active")
     resource = ResourceItem.objects.create(
-        resource_type=ResourceType.objects.create(name="seat", field_schema=[]),
+        resource_type=ResourceType.objects.create(
+            name="seat",
+            field_schema=[],
+            confirmation_policy=ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED,
+        ),
         name="Seat",
         total_quantity=1,
     )

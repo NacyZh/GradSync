@@ -101,7 +101,10 @@ def test_use_submission_dependency_requires_retirement():
 def test_student_booking_is_pending_originated_and_capacity_validated():
     student = UserFactory(global_role="student", status="active")
     resource = ResourceItem.objects.create(
-        resource_type=ResourceType.objects.create(name="Microscope"),
+        resource_type=ResourceType.objects.create(
+            name="Microscope",
+            confirmation_policy=ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED,
+        ),
         name="Scope",
         total_quantity=2,
     )
@@ -127,7 +130,10 @@ def test_student_booking_is_pending_originated_and_capacity_validated():
 def test_student_booking_rejects_unusable_or_over_capacity_resource():
     student = UserFactory(global_role="student", status="active")
     resource = ResourceItem.objects.create(
-        resource_type=ResourceType.objects.create(name="Microscope"),
+        resource_type=ResourceType.objects.create(
+            name="Microscope",
+            confirmation_policy=ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED,
+        ),
         name="Scope",
         total_quantity=1,
     )
@@ -158,7 +164,10 @@ def test_student_can_cancel_own_not_started_booking_only():
     student = UserFactory(global_role="student", status="active")
     other_student = UserFactory(global_role="student", status="active")
     resource = ResourceItem.objects.create(
-        resource_type=ResourceType.objects.create(name="Microscope"),
+        resource_type=ResourceType.objects.create(
+            name="Microscope",
+            confirmation_policy=ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED,
+        ),
         name="Scope",
         total_quantity=1,
     )
@@ -188,8 +197,12 @@ def test_student_can_cancel_own_not_started_booking_only():
 def test_manager_can_approve_reject_and_duplicate_decision_conflicts():
     manager = UserFactory(global_role="advisor", status="active")
     student = UserFactory(global_role="student", status="active")
+    resource_type = ResourceType.objects.create(
+        name="Microscope",
+        confirmation_policy=ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED,
+    )
     resource = ResourceItem.objects.create(
-        resource_type=ResourceType.objects.create(name="Microscope"),
+        resource_type=resource_type,
         name="Scope",
         total_quantity=1,
     )

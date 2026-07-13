@@ -53,7 +53,10 @@ def test_resource_list_and_booking_create(api_client):
 def test_student_booking_api_creates_pending_request_and_allows_cancel(api_client):
     student = UserFactory(global_role="student", status="active")
     resource = ResourceItem.objects.create(
-        resource_type=ResourceType.objects.create(name="Microscope"),
+        resource_type=ResourceType.objects.create(
+            name="Microscope",
+            confirmation_policy=ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED,
+        ),
         name="Scope",
         total_quantity=4,
     )

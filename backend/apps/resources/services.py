@@ -459,7 +459,11 @@ class BookingService:
         if resource_item.status != ResourceItem.Status.AVAILABLE:
             raise ValidationError("Resource is not available for new use")
         policy = resource_item.effective_confirmation_policy
-        status = Booking.Status.PENDING if is_student else Booking.Status.CONFIRMED
+        status = (
+            Booking.Status.PENDING
+            if is_student and policy == ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED
+            else Booking.Status.CONFIRMED
+        )
         origin = Booking.Origin.STUDENT_REQUEST if is_student else (
             Booking.Origin.STAFF_DIRECT if is_manager else Booking.Origin.LEGACY_BOOKING
         )
