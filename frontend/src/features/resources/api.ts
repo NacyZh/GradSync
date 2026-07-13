@@ -11,12 +11,20 @@ export type ResourceItem = {
   status: string;
   available?: boolean;
   conflictingBookingCount?: number;
+  allocatedQuantity?: number;
   resourceType?: string;
   totalQuantity: number;
   availableQuantity?: number;
   confirmationPolicyOverride?: ConfirmationPolicy | null;
   effectiveConfirmationPolicy: ConfirmationPolicy;
   version: number;
+  currentUsePeriods?: Array<{ bookingId: number; startsAt: string; endsAt: string; quantity: number }>;
+};
+
+export type ResourceAvailabilityResponse = {
+  observedAt?: string;
+  freshnessToken?: string;
+  results: ResourceItem[];
 };
 
 export type ConfirmationPolicy = 'immediate' | 'approval_required';
@@ -36,15 +44,21 @@ export type ResourceType = {
 export type Booking = {
   id: number;
   resourceId: number;
+  resourceName?: string;
   requestedById: number;
+  requesterName?: string;
   startsAt: string;
   endsAt: string;
   quantity: number;
+  origin: 'student_request' | 'staff_direct' | 'legacy_booking';
   confirmationPolicy: ConfirmationPolicy;
   status: string;
   purpose?: string;
   reviewerId?: number | null;
   decisionNote?: string;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  createdAt?: string;
   version: number;
 };
 
@@ -90,6 +104,7 @@ export type LaboratoryResource = {
   effectiveConfirmationPolicy: ConfirmationPolicy;
   version: number;
   useSubmissions?: ResourceUseSubmission[];
+  currentUsePeriods?: Array<{ bookingId: number; startsAt: string; endsAt: string; quantity: number }>;
 };
 
 export type ResourceWrite = {
@@ -159,12 +174,17 @@ export function listResourceAvailability(startsAt: string, endsAt: string) {
     startsAt: new Date(startsAt).toISOString(),
     endsAt: new Date(endsAt).toISOString(),
   });
-  return apiRequest<ResourceItem[] | { results: ResourceItem[] }>(`/api/resources/availability/?${params.toString()}`)
-    .then((response) => Array.isArray(response) ? response : response.results);
+  return apiRequest<ResourceItem[] | ResourceAvailabilityResponse>(`/api/resources/availability/?${params.toString()}`)
+    .then((response) => Array.isArray(response) ? { results: response } : response);
 }
 
-export function listBookings() {
-  return apiRequest<{ results: Booking[] }>('/api/bookings/');
+export function listBookings(params?: { reviewQueue?: boolean; origin?: Booking['origin']; status?: string }) {
+  const search = new URLSearchParams();
+  if (params?.reviewQueue) search.set('reviewQueue', 'true');
+  if (params?.origin) search.set('origin', params.origin);
+  if (params?.status) search.set('status', params.status);
+  const suffix = search.toString() ? `?${search.toString()}` : '';
+  return apiRequest<{ results: Booking[] }>(`/api/bookings/${suffix}`);
 }
 
 export function createBooking(payload: { resourceId: number; startsAt: string; endsAt: string; quantity: number; purpose?: string }) {

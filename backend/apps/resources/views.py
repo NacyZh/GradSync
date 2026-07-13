@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import mixins, status, viewsets
@@ -28,6 +29,8 @@ from .services import (
     BookingService,
     ResourceConflict,
     ResourceInventoryService,
+    current_use_periods_by_resource,
+    reconcile_completed_bookings,
     resource_status_from_contract,
 )
 
@@ -127,6 +130,18 @@ class StandaloneBookingViewSet(viewsets.ModelViewSet):
         queryset = Booking.objects.select_related("resource_item", "resource_item__resource_type")
         if getattr(self.request.user, "global_role", "") == "student":
             queryset = queryset.filter(requested_by=self.request.user)
+        review_queue = self.request.query_params.get("reviewQueue")
+        if review_queue in {"true", "1", "yes"}:
+            if getattr(self.request.user, "global_role", "") not in {"advisor", "admin"}:
+                queryset = queryset.none()
+            else:
+                queryset = queryset.filter(
+                    origin=Booking.Origin.STUDENT_REQUEST,
+                    status=Booking.Status.PENDING,
+                )
+        origin_filter = self.request.query_params.get("origin")
+        if origin_filter:
+            queryset = queryset.filter(origin=origin_filter)
         queryset = apply_text_search(
             queryset,
             self.request.query_params.get("search"),
@@ -196,6 +211,8 @@ class StandaloneBookingViewSet(viewsets.ModelViewSet):
         booking = self.get_object()
         try:
             booking = BookingService(request.user).cancel_booking(booking)
+        except ResourceConflict as exc:
+            return Response(exc.payload, status=status.HTTP_409_CONFLICT)
         except DjangoValidationError as exc:
             raise ValidationError(exc.messages) from exc
         return Response(BookingSerializer(booking).data)
@@ -290,7 +307,17 @@ class LaboratoryResourceViewSet(
         responses={200: LaboratoryResourceSerializer(many=True)},
     )
     def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+        reconcile_completed_bookings()
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        resources = list(page if page is not None else queryset)
+        current_periods = current_use_periods_by_resource([resource.id for resource in resources])
+        for resource in resources:
+            resource.current_use_periods = current_periods.get(resource.id, [])
+        serializer = self.get_serializer(resources, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response({"results": serializer.data})
 
     def get_queryset(self):
         queryset = self.queryset
@@ -311,6 +338,8 @@ class LaboratoryResourceViewSet(
 
     @action(detail=False, methods=["get"], url_path="availability")
     def availability(self, request):
+        observed_at = timezone.now()
+        reconcile_completed_bookings(observed_at)
         starts_at = parse_datetime(
             request.query_params.get("startsAt", "") or request.query_params.get("starts_at", "")
         )
@@ -331,11 +360,24 @@ class LaboratoryResourceViewSet(
             )
         )
         resources = list(queryset)
+        current_periods = current_use_periods_by_resource(
+            [resource.id for resource in resources],
+            now=observed_at,
+        )
         for resource in resources:
+            resource.allocated_quantity = resource.reserved_quantity
             resource.available_quantity = max(
                 resource.total_quantity - resource.reserved_quantity, 0
             )
-        return Response(LaboratoryResourceSerializer(resources, many=True).data)
+            resource.current_use_periods = current_periods.get(resource.id, [])
+        serialized = LaboratoryResourceSerializer(resources, many=True).data
+        return Response(
+            {
+                "observedAt": observed_at.isoformat(),
+                "freshnessToken": f"{observed_at.timestamp():.6f}:{len(resources)}",
+                "results": serialized,
+            }
+        )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

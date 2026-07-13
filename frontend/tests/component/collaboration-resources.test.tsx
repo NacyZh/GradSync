@@ -112,6 +112,27 @@ describe('collaboration resources UI', () => {
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 
+  it('keeps the resource workspace regions in the required reading order', async () => {
+    mockFetch((url) => {
+      if (url.includes('/api/accounts/me/')) return { id: 11, global_role: 'student', status: 'active' };
+      if (url.endsWith('/api/resources/')) return { results: [resource()] };
+      if (url.includes('/api/resources/availability/')) return { observedAt: new Date().toISOString(), freshnessToken: '1', results: [resource()] };
+      if (url.includes('/resource-types')) return { results: [] };
+      return { results: [] };
+    });
+    renderResources();
+
+    await screen.findAllByText('Confocal microscope');
+    const resourceList = screen.getByRole('region', { name: 'Resource list' });
+    const availability = screen.getByRole('region', { name: 'Booking calendar' });
+    const useForm = screen.getByRole('form', { name: 'Submit resource use' });
+    const submissions = screen.getByRole('region', { name: 'Resource use submissions' });
+
+    expect(resourceList.compareDocumentPosition(availability) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(availability.compareDocumentPosition(useForm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(useForm.compareDocumentPosition(submissions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('rejects legacy use-record data without crashing the resource workspace', async () => {
     mockFetch((url) => {
       if (url.includes('/api/accounts/me/')) return { id: 10, global_role: 'advisor', status: 'active' };

@@ -56,20 +56,20 @@ export function ResourceListPage() {
 
   const createMutation = useMutation({
     mutationFn: createLaboratoryResource,
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['resources'] }); setInventoryOpen(false); },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setInventoryOpen(false); },
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: ResourceWrite & { version: number } }) => updateLaboratoryResource(id, payload),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['resources'] }); setInventoryOpen(false); setEditing(undefined); },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setInventoryOpen(false); setEditing(undefined); },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteLaboratoryResource,
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['resources'] }); setLifecycle(undefined); setCanRetire(false); },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setLifecycle(undefined); setCanRetire(false); },
     onError: () => setCanRetire(true),
   });
   const retireMutation = useMutation({
     mutationFn: (resource: LaboratoryResource) => retireLaboratoryResource(resource.id, resource.version),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['resources'] }); setLifecycle(undefined); setCanRetire(false); },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setLifecycle(undefined); setCanRetire(false); },
   });
 
   function openCreate() { setEditing(undefined); setInventoryOpen(true); }
@@ -103,7 +103,26 @@ export function ResourceListPage() {
           {resourcesQuery.error ? <DataState state="error" title="Resources unavailable" message={resourcesQuery.error.message} /> : null}
           {!resourcesQuery.isLoading && filtered.length === 0 ? <DataState state={query || typeFilter !== 'all' || statusFilter !== 'bookable' ? 'filtered-empty' : 'empty'} title="No resources" message={canManage ? 'Create the first real resource to begin.' : 'No shared resources are currently available.'} /> : null}
           <ul className="resource-list">
-            {filtered.map((resource) => <li key={resource.id} className="items-start"><div className="min-w-0"><strong>{resource.name}</strong><p>{resource.resourceType} · {resource.location || 'No location'}</p><p>{resource.availableQuantity ?? resource.totalQuantity} of {resource.totalQuantity} available · {resource.effectiveConfirmationPolicy === 'immediate' ? 'Immediate confirmation' : 'Approval required'}</p></div><div className="flex flex-wrap items-center justify-end gap-2"><StatusBadge status={resource.status} />{canManage ? <><Button size="sm" variant="outline" onClick={() => openEdit(resource)}><Pencil className="h-4 w-4" />Edit</Button><Button size="sm" variant="destructive" onClick={() => { setCanRetire(false); setLifecycle(resource); }}><Trash2 className="h-4 w-4" />Delete</Button></> : null}</div></li>)}
+            {filtered.map((resource) => (
+              <li key={resource.id} className="items-start">
+                <div className="min-w-0">
+                  <strong>{resource.name}</strong>
+                  <p>{resource.resourceType} · {resource.location || 'No location'}</p>
+                  <p>{resource.availableQuantity ?? resource.totalQuantity} of {resource.totalQuantity} available · {resource.effectiveConfirmationPolicy === 'immediate' ? 'Immediate confirmation' : 'Approval required'}</p>
+                </div>
+                <div className="flex flex-col items-end gap-2 text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <StatusBadge status={resource.status} />
+                    {canManage ? <><Button size="sm" variant="outline" onClick={() => openEdit(resource)}><Pencil className="h-4 w-4" />Edit</Button><Button size="sm" variant="destructive" onClick={() => { setCanRetire(false); setLifecycle(resource); }}><Trash2 className="h-4 w-4" />Delete</Button></> : null}
+                  </div>
+                  {resource.currentUsePeriods?.length ? (
+                    <small className="text-muted-foreground">
+                      In use {new Date(resource.currentUsePeriods[0].startsAt).toLocaleTimeString()}–{new Date(resource.currentUsePeriods[0].endsAt).toLocaleTimeString()} · Qty {resource.currentUsePeriods[0].quantity}
+                    </small>
+                  ) : null}
+                </div>
+              </li>
+            ))}
           </ul>
         </section>
         <BookingCalendar onWindowChange={setAvailabilityWindow} />

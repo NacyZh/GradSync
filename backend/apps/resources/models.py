@@ -152,6 +152,11 @@ class ResourceUseSubmission(models.Model):
 
 
 class Booking(models.Model):
+    class Origin(models.TextChoices):
+        STUDENT_REQUEST = "student_request", "Student request"
+        STAFF_DIRECT = "staff_direct", "Staff direct"
+        LEGACY_BOOKING = "legacy_booking", "Legacy booking"
+
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         CONFIRMED = "confirmed", "Confirmed"
@@ -174,6 +179,11 @@ class Booking(models.Model):
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
     quantity = models.PositiveIntegerField(default=1)
+    origin = models.CharField(
+        max_length=24,
+        choices=Origin.choices,
+        default=Origin.LEGACY_BOOKING,
+    )
     confirmation_policy = models.CharField(
         max_length=24,
         choices=ResourceType.ConfirmationPolicy.choices,
@@ -194,6 +204,7 @@ class Booking(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -211,4 +222,5 @@ class Booking(models.Model):
                 name="booking_overlap_idx",
             ),
             models.Index(fields=["requested_by", "status"], name="booking_requester_idx"),
+            models.Index(fields=["status", "created_at"], name="booking_review_queue_idx"),
         ]

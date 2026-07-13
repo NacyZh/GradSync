@@ -85,7 +85,7 @@
 
   .topbar-role,
   .status-pill {
-    @apply inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-extrabold capitalize text-muted-foreground;
+    @apply inline-flex items-center justify-center rounded-full bg-muted px-2.5 py-1 text-center text-xs font-extrabold capitalize text-muted-foreground;
   }
 
   .status-pill.completed,
@@ -209,7 +209,7 @@
   .resource-list li,
   .notification-list li,
   .timeline li {
-    @apply flex justify-between gap-3 rounded-md border p-3;
+    @apply flex items-center justify-between gap-3 rounded-md border p-3;
   }
 
   .resource-list p,

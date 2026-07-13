@@ -33,6 +33,21 @@ def _is_active_student(user) -> bool:
     )
 
 
+def _booking_snapshot(booking: Booking, *, outcome: str, prior_status: str | None = None):
+    return {
+        "bookingId": booking.pk,
+        "requesterId": booking.requested_by_id,
+        "resourceId": booking.resource_item_id,
+        "quantity": booking.quantity,
+        "startsAt": booking.starts_at.isoformat() if booking.starts_at else None,
+        "endsAt": booking.ends_at.isoformat() if booking.ends_at else None,
+        "origin": booking.origin,
+        "priorStatus": prior_status,
+        "currentStatus": booking.status,
+        "outcome": outcome,
+    }
+
+
 def resource_status_to_contract(status: str) -> str:
     if status == ResourceItem.Status.AVAILABLE:
         return "active"
@@ -45,6 +60,54 @@ def resource_status_from_contract(status: str) -> str:
     if status in {ResourceItem.Status.UNAVAILABLE, ResourceItem.Status.RETIRED}:
         return status
     raise ValidationError("Unsupported resource status")
+
+
+def reconcile_completed_bookings(now=None) -> int:
+    now = now or timezone.now()
+    updated = Booking.objects.filter(
+        status__in=[Booking.Status.CONFIRMED, Booking.Status.RESERVED],
+        ends_at__lte=now,
+        completed_at__isnull=True,
+    ).update(status=Booking.Status.COMPLETED, completed_at=now)
+    if updated:
+        record_event(
+            None,
+            None,
+            "booking.completion_reconciled",
+            f"Completed {updated} ended booking(s)",
+            target_snapshot={"completedCount": updated, "observedAt": now.isoformat()},
+        )
+    return updated
+
+
+def current_use_periods_by_resource(resource_ids, now=None, *, limit_per_resource=3):
+    now = now or timezone.now()
+    grouped = {resource_id: [] for resource_id in resource_ids}
+    if not grouped:
+        return grouped
+    bookings = (
+        Booking.objects.filter(
+            resource_item_id__in=grouped.keys(),
+            status__in=[Booking.Status.CONFIRMED, Booking.Status.RESERVED],
+            starts_at__lte=now,
+            ends_at__gt=now,
+        )
+        .order_by("resource_item_id", "ends_at", "starts_at")
+        .values("id", "resource_item_id", "starts_at", "ends_at", "quantity")
+    )
+    for booking in bookings:
+        periods = grouped[booking["resource_item_id"]]
+        if len(periods) >= limit_per_resource:
+            continue
+        periods.append(
+            {
+                "bookingId": booking["id"],
+                "startsAt": booking["starts_at"].isoformat(),
+                "endsAt": booking["ends_at"].isoformat(),
+                "quantity": booking["quantity"],
+            }
+        )
+    return grouped
 
 
 class ResourceInventoryService:
@@ -333,8 +396,33 @@ class BookingService:
             raise ValidationError("Bookings must start in the future")
         return starts_at, ends_at
 
+    def _direct_use_window(self, starts_at, ends_at):
+        starts_at = parse_datetime(starts_at) if isinstance(starts_at, str) else starts_at
+        ends_at = parse_datetime(ends_at) if isinstance(ends_at, str) else ends_at
+        now = timezone.now()
+        if not starts_at or not ends_at or ends_at <= starts_at:
+            raise ValidationError("Booking end time must be after start time")
+        if ends_at <= now:
+            raise ValidationError("Direct resource use cannot be recorded after it has ended")
+        return starts_at, ends_at
+
     def _assert_capacity(self, resource_item, starts_at, ends_at, quantity, exclude=None):
         resource_item = ResourceItem.objects.select_for_update().get(pk=resource_item.pk)
+        if resource_item.status != ResourceItem.Status.AVAILABLE:
+            raise ResourceConflict(
+                {
+                    "code": "resource_unusable",
+                    "detail": "Resource is not available for new use",
+                }
+            )
+        if quantity > resource_item.total_quantity:
+            raise ResourceConflict(
+                {
+                    "code": "insufficient_capacity",
+                    "availableQuantity": resource_item.total_quantity,
+                    "requestedQuantity": quantity,
+                }
+            )
         overlapping = Booking.objects.filter(
             resource_item=resource_item,
             status__in=[Booking.Status.CONFIRMED, Booking.Status.RESERVED],
@@ -359,17 +447,23 @@ class BookingService:
         self, *, resource_item, starts_at, ends_at, quantity=1, purpose: str = "", project=None
     ) -> Booking:
         self._require_active_user()
-        starts_at, ends_at = self._window(starts_at, ends_at)
+        is_student = _is_active_student(self.user)
+        is_manager = _is_resource_manager(self.user)
+        starts_at, ends_at = (
+            self._window(starts_at, ends_at)
+            if is_student or not is_manager
+            else self._direct_use_window(starts_at, ends_at)
+        )
         if quantity < 1:
             raise ValidationError({"quantity": "Quantity must be at least 1"})
+        if resource_item.status != ResourceItem.Status.AVAILABLE:
+            raise ValidationError("Resource is not available for new use")
         policy = resource_item.effective_confirmation_policy
-        status = (
-            Booking.Status.PENDING
-            if policy == ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED
-            else Booking.Status.CONFIRMED
+        status = Booking.Status.PENDING if is_student else Booking.Status.CONFIRMED
+        origin = Booking.Origin.STUDENT_REQUEST if is_student else (
+            Booking.Origin.STAFF_DIRECT if is_manager else Booking.Origin.LEGACY_BOOKING
         )
-        if status == Booking.Status.CONFIRMED:
-            self._assert_capacity(resource_item, starts_at, ends_at, quantity)
+        self._assert_capacity(resource_item, starts_at, ends_at, quantity)
         booking = Booking.objects.create(
             project=project or self.project,
             resource_item=resource_item,
@@ -377,11 +471,19 @@ class BookingService:
             starts_at=starts_at,
             ends_at=ends_at,
             quantity=quantity,
+            origin=origin,
             confirmation_policy=policy,
             status=status,
             purpose=purpose,
         )
-        record_event(None, self.user, "booking.created", f"Created booking {booking.id}", booking)
+        record_event(
+            None,
+            self.user,
+            "booking.created",
+            f"Created booking {booking.id}",
+            booking,
+            target_snapshot=_booking_snapshot(booking, outcome="created"),
+        )
         self._notify_booking_change(booking, f"Booking {status}")
         return booking
 
@@ -424,40 +526,100 @@ class BookingService:
     @transaction.atomic
     def cancel_booking(self, booking: Booking) -> Booking:
         self._require_active_user()
+        booking = Booking.objects.select_for_update().get(pk=booking.pk)
         self._ensure_future_booking(booking)
         if booking.requested_by_id != self.user.id and not _is_resource_manager(self.user):
             raise ValidationError("Only the requester or an advisor can cancel this booking")
+        if booking.status not in {
+            Booking.Status.PENDING,
+            Booking.Status.CONFIRMED,
+            Booking.Status.RESERVED,
+        }:
+            raise ResourceConflict(
+                {
+                    "code": "stale_decision",
+                    "currentStatus": booking.status,
+                    "detail": "Only pending or confirmed bookings can be cancelled",
+                }
+            )
+        prior_status = booking.status
         booking.status = Booking.Status.CANCELLED
         booking.cancelled_at = timezone.now()
         booking.version += 1
         booking.save(update_fields=["status", "cancelled_at", "version", "updated_at"])
         self._notify_booking_change(booking, "Booking cancelled")
         record_event(
-            None, self.user, "booking.cancelled", f"Cancelled booking {booking.id}", booking
+            None,
+            self.user,
+            "booking.cancelled",
+            f"Cancelled booking {booking.id}",
+            booking,
+            target_snapshot=_booking_snapshot(
+                booking, outcome="cancelled", prior_status=prior_status
+            ),
         )
         return booking
 
-    @transaction.atomic
     def decide_booking(self, booking: Booking, *, approve: bool, decision_note: str = ""):
         self._require_manager()
-        booking = Booking.objects.select_for_update().get(pk=booking.pk)
-        if booking.status != Booking.Status.PENDING:
-            raise ValidationError("Only pending bookings can be decided")
-        if approve:
-            self._assert_capacity(
-                booking.resource_item, booking.starts_at, booking.ends_at, booking.quantity
+        try:
+            with transaction.atomic():
+                booking = Booking.objects.select_for_update().get(pk=booking.pk)
+                if booking.status != Booking.Status.PENDING:
+                    raise ResourceConflict(
+                        {
+                            "code": "duplicate_decision",
+                            "currentStatus": booking.status,
+                            "detail": "Only pending bookings can be decided",
+                        }
+                    )
+                prior_status = booking.status
+                if approve:
+                    self._assert_capacity(
+                        booking.resource_item, booking.starts_at, booking.ends_at, booking.quantity
+                    )
+                    booking.status = Booking.Status.CONFIRMED
+                else:
+                    booking.status = Booking.Status.REJECTED
+                booking.reviewer = self.user
+                booking.decision_note = decision_note.strip()
+                booking.decided_at = timezone.now()
+                booking.version += 1
+                booking.save()
+                record_event(
+                    None,
+                    self.user,
+                    f"booking.{booking.status}",
+                    f"Booking {booking.status}",
+                    booking,
+                    target_snapshot=_booking_snapshot(
+                        booking, outcome=booking.status, prior_status=prior_status
+                    ),
+                )
+        except ResourceConflict as exc:
+            fresh_booking = Booking.objects.get(pk=booking.pk)
+            event_type = (
+                "booking.capacity_conflict"
+                if exc.payload.get("code") == "insufficient_capacity"
+                else "booking.duplicate_decision"
             )
-            booking.status = Booking.Status.CONFIRMED
-        else:
-            booking.status = Booking.Status.REJECTED
-        booking.reviewer = self.user
-        booking.decision_note = decision_note.strip()
-        booking.decided_at = timezone.now()
-        booking.version += 1
-        booking.save()
-        record_event(
-            None, self.user, f"booking.{booking.status}", f"Booking {booking.status}", booking
-        )
+            outcome = (
+                "capacity_conflict"
+                if exc.payload.get("code") == "insufficient_capacity"
+                else "duplicate_decision"
+            )
+            record_event(
+                None,
+                self.user,
+                event_type,
+                f"Decision conflict for booking {fresh_booking.id}",
+                fresh_booking,
+                target_snapshot={
+                    **_booking_snapshot(fresh_booking, outcome=outcome),
+                    **exc.payload,
+                },
+            )
+            raise
         self._notify_booking_change(booking, f"Booking {booking.status}")
         return booking
 

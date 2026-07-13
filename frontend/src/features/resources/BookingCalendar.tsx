@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, Filter } from 'lucide-react';
+import { CalendarClock, Filter, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Badge } from '@/shared/ui/primitives/badge';
+import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { DataState } from '../../shared/ui/DataState';
@@ -42,9 +43,13 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
     queryKey: ['resource-availability', startsAt, endsAt],
     queryFn: () => listResourceAvailability(startsAt, endsAt),
     enabled: hasValidWindow,
+    refetchInterval: hasValidWindow ? 5000 : false,
+    refetchOnWindowFocus: true,
+    placeholderData: (previous) => previous,
   });
-  const availability = availabilityQuery.data ?? [];
+  const availability = availabilityQuery.data?.results ?? [];
   const unavailable = availability.filter((resource) => (resource.availableQuantity ?? resource.totalQuantity) < 1);
+  const observedAt = availabilityQuery.data?.observedAt;
 
   function updateWindow(nextStartsAt = startsAt, nextEndsAt = endsAt) {
     const nextStartsAtMs = new Date(nextStartsAt).getTime();
@@ -66,10 +71,16 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
           </h2>
           <p className="text-sm text-muted-foreground">Choose a future window before reserving or checking conflicts.</p>
         </div>
-        <Badge variant="secondary">
-          <Filter className="h-3.5 w-3.5" aria-hidden="true" />
-          {availability.length} resources
-        </Badge>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Badge variant="secondary">
+            <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+            {availability.length} resources
+          </Badge>
+          <Button type="button" variant="outline" size="sm" onClick={() => availabilityQuery.refetch()} disabled={!hasValidWindow || availabilityQuery.isFetching}>
+            <RefreshCw className={`h-4 w-4 ${availabilityQuery.isFetching ? 'animate-spin' : ''}`} aria-hidden="true" />
+            Refresh
+          </Button>
+        </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="grid gap-1.5">
@@ -103,7 +114,9 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
         <BookingConflictAlert title="Invalid availability window" message={invalidWindowMessage} />
       ) : null}
       {availabilityQuery.isLoading ? <DataState state="loading" message="Checking resource availability." className="mt-4" /> : null}
-      {availabilityQuery.error ? <DataState state="error" title="Availability unavailable" message={availabilityQuery.error.message} className="mt-4" /> : null}
+      {observedAt ? <p className="mt-3 text-xs text-muted-foreground" role="status">Availability observed {new Date(observedAt).toLocaleTimeString()}</p> : null}
+      {availabilityQuery.isFetching && !availabilityQuery.isLoading ? <p className="mt-3 text-xs text-muted-foreground" role="status">Updating availability…</p> : null}
+      {availabilityQuery.error ? <DataState state="error" title="Availability unavailable" message={`${availabilityQuery.error.message}${availability.length ? ' Showing last known availability.' : ''}`} className="mt-4" /> : null}
       {unavailable.length ? (
         <BookingConflictAlert
           title="Conflicts in this window"
@@ -126,7 +139,9 @@ export function BookingCalendar({ onWindowChange }: BookingCalendarProps) {
 function AvailabilityRow({ resource }: { resource: ResourceItem }) {
   const conflicts = resource.conflictingBookingCount ?? 0;
   const available = (resource.availableQuantity ?? resource.totalQuantity) > 0;
-  const statusLabel = available ? `${resource.availableQuantity ?? resource.totalQuantity} available` : 'Unavailable';
+  const availableQuantity = resource.availableQuantity ?? resource.totalQuantity;
+  const allocatedQuantity = resource.allocatedQuantity ?? Math.max(resource.totalQuantity - availableQuantity, 0);
+  const statusLabel = available ? `${availableQuantity} available` : 'Unavailable';
 
   return (
     <li>
@@ -135,7 +150,13 @@ function AvailabilityRow({ resource }: { resource: ResourceItem }) {
         <p>
           Type #{resource.resourceTypeId} · {resource.location ?? 'No location'}
         </p>
-        {conflicts ? <small className="text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'}</small> : null}
+        <small className="text-muted-foreground">{allocatedQuantity} allocated · {availableQuantity} available</small>
+        {resource.currentUsePeriods?.length ? (
+          <small className="block text-muted-foreground">
+            In use until {new Date(resource.currentUsePeriods[0].endsAt).toLocaleTimeString()} · Qty {resource.currentUsePeriods[0].quantity}
+          </small>
+        ) : null}
+        {conflicts ? <small className="block text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'}</small> : null}
       </div>
       <span className={`status-pill ${available ? 'available' : 'unavailable'}`}>
         {statusLabel}

@@ -2,7 +2,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import Booking, ResourceItem, ResourceType, ResourceUseSubmission
-from .services import resource_status_to_contract
+from .services import current_use_periods_by_resource, resource_status_to_contract
 
 
 class ResourceFieldSerializer(serializers.Serializer):
@@ -57,6 +57,8 @@ class ResourceItemSerializer(serializers.ModelSerializer):
     resourceType = serializers.CharField(source="resource_type.name", read_only=True)
     totalQuantity = serializers.IntegerField(source="total_quantity")
     availableQuantity = serializers.IntegerField(read_only=True, required=False)
+    allocatedQuantity = serializers.IntegerField(read_only=True, required=False)
+    currentUsePeriods = serializers.SerializerMethodField()
     confirmationPolicyOverride = serializers.ChoiceField(
         source="confirmation_policy_override",
         choices=ResourceType.ConfirmationPolicy.choices,
@@ -78,6 +80,8 @@ class ResourceItemSerializer(serializers.ModelSerializer):
             "location",
             "totalQuantity",
             "availableQuantity",
+            "allocatedQuantity",
+            "currentUsePeriods",
             "fieldValues",
             "availabilityPolicy",
             "status",
@@ -88,33 +92,51 @@ class ResourceItemSerializer(serializers.ModelSerializer):
             "conflictingBookingCount",
         ]
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_currentUsePeriods(self, obj):
+        periods = getattr(obj, "current_use_periods", None)
+        if periods is not None:
+            return periods
+        return current_use_periods_by_resource([obj.pk]).get(obj.pk, [])
+
 
 class BookingSerializer(serializers.ModelSerializer):
     resourceId = serializers.IntegerField(source="resource_item_id")
+    resourceName = serializers.CharField(source="resource_item.name", read_only=True)
     requestedById = serializers.IntegerField(source="requested_by_id", read_only=True)
+    requesterName = serializers.CharField(source="requested_by.name", read_only=True)
     reviewerId = serializers.IntegerField(source="reviewer_id", read_only=True)
     startsAt = serializers.DateTimeField(source="starts_at")
     endsAt = serializers.DateTimeField(source="ends_at")
     confirmationPolicy = serializers.CharField(source="confirmation_policy", read_only=True)
     decisionNote = serializers.CharField(source="decision_note", read_only=True)
+    completedAt = serializers.DateTimeField(source="completed_at", read_only=True)
+    cancelledAt = serializers.DateTimeField(source="cancelled_at", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
 
     class Meta:
         model = Booking
         fields = [
             "id",
             "resourceId",
+            "resourceName",
             "requestedById",
+            "requesterName",
             "startsAt",
             "endsAt",
             "quantity",
+            "origin",
             "confirmationPolicy",
             "status",
             "purpose",
             "reviewerId",
             "decisionNote",
+            "completedAt",
+            "cancelledAt",
+            "createdAt",
             "version",
         ]
-        read_only_fields = ["status", "version"]
+        read_only_fields = ["status", "version", "origin"]
 
 
 class BookingDecisionSerializer(serializers.Serializer):
@@ -153,6 +175,7 @@ class LaboratoryResourceSerializer(serializers.ModelSerializer):
     resourceTypeId = serializers.IntegerField(source="resource_type_id", read_only=True)
     totalQuantity = serializers.IntegerField(source="total_quantity", read_only=True)
     availableQuantity = serializers.SerializerMethodField()
+    currentUsePeriods = serializers.SerializerMethodField()
     confirmationPolicyOverride = serializers.CharField(
         source="confirmation_policy_override", read_only=True, allow_null=True
     )
@@ -172,6 +195,7 @@ class LaboratoryResourceSerializer(serializers.ModelSerializer):
             "location",
             "totalQuantity",
             "availableQuantity",
+            "currentUsePeriods",
             "status",
             "managerId",
             "useInstructions",
@@ -187,6 +211,13 @@ class LaboratoryResourceSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.IntegerField())
     def get_availableQuantity(self, obj):
         return getattr(obj, "available_quantity", obj.total_quantity)
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_currentUsePeriods(self, obj):
+        periods = getattr(obj, "current_use_periods", None)
+        if periods is not None:
+            return periods
+        return current_use_periods_by_resource([obj.pk]).get(obj.pk, [])
 
 
 class ResourceCreateSerializer(serializers.Serializer):
