@@ -4,11 +4,7 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
     command: >
-      sh -c "until python manage.py migrate --noinput; do
-        echo 'Waiting for database migrations to become available...';
-        sleep 2;
-      done
-      && python manage.py seed_validation_research_ops_e2e
+      sh -c "&& python manage.py seed_validation_research_ops_e2e
       && python manage.py runserver 0.0.0.0:8000"
     env_file: .env.example
     environment:
