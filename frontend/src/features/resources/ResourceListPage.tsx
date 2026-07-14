@@ -128,7 +128,7 @@ export function ResourceListPage() {
           {resourcesQuery.isLoading ? <DataState state="loading" message="Loading resources." /> : null}
           {resourcesQuery.error ? <DataState state="error" title="Resources unavailable" message={resourcesQuery.error.message} /> : null}
           {!resourcesQuery.isLoading && filtered.length === 0 ? <DataState state={query || typeFilter !== 'all' || statusFilter !== 'bookable' ? 'filtered-empty' : 'empty'} title="No resources" message={canManage ? 'Create the first real resource to begin.' : 'No shared resources are currently available.'} /> : null}
-          <ul className="resource-list">
+          <ul className="resource-list max-h-[40.5rem] overflow-y-auto pr-1">
             {filtered.map((resource) => (
               <li
                 key={resource.id}
@@ -137,18 +137,22 @@ export function ResourceListPage() {
                 aria-pressed={selectedResource?.id === resource.id}
                 onClick={() => selectResource(resource.id)}
                 onKeyDown={(event) => onResourceCardKeyDown(event, resource.id)}
-                className={`cursor-pointer items-start transition hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedResource?.id === resource.id ? 'ring-2 ring-primary/40' : ''}`}
+                className={`min-h-24 cursor-pointer items-start transition hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedResource?.id === resource.id ? 'ring-2 ring-primary/40' : ''}`}
               >
                 <div className="min-w-0">
-                  <strong>{resource.name}</strong>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <strong className="min-w-0 truncate">{resource.name}</strong>
+                    <Badge variant="secondary">
+                      {resource.effectiveConfirmationPolicy === 'immediate' ? 'Immediate confirmation' : 'Approval required'}
+                    </Badge>
+                  </div>
                   <p>{getResourceTypeName(resource, resourceTypeById)} · {resource.location || 'No location'}</p>
-                  <p>{formatAvailabilitySummary(resource, availabilityById.get(resource.id))} · {resource.effectiveConfirmationPolicy === 'immediate' ? 'Immediate confirmation' : 'Approval required'}</p>
+                  <p>{formatAvailabilitySummary(resource, availabilityById.get(resource.id))}</p>
                   <ResourceUsePeriods resource={resource} availability={availabilityById.get(resource.id)} />
                 </div>
                 <div className="flex flex-col items-end gap-2 text-right">
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <StatusBadge status={getResourceCardStatus(resource, availabilityById.get(resource.id))} />
-                    {selectedResource?.id === resource.id ? <Badge variant="secondary">Selected</Badge> : null}
                     {canManage ? <><Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(resource); }}><Pencil className="h-4 w-4" />Edit</Button><Button size="sm" variant="destructive" onClick={(event) => { event.stopPropagation(); setCanRetire(false); setLifecycle(resource); }}><Trash2 className="h-4 w-4" />Delete</Button></> : null}
                   </div>
                 </div>
