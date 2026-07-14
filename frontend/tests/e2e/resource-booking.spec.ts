@@ -83,7 +83,7 @@ test('resource booking shows availability and handles conflict before success', 
   await expect(page.getByRole('region', { name: 'Selected project context' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Resource list' })).toContainText('Confocal microscope');
   if (!fullStackE2E) {
-    await expect(page.getByRole('region', { name: 'Selected resource availability' })).toContainText('Current use periods');
+    await expect(page.getByRole('region', { name: 'Selected resource availability' })).toContainText('Use periods');
     await expect(page.getByRole('region', { name: 'Selected resource availability' })).toContainText('Qty 2');
   }
   await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Confocal microscope');

@@ -389,8 +389,8 @@ describe('resource booking UI', () => {
 
     expect((await screen.findAllByText('Confocal microscope')).length).toBeGreaterThan(0);
     const detail = screen.getByRole('region', { name: 'Selected resource availability' });
-    expect(detail).toHaveTextContent('Available');
-    expect(detail).toHaveTextContent('Allocated');
+    expect(detail).toHaveTextContent('3 available · 1 allocated · 4 total');
+    expect(detail).toHaveTextContent('Use periods');
     expect(detail).toHaveTextContent('Qty 1');
 
     await vi.advanceTimersByTimeAsync(5100);

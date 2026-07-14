@@ -174,35 +174,27 @@ function AvailabilityDetailCard({ resource, resourceTypes }: { resource: Resourc
   const usePeriods = resource.currentUsePeriods ?? [];
 
   return (
-    <section className="mt-4 rounded-lg border border-border/70 bg-muted/20 p-4" aria-label="Selected resource availability">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="mt-4 rounded-lg border border-border/70 bg-muted/20 p-3" aria-label="Selected resource availability">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="truncate text-base font-bold">{resource.name}</h3>
           <p className="text-sm text-muted-foreground">{resourceType} · {resource.location ?? 'No location'}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {availableQuantity} available · {allocatedQuantity} allocated · {resource.totalQuantity} total
+          </p>
         </div>
         <span className={`status-pill ${available ? 'available' : 'unavailable'}`}>
           {statusLabel}
           {conflicts ? ` · ${conflicts} conflict${conflicts === 1 ? '' : 's'}` : ''}
         </span>
       </div>
-      <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-md border bg-background p-3">
-          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Available</dt>
-          <dd className="mt-1 text-xl font-extrabold">{availableQuantity}</dd>
+      <div className="mt-3 rounded-md border bg-background p-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-sm font-bold">Use periods</h4>
+          {usePeriods.length ? <Badge variant="secondary">{usePeriods.length} period{usePeriods.length === 1 ? '' : 's'}</Badge> : null}
         </div>
-        <div className="rounded-md border bg-background p-3">
-          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Allocated</dt>
-          <dd className="mt-1 text-xl font-extrabold">{allocatedQuantity}</dd>
-        </div>
-        <div className="rounded-md border bg-background p-3">
-          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Total</dt>
-          <dd className="mt-1 text-xl font-extrabold">{resource.totalQuantity}</dd>
-        </div>
-      </dl>
-      <div className="mt-4 rounded-md border bg-background p-3">
-        <h4 className="text-sm font-bold">Current use periods</h4>
         {usePeriods.length ? (
-          <ul className="mt-2 grid gap-2">
+          <ul className="mt-2 grid max-h-56 gap-2 overflow-y-auto pr-1">
             {usePeriods.map((period) => (
               <li key={period.bookingId} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 p-2 text-sm">
                 <span>{formatDateTime(period.startsAt)} – {formatDateTime(period.endsAt)}</span>
@@ -211,7 +203,7 @@ function AvailabilityDetailCard({ resource, resourceTypes }: { resource: Resourc
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">No active use in the selected window.</p>
+          <p className="mt-2 text-sm text-muted-foreground">No use periods in the selected window.</p>
         )}
         {conflicts ? <p className="mt-2 text-xs text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'} found in this window.</p> : null}
       </div>
