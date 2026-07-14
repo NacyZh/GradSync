@@ -144,11 +144,7 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
       {!resource ? (
         <DataState state="empty" title="Select a resource" message="Choose a resource card on the left before checking availability or reserving." className="mt-4" />
       ) : null}
-      {resource && !availabilityQuery.isLoading ? (
-        <div className="resource-list mt-4">
-          <AvailabilityRow resource={bookingResource} />
-        </div>
-      ) : null}
+      {resource && !availabilityQuery.isLoading ? <AvailabilityDetailCard resource={bookingResource} resourceTypes={resourceTypes} /> : null}
       {resource ? (
         <div className="mt-4">
           <BookingForm
@@ -165,35 +161,70 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
   );
 }
 
-function AvailabilityRow({ resource }: { resource: ResourceItem | undefined }) {
+function AvailabilityDetailCard({ resource, resourceTypes }: { resource: ResourceItem | undefined; resourceTypes: ResourceType[] }) {
   if (!resource) {
     return <DataState state="empty" title="No availability data" message="Availability for the selected resource has not been returned yet." />;
   }
+  const resourceType = resourceTypes.find((type) => type.id === resource.resourceTypeId)?.name ?? resource.resourceType ?? `Type #${resource.resourceTypeId}`;
   const conflicts = resource.conflictingBookingCount ?? 0;
   const available = (resource.availableQuantity ?? resource.totalQuantity) > 0;
   const availableQuantity = resource.availableQuantity ?? resource.totalQuantity;
   const allocatedQuantity = resource.allocatedQuantity ?? Math.max(resource.totalQuantity - availableQuantity, 0);
   const statusLabel = available ? `${availableQuantity} available` : 'Unavailable';
+  const usePeriods = resource.currentUsePeriods ?? [];
 
   return (
-    <div className="rounded-lg border border-border/70 p-3">
-      <div className="min-w-0">
-        <strong>{resource.name}</strong>
-        <p>
-          Type #{resource.resourceTypeId} · {resource.location ?? 'No location'}
-        </p>
-        <small className="text-muted-foreground">{allocatedQuantity} allocated · {availableQuantity} available</small>
-        {resource.currentUsePeriods?.length ? (
-          <small className="block text-muted-foreground">
-            In use until {new Date(resource.currentUsePeriods[0].endsAt).toLocaleTimeString()} · Qty {resource.currentUsePeriods[0].quantity}
-          </small>
-        ) : null}
-        {conflicts ? <small className="block text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'}</small> : null}
+    <section className="mt-4 rounded-lg border border-border/70 bg-muted/20 p-4" aria-label="Selected resource availability">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-bold">{resource.name}</h3>
+          <p className="text-sm text-muted-foreground">{resourceType} · {resource.location ?? 'No location'}</p>
+        </div>
+        <span className={`status-pill ${available ? 'available' : 'unavailable'}`}>
+          {statusLabel}
+          {conflicts ? ` · ${conflicts} conflict${conflicts === 1 ? '' : 's'}` : ''}
+        </span>
       </div>
-      <span className={`status-pill ${available ? 'available' : 'unavailable'}`}>
-        {statusLabel}
-        {conflicts ? ` · ${conflicts} conflict${conflicts === 1 ? '' : 's'}` : ''}
-      </span>
-    </div>
+      <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-md border bg-background p-3">
+          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Available</dt>
+          <dd className="mt-1 text-xl font-extrabold">{availableQuantity}</dd>
+        </div>
+        <div className="rounded-md border bg-background p-3">
+          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Allocated</dt>
+          <dd className="mt-1 text-xl font-extrabold">{allocatedQuantity}</dd>
+        </div>
+        <div className="rounded-md border bg-background p-3">
+          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Total</dt>
+          <dd className="mt-1 text-xl font-extrabold">{resource.totalQuantity}</dd>
+        </div>
+      </dl>
+      <div className="mt-4 rounded-md border bg-background p-3">
+        <h4 className="text-sm font-bold">Current use periods</h4>
+        {usePeriods.length ? (
+          <ul className="mt-2 grid gap-2">
+            {usePeriods.map((period) => (
+              <li key={period.bookingId} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 p-2 text-sm">
+                <span>{formatDateTime(period.startsAt)} – {formatDateTime(period.endsAt)}</span>
+                <Badge variant="secondary">Qty {period.quantity}</Badge>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">No active use in the selected window.</p>
+        )}
+        {conflicts ? <p className="mt-2 text-xs text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'} found in this window.</p> : null}
+      </div>
+    </section>
   );
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }

@@ -128,7 +128,7 @@ export function ResourceListPage() {
           {resourcesQuery.isLoading ? <DataState state="loading" message="Loading resources." /> : null}
           {resourcesQuery.error ? <DataState state="error" title="Resources unavailable" message={resourcesQuery.error.message} /> : null}
           {!resourcesQuery.isLoading && filtered.length === 0 ? <DataState state={query || typeFilter !== 'all' || statusFilter !== 'bookable' ? 'filtered-empty' : 'empty'} title="No resources" message={canManage ? 'Create the first real resource to begin.' : 'No shared resources are currently available.'} /> : null}
-          <ul className="resource-list max-h-[51rem] overflow-y-auto pr-1">
+          <ul className="resource-list max-h-[50.8rem] overflow-y-auto pr-1">
             {filtered.map((resource) => (
               <li
                 key={resource.id}
@@ -148,7 +148,6 @@ export function ResourceListPage() {
                   </div>
                   <p>{getResourceTypeName(resource, resourceTypeById)} · {resource.location || 'No location'}</p>
                   <p>{formatAvailabilitySummary(resource, availabilityById.get(resource.id))}</p>
-                  <ResourceUsePeriods resource={resource} availability={availabilityById.get(resource.id)} />
                 </div>
                 <div className="flex flex-col items-end gap-2 text-right">
                   <div className="flex flex-wrap items-center justify-end gap-2">
@@ -192,28 +191,4 @@ function getResourceCardStatus(resource: LaboratoryResource, availability?: Reso
   if (!availability) return resource.status === 'active' ? 'available' : resource.status;
   const availableQuantity = availability.availableQuantity ?? availability.totalQuantity ?? resource.availableQuantity ?? resource.totalQuantity ?? 0;
   return availableQuantity > 0 ? 'available' : 'unavailable';
-}
-
-function ResourceUsePeriods({ resource, availability }: { resource: LaboratoryResource; availability?: ResourceItem }) {
-  const periods = availability?.currentUsePeriods ?? resource.currentUsePeriods ?? [];
-  if (!periods.length) return null;
-  return (
-    <div className="mt-2 grid gap-1">
-      {periods.slice(0, 2).map((period) => (
-        <small key={period.bookingId} className="text-muted-foreground">
-          In use {formatDateTime(period.startsAt)} – {formatDateTime(period.endsAt)} · Qty {period.quantity}
-        </small>
-      ))}
-    </div>
-  );
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString(undefined, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }

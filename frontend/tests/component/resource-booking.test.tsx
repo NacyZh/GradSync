@@ -388,7 +388,10 @@ describe('resource booking UI', () => {
     );
 
     expect((await screen.findAllByText('Confocal microscope')).length).toBeGreaterThan(0);
-    expect(screen.getByText(/1 allocated · 3 available/)).toBeInTheDocument();
+    const detail = screen.getByRole('region', { name: 'Selected resource availability' });
+    expect(detail).toHaveTextContent('Available');
+    expect(detail).toHaveTextContent('Allocated');
+    expect(detail).toHaveTextContent('Qty 1');
 
     await vi.advanceTimersByTimeAsync(5100);
     expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/resources/availability/'))).toHaveLength(1);
