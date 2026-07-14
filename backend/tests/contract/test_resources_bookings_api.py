@@ -214,6 +214,35 @@ def test_staff_direct_booking_api_is_confirmed_and_not_in_review_queue(api_clien
 
 
 @pytest.mark.django_db
+def test_active_booking_return_api_completes_and_releases_use(api_client):
+    manager = UserFactory(global_role="advisor", status="active")
+    resource = ResourceItem.objects.create(
+        resource_type=ResourceType.objects.create(name="Microscope"),
+        name="Scope",
+        total_quantity=1,
+    )
+    now = timezone.now()
+    booking = Booking.objects.create(
+        resource_item=resource,
+        requested_by=manager,
+        starts_at=now - timezone.timedelta(minutes=20),
+        ends_at=now + timezone.timedelta(hours=2),
+        quantity=1,
+        origin=Booking.Origin.STAFF_DIRECT,
+        status=Booking.Status.CONFIRMED,
+    )
+
+    response = authenticate(api_client, manager).post(f"/api/bookings/{booking.id}/return/")
+
+    assert response.status_code == 200
+    assert response.data["status"] == Booking.Status.COMPLETED
+    assert response.data["completedAt"] is not None
+    assert response.data["version"] == booking.version + 1
+    booking.refresh_from_db()
+    assert booking.ends_at <= timezone.now()
+
+
+@pytest.mark.django_db
 def test_resource_availability_returns_freshness_and_current_use_periods(api_client):
     manager = UserFactory(global_role="advisor", status="active")
     resource = ResourceItem.objects.create(

@@ -427,4 +427,92 @@ describe('resource booking UI', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() => expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/resources/availability/')).length).toBe(2));
   });
+
+  it('returns active use periods and cancels future resource periods', async () => {
+    const now = Date.now();
+    const activeStartsAt = new Date(now - 30 * 60 * 1000).toISOString();
+    const activeEndsAt = new Date(now + 30 * 60 * 1000).toISOString();
+    const futureStartsAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+    const futureEndsAt = new Date(now + 25 * 60 * 60 * 1000).toISOString();
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/resources/availability/')) {
+        return jsonResponse({ results: [{
+          id: 41,
+          resourceTypeId: 7,
+          resourceType: 'Microscope',
+          name: 'Confocal microscope',
+          location: 'Room 2',
+          status: 'active',
+          totalQuantity: 2,
+          allocatedQuantity: 1,
+          availableQuantity: 1,
+          effectiveConfirmationPolicy: 'approval_required',
+          version: 1,
+        }] });
+      }
+      if (url.includes('/api/bookings/?resourceId=41')) {
+        return jsonResponse({ results: [
+          {
+            id: 501,
+            resourceId: 41,
+            resourceName: 'Confocal microscope',
+            requestedById: 7,
+            startsAt: activeStartsAt,
+            endsAt: activeEndsAt,
+            quantity: 1,
+            origin: 'staff_direct',
+            confirmationPolicy: 'approval_required',
+            status: 'confirmed',
+            version: 1,
+          },
+          {
+            id: 502,
+            resourceId: 41,
+            resourceName: 'Confocal microscope',
+            requestedById: 7,
+            startsAt: futureStartsAt,
+            endsAt: futureEndsAt,
+            quantity: 1,
+            origin: 'student_request',
+            confirmationPolicy: 'approval_required',
+            status: 'pending',
+            version: 1,
+          },
+        ] });
+      }
+      if (url.endsWith('/api/bookings/501/return/') && init?.method === 'POST') {
+        return jsonResponse({ id: 501, resourceId: 41, startsAt: activeStartsAt, endsAt: new Date().toISOString(), quantity: 1, status: 'completed', version: 2 });
+      }
+      if (url.endsWith('/api/bookings/502/cancel/') && init?.method === 'POST') {
+        return jsonResponse({ id: 502, resourceId: 41, startsAt: futureStartsAt, endsAt: futureEndsAt, quantity: 1, status: 'cancelled', version: 2 });
+      }
+      return jsonResponse({ results: [] });
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    renderWithClient(
+      <BookingCalendar
+        resource={{
+          id: 41,
+          resourceType: 'Microscope',
+          resourceTypeId: 7,
+          name: 'Confocal microscope',
+          location: 'Room 2',
+          status: 'active',
+          totalQuantity: 2,
+          availableQuantity: 1,
+          effectiveConfirmationPolicy: 'approval_required',
+          version: 1,
+        }}
+        resourceTypes={[{ id: 7, name: 'Microscope', scope: 'global', fieldSchema: [], status: 'active' }]}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Return resource' }));
+    await waitFor(() => expect(fetchSpy.mock.calls.some(([url, init]) => String(url).endsWith('/api/bookings/501/return/') && init?.method === 'POST')).toBe(true));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(fetchSpy.mock.calls.some(([url, init]) => String(url).endsWith('/api/bookings/502/cancel/') && init?.method === 'POST')).toBe(true));
+  });
 });

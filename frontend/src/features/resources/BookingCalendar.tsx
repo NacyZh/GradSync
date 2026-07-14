@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Filter, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -11,7 +11,7 @@ import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { BookingConflictAlert } from './BookingConflictAlert';
 import { BookingForm } from './BookingForm';
 import type { Booking, LaboratoryResource, ResourceItem, ResourceType } from './api';
-import { listBookings, listResourceAvailability } from './api';
+import { cancelBooking, listBookings, listResourceAvailability, returnBooking } from './api';
 
 function toDateTimeLocal(date: Date) {
   const offsetMs = date.getTimezoneOffset() * 60_000;
@@ -26,6 +26,7 @@ type BookingCalendarProps = {
 };
 
 export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, onAvailabilityChange }: BookingCalendarProps) {
+  const queryClient = useQueryClient();
   const defaults = useMemo(() => {
     const start = new Date();
     start.setDate(start.getDate() + 1);
@@ -70,6 +71,19 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
   const availableQuantity = bookingResource ? bookingResource.availableQuantity ?? bookingResource.totalQuantity : 0;
   const isUnavailable = Boolean(bookingResource && availableQuantity < 1);
   const observedAt = availabilityQuery.data?.observedAt;
+  function refreshResourceState() {
+    void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    void queryClient.invalidateQueries({ queryKey: ['resources'] });
+    void queryClient.invalidateQueries({ queryKey: ['resource-availability'] });
+  }
+  const returnMutation = useMutation({
+    mutationFn: returnBooking,
+    onSuccess: refreshResourceState,
+  });
+  const cancelMutation = useMutation({
+    mutationFn: cancelBooking,
+    onSuccess: refreshResourceState,
+  });
 
   const updateWindow = useCallback((nextStartsAt = startsAt, nextEndsAt = endsAt) => {
     const nextStartsAtMs = new Date(nextStartsAt).getTime();
@@ -162,6 +176,18 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
           usePeriods={usePeriodBookings}
           usePeriodsLoading={usePeriodsQuery.isLoading}
           usePeriodsUpdating={usePeriodsQuery.isFetching && !usePeriodsQuery.isLoading}
+          returningBookingId={returnMutation.variables}
+          cancellingBookingId={cancelMutation.variables}
+          onReturn={(bookingId) => returnMutation.mutate(bookingId)}
+          onCancel={(bookingId) => cancelMutation.mutate(bookingId)}
+        />
+      ) : null}
+      {(returnMutation.error || cancelMutation.error) ? (
+        <DataState
+          state="error"
+          title="Use period update failed"
+          message={(returnMutation.error ?? cancelMutation.error)?.message ?? 'Unable to update this use period.'}
+          className="mt-4"
         />
       ) : null}
       {resource ? (
@@ -186,12 +212,20 @@ function AvailabilityDetailCard({
   usePeriods,
   usePeriodsLoading,
   usePeriodsUpdating,
+  returningBookingId,
+  cancellingBookingId,
+  onReturn,
+  onCancel,
 }: {
   resource: ResourceItem | undefined;
   resourceTypes: ResourceType[];
   usePeriods: Booking[];
   usePeriodsLoading: boolean;
   usePeriodsUpdating: boolean;
+  returningBookingId?: number;
+  cancellingBookingId?: number;
+  onReturn: (bookingId: number) => void;
+  onCancel: (bookingId: number) => void;
 }) {
   if (!resource) {
     return <DataState state="empty" title="No availability data" message="Availability for the selected resource has not been returned yet." />;
@@ -234,6 +268,16 @@ function AvailabilityDetailCard({
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">Qty {period.quantity}</Badge>
                   <StatusBadge status={period.status} />
+                  {canReturnBooking(period) ? (
+                    <Button type="button" size="sm" onClick={() => onReturn(period.id)} disabled={returningBookingId === period.id}>
+                      Return resource
+                    </Button>
+                  ) : null}
+                  {canCancelFutureBooking(period) ? (
+                    <Button type="button" size="sm" variant="outline" onClick={() => onCancel(period.id)} disabled={cancellingBookingId === period.id}>
+                      Cancel
+                    </Button>
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -246,6 +290,18 @@ function AvailabilityDetailCard({
       </div>
     </section>
   );
+}
+
+function canReturnBooking(booking: Booking) {
+  const now = Date.now();
+  return ['confirmed', 'reserved'].includes(booking.status)
+    && new Date(booking.startsAt).getTime() <= now
+    && now < new Date(booking.endsAt).getTime();
+}
+
+function canCancelFutureBooking(booking: Booking) {
+  return ['pending', 'confirmed', 'reserved'].includes(booking.status)
+    && new Date(booking.startsAt).getTime() > Date.now();
 }
 
 function formatDateTime(value: string) {

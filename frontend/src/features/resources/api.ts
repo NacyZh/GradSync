@@ -165,6 +165,10 @@ export function cancelBooking(bookingId: number) {
   return apiRequest<Booking>(`/api/bookings/${bookingId}/cancel/`, { method: 'POST' });
 }
 
+export function returnBooking(bookingId: number) {
+  return apiRequest<Booking>(`/api/bookings/${bookingId}/return/`, { method: 'POST' });
+}
+
 export function decideBooking(bookingId: number, approve: boolean, decisionNote = '') {
   return apiRequest<Booking>(`/api/bookings/${bookingId}/${approve ? 'approve' : 'reject'}/`, {
     method: 'POST', body: JSON.stringify({ decisionNote }),

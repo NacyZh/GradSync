@@ -42,6 +42,47 @@ def test_started_booking_cannot_be_changed_or_cancelled():
 
 
 @pytest.mark.django_db
+def test_active_booking_can_be_returned_early():
+    student = UserFactory(global_role="student")
+    resource_type = ResourceType.objects.create(name="scope", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Scope")
+    now = timezone.now()
+    booking = Booking.objects.create(
+        resource_item=resource,
+        requested_by=student,
+        starts_at=now - timezone.timedelta(minutes=30),
+        ends_at=now + timezone.timedelta(hours=2),
+        status=Booking.Status.CONFIRMED,
+    )
+
+    returned = BookingService(student).return_booking(booking)
+
+    assert returned.status == Booking.Status.COMPLETED
+    assert returned.completed_at is not None
+    assert returned.ends_at <= timezone.now()
+    assert returned.version == booking.version + 1
+
+
+@pytest.mark.django_db
+def test_future_booking_cannot_be_returned():
+    student = UserFactory(global_role="student")
+    resource_type = ResourceType.objects.create(name="scope", field_schema=[])
+    resource = ResourceItem.objects.create(resource_type=resource_type, name="Scope")
+    starts_at = timezone.now() + timezone.timedelta(hours=1)
+    booking = Booking.objects.create(
+        resource_item=resource,
+        requested_by=student,
+        starts_at=starts_at,
+        ends_at=starts_at + timezone.timedelta(hours=2),
+        status=Booking.Status.CONFIRMED,
+    )
+
+    with pytest.raises(ResourceConflict) as conflict:
+        BookingService(student).return_booking(booking)
+    assert conflict.value.payload["code"] == "return_window_invalid"
+
+
+@pytest.mark.django_db
 def test_quantity_capacity_and_policy_snapshot():
     student = UserFactory(global_role="student")
     resource_type = ResourceType.objects.create(name="GPU", confirmation_policy="immediate")

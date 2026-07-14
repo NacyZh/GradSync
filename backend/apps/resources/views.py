@@ -217,6 +217,17 @@ class StandaloneBookingViewSet(viewsets.ModelViewSet):
             raise ValidationError(exc.messages) from exc
         return Response(BookingSerializer(booking).data)
 
+    @action(detail=True, methods=["post"], url_path="return")
+    def return_resource(self, request, pk=None, **kwargs):
+        booking = self.get_object()
+        try:
+            booking = BookingService(request.user).return_booking(booking)
+        except ResourceConflict as exc:
+            return Response(exc.payload, status=status.HTTP_409_CONFLICT)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
+        return Response(BookingSerializer(booking).data)
+
     def _decide(self, request, approve):
         serializer = BookingDecisionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

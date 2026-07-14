@@ -564,6 +564,48 @@ class BookingService:
         )
         return booking
 
+    @transaction.atomic
+    def return_booking(self, booking: Booking) -> Booking:
+        self._require_active_user()
+        booking = Booking.objects.select_for_update().get(pk=booking.pk)
+        now = timezone.now()
+        if booking.requested_by_id != self.user.id and not _is_resource_manager(self.user):
+            raise ValidationError("Only the requester or an advisor can return this resource")
+        if booking.status not in {Booking.Status.CONFIRMED, Booking.Status.RESERVED}:
+            raise ResourceConflict(
+                {
+                    "code": "return_not_allowed",
+                    "currentStatus": booking.status,
+                    "detail": "Only active confirmed or reserved bookings can be returned",
+                }
+            )
+        if not (booking.starts_at <= now < booking.ends_at):
+            raise ResourceConflict(
+                {
+                    "code": "return_window_invalid",
+                    "currentStatus": booking.status,
+                    "detail": "Resources can only be returned during the active use window",
+                }
+            )
+        prior_status = booking.status
+        booking.ends_at = now
+        booking.status = Booking.Status.COMPLETED
+        booking.completed_at = now
+        booking.version += 1
+        booking.save(update_fields=["ends_at", "status", "completed_at", "version", "updated_at"])
+        self._notify_booking_change(booking, "Resource returned")
+        record_event(
+            None,
+            self.user,
+            "booking.returned",
+            f"Returned booking {booking.id}",
+            booking,
+            target_snapshot=_booking_snapshot(
+                booking, outcome="returned", prior_status=prior_status
+            ),
+        )
+        return booking
+
     def decide_booking(self, booking: Booking, *, approve: bool, decision_note: str = ""):
         self._require_manager()
         try:
