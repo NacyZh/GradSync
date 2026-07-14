@@ -128,7 +128,7 @@ export function ResourceListPage() {
           {resourcesQuery.isLoading ? <DataState state="loading" message="Loading resources." /> : null}
           {resourcesQuery.error ? <DataState state="error" title="Resources unavailable" message={resourcesQuery.error.message} /> : null}
           {!resourcesQuery.isLoading && filtered.length === 0 ? <DataState state={query || typeFilter !== 'all' || statusFilter !== 'bookable' ? 'filtered-empty' : 'empty'} title="No resources" message={canManage ? 'Create the first real resource to begin.' : 'No shared resources are currently available.'} /> : null}
-          <ul className="resource-list max-h-[45rem] overflow-y-auto pr-1">
+          <ul className="resource-list max-h-[50rem] overflow-y-auto pr-1">
             {filtered.map((resource) => (
               <li
                 key={resource.id}
