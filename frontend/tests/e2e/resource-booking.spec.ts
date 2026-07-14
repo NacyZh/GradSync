@@ -29,7 +29,22 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route('**/api/resources/availability/?**', async (route) => {
     await fulfillJson(route, [
-      { id: 41, resourceTypeId: 7, name: 'Confocal microscope', location: 'Room 2', status: 'active', totalQuantity: 2, availableQuantity: 0 },
+      {
+        id: 41,
+        resourceTypeId: 7,
+        name: 'Confocal microscope',
+        location: 'Room 2',
+        status: 'active',
+        totalQuantity: 2,
+        availableQuantity: 0,
+        allocatedQuantity: 2,
+        currentUsePeriods: [{
+          bookingId: 501,
+          startsAt: '2099-01-01T09:00:00Z',
+          endsAt: '2099-01-01T10:00:00Z',
+          quantity: 2,
+        }],
+      },
       { id: 42, resourceTypeId: 7, name: 'Open bench', location: 'Room 3', status: 'active', totalQuantity: 3, availableQuantity: 3 },
     ]);
   });
@@ -67,6 +82,7 @@ test('resource booking shows availability and handles conflict before success', 
   await expect(page.getByRole('heading', { name: 'Lab resources' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Selected project context' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Resource list' })).toContainText('Confocal microscope');
+  await expect(page.getByRole('region', { name: 'Resource list' })).toContainText(/In use .* Qty 2/);
   await expect(page.getByRole('region', { name: 'Booking calendar' })).toContainText('Confocal microscope');
 
   const reserveForm = page.getByRole('form', { name: 'Reserve resource' });

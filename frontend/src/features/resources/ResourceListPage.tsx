@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pencil, PlusCircle, Search, SlidersHorizontal, Trash2, Wrench } from 'lucide-react';
 
 import { Badge } from '@/shared/ui/primitives/badge';
@@ -12,7 +12,6 @@ import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { BookingCalendar } from './BookingCalendar';
-import { BookingForm } from './BookingForm';
 import type { LaboratoryResource, ResourceItem, ResourceWrite } from './api';
 import {
   createLaboratoryResource,
@@ -33,7 +32,8 @@ export function ResourceListPage() {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('bookable');
-  const [availabilityWindow, setAvailabilityWindow] = useState({ startsAt: '', endsAt: '', hasValidWindow: true });
+  const [selectedResourceId, setSelectedResourceId] = useState<number | undefined>();
+  const [availability, setAvailability] = useState<ResourceItem[]>([]);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [editing, setEditing] = useState<LaboratoryResource>();
   const [lifecycle, setLifecycle] = useState<LaboratoryResource>();
@@ -49,10 +49,18 @@ export function ResourceListPage() {
       && (typeFilter === 'all' || resource.resourceType === typeFilter)
       && (statusFilter === 'all' || (statusFilter === 'bookable' ? resource.status === 'active' : resource.status === statusFilter));
   }), [query, resources, statusFilter, typeFilter]);
-  const bookingResources = useMemo<ResourceItem[]>(() => filtered.map((resource) => ({
-    ...resource,
-    status: resource.status === 'active' ? 'available' : resource.status,
-  })), [filtered]);
+  const availabilityById = useMemo(() => new Map(availability.map((resource) => [resource.id, resource])), [availability]);
+  const selectedResource = filtered.find((resource) => resource.id === selectedResourceId) ?? filtered[0];
+
+  useEffect(() => {
+    if (!filtered.length) {
+      setSelectedResourceId(undefined);
+      return;
+    }
+    if (!selectedResourceId || !filtered.some((resource) => resource.id === selectedResourceId)) {
+      setSelectedResourceId(filtered[0].id);
+    }
+  }, [filtered, selectedResourceId]);
 
   const createMutation = useMutation({
     mutationFn: createLaboratoryResource,
@@ -107,35 +115,68 @@ export function ResourceListPage() {
           {!resourcesQuery.isLoading && filtered.length === 0 ? <DataState state={query || typeFilter !== 'all' || statusFilter !== 'bookable' ? 'filtered-empty' : 'empty'} title="No resources" message={canManage ? 'Create the first real resource to begin.' : 'No shared resources are currently available.'} /> : null}
           <ul className="resource-list">
             {filtered.map((resource) => (
-              <li key={resource.id} className="items-start">
+              <li key={resource.id} className={`items-start ${selectedResource?.id === resource.id ? 'ring-2 ring-primary/40' : ''}`}>
                 <div className="min-w-0">
                   <strong>{resource.name}</strong>
                   <p>{resource.resourceType} · {resource.location || 'No location'}</p>
-                  <p>{resource.availableQuantity ?? resource.totalQuantity} of {resource.totalQuantity} available · {resource.effectiveConfirmationPolicy === 'immediate' ? 'Immediate confirmation' : 'Approval required'}</p>
+                  <p>{formatAvailabilitySummary(resource, availabilityById.get(resource.id))} · {resource.effectiveConfirmationPolicy === 'immediate' ? 'Immediate confirmation' : 'Approval required'}</p>
+                  <ResourceUsePeriods resource={resource} availability={availabilityById.get(resource.id)} />
                 </div>
                 <div className="flex flex-col items-end gap-2 text-right">
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <StatusBadge status={resource.status} />
+                    <Button size="sm" variant={selectedResource?.id === resource.id ? 'default' : 'outline'} onClick={() => setSelectedResourceId(resource.id)}>
+                      {selectedResource?.id === resource.id ? 'Selected' : 'Select'}
+                    </Button>
                     {canManage ? <><Button size="sm" variant="outline" onClick={() => openEdit(resource)}><Pencil className="h-4 w-4" />Edit</Button><Button size="sm" variant="destructive" onClick={() => { setCanRetire(false); setLifecycle(resource); }}><Trash2 className="h-4 w-4" />Delete</Button></> : null}
                   </div>
-                  {resource.currentUsePeriods?.length ? (
-                    <small className="text-muted-foreground">
-                      In use {new Date(resource.currentUsePeriods[0].startsAt).toLocaleTimeString()}–{new Date(resource.currentUsePeriods[0].endsAt).toLocaleTimeString()} · Qty {resource.currentUsePeriods[0].quantity}
-                    </small>
-                  ) : null}
                 </div>
               </li>
             ))}
           </ul>
         </section>
-        <BookingCalendar onWindowChange={setAvailabilityWindow} />
+        <BookingCalendar
+          resource={selectedResource}
+          resourceTypes={resourceTypes}
+          onAvailabilityChange={setAvailability}
+        />
       </div>
 
       <ResourceUseSubmissionPanel resources={filtered} canManage={canManage} />
-      <BookingForm resources={bookingResources} resourceTypes={resourceTypes} defaultStartsAt={availabilityWindow.startsAt} defaultEndsAt={availabilityWindow.endsAt} disabled={!availabilityWindow.hasValidWindow} />
 
       <ResourceInventoryDialog open={inventoryOpen} resource={editing} pending={createMutation.isPending || updateMutation.isPending} error={createMutation.error?.message ?? updateMutation.error?.message} onOpenChange={(open) => { setInventoryOpen(open); if (!open) setEditing(undefined); }} onSubmit={save} />
       <ResourceLifecycleDialog resource={lifecycle} open={Boolean(lifecycle)} pending={deleteMutation.isPending || retireMutation.isPending} error={deleteMutation.error?.message ?? retireMutation.error?.message} canRetire={canRetire} onOpenChange={(open) => { if (!open) { setLifecycle(undefined); setCanRetire(false); } }} onDelete={() => lifecycle && deleteMutation.mutate(lifecycle.id)} onRetire={() => lifecycle && retireMutation.mutate(lifecycle)} />
     </PageShell>
   );
+}
+
+function formatAvailabilitySummary(resource: LaboratoryResource, availability?: ResourceItem) {
+  const totalQuantity = availability?.totalQuantity ?? resource.totalQuantity ?? 0;
+  const availableQuantity = availability?.availableQuantity ?? resource.availableQuantity ?? totalQuantity;
+  const allocatedQuantity = availability?.allocatedQuantity ?? Math.max(totalQuantity - availableQuantity, 0);
+  return `${availableQuantity} of ${totalQuantity} available · ${allocatedQuantity} in use`;
+}
+
+function ResourceUsePeriods({ resource, availability }: { resource: LaboratoryResource; availability?: ResourceItem }) {
+  const periods = availability?.currentUsePeriods ?? resource.currentUsePeriods ?? [];
+  if (!periods.length) return null;
+  return (
+    <div className="mt-2 grid gap-1">
+      {periods.slice(0, 2).map((period) => (
+        <small key={period.bookingId} className="text-muted-foreground">
+          In use {formatDateTime(period.startsAt)} – {formatDateTime(period.endsAt)} · Qty {period.quantity}
+        </small>
+      ))}
+    </div>
+  );
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }

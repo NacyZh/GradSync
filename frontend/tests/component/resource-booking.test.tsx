@@ -369,9 +369,25 @@ describe('resource booking UI', () => {
     });
     vi.stubGlobal('fetch', fetchSpy);
 
-    renderWithClient(<BookingCalendar />);
+    renderWithClient(
+      <BookingCalendar
+        resource={{
+          id: 41,
+          resourceType: 'Microscope',
+          resourceTypeId: 7,
+          name: 'Confocal microscope',
+          location: 'Room 2',
+          status: 'active',
+          totalQuantity: 4,
+          availableQuantity: 4,
+          effectiveConfirmationPolicy: 'approval_required',
+          version: 1,
+        }}
+        resourceTypes={[{ id: 7, name: 'Microscope', scope: 'global', fieldSchema: [], status: 'active' }]}
+      />,
+    );
 
-    expect(await screen.findByText('Confocal microscope')).toBeInTheDocument();
+    expect((await screen.findAllByText('Confocal microscope')).length).toBeGreaterThan(0);
     expect(screen.getByText(/1 allocated · 3 available/)).toBeInTheDocument();
 
     await vi.advanceTimersByTimeAsync(5100);
