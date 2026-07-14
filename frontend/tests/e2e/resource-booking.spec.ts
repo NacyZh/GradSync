@@ -48,6 +48,21 @@ test.beforeEach(async ({ page }) => {
       { id: 42, resourceTypeId: 7, name: 'Open bench', location: 'Room 3', status: 'active', totalQuantity: 3, availableQuantity: 3 },
     ]);
   });
+  await page.route('**/api/bookings/?resourceId=**', async (route) => {
+    await fulfillJson(route, { results: [{
+      id: 501,
+      resourceId: 41,
+      resourceName: 'Confocal microscope',
+      requestedById: 10,
+      startsAt: '2099-01-01T09:00:00Z',
+      endsAt: '2099-01-01T10:00:00Z',
+      quantity: 2,
+      origin: 'staff_direct',
+      confirmationPolicy: 'immediate',
+      status: 'confirmed',
+      version: 1,
+    }] });
+  });
 });
 
 test('resource booking shows availability and handles conflict before success', async ({ page }) => {

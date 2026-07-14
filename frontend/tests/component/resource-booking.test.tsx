@@ -365,6 +365,33 @@ describe('resource booking UI', () => {
           }],
         });
       }
+      if (url.includes('/api/bookings/?resourceId=41')) {
+        return jsonResponse({ results: [{
+          id: 501,
+          resourceId: 41,
+          resourceName: 'Confocal microscope',
+          requestedById: 7,
+          startsAt: new Date().toISOString(),
+          endsAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          quantity: 1,
+          origin: 'staff_direct',
+          confirmationPolicy: 'approval_required',
+          status: 'confirmed',
+          version: 1,
+        }, {
+          id: 502,
+          resourceId: 41,
+          resourceName: 'Confocal microscope',
+          requestedById: 7,
+          startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          endsAt: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(),
+          quantity: 2,
+          origin: 'student_request',
+          confirmationPolicy: 'approval_required',
+          status: 'pending',
+          version: 1,
+        }] });
+      }
       return jsonResponse({ results: [] });
     });
     vi.stubGlobal('fetch', fetchSpy);
@@ -392,6 +419,7 @@ describe('resource booking UI', () => {
     expect(detail).toHaveTextContent('3 available · 1 allocated · 4 total');
     expect(detail).toHaveTextContent('Use periods');
     expect(detail).toHaveTextContent('Qty 1');
+    expect(detail).toHaveTextContent('Qty 2');
 
     await vi.advanceTimersByTimeAsync(5100);
     expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/resources/availability/'))).toHaveLength(1);

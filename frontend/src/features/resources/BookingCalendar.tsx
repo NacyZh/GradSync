@@ -7,10 +7,11 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { DataState } from '../../shared/ui/DataState';
+import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { BookingConflictAlert } from './BookingConflictAlert';
 import { BookingForm } from './BookingForm';
-import type { LaboratoryResource, ResourceItem, ResourceType } from './api';
-import { listResourceAvailability } from './api';
+import type { Booking, LaboratoryResource, ResourceItem, ResourceType } from './api';
+import { listBookings, listResourceAvailability } from './api';
 
 function toDateTimeLocal(date: Date) {
   const offsetMs = date.getTimezoneOffset() * 60_000;
@@ -50,7 +51,17 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
     refetchOnWindowFocus: true,
     placeholderData: (previous) => previous,
   });
+  const usePeriodsQuery = useQuery({
+    queryKey: ['bookings', 'resource-periods', resource?.id],
+    queryFn: () => listBookings({ resourceId: resource?.id }),
+    enabled: Boolean(resource?.id),
+    refetchOnWindowFocus: true,
+    placeholderData: (previous) => previous,
+  });
   const availability = useMemo(() => availabilityQuery.data?.results ?? [], [availabilityQuery.data]);
+  const usePeriodBookings = useMemo(() => (usePeriodsQuery.data?.results ?? [])
+    .filter((booking) => booking.resourceId === resource?.id && !['cancelled', 'rejected'].includes(booking.status))
+    .sort((first, second) => new Date(first.startsAt).getTime() - new Date(second.startsAt).getTime()), [resource?.id, usePeriodsQuery.data]);
   const selectedAvailability = availability.find((item) => item.id === resource?.id);
   const bookingResource = selectedAvailability ?? (resource ? {
     ...resource,
@@ -144,7 +155,15 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
       {!resource ? (
         <DataState state="empty" title="Select a resource" message="Choose a resource card on the left before checking availability or reserving." className="mt-4" />
       ) : null}
-      {resource && !availabilityQuery.isLoading ? <AvailabilityDetailCard resource={bookingResource} resourceTypes={resourceTypes} /> : null}
+      {resource && !availabilityQuery.isLoading ? (
+        <AvailabilityDetailCard
+          resource={bookingResource}
+          resourceTypes={resourceTypes}
+          usePeriods={usePeriodBookings}
+          usePeriodsLoading={usePeriodsQuery.isLoading}
+          usePeriodsUpdating={usePeriodsQuery.isFetching && !usePeriodsQuery.isLoading}
+        />
+      ) : null}
       {resource ? (
         <div className="mt-4">
           <BookingForm
@@ -161,7 +180,19 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
   );
 }
 
-function AvailabilityDetailCard({ resource, resourceTypes }: { resource: ResourceItem | undefined; resourceTypes: ResourceType[] }) {
+function AvailabilityDetailCard({
+  resource,
+  resourceTypes,
+  usePeriods,
+  usePeriodsLoading,
+  usePeriodsUpdating,
+}: {
+  resource: ResourceItem | undefined;
+  resourceTypes: ResourceType[];
+  usePeriods: Booking[];
+  usePeriodsLoading: boolean;
+  usePeriodsUpdating: boolean;
+}) {
   if (!resource) {
     return <DataState state="empty" title="No availability data" message="Availability for the selected resource has not been returned yet." />;
   }
@@ -171,8 +202,6 @@ function AvailabilityDetailCard({ resource, resourceTypes }: { resource: Resourc
   const availableQuantity = resource.availableQuantity ?? resource.totalQuantity;
   const allocatedQuantity = resource.allocatedQuantity ?? Math.max(resource.totalQuantity - availableQuantity, 0);
   const statusLabel = available ? `${availableQuantity} available` : 'Unavailable';
-  const usePeriods = resource.currentUsePeriods ?? [];
-
   return (
     <section className="mt-4 rounded-lg border border-border/70 bg-muted/20 p-3" aria-label="Selected resource availability">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -191,20 +220,28 @@ function AvailabilityDetailCard({ resource, resourceTypes }: { resource: Resourc
       <div className="mt-3 rounded-md border bg-background p-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-sm font-bold">Use periods</h4>
-          {usePeriods.length ? <Badge variant="secondary">{usePeriods.length} period{usePeriods.length === 1 ? '' : 's'}</Badge> : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {usePeriodsUpdating ? <span className="text-xs text-muted-foreground" role="status">Updating…</span> : null}
+            {usePeriods.length ? <Badge variant="secondary">{usePeriods.length} period{usePeriods.length === 1 ? '' : 's'}</Badge> : null}
+          </div>
         </div>
-        {usePeriods.length ? (
+        {usePeriodsLoading ? <DataState state="loading" message="Loading use periods." className="mt-2" /> : null}
+        {!usePeriodsLoading && usePeriods.length ? (
           <ul className="mt-2 grid max-h-56 gap-2 overflow-y-auto pr-1">
             {usePeriods.map((period) => (
-              <li key={period.bookingId} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 p-2 text-sm">
+              <li key={period.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 p-2 text-sm">
                 <span>{formatDateTime(period.startsAt)} – {formatDateTime(period.endsAt)}</span>
-                <Badge variant="secondary">Qty {period.quantity}</Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">Qty {period.quantity}</Badge>
+                  <StatusBadge status={period.status} />
+                </div>
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="mt-2 text-sm text-muted-foreground">No use periods in the selected window.</p>
-        )}
+        ) : null}
+        {!usePeriodsLoading && !usePeriods.length ? (
+          <p className="mt-2 text-sm text-muted-foreground">No use periods for this resource.</p>
+        ) : null}
         {conflicts ? <p className="mt-2 text-xs text-muted-foreground">{conflicts} overlapping booking{conflicts === 1 ? '' : 's'} found in this window.</p> : null}
       </div>
     </section>

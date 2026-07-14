@@ -137,11 +137,12 @@ export function listResourceAvailability(startsAt: string, endsAt: string) {
     .then((response) => Array.isArray(response) ? { results: response } : response);
 }
 
-export function listBookings(params?: { reviewQueue?: boolean; origin?: Booking['origin']; status?: string }) {
+export function listBookings(params?: { reviewQueue?: boolean; origin?: Booking['origin']; status?: string; resourceId?: number }) {
   const search = new URLSearchParams();
   if (params?.reviewQueue) search.set('reviewQueue', 'true');
   if (params?.origin) search.set('origin', params.origin);
   if (params?.status) search.set('status', params.status);
+  if (params?.resourceId) search.set('resourceId', String(params.resourceId));
   const suffix = search.toString() ? `?${search.toString()}` : '';
   return apiRequest<{ results: Booking[] }>(`/api/bookings/${suffix}`);
 }
