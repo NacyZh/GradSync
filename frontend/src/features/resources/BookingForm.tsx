@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarPlus } from 'lucide-react';
 
@@ -28,6 +28,7 @@ type BookingFormProps = {
 };
 
 export function BookingForm({ resources = [], resourceTypes = [], defaultStartsAt = '', defaultEndsAt = '', disabled = false }: BookingFormProps) {
+  const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const { notify } = useAppFeedback();
   const availableResources = useMemo(
@@ -47,7 +48,12 @@ export function BookingForm({ resources = [], resourceTypes = [], defaultStartsA
   }, [availableResources, selectedResourceId]);
   const mutation = useMutation({
     mutationFn: (payload: { resourceId: number; startsAt: string; endsAt: string; quantity: number; purpose?: string }) => createBooking(payload),
-    onSuccess: (booking) => notify(booking.status === 'pending' ? 'Booking submitted for approval' : 'Booking confirmed', 'success'),
+    onSuccess: (booking) => {
+      void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: ['resources'] });
+      void queryClient.invalidateQueries({ queryKey: ['resource-availability'] });
+      notify(booking.status === 'pending' ? 'Booking submitted for approval' : 'Booking confirmed', 'success');
+    },
     onError: (error) => notify(error.message, 'error'),
   });
 

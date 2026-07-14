@@ -43,13 +43,17 @@ export function ResourceListPage() {
   const typesQuery = useQuery({ queryKey: ['resource-types'], queryFn: listResourceTypes });
   const resources = useMemo(() => resourcesQuery.data?.results ?? [], [resourcesQuery.data]);
   const resourceTypes = useMemo(() => typesQuery.data?.results ?? [], [typesQuery.data]);
-  const filtered = useMemo(() => resources.filter((resource) => {
-    const text = `${resource.name} ${resource.resourceType} ${resource.location ?? ''}`.toLowerCase();
-    return text.includes(query.toLowerCase())
-      && (typeFilter === 'all' || resource.resourceType === typeFilter)
-      && (statusFilter === 'all' || (statusFilter === 'bookable' ? resource.status === 'active' : resource.status === statusFilter));
-  }), [query, resources, statusFilter, typeFilter]);
+  const resourceTypeById = useMemo(() => new Map(resourceTypes.map((type) => [type.id, type.name])), [resourceTypes]);
   const availabilityById = useMemo(() => new Map(availability.map((resource) => [resource.id, resource])), [availability]);
+  const resourceTypeOptions = useMemo(() => Array.from(new Set(resources.map((resource) => getResourceTypeName(resource, resourceTypeById)).filter(Boolean))).sort(), [resourceTypeById, resources]);
+  const filtered = useMemo(() => resources.filter((resource) => {
+    const typeName = getResourceTypeName(resource, resourceTypeById);
+    const cardStatus = getResourceCardStatus(resource, availabilityById.get(resource.id));
+    const text = `${resource.name} ${typeName} ${resource.location ?? ''}`.toLowerCase();
+    return text.includes(query.toLowerCase())
+      && (typeFilter === 'all' || typeName === typeFilter)
+      && (statusFilter === 'all' || (statusFilter === 'bookable' ? resource.status === 'active' : cardStatus === statusFilter));
+  }), [availabilityById, query, resourceTypeById, resources, statusFilter, typeFilter]);
   const selectedResource = filtered.find((resource) => resource.id === selectedResourceId) ?? filtered[0];
 
   useEffect(() => {
@@ -90,6 +94,17 @@ export function ResourceListPage() {
     }
   }
 
+  function selectResource(resourceId: number) {
+    setSelectedResourceId(resourceId);
+  }
+
+  function onResourceCardKeyDown(event: React.KeyboardEvent<HTMLLIElement>, resourceId: number) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectResource(resourceId);
+    }
+  }
+
   return (
     <PageShell
       title="Lab resources"
@@ -101,8 +116,8 @@ export function ResourceListPage() {
         <div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4" />Resource filters</h2><p className="text-sm text-muted-foreground">Filter real inventory by name, type, location, and status.</p></div></div>
         <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_12rem_12rem_auto]">
           <Label className="grid gap-1.5" htmlFor="resource-search">Search resources<span className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4" /><Input id="resource-search" className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} /></span></Label>
-          <Label className="grid gap-1.5">Type<Select value={typeFilter} onValueChange={setTypeFilter}><SelectTrigger aria-label="Resource type filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem>{Array.from(new Set(resources.map((resource) => resource.resourceType))).map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent></Select></Label>
-          <Label className="grid gap-1.5">Status<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger aria-label="Resource status filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bookable">Bookable</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="unavailable">Unavailable</SelectItem><SelectItem value="retired">Retired</SelectItem><SelectItem value="all">All statuses</SelectItem></SelectContent></Select></Label>
+          <Label className="grid gap-1.5">Type<Select value={typeFilter} onValueChange={setTypeFilter}><SelectTrigger aria-label="Resource type filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem>{resourceTypeOptions.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent></Select></Label>
+          <Label className="grid gap-1.5">Status<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger aria-label="Resource status filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bookable">Bookable</SelectItem><SelectItem value="available">Available</SelectItem><SelectItem value="unavailable">Unavailable</SelectItem><SelectItem value="retired">Retired</SelectItem><SelectItem value="all">All statuses</SelectItem></SelectContent></Select></Label>
           <Button type="button" variant="outline" className="self-end" onClick={() => { setQuery(''); setTypeFilter('all'); setStatusFilter('bookable'); }}>Clear</Button>
         </div>
       </section>
@@ -115,20 +130,26 @@ export function ResourceListPage() {
           {!resourcesQuery.isLoading && filtered.length === 0 ? <DataState state={query || typeFilter !== 'all' || statusFilter !== 'bookable' ? 'filtered-empty' : 'empty'} title="No resources" message={canManage ? 'Create the first real resource to begin.' : 'No shared resources are currently available.'} /> : null}
           <ul className="resource-list">
             {filtered.map((resource) => (
-              <li key={resource.id} className={`items-start ${selectedResource?.id === resource.id ? 'ring-2 ring-primary/40' : ''}`}>
+              <li
+                key={resource.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedResource?.id === resource.id}
+                onClick={() => selectResource(resource.id)}
+                onKeyDown={(event) => onResourceCardKeyDown(event, resource.id)}
+                className={`cursor-pointer items-start transition hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedResource?.id === resource.id ? 'ring-2 ring-primary/40' : ''}`}
+              >
                 <div className="min-w-0">
                   <strong>{resource.name}</strong>
-                  <p>{resource.resourceType} · {resource.location || 'No location'}</p>
+                  <p>{getResourceTypeName(resource, resourceTypeById)} · {resource.location || 'No location'}</p>
                   <p>{formatAvailabilitySummary(resource, availabilityById.get(resource.id))} · {resource.effectiveConfirmationPolicy === 'immediate' ? 'Immediate confirmation' : 'Approval required'}</p>
                   <ResourceUsePeriods resource={resource} availability={availabilityById.get(resource.id)} />
                 </div>
                 <div className="flex flex-col items-end gap-2 text-right">
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <StatusBadge status={resource.status} />
-                    <Button size="sm" variant={selectedResource?.id === resource.id ? 'default' : 'outline'} onClick={() => setSelectedResourceId(resource.id)}>
-                      {selectedResource?.id === resource.id ? 'Selected' : 'Select'}
-                    </Button>
-                    {canManage ? <><Button size="sm" variant="outline" onClick={() => openEdit(resource)}><Pencil className="h-4 w-4" />Edit</Button><Button size="sm" variant="destructive" onClick={() => { setCanRetire(false); setLifecycle(resource); }}><Trash2 className="h-4 w-4" />Delete</Button></> : null}
+                    <StatusBadge status={getResourceCardStatus(resource, availabilityById.get(resource.id))} />
+                    {selectedResource?.id === resource.id ? <Badge variant="secondary">Selected</Badge> : null}
+                    {canManage ? <><Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(resource); }}><Pencil className="h-4 w-4" />Edit</Button><Button size="sm" variant="destructive" onClick={(event) => { event.stopPropagation(); setCanRetire(false); setLifecycle(resource); }}><Trash2 className="h-4 w-4" />Delete</Button></> : null}
                   </div>
                 </div>
               </li>
@@ -155,6 +176,18 @@ function formatAvailabilitySummary(resource: LaboratoryResource, availability?: 
   const availableQuantity = availability?.availableQuantity ?? resource.availableQuantity ?? totalQuantity;
   const allocatedQuantity = availability?.allocatedQuantity ?? Math.max(totalQuantity - availableQuantity, 0);
   return `${availableQuantity} of ${totalQuantity} available · ${allocatedQuantity} in use`;
+}
+
+function getResourceTypeName(resource: LaboratoryResource, resourceTypeById: Map<number, string>) {
+  return resource.resourceType || resourceTypeById.get(resource.resourceTypeId) || 'Resource';
+}
+
+function getResourceCardStatus(resource: LaboratoryResource, availability?: ResourceItem) {
+  if (resource.status === 'retired') return 'retired';
+  if (resource.status === 'unavailable') return 'unavailable';
+  if (!availability) return resource.status === 'active' ? 'available' : resource.status;
+  const availableQuantity = availability.availableQuantity ?? availability.totalQuantity ?? resource.availableQuantity ?? resource.totalQuantity ?? 0;
+  return availableQuantity > 0 ? 'available' : 'unavailable';
 }
 
 function ResourceUsePeriods({ resource, availability }: { resource: LaboratoryResource; availability?: ResourceItem }) {
