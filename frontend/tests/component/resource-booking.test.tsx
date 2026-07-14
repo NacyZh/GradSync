@@ -379,6 +379,18 @@ describe('resource booking UI', () => {
           status: 'confirmed',
           version: 1,
         }, {
+          id: 503,
+          resourceId: 41,
+          resourceName: 'Confocal microscope',
+          requestedById: 7,
+          startsAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+          endsAt: new Date(Date.now() - 47 * 60 * 60 * 1000).toISOString(),
+          quantity: 3,
+          origin: 'staff_direct',
+          confirmationPolicy: 'approval_required',
+          status: 'completed',
+          version: 2,
+        }, {
           id: 502,
           resourceId: 41,
           resourceName: 'Confocal microscope',
@@ -420,6 +432,7 @@ describe('resource booking UI', () => {
     expect(detail).toHaveTextContent('Use periods');
     expect(detail).toHaveTextContent('Qty 1');
     expect(detail).toHaveTextContent('Qty 2');
+    expect(detail).not.toHaveTextContent('Qty 3');
 
     await vi.advanceTimersByTimeAsync(5100);
     expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/resources/availability/'))).toHaveLength(1);

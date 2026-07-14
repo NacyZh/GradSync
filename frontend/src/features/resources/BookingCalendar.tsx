@@ -61,7 +61,7 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
   });
   const availability = useMemo(() => availabilityQuery.data?.results ?? [], [availabilityQuery.data]);
   const usePeriodBookings = useMemo(() => (usePeriodsQuery.data?.results ?? [])
-    .filter((booking) => booking.resourceId === resource?.id && !['cancelled', 'rejected'].includes(booking.status))
+    .filter((booking) => booking.resourceId === resource?.id && !['completed', 'cancelled', 'rejected'].includes(booking.status))
     .sort((first, second) => new Date(first.startsAt).getTime() - new Date(second.startsAt).getTime()), [resource?.id, usePeriodsQuery.data]);
   const selectedAvailability = availability.find((item) => item.id === resource?.id);
   const bookingResource = selectedAvailability ?? (resource ? {
