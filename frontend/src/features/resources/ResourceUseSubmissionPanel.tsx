@@ -34,10 +34,12 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
     queryKey: canManage ? ['bookings', 'review-queue'] : ['bookings'],
     queryFn: () => listBookings(canManage ? { reviewQueue: true } : undefined),
   });
-  const bookings = useMemo(() => (bookingsQuery.data?.results ?? []).map((booking) => ({
-    ...booking,
-    resourceName: booking.resourceName ?? resources.find((resource) => resource.id === booking.resourceId)?.name ?? `Resource #${booking.resourceId}`,
-  })), [bookingsQuery.data, resources]);
+  const bookings = useMemo(() => (bookingsQuery.data?.results ?? [])
+    .map((booking) => ({
+      ...booking,
+      resourceName: booking.resourceName ?? resources.find((resource) => resource.id === booking.resourceId)?.name ?? `Resource #${booking.resourceId}`,
+    }))
+    .sort((first, second) => getBookingSortTime(second) - getBookingSortTime(first)), [bookingsQuery.data, resources]);
   const pendingSubmissions = bookings.filter((booking) => booking.status === 'pending');
   const activeResources = useMemo(
     () => resources.filter((resource) => resource.status !== 'retired'),
@@ -216,9 +218,9 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
         {bookingsQuery.isLoading ? <DataState state="loading" message="Loading resource use records." /> : null}
         {bookingsQuery.error ? <DataState state="error" title="Use records unavailable" message={bookingsQuery.error.message ?? 'Unable to load resource use records.'} /> : null}
         {!bookingsQuery.isLoading && !bookingsQuery.error && bookings.length === 0 ? <DataState state="empty" title={canManage ? 'No student requests' : 'No use submissions'} message={canManage ? 'Pending student resource requests appear here for review.' : 'Your resource use requests and direct outcomes appear here.'} /> : null}
-        <ul className="resource-list">
+        <ul className="resource-list max-h-[40.5rem] overflow-y-auto pr-1">
           {bookings.map((booking) => (
-            <li key={`booking-${booking.id}`} className="items-start">
+            <li key={`booking-${booking.id}`} className="min-h-24 items-start">
               <div className="min-w-0">
                 <strong>{booking.resourceName}</strong>
                 <p>{new Date(booking.startsAt).toLocaleString()} – {new Date(booking.endsAt).toLocaleString()} · Qty {booking.quantity}</p>
@@ -257,4 +259,14 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
       </section>
     </div>
   );
+}
+
+function getBookingSortTime(booking: Booking) {
+  const candidates = [booking.createdAt, booking.startsAt, booking.endsAt];
+  for (const value of candidates) {
+    if (!value) continue;
+    const time = new Date(value).getTime();
+    if (Number.isFinite(time)) return time;
+  }
+  return 0;
 }
