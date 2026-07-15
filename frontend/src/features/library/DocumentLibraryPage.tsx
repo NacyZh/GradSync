@@ -28,6 +28,8 @@ import {
   type DocumentRecord,
 } from './documentApi';
 
+const EMPTY_CATEGORIES: DocumentCategory[] = [];
+
 function formatBytes(size: number) {
   if (size < 1024) return `${size} bytes`;
   if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
@@ -422,7 +424,7 @@ export function DocumentLibraryPage() {
   const [renamedDocuments, setRenamedDocuments] = useState<Record<string, DocumentRecord>>({});
   const [deletedDocumentIds, setDeletedDocumentIds] = useState<Set<string>>(() => new Set());
   const categoriesQuery = useDocumentCategories();
-  const categories = categoriesQuery.data ?? [];
+  const categories = categoriesQuery.data ?? EMPTY_CATEGORIES;
   const selectedCategory = categories.find((category) => category.id === categoryId);
   const projectDocumentsQuery = useDocuments(projectId, query, categoryId, '');
   const sharedDocumentsQuery = useSharedDocuments(query, categoryId, standalone);
