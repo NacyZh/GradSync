@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ProjectMembersPanel } from '../../src/features/projects/ProjectMembersPanel';
+import { ProjectCreatePage } from '../../src/features/projects/ProjectCreatePage';
 import { renderWithClient } from './test-utils';
 
 function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
@@ -89,5 +90,49 @@ describe('collaboration project members UI', () => {
     await userEvent.type(screen.getByLabelText('Student nickname'), 'No Match');
 
     expect(await screen.findByText('No eligible students match this search.')).toBeInTheDocument();
+  });
+
+  it('creates a project from selected student account options', async () => {
+    const requests: RequestInit[] = [];
+    mockFetch((url, init) => {
+      requests.push(init ?? {});
+      if (url.includes('/api/accounts/students/')) {
+        return [
+          { id: 7, nickname: 'Alex', email: 'alex.one@example.edu', degreeType: 'masters', label: 'Alex <alex.one@example.edu>' },
+          { id: 8, nickname: 'Alex', email: 'alex.two@example.edu', degreeType: 'doctoral', label: 'Alex <alex.two@example.edu>' },
+        ];
+      }
+      return { id: 44, title: 'Dropdown Project', description: '', status: 'active' };
+    });
+
+    renderWithClient(<ProjectCreatePage />);
+
+    await userEvent.type(screen.getByLabelText('Project title'), 'Dropdown Project');
+    await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
+    expect(await screen.findByText('alex.one@example.edu')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('alex.two@example.edu'));
+    expect(screen.getByRole('list', { name: 'Selected students' })).toHaveTextContent('Alex <alex.two@example.edu>');
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
+    const body = JSON.parse(String(requests.find((request) => request.method === 'POST')?.body));
+    expect(body).toMatchObject({ title: 'Dropdown Project', student_ids: [8] });
+  });
+
+  it('blocks duplicate selected students in project creation selector', async () => {
+    mockFetch((url) => {
+      if (url.includes('/api/accounts/students/')) {
+        return [{ id: 7, nickname: 'Alex', email: 'alex.one@example.edu', degreeType: 'masters', label: 'Alex <alex.one@example.edu>' }];
+      }
+      return { id: 44, title: 'Dropdown Project', description: '', status: 'active' };
+    });
+
+    renderWithClient(<ProjectCreatePage />);
+
+    await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
+    await userEvent.click(await screen.findByText('alex.one@example.edu'));
+
+    expect(screen.getByRole('button', { name: /alex.one@example.edu/ })).toBeDisabled();
+    expect(screen.getByText('Selected')).toBeInTheDocument();
   });
 });

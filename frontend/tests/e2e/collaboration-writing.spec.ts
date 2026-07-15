@@ -19,7 +19,7 @@ test('writing project feedback flow is reachable', async ({ page }) => {
       });
     });
 
-    await page.route('**/api/writing-projects/2/versions', async (route) => {
+    await page.route(/\/api\/writing-projects\/2\/versions\/?$/, async (route) => {
       uploaded = true;
       await fulfillJson(
         route,
@@ -36,7 +36,7 @@ test('writing project feedback flow is reachable', async ({ page }) => {
       );
     });
 
-    await page.route('**/api/writing-versions/6/feedback', async (route) => {
+    await page.route(/\/api\/writing-versions\/6\/feedback\/?$/, async (route) => {
       feedbackSubmitted = true;
       await fulfillJson(
         route,

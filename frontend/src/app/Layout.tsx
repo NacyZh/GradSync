@@ -29,7 +29,7 @@ export function Layout({ children }: PropsWithChildren) {
   const primaryLinks = user
     ? [
         { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'advisor', 'student'] },
-        { to: '/projects/new', label: 'Projects', icon: BriefcaseBusiness, roles: ['admin', 'advisor'] },
+        { to: '/projects', label: 'Projects', icon: BriefcaseBusiness, roles: ['admin', 'advisor', 'student'] },
         { to: '/resources', label: 'Resources', icon: Settings, roles: ['admin', 'advisor', 'student'] },
         { to: '/library/papers', label: 'Papers', icon: BookOpen, roles: ['admin', 'advisor', 'student'] },
         { to: '/library/code', label: 'Code', icon: Code2, roles: ['admin', 'advisor', 'student'] },

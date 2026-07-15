@@ -24,11 +24,42 @@ export type Project = {
   status: 'active' | 'archived';
   starts_on?: string | null;
   ends_on?: string | null;
+  startsOn?: string | null;
+  endsOn?: string | null;
+  latestEventId?: string | null;
+  freshness?: ProjectFreshness;
+  generatedAt?: string;
   memberships?: ProjectMembership[];
   current_tasks?: unknown[];
   pending_reviews?: unknown[];
   upcoming_bookings?: unknown[];
-  activity?: { event_type: string; summary: string; created_at: string }[];
+  activity?: ProjectEvent[];
+};
+
+export type ProjectFreshness = {
+  state: 'fresh' | 'stale' | 'refreshing';
+  latestEventId?: string | null;
+};
+
+export type ProjectEvent = {
+  id?: string;
+  source?: string;
+  event_type?: string;
+  eventType?: string;
+  targetType?: string;
+  targetId?: string;
+  summary: string;
+  actor_id?: number | null;
+  actorId?: number | null;
+  created_at?: string;
+  createdAt?: string;
+};
+
+export type ProjectListResponse = {
+  results: Project[];
+  capabilities?: {
+    canCreateProject: boolean;
+  };
 };
 
 export type ProjectMembership = {
@@ -47,10 +78,10 @@ export type ProjectMembership = {
 };
 
 export function listProjects() {
-  return apiRequest<{ results: Project[] }>('/api/projects/');
+  return apiRequest<ProjectListResponse>('/api/projects/');
 }
 
-export function createProject(payload: { title: string; description?: string; starts_on?: string | null; ends_on?: string | null; student_ids?: number[] }) {
+export function createProject(payload: { title: string; description?: string; starts_on?: string | null; ends_on?: string | null; student_ids?: number[]; studentIds?: number[] }) {
   return apiRequest<Project>('/api/projects/', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -59,6 +90,11 @@ export function createProject(payload: { title: string; description?: string; st
 
 export function getProject(projectId: number) {
   return apiRequest<Project>(`/api/projects/${projectId}/`);
+}
+
+export function listProjectEvents(projectId: number, after?: string | null) {
+  const suffix = after ? `?after=${encodeURIComponent(after)}` : '';
+  return apiRequest<{ results: ProjectEvent[] }>(`/api/projects/${projectId}/events/${suffix}`);
 }
 
 export function updateProject(projectId: number, payload: Partial<Pick<Project, 'title' | 'description' | 'starts_on' | 'ends_on'>>) {
@@ -93,12 +129,18 @@ export type StudentOption = {
   id: number;
   nickname: string;
   email: string;
-  degreeType: 'masters' | 'doctoral';
+  degreeType: 'masters' | 'doctoral' | null;
   label: string;
+  eligibility?: {
+    selectable: boolean;
+    reason: string;
+  };
 };
 
-export function searchStudents(query: string) {
-  return apiRequest<StudentOption[]>(`/api/accounts/students/?q=${encodeURIComponent(query)}`);
+export function searchStudents(query: string, projectId?: number) {
+  const params = new URLSearchParams({ q: query });
+  if (projectId) params.set('projectId', String(projectId));
+  return apiRequest<StudentOption[]>(`/api/accounts/students/?${params.toString()}`);
 }
 
 export function listProjectMaterials(projectId: number) {
@@ -122,4 +164,11 @@ export function updateProjectMaterialVisibility(projectId: number, materialId: s
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
+}
+
+export function downloadProjectMaterial(projectId: number, materialId: string) {
+  return apiRequest<{ filename: string; deliveryMode: 'direct_response' | 'signed_url'; url: string; expiresAt: string }>(
+    `/api/projects/${projectId}/materials/${materialId}/download/`,
+    { method: 'POST' },
+  );
 }

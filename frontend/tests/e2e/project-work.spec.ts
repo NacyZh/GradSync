@@ -6,6 +6,22 @@ test.beforeEach(async ({ page }) => {
   await mockAuthenticatedApi(page);
 });
 
+test('advisor can enter projects from primary navigation', async ({ page }) => {
+  if (fullStackE2E) {
+    await loginAs(page);
+  }
+
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Projects' }).first().click();
+  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /New project/ })).toBeVisible();
+  if (!fullStackE2E) {
+    await expect(page.getByRole('region', { name: 'Visible projects' })).toContainText('Graphene Lab');
+    await expect(page.getByRole('link', { name: 'Open', exact: true })).toHaveAttribute('href', '/projects/1');
+  }
+});
+
 test('advisor can create a project and dashboard shows isolated project activity', async ({ page }) => {
   if (!fullStackE2E) {
     await page.route('**/api/projects/', async (route) => {
@@ -26,7 +42,6 @@ test('advisor can create a project and dashboard shows isolated project activity
   await expect(page.getByRole('heading', { name: 'Create project' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Project setup guidance' })).toContainText('Project-scoped by default');
   await page.getByLabel('Project title').fill('Quantum Thesis');
-  await page.getByLabel('Student IDs').fill('12,13');
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.getByText('Created project Quantum Thesis')).toBeVisible();
 

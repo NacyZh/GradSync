@@ -120,4 +120,81 @@ describe('project materials UI', () => {
     expect(screen.queryByText('Selected file: notes.md')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload material' })).toBeDisabled();
   });
+
+  it('downloads permitted project materials and reports unavailable errors', async () => {
+    const requests: string[] = [];
+    mockFetch((url, init) => {
+      requests.push(`${init?.method ?? 'GET'} ${url}`);
+      if (url.includes('/download/')) {
+        return { payload: { filename: 'Protocol.pdf', deliveryMode: 'direct_response', url: '', expiresAt: '2026-07-15T00:00:00Z' } };
+      }
+      return {
+        payload: {
+          count: 2,
+          results: [
+            {
+              id: '44',
+              materialType: 'document',
+              backingRecordId: '9',
+              displayName: 'Protocol',
+              sourceProject: { id: '1', title: 'Boundary Project' },
+              visibility: 'project-only',
+              classificationState: 'active',
+              actionCapabilities: { canView: true, canDownload: true, canChangeVisibility: false },
+            },
+            {
+              id: '45',
+              materialType: 'document',
+              backingRecordId: '10',
+              displayName: 'Missing Protocol',
+              sourceProject: { id: '1', title: 'Boundary Project' },
+              visibility: 'project-only',
+              classificationState: 'active',
+              actionCapabilities: { canView: true, canDownload: false, canChangeVisibility: false },
+            },
+          ],
+        },
+      };
+    });
+
+    renderProjectMaterials();
+
+    expect(await screen.findByText('Protocol')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download Protocol' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Download Missing Protocol' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Download Protocol' }));
+
+    await waitFor(() => expect(requests.some((request) => request.includes('/download/'))).toBe(true));
+    expect(await screen.findByText('Download ready: Protocol.pdf')).toBeInTheDocument();
+  });
+
+  it('shows download errors without leaving the materials workspace', async () => {
+    mockFetch((url) => {
+      if (url.includes('/download/')) {
+        return { status: 410, payload: { message: 'Project material is no longer available' } };
+      }
+      return {
+        payload: {
+          count: 1,
+          results: [{
+            id: '44',
+            materialType: 'document',
+            backingRecordId: '9',
+            displayName: 'Protocol',
+            sourceProject: { id: '1', title: 'Boundary Project' },
+            visibility: 'project-only',
+            classificationState: 'active',
+            actionCapabilities: { canView: true, canDownload: true, canChangeVisibility: false },
+          }],
+        },
+      };
+    });
+
+    renderProjectMaterials();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Download Protocol' }));
+
+    expect(await screen.findByText('Project material is no longer available')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Project materials' })).toBeInTheDocument();
+  });
 });

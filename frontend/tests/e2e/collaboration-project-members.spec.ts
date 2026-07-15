@@ -47,6 +47,21 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/projects/1/members/2/', async (route) => {
     await route.fulfill({ status: 204 });
   });
+  await page.route('**/api/projects/', async (route) => {
+    if (route.request().method() === 'POST') {
+      await fulfillJson(route, {
+        id: 9,
+        title: 'Selected Student Project',
+        description: '',
+        status: 'active',
+        memberships: [
+          { id: 8, projectId: 9, userId: 14, nickname: 'Alex', email: 'alex.two@example.edu', role: 'student', status: 'active' },
+        ],
+      }, 201);
+      return;
+    }
+    await fulfillJson(route, { capabilities: { canCreateProject: true }, results: [] });
+  });
 });
 
 test('teacher manages project membership by student nickname', async ({ page }) => {
@@ -72,4 +87,23 @@ test('teacher manages project membership by student nickname', async ({ page }) 
     await page.getByRole('dialog', { name: 'Remove student?' }).getByRole('button', { name: 'Remove student' }).click();
     await expect(page.getByText('Member removed')).toBeVisible();
   }
+});
+
+test('teacher creates a project with selected student accounts', async ({ page }) => {
+  if (fullStackE2E) {
+    await loginAs(page, 'advisor@example.edu');
+  }
+
+  await page.goto('/projects/new');
+  await page.getByLabel('Project title').fill('Selected Student Project');
+
+  if (!fullStackE2E) {
+    await page.getByLabel('Student nickname').fill('Alex');
+    await expect(page.getByText('alex.one@example.edu')).toBeVisible();
+    await page.getByText('alex.two@example.edu').click();
+    await expect(page.getByRole('list', { name: 'Selected students' })).toContainText('Alex <alex.two@example.edu>');
+  }
+
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByText('Created project Selected Student Project')).toBeVisible();
 });

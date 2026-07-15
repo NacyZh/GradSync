@@ -29,3 +29,17 @@ test('main application landmarks are present', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 700 });
   await expect(page.getByRole('complementary', { name: 'Workspace navigation' })).toBeVisible();
 });
+
+test('project dashboard member focus remains stable during refresh window', async ({ page }) => {
+  await mockAuthenticatedApi(page);
+  if (fullStackE2E) {
+    await loginAs(page);
+  }
+
+  await page.goto('/projects/1');
+  const selector = page.getByLabel('Student nickname');
+  await selector.focus();
+  await expect(selector).toBeFocused();
+  await page.waitForTimeout(5200);
+  await expect(selector).toBeFocused();
+});

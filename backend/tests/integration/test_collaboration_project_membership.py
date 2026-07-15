@@ -125,3 +125,56 @@ def test_duplicate_nicknames_and_duplicate_active_membership_are_handled(api_cli
     assert first_add.status_code == 201
     assert duplicate_add.status_code == 400
     assert second_add.status_code == 201
+
+
+@pytest.mark.django_db
+def test_project_creation_with_selected_students_records_membership_audit(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    student_one = _student("one@example.edu", "One")
+    student_two = _student("two@example.edu", "Two")
+
+    response = authenticate(api_client, teacher).post(
+        "/api/projects/",
+        {"title": "Selected Students", "studentIds": [student_one.id, student_two.id]},
+        format="json",
+    )
+
+    project = ResearchProject.objects.get(title="Selected Students")
+    assert response.status_code == 201
+    assert project.memberships.filter(user=student_one, role="student", status="active").exists()
+    assert project.memberships.filter(user=student_two, role="student", status="active").exists()
+    assert AuditEvent.objects.filter(
+        project=project, actor=teacher, event_type="membership.added"
+    ).count() == 2
+
+
+@pytest.mark.django_db
+def test_project_creation_rejects_stale_or_duplicate_student_selection(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    inactive_student = UserFactory(
+        email="inactive@example.edu",
+        name="Inactive",
+        nickname="Inactive",
+        global_role="student",
+        active_role="student",
+        status="suspended",
+    )
+    student = _student("duplicate@example.edu", "Duplicate")
+    client = authenticate(api_client, teacher)
+
+    inactive_response = client.post(
+        "/api/projects/",
+        {"title": "Inactive Student", "studentIds": [inactive_student.id]},
+        format="json",
+    )
+    duplicate_response = client.post(
+        "/api/projects/",
+        {"title": "Duplicate Student", "studentIds": [student.id, student.id]},
+        format="json",
+    )
+
+    assert inactive_response.status_code == 400
+    assert duplicate_response.status_code == 400
+    assert not ResearchProject.objects.filter(
+        title__in=["Inactive Student", "Duplicate Student"]
+    ).exists()

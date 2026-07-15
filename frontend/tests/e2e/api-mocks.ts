@@ -42,7 +42,17 @@ export const selectedProject = {
   title: 'Graphene Lab',
   description: 'Research operations validation',
   status: 'active',
-  memberships: [],
+  memberships: [
+    {
+      id: 1,
+      projectId: 1,
+      userId: 12,
+      nickname: 'Student With Exceptionally Long Display Name For Layout Validation',
+      email: 'student.with.exceptionally.long.email.address.for.layout.validation@example.research.university.edu',
+      role: 'student',
+      status: 'active',
+    },
+  ],
   current_tasks: [{
     id: 11,
     title: 'Analyze sample',
@@ -284,6 +294,12 @@ export async function mockAuthenticatedApi(page: Page) {
   await page.route('**/api/code-artifacts/upload-policy/', async (route) => {
     await fulfillJson(route, codeUploadPolicy);
   });
+  await page.route('**/api/projects/', async (route) => {
+    await fulfillJson(route, {
+      capabilities: { canCreateProject: true },
+      results: [selectedProject],
+    });
+  });
   await page.route('**/api/projects/1/', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ json: selectedProject });
@@ -297,6 +313,9 @@ export async function mockAuthenticatedApi(page: Page) {
         results: [{ id: 1, event_type: 'pending_review', target_type: 'progress_report', target_id: '21', subject: 'Pending review reminder', action_path: '/projects/1/reviews', status: 'queued', eligible_at: '2026-06-25T08:05:00Z' }],
       },
     });
+  });
+  await page.route('**/api/projects/1/events/', async (route) => {
+    await fulfillJson(route, { results: [] });
   });
   await page.route('**/api/projects/1/tasks/11/', async (route) => {
     await fulfillJson(route, { id: 11, title: 'Analyze sample', status: 'completed', priority: 'high' });

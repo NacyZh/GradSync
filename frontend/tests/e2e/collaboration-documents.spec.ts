@@ -32,6 +32,44 @@ async function mockDocumentLibrary(page: Page) {
       body: Buffer.from('document'),
     });
   });
+  await page.route('**/api/projects/1/materials/44/download/', async (route) => {
+    await fulfillJson(route, {
+      filename: 'Project Protocol.pdf',
+      deliveryMode: 'direct_response',
+      url: '',
+      expiresAt: '2026-07-15T00:00:00Z',
+    });
+  });
+  await page.route('**/api/projects/1/materials/45/download/', async (route) => {
+    await fulfillJson(route, { message: 'Project material is no longer available' }, 410);
+  });
+  await page.route('**/api/projects/1/materials/', async (route) => {
+    await fulfillJson(route, {
+      count: 1,
+      results: [
+        {
+          id: '44',
+          materialType: 'document',
+          backingRecordId: '4',
+          displayName: 'Project Protocol',
+          sourceProject: { id: '1', title: 'Graphene Lab' },
+          visibility: 'project-only',
+          classificationState: 'active',
+          actionCapabilities: { canView: true, canDownload: true, canChangeVisibility: false },
+        },
+        {
+          id: '45',
+          materialType: 'document',
+          backingRecordId: '5',
+          displayName: 'Stale Project Protocol',
+          sourceProject: { id: '1', title: 'Graphene Lab' },
+          visibility: 'project-only',
+          classificationState: 'active',
+          actionCapabilities: { canView: true, canDownload: true, canChangeVisibility: false },
+        },
+      ],
+    });
+  });
   await page.route('**/api/library/documents/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -150,6 +188,19 @@ test('document library upload, shared category, search, list, detail, and downlo
     expect(download.suggestedFilename()).toBe('protocol.pdf');
     await expect(page.getByText(/protocol.pdf/)).toBeVisible();
   }
+});
+
+test('project material document download stays inside project materials workspace', async ({ page }) => {
+  test.skip(fullStackE2E, 'Mocked project material download coverage uses deterministic fixtures.');
+  await mockDocumentLibrary(page);
+
+  await page.goto('/projects/1/materials');
+  await expect(page.getByRole('heading', { name: 'Project materials' })).toBeVisible();
+  await expect(page.getByText('Project Protocol', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Download Project Protocol' }).click();
+  await expect(page.getByText('Download ready: Project Protocol.pdf', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Download Stale Project Protocol' }).click();
+  await expect(page.getByText('Project material is no longer available', { exact: true })).toBeVisible();
 });
 
 test('standalone shared documents hide project-level rename and delete actions', async ({ page }) => {

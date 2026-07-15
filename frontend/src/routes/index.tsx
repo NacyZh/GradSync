@@ -12,6 +12,7 @@ export const routeWorkspaceBundles = {
   accountAdmin: () => import('../features/admin/AccountAdminPage'),
   roleActivation: () => import('../features/admin/RoleActivationPage'),
   profile: () => import('../features/auth/ProfilePage'),
+  projectsLanding: () => import('../features/projects/ProjectsLandingPage'),
   projectCreate: () => import('../features/projects/ProjectCreatePage'),
   projectDashboard: () => import('../features/projects/ProjectDashboardPage'),
   projectMaterials: () => import('../features/projects/ProjectMaterialsPage'),
@@ -28,6 +29,7 @@ export const routeWorkspaceBundles = {
 const AccountAdminPage = lazy(async () => ({ default: (await routeWorkspaceBundles.accountAdmin()).AccountAdminPage }));
 const RoleActivationPage = lazy(async () => ({ default: (await routeWorkspaceBundles.roleActivation()).RoleActivationPage }));
 const ProfilePage = lazy(async () => ({ default: (await routeWorkspaceBundles.profile()).ProfilePage }));
+const ProjectsLandingPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectsLanding()).ProjectsLandingPage }));
 const ProjectCreatePage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectCreate()).ProjectCreatePage }));
 const ProjectDashboardPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectDashboard()).ProjectDashboardPage }));
 const ProjectMaterialsPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectMaterials()).ProjectMaterialsPage }));
@@ -94,6 +96,10 @@ export const router = createBrowserRouter([
     element: rolePage(<RoleActivationPage />, 'admin'),
   },
   // Advisor + Admin: create and manage projects.
+  {
+    path: '/projects',
+    element: protectedPage(<ProjectsLandingPage />),
+  },
   {
     path: '/projects/new',
     element: rolePage(<ProjectCreatePage />, 'admin', 'advisor'),

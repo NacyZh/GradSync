@@ -17,12 +17,14 @@ import { TaskStatusControl } from '../tasks/TaskStatusControl';
 import { TaskTree, type TaskNode } from '../tasks/TaskTree';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
 import { archiveProject, getProject, reopenProject } from './api';
+import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 
 export function ProjectDashboardPage() {
   const projectId = Number(useParams().projectId ?? 0);
   const { confirm, notify } = useAppFeedback();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const projectQuery = useQuery({ queryKey: ['project', projectId], queryFn: () => getProject(projectId), enabled: Boolean(projectId) });
+  const liveRefresh = useProjectLiveRefresh(projectId, projectQuery.data?.latestEventId);
   const archiveMutation = useMutation({
     mutationFn: () => archiveProject(projectId),
     onSuccess: () => {
@@ -92,6 +94,9 @@ export function ProjectDashboardPage() {
       className="project-workspace"
     >
       <FormStatus error={archiveMutation.error?.message ?? reopenMutation.error?.message} success={archiveMutation.isSuccess || reopenMutation.isSuccess ? 'Project status updated' : undefined} />
+      {liveRefresh.state === 'stale' ? (
+        <DataState state="warning" title="Project data may be stale" message="Last successful project data is still visible while live refresh retries." />
+      ) : null}
       {archived ? (
         <DataState
           state="warning"
@@ -107,7 +112,7 @@ export function ProjectDashboardPage() {
         <MetricCard icon={CalendarDays} label="Upcoming bookings" value={bookings.length} detail={nextDeadline ? `Next due ${formatDate(nextDeadline.deadline_at)}` : 'reserved resources'} />
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(20rem,1.1fr)_minmax(22rem,0.95fr)_minmax(18rem,0.75fr)]">
+      <div className="grid min-w-0 gap-4 overflow-hidden xl:grid-cols-[minmax(20rem,1.1fr)_minmax(22rem,0.95fr)_minmax(18rem,0.75fr)]">
         <section className="panel" aria-label="Current tasks">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -160,7 +165,7 @@ export function ProjectDashboardPage() {
           )}
           <TaskForm projectId={projectId} disabled={archived} />
         </section>
-        <aside className="panel" aria-label="Members and progress">
+        <aside className="panel min-w-0 overflow-hidden" aria-label="Members and progress">
           <h2>Members and progress</h2>
           <div className="my-4 grid place-items-center">
             <div className="progress-ring" aria-label={`Project progress ${progress}%`}>
@@ -189,8 +194,8 @@ export function ProjectDashboardPage() {
           {project.activity?.length ? (
             <ul className="timeline">
               {project.activity.map((event, index) => (
-                <li key={`${event.event_type}-${index}`}>
-                  <strong>{event.event_type.replaceAll('_', ' ')}</strong>
+                <li key={`${event.eventType ?? event.event_type ?? 'event'}-${index}`}>
+                  <strong>{(event.eventType ?? event.event_type ?? 'activity').replaceAll('_', ' ')}</strong>
                   <span>{event.summary}</span>
                 </li>
               ))}

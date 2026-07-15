@@ -53,27 +53,34 @@ export function ProjectMembersPanel({ projectId, members = [], disabled = false 
         <p className="mt-1 text-sm text-muted-foreground">{members.length} loaded members</p>
       </div>
       {members.length === 0 ? <p className="text-sm text-muted-foreground">No members loaded yet.</p> : null}
-      <ul className="grid gap-2">
+      <ul className="grid min-w-0 gap-2">
         {members.map((member) => (
-          <li key={member.id} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
-            <span className="min-w-0">
-              <strong>{member.nickname || member.name || `User ${member.userId ?? member.user_id}`}</strong>
-              {member.email ? <span className="ml-2 text-muted-foreground">{member.email}</span> : null}
-              <span className="ml-2 text-muted-foreground">{member.role}</span>
+          <li key={member.id} className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <span className="grid min-w-0 gap-1">
+              <strong className="min-w-0 truncate">{member.nickname || member.name || `User ${member.userId ?? member.user_id}`}</strong>
+              {member.email ? <span className="min-w-0 overflow-hidden text-ellipsis break-all text-muted-foreground">{member.email}</span> : null}
+              <span className="text-muted-foreground">{member.role}</span>
             </span>
-            <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <span className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
               <StatusBadge status={member.status} />
               {member.role === 'student' && member.status === 'active' ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => onRemove(member)} disabled={disabled || removeMutation.isPending}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onRemove(member)}
+                  disabled={disabled || removeMutation.isPending}
+                  aria-label={`Remove ${member.nickname || member.name || `User ${member.userId ?? member.user_id}`}`}
+                >
                   <UserMinus className="h-4 w-4" aria-hidden="true" />
-                  Remove {member.nickname || member.name || `User ${member.userId ?? member.user_id}`}
+                  Remove
                 </Button>
               ) : null}
             </span>
           </li>
         ))}
       </ul>
-      <form aria-label="Add project member" className="grid gap-3 rounded-md border p-3">
+      <form aria-label="Add project member" className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-3">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-extrabold">
             <UserPlus className="h-4 w-4" aria-hidden="true" />

@@ -1,7 +1,13 @@
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from tests.factories.shared_workspace import active_student, active_teacher, project_with_members
+from apps.projects.models import ProjectMaterial
+from tests.factories.shared_workspace import (
+    active_student,
+    active_teacher,
+    project_only_document,
+    project_with_members,
+)
 from tests.helpers import authenticate
 
 
@@ -67,3 +73,54 @@ def test_project_material_visibility_change_denies_ordinary_member(api_client):
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_project_material_download_contract_authorized_for_descriptor(api_client):
+    advisor = active_teacher()
+    student = active_student()
+    project = project_with_members(advisor=advisor, students=[student])
+    document = project_only_document(project)
+    material = ProjectMaterial.objects.create(
+        source_project=project,
+        material_type=ProjectMaterial.MaterialType.DOCUMENT,
+        backing_record_id=document.id,
+        visibility_state=ProjectMaterial.VisibilityState.PROJECT_ONLY,
+        classification_state=ProjectMaterial.ClassificationState.ACTIVE,
+        classification_reason=ProjectMaterial.ClassificationReason.EXPLICIT_PROJECT_SPECIFIC,
+        created_by=advisor,
+    )
+
+    response = authenticate(api_client, student).post(
+        f"/api/projects/{project.id}/materials/{material.id}/download/"
+    )
+
+    assert response.status_code == 200
+    assert response.data["deliveryMode"] == "direct_response"
+    assert response.data["filename"]
+
+
+@pytest.mark.django_db
+def test_project_material_download_contract_denies_outsider_and_stale_material(api_client):
+    advisor = active_teacher()
+    outsider = active_student()
+    project = project_with_members(advisor=advisor)
+    material = ProjectMaterial.objects.create(
+        source_project=project,
+        material_type=ProjectMaterial.MaterialType.DOCUMENT,
+        backing_record_id=999999,
+        visibility_state=ProjectMaterial.VisibilityState.PROJECT_ONLY,
+        classification_state=ProjectMaterial.ClassificationState.ACTIVE,
+        classification_reason=ProjectMaterial.ClassificationReason.EXPLICIT_PROJECT_SPECIFIC,
+        created_by=advisor,
+    )
+
+    outsider_response = authenticate(api_client, outsider).post(
+        f"/api/projects/{project.id}/materials/{material.id}/download/"
+    )
+    stale_response = authenticate(api_client, advisor).post(
+        f"/api/projects/{project.id}/materials/{material.id}/download/"
+    )
+
+    assert outsider_response.status_code in {403, 404}
+    assert stale_response.status_code == 410

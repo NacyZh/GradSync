@@ -126,14 +126,33 @@ class RoleActivationUpdateSerializer(serializers.Serializer):
 
 
 class StudentOptionSerializer(serializers.ModelSerializer):
-    degreeType = serializers.CharField(source="student_profile.degree_type")
+    degreeType = serializers.SerializerMethodField()
     label = serializers.SerializerMethodField()
+    eligibility = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "nickname", "email", "degreeType", "label"]
+        fields = ["id", "nickname", "email", "degreeType", "label", "eligibility"]
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_degreeType(self, obj):
+        profile = getattr(obj, "student_profile", None)
+        return profile.degree_type if profile else None
 
     @extend_schema_field(serializers.CharField())
     def get_label(self, obj):
         nickname = obj.nickname or obj.name
         return f"{nickname} <{obj.email}>"
+
+    @extend_schema_field(serializers.DictField())
+    def get_eligibility(self, obj):
+        project_id = self.context.get("project_id")
+        if not project_id:
+            return {"selectable": True, "reason": ""}
+        active_membership_exists = obj.project_memberships.filter(
+            project_id=project_id,
+            status="active",
+        ).exists()
+        if active_membership_exists:
+            return {"selectable": False, "reason": "already_active_member"}
+        return {"selectable": True, "reason": ""}

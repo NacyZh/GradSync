@@ -104,6 +104,16 @@ jobs:
           else
             echo "Skipping code repository layout OpenAPI contract: specs/007-code-repository-layout/contracts/openapi.yaml is not tracked in this checkout."
           fi
+      - name: Check projects module OpenAPI contract drift
+        env:
+          PYTHON: python
+          OPENAPI_STRICT_SHAPES: "1"
+        run: |
+          if [ -f specs/014-refine-projects-module/contracts/openapi.yaml ]; then
+            bash scripts/check-openapi-contract.sh specs/014-refine-projects-module/contracts/openapi.yaml
+          else
+            echo "Skipping projects module OpenAPI contract: specs/014-refine-projects-module/contracts/openapi.yaml is not tracked in this checkout."
+          fi
       - name: Run backend tests
         working-directory: backend
         run: python -m pytest

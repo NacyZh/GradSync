@@ -11,28 +11,10 @@ import { DataState } from '../../src/shared/ui/DataState';
 import { Button } from '../../src/shared/ui/primitives/button';
 import { productionChunkSizeWarningLimit, productionManualChunks } from '../../build-guards';
 import tailwindConfig from '../../tailwind.config';
-import { renderWithClient } from './test-utils';
+import { mockCurrentUserFetch, renderWithClient } from './test-utils';
 
 function mockCurrentUser(user: CurrentUser | null) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => {
-      if (user) {
-        return Promise.resolve(
-          new Response(JSON.stringify(user), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }),
-        );
-      }
-      return Promise.resolve(
-        new Response(JSON.stringify({ message: 'Authentication required' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      );
-    }),
-  );
+  mockCurrentUserFetch(user);
 }
 
 function renderLayout() {
@@ -62,7 +44,7 @@ describe('role-aware navigation', () => {
 
     await screen.findByText('admin');
     expect(screen.getByRole('link', { name: 'Team' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects');
     expect(screen.getByRole('link', { name: 'Open notifications' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
@@ -82,11 +64,11 @@ describe('role-aware navigation', () => {
     renderLayout();
 
     await screen.findByText('advisor');
-    expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects');
     expect(screen.queryByRole('link', { name: 'Team' })).not.toBeInTheDocument();
   });
 
-  it('hides project creation and account admin from student', async () => {
+  it('shows project entry but hides account admin from student', async () => {
     mockCurrentUser({
       id: 3,
       email: 'student@test.local',
@@ -97,7 +79,7 @@ describe('role-aware navigation', () => {
     renderLayout();
 
     await screen.findByText('student');
-    expect(screen.queryByRole('link', { name: 'Projects' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects');
     expect(screen.queryByRole('link', { name: 'Team' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Resources' })).toBeInTheDocument();
   });
@@ -193,6 +175,7 @@ describe('role-aware navigation', () => {
       'accountAdmin',
       'roleActivation',
       'profile',
+      'projectsLanding',
       'projectCreate',
       'projectDashboard',
       'projectMaterials',

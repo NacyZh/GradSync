@@ -38,14 +38,14 @@ class ProjectService:
             project=project, user=self.actor, role=ProjectMembership.Role.ADVISOR
         )
 
-        users = get_user_model().objects.filter(id__in=student_ids or [])
-        for user in users:
-            ProjectMembership.objects.get_or_create(
+        for user in _eligible_project_students(student_ids or []):
+            membership = ProjectMembership.objects.create(
                 project=project,
                 user=user,
                 status=ProjectMembership.Status.ACTIVE,
-                defaults={"role": ProjectMembership.Role.STUDENT},
+                role=ProjectMembership.Role.STUDENT,
             )
+            record_membership_change(project, self.actor, membership, "added")
         record_event(
             project, self.actor, "project.created", f"Created project {project.title}", project
         )
@@ -165,3 +165,122 @@ def projects_visible_to(user):
     return ResearchProject.objects.filter(
         memberships__user=user, memberships__status="active"
     ).distinct()
+
+
+def can_create_projects(user) -> bool:
+    return bool(getattr(user, "is_authenticated", False) and getattr(user, "is_advisor", False))
+
+
+def _eligible_project_students(student_ids: list[int]):
+    if not student_ids:
+        return []
+    if len(student_ids) != len(set(student_ids)):
+        raise ValidationError("Student selections must not contain duplicates")
+
+    user_model = get_user_model()
+    students = list(user_model.objects.filter(id__in=student_ids))
+    found_ids = {student.id for student in students}
+    if found_ids != set(student_ids):
+        raise ValidationError("Selected student does not exist")
+
+    for student in students:
+        if (
+            student.global_role != student.GlobalRole.STUDENT
+            or student.status != student.Status.ACTIVE
+            or student.active_role != student.RequestedRole.STUDENT
+        ):
+            raise ValidationError("Selected account is not an active student")
+    return students
+
+
+def project_event_feed(project: ResearchProject, *, after: str | None = None, limit: int = 50):
+    after_source = None
+    after_id = None
+    if after and ":" in after:
+        after_source, raw_id = after.split(":", 1)
+        if raw_id.isdigit():
+            after_id = int(raw_id)
+
+    events = []
+    audit_events = project.audit_events.select_related("actor").order_by("-created_at")[:limit]
+    for event in audit_events:
+        event_id = f"audit:{event.id}"
+        if after_source == "audit" and after_id is not None and event.id <= after_id:
+            continue
+        events.append(
+            {
+                "id": event_id,
+                "source": "audit",
+                "eventType": event.event_type,
+                "targetType": event.target_type,
+                "targetId": event.target_id,
+                "summary": event.summary,
+                "actorId": event.actor_id,
+                "createdAt": event.created_at,
+            }
+        )
+
+    download_events = project.download_events.select_related("actor").order_by("-downloaded_at")[
+        :limit
+    ]
+    for event in download_events:
+        event_id = f"download:{event.id}"
+        if after_source == "download" and after_id is not None and event.id <= after_id:
+            continue
+        events.append(
+            {
+                "id": event_id,
+                "source": "download",
+                "eventType": f"download.{event.target_type}",
+                "targetType": event.target_type,
+                "targetId": event.target_id,
+                "summary": f"Downloaded {event.filename}",
+                "actorId": event.actor_id,
+                "createdAt": event.downloaded_at,
+            }
+        )
+
+    notification_events = project.notifications.select_related("sender").order_by("-created_at")[
+        :limit
+    ]
+    for notification in notification_events:
+        event_id = f"notification:{notification.id}"
+        if after_source == "notification" and after_id is not None and notification.id <= after_id:
+            continue
+        events.append(
+            {
+                "id": event_id,
+                "source": "notification",
+                "eventType": f"notification.{notification.status}",
+                "targetType": notification.target_type,
+                "targetId": notification.target_id,
+                "summary": notification.subject,
+                "actorId": notification.sender_id,
+                "createdAt": notification.created_at,
+            }
+        )
+
+    comment_events = project.inline_comments.select_related("author").order_by("-created_at")[
+        :limit
+    ]
+    for comment in comment_events:
+        event_id = f"comment:{comment.id}"
+        if after_source == "comment" and after_id is not None and comment.id <= after_id:
+            continue
+        events.append(
+            {
+                "id": event_id,
+                "source": "comment",
+                "eventType": f"inline_comment.{comment.status}",
+                "targetType": comment.target_type,
+                "targetId": str(comment.target_id),
+                "summary": (
+                    f"Comment on {comment.target_type} {comment.target_id}: {comment.anchor}"
+                ),
+                "actorId": comment.author_id,
+                "createdAt": comment.created_at,
+            }
+        )
+
+    events = sorted(events, key=lambda item: item["createdAt"], reverse=True)
+    return events[: max(1, min(limit, 100))]

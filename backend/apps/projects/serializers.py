@@ -1,3 +1,4 @@
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -6,7 +7,7 @@ from .material_services import (
     project_material_display_name,
 )
 from .models import ProjectMaterial, ProjectMembership, ResearchProject
-from .services import ProjectService
+from .services import ProjectService, project_event_feed
 
 
 class ProjectMembershipSerializer(serializers.ModelSerializer):
@@ -49,11 +50,35 @@ class ProjectCreateSerializer(serializers.Serializer):
     ends_on = serializers.DateField(required=False, allow_null=True)
     student_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
 
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        if "studentIds" in data and "student_ids" not in data:
+            data["student_ids"] = data["studentIds"]
+        return super().to_internal_value(data)
+
     def validate(self, attrs):
         starts_on = attrs.get("starts_on")
         ends_on = attrs.get("ends_on")
         if starts_on and ends_on and ends_on < starts_on:
             raise serializers.ValidationError("Project end date cannot be before start date")
+        student_ids = attrs.get("student_ids") or []
+        if len(student_ids) != len(set(student_ids)):
+            raise serializers.ValidationError("Student selections must not contain duplicates")
+        if student_ids:
+            from django.contrib.auth import get_user_model
+
+            user_model = get_user_model()
+            students = list(user_model.objects.filter(id__in=student_ids))
+            if {student.id for student in students} != set(student_ids):
+                raise serializers.ValidationError("Selected student does not exist")
+            for student in students:
+                if (
+                    student.global_role != student.GlobalRole.STUDENT
+                    or student.status != student.Status.ACTIVE
+                    or student.active_role != student.RequestedRole.STUDENT
+                ):
+                    raise serializers.ValidationError("Selected account is not an active student")
         return attrs
 
     def create(self, validated_data):
@@ -62,6 +87,10 @@ class ProjectCreateSerializer(serializers.Serializer):
 
 class ProjectSerializer(serializers.ModelSerializer):
     memberships = ProjectMembershipSerializer(many=True, read_only=True)
+    advisorId = serializers.IntegerField(source="advisor_id", read_only=True)
+    startsOn = serializers.DateField(source="starts_on", read_only=True)
+    endsOn = serializers.DateField(source="ends_on", read_only=True)
+    archivedAt = serializers.DateTimeField(source="archived_at", read_only=True)
 
     class Meta:
         model = ResearchProject
@@ -74,6 +103,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             "starts_on",
             "ends_on",
             "archived_at",
+            "advisorId",
+            "startsOn",
+            "endsOn",
+            "archivedAt",
             "memberships",
         ]
 
@@ -147,14 +180,31 @@ class ProjectMaterialVisibilitySerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
 
 
+class ProjectEventSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    source = serializers.ChoiceField(choices=["audit", "download", "notification", "comment"])
+    eventType = serializers.CharField()
+    targetType = serializers.CharField(allow_blank=True)
+    targetId = serializers.CharField(allow_blank=True)
+    summary = serializers.CharField()
+    actorId = serializers.IntegerField(allow_null=True)
+    createdAt = serializers.DateTimeField()
+
+
 class ProjectDashboardSerializer(ProjectSerializer):
     current_tasks = serializers.SerializerMethodField()
     pending_reviews = serializers.SerializerMethodField()
+    latestEventId = serializers.SerializerMethodField()
+    freshness = serializers.SerializerMethodField()
+    generatedAt = serializers.SerializerMethodField()
 
     class Meta(ProjectSerializer.Meta):
         fields = ProjectSerializer.Meta.fields + [
             "current_tasks",
             "pending_reviews",
+            "latestEventId",
+            "freshness",
+            "generatedAt",
         ]
 
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
@@ -194,15 +244,32 @@ class ProjectDashboardSerializer(ProjectSerializer):
             )
         return sorted(pending, key=lambda item: item["submitted_at"], reverse=True)[:10]
 
+    def get_latestEventId(self, obj):
+        events = project_event_feed(obj, limit=1)
+        return events[0]["id"] if events else None
+
+    def get_freshness(self, obj):
+        return {
+            "state": "fresh",
+            "latestEventId": self.get_latestEventId(obj),
+        }
+
+    def get_generatedAt(self, obj):
+        return timezone.now()
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         audit_events = [
             {
+                "id": f"audit:{event.id}",
                 "source": "audit",
                 "event_type": event.event_type,
+                "eventType": event.event_type,
                 "summary": event.summary,
                 "actor_id": event.actor_id,
+                "actorId": event.actor_id,
                 "created_at": event.created_at,
+                "createdAt": event.created_at,
             }
             for event in instance.audit_events.select_related("actor")[:20]
         ]
@@ -210,11 +277,14 @@ class ProjectDashboardSerializer(ProjectSerializer):
             {
                 "source": "comment",
                 "event_type": "inline_comment." + comment.status,
+                "eventType": "inline_comment." + comment.status,
                 "summary": (
                     f"Comment on {comment.target_type} {comment.target_id}: {comment.anchor}"
                 ),
                 "actor_id": comment.author_id,
+                "actorId": comment.author_id,
                 "created_at": comment.created_at,
+                "createdAt": comment.created_at,
             }
             for comment in instance.inline_comments.select_related("author")[:20]
         ]
@@ -222,19 +292,26 @@ class ProjectDashboardSerializer(ProjectSerializer):
             {
                 "source": "notification",
                 "event_type": "notification." + notification.status,
+                "eventType": "notification." + notification.status,
                 "summary": notification.subject,
                 "actor_id": notification.sender_id,
+                "actorId": notification.sender_id,
                 "created_at": notification.created_at,
+                "createdAt": notification.created_at,
             }
             for notification in instance.notifications.select_related("sender")[:20]
         ]
         download_events = [
             {
+                "id": f"download:{event.id}",
                 "source": "download",
                 "event_type": "download." + event.target_type,
+                "eventType": "download." + event.target_type,
                 "summary": f"Downloaded {event.filename}",
                 "actor_id": event.actor_id,
+                "actorId": event.actor_id,
                 "created_at": event.downloaded_at,
+                "createdAt": event.downloaded_at,
             }
             for event in instance.download_events.select_related("actor")[:20]
         ]

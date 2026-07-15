@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit.boundary_events import record_boundary_event
+from apps.common.downloads import DownloadUnavailable
 from apps.common.file_services import store_uploaded_file
 from apps.common.models import UploadedFile
 from apps.library.models.documents import DocumentCategory, DocumentRecord
@@ -224,15 +225,56 @@ def project_material_display_name(material: ProjectMaterial) -> str:
     return getattr(record, "title", "") or getattr(record, "name", "") or ""
 
 
+def project_material_download_available(material: ProjectMaterial) -> bool:
+    if material.classification_state != ProjectMaterial.ClassificationState.ACTIVE:
+        return False
+    record = backing_record_for(material)
+    if record is None:
+        return False
+    if material.material_type == ProjectMaterial.MaterialType.DOCUMENT:
+        return bool(getattr(record, "document_file_id", None))
+    if material.material_type == ProjectMaterial.MaterialType.PAPER:
+        return bool(
+            getattr(record, "uploaded_file_id", None)
+            or record.attachments.filter(status="active").exists()
+        )
+    if material.material_type == ProjectMaterial.MaterialType.CODE:
+        return bool(
+            getattr(record, "archive_file_id", None)
+            or record.versions.filter(storage_key__gt="").exists()
+        )
+    return False
+
+
 def project_material_capabilities(user, material: ProjectMaterial) -> dict:
     can_change = can_change_project_material_visibility(user, material.source_project)
     return {
         "canView": True,
-        "canDownload": True,
+        "canDownload": project_material_download_available(material),
         "canRename": False,
         "canDelete": False,
         "canChangeVisibility": can_change,
     }
+
+
+def describe_project_material_download(user, material: ProjectMaterial) -> dict:
+    _require_project_member_or_admin(user, material.source_project)
+    record = backing_record_for(material)
+    if record is None or not project_material_download_available(material):
+        raise DownloadUnavailable("Project material is no longer available")
+    if material.material_type == ProjectMaterial.MaterialType.DOCUMENT:
+        from apps.library.services.downloads import describe_document_download
+
+        return describe_document_download(user, record)
+    if material.material_type == ProjectMaterial.MaterialType.PAPER:
+        from apps.library.services.downloads import describe_paper_download
+
+        return describe_paper_download(user, record)
+    if material.material_type == ProjectMaterial.MaterialType.CODE:
+        from apps.repositories.download_services import describe_code_artifact_download
+
+        return describe_code_artifact_download(user, record)
+    raise DownloadUnavailable("Project material is no longer available")
 
 
 @transaction.atomic

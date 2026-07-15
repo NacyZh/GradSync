@@ -166,9 +166,23 @@ class StudentSearchView(generics.ListAPIView):
     serializer_class = StudentOptionSerializer
     pagination_class = None
 
-    @extend_schema(parameters=[OpenApiParameter("q", str, OpenApiParameter.QUERY)])
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("projectId", int, OpenApiParameter.QUERY),
+        ],
+        responses={
+            200: StudentOptionSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+    )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["project_id"] = self.request.query_params.get("projectId")
+        return context
 
     def get_queryset(self):
         query = self.request.query_params.get("q", "").strip()

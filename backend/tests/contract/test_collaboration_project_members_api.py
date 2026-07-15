@@ -66,6 +66,62 @@ def test_student_search_disambiguates_duplicate_nicknames_contract(api_client):
 
 
 @pytest.mark.django_db
+def test_student_search_marks_existing_project_member_eligibility(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    existing = _student("existing@example.edu", "Ada")
+    _student("available@example.edu", "Ada")
+    project = ResearchProject.objects.create(title="Eligibility Project", advisor=teacher)
+    ProjectMembership.objects.create(project=project, user=teacher, role="advisor")
+    ProjectMembership.objects.create(project=project, user=existing, role="student")
+
+    response = authenticate(api_client, teacher).get(
+        f"/api/accounts/students/?q=Ada&projectId={project.id}"
+    )
+
+    assert response.status_code == 200
+    by_email = {item["email"]: item for item in response.data}
+    assert by_email["existing@example.edu"]["eligibility"] == {
+        "selectable": False,
+        "reason": "already_active_member",
+    }
+    assert by_email["available@example.edu"]["eligibility"] == {
+        "selectable": True,
+        "reason": "",
+    }
+
+
+@pytest.mark.django_db
+def test_project_create_contract_accepts_student_ids_camel_case(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    student = _student("selected@example.edu", "Selected")
+
+    response = authenticate(api_client, teacher).post(
+        "/api/projects/",
+        {"title": "Created With Student", "studentIds": [student.id]},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    project = ResearchProject.objects.get(title="Created With Student")
+    assert project.memberships.filter(user=student, role="student", status="active").exists()
+
+
+@pytest.mark.django_db
+def test_project_create_contract_rejects_ineligible_student_ids(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    non_student = UserFactory(global_role="advisor", status="active")
+
+    response = authenticate(api_client, teacher).post(
+        "/api/projects/",
+        {"title": "Invalid Student", "studentIds": [non_student.id]},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "active student" in response.data["message"]
+
+
+@pytest.mark.django_db
 def test_project_member_contract_rejects_non_student_and_non_advisor(api_client):
     teacher = UserFactory(global_role="advisor", status="active")
     student = _student("student@example.edu", "Student")

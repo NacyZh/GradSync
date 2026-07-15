@@ -28,6 +28,7 @@ export function HomePage() {
           <p>Research group operations for projects, reviews, reports, bookings, and reminders.</p>
         </div>
         <nav aria-label="Primary actions" className="action-row">
+          <Button asChild variant="outline"><Link to="/projects">Projects</Link></Button>
           {(role === 'admin' || role === 'advisor') ? (
             <Button asChild><Link to="/projects/new">New project</Link></Button>
           ) : null}

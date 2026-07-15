@@ -22,6 +22,7 @@ async function mockCollaborationApi(page: Page) {
   let paperUploaded = false;
   let codeUploaded = false;
   let documentUploaded = false;
+  let liveMemberAdded = false;
 
   await page.route('**/api/accounts/me/', async (route) => fulfillJson(route, currentUser));
   await page.route('**/api/accounts/logout/', async (route) => route.fulfill({ status: 204 }));
@@ -61,6 +62,7 @@ async function mockCollaborationApi(page: Page) {
       memberships: [
         { id: 1, projectId: 1, userId: 10, nickname: 'Advisor One', email: 'advisor@example.edu', role: 'advisor', status: 'active' },
         { id: 2, projectId: 1, userId: 12, nickname: 'Student One', email: 'student.one@example.edu', role: 'student', status: 'active' },
+        ...(liveMemberAdded ? [{ id: 4, projectId: 1, userId: 14, nickname: 'Alex', email: 'alex.two@example.edu', role: 'student', status: 'active' }] : []),
       ],
       current_tasks: [],
       pending_reviews: [],
@@ -70,10 +72,20 @@ async function mockCollaborationApi(page: Page) {
   });
   await page.route('**/api/projects/1/members/', async (route) => {
     if (route.request().method() === 'POST') {
+      liveMemberAdded = true;
       await fulfillJson(route, { id: 4, projectId: 1, userId: 14, nickname: 'Alex', email: 'alex.two@example.edu', role: 'student', status: 'active' }, 201);
       return;
     }
     await route.fallback();
+  });
+  await page.route('**/api/projects/1/events/', async (route) => {
+    await fulfillJson(route, {
+      latestEventId: liveMemberAdded ? 'audit:44' : null,
+      generatedAt: new Date().toISOString(),
+      results: liveMemberAdded
+        ? [{ id: 'audit:44', source: 'audit', eventType: 'membership.added', targetType: 'ProjectMembership', targetId: '4', summary: 'Membership added', actorId: 10, createdAt: new Date().toISOString() }]
+        : [],
+    });
   });
   await page.route('**/api/projects/1/members/2/', async (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/library/papers/**', async (route) => {
@@ -278,6 +290,9 @@ async function mockCollaborationApi(page: Page) {
     setAdvisor() {
       currentUser = advisorUser;
     },
+    triggerMemberEvent() {
+      liveMemberAdded = true;
+    },
   };
 }
 
@@ -379,4 +394,13 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
     await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toContainText('Feedback available');
     await expect(page.getByRole('alert')).toContainText('SMTP provider unavailable');
   });
+});
+
+test('project dashboard refreshes from project events without full reload', async ({ page }) => {
+  const auth = await mockCollaborationApi(page);
+
+  await page.goto('/projects/1');
+  await expect(page.getByRole('region', { name: 'Project members' })).not.toContainText('alex.two@example.edu');
+  auth.triggerMemberEvent();
+  await expect(page.getByRole('region', { name: 'Project members' })).toContainText('alex.two@example.edu', { timeout: 7000 });
 });

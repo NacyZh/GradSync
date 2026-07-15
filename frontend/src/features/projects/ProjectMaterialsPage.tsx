@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileUp, FolderOpen, X } from 'lucide-react';
+import { Download, FileUp, FolderOpen, X } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 
@@ -10,16 +10,21 @@ import { DataState } from '../../shared/ui/DataState';
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { PageShell } from '../../shared/ui/PageShell';
 import { SourceProjectBadge, VisibilityStateBadge } from '../../shared/ui/BoundaryBadges';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import {
   createProjectMaterial,
+  downloadProjectMaterial,
   listProjectMaterials,
   updateProjectMaterialVisibility,
   type ProjectMaterial,
 } from './api';
+import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 
 export function ProjectMaterialsPage() {
   const projectId = Number(useParams().projectId ?? 0);
   const queryClient = useQueryClient();
+  const { notify } = useAppFeedback();
+  const liveRefresh = useProjectLiveRefresh(projectId);
   const [title, setTitle] = useState('');
   const [materialType, setMaterialType] = useState<ProjectMaterial['materialType']>('document');
   const [visibility, setVisibility] = useState<ProjectMaterial['visibility']>('project-only');
@@ -49,6 +54,11 @@ export function ProjectMaterialsPage() {
     mutationFn: ({ materialId, nextVisibility }: { materialId: string; nextVisibility: ProjectMaterial['visibility'] }) =>
       updateProjectMaterialVisibility(projectId, materialId, { visibility: nextVisibility }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projectMaterials', projectId] }),
+  });
+  const downloadMutation = useMutation({
+    mutationFn: (materialId: string) => downloadProjectMaterial(projectId, materialId),
+    onSuccess: (descriptor) => notify(`Download ready: ${descriptor.filename}`, 'success'),
+    onError: (downloadError) => notify(downloadError.message, 'error'),
   });
 
   async function onSubmit(event: FormEvent) {
@@ -112,6 +122,9 @@ export function ProjectMaterialsPage() {
 
         <section className="panel" aria-label="Project material list">
           <h2>Materials</h2>
+          {liveRefresh.state === 'stale' ? (
+            <DataState state="warning" title="Materials may be stale" message="Last successful material list is still visible while live refresh retries." />
+          ) : null}
           {materialsQuery.isLoading ? <DataState state="loading" title="Loading materials" message="Loading project materials." /> : null}
           {materialsQuery.error ? <DataState state="error" title="Materials unavailable" message={materialsQuery.error.message} /> : null}
           {!materialsQuery.isLoading && !materialsQuery.data?.results.length ? (
@@ -130,24 +143,38 @@ export function ProjectMaterialsPage() {
                 <p className="text-sm capitalize text-muted-foreground">
                   {material.materialType} · {material.classificationState.replaceAll('_', ' ')}
                 </p>
-                {material.actionCapabilities.canChangeVisibility ? (
+                {material.actionCapabilities.canDownload || material.actionCapabilities.canChangeVisibility ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={material.visibility === 'project-only' || visibilityMutation.isPending}
-                      onClick={() => visibilityMutation.mutate({ materialId: material.id, nextVisibility: 'project-only' })}
+                      aria-label={`Download ${material.displayName || `${material.materialType} ${material.backingRecordId}`}`}
+                      disabled={!material.actionCapabilities.canDownload || downloadMutation.isPending}
+                      onClick={() => downloadMutation.mutate(material.id)}
                     >
-                      Set project-only
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                      Download
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={material.visibility === 'group-wide' || visibilityMutation.isPending}
-                      onClick={() => visibilityMutation.mutate({ materialId: material.id, nextVisibility: 'group-wide' })}
-                    >
-                      Set group-wide
-                    </Button>
+                    {material.actionCapabilities.canChangeVisibility ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={material.visibility === 'project-only' || visibilityMutation.isPending}
+                          onClick={() => visibilityMutation.mutate({ materialId: material.id, nextVisibility: 'project-only' })}
+                        >
+                          Set project-only
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={material.visibility === 'group-wide' || visibilityMutation.isPending}
+                          onClick={() => visibilityMutation.mutate({ materialId: material.id, nextVisibility: 'group-wide' })}
+                        >
+                          Set group-wide
+                        </Button>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
               </li>

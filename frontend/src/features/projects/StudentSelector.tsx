@@ -6,11 +6,18 @@ import { Input } from '@/shared/ui/primitives/input';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { searchStudents, type StudentOption } from './api';
 
-export function StudentSelector({ onSelect, disabled = false }: { onSelect: (student: StudentOption) => void; disabled?: boolean }) {
+type StudentSelectorProps = {
+  onSelect: (student: StudentOption) => void;
+  disabled?: boolean;
+  projectId?: number;
+  selectedIds?: number[];
+};
+
+export function StudentSelector({ onSelect, disabled = false, projectId, selectedIds = [] }: StudentSelectorProps) {
   const [query, setQuery] = useState('');
   const { data = [], isFetching } = useQuery({
-    queryKey: ['students', query],
-    queryFn: () => searchStudents(query),
+    queryKey: ['students', query, projectId],
+    queryFn: () => searchStudents(query, projectId),
     enabled: query.trim().length > 0,
   });
 
@@ -31,12 +38,22 @@ export function StudentSelector({ onSelect, disabled = false }: { onSelect: (stu
         <ul className="grid max-h-56 gap-2 overflow-auto rounded-md border p-2">
           {data.map((student) => (
             <li key={student.id}>
-              <button type="button" className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-2 text-left hover:bg-muted" onClick={() => onSelect(student)} disabled={disabled}>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-2 text-left hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => onSelect(student)}
+                disabled={disabled || selectedIds.includes(student.id) || student.eligibility?.selectable === false}
+                aria-disabled={disabled || selectedIds.includes(student.id) || student.eligibility?.selectable === false}
+              >
                 <span>
                   <strong>{student.nickname || student.email}</strong>
                   <span className="ml-2 text-sm text-muted-foreground">{student.email}</span>
+                  {selectedIds.includes(student.id) ? <span className="ml-2 text-xs text-muted-foreground">Selected</span> : null}
+                  {student.eligibility?.selectable === false ? (
+                    <span className="ml-2 text-xs text-muted-foreground">Already a member</span>
+                  ) : null}
                 </span>
-                <StatusBadge status={student.degreeType} />
+                {student.degreeType ? <StatusBadge status={student.degreeType} /> : null}
               </button>
             </li>
           ))}

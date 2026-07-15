@@ -114,6 +114,9 @@ test.describe('production workspace layout', () => {
 
         await expectPrimaryControlsStayInsideViewport(page);
         await expectNoVisibleTextOverlap(page);
+        if (routeCase.path === '/projects/1') {
+          await expectMembersPanelContentStaysInside(page);
+        }
       });
     }
   }
@@ -185,6 +188,23 @@ async function expectNoVisibleTextOverlap(page: Page) {
       const overlapArea = overlapX * overlapY;
       expect(overlapArea).toBeLessThanOrEqual(1);
     }
+  }
+}
+
+async function expectMembersPanelContentStaysInside(page: Page) {
+  const panel = page.getByRole('complementary', { name: 'Members and progress' });
+  await expect(panel).toBeVisible();
+  const panelBox = await panel.boundingBox();
+  expect(panelBox).not.toBeNull();
+  const memberRows = await panel.locator('li').evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    }),
+  );
+  for (const row of memberRows) {
+    expect(row.x).toBeGreaterThanOrEqual((panelBox?.x ?? 0) - 1);
+    expect(row.x + row.width).toBeLessThanOrEqual((panelBox?.x ?? 0) + (panelBox?.width ?? 0) + 1);
   }
 }
 

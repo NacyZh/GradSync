@@ -3,17 +3,26 @@ import re
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
+from django.utils import timezone
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import mixins, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.common.downloads import DownloadUnavailable
+
 from .legacy_link_services import resolve_legacy_project_link
 from .material_services import (
     change_project_material_visibility,
     create_project_material,
+    describe_project_material_download,
     project_material_queryset_for,
 )
 from .models import ProjectMaterial, ProjectMembership, ResearchProject
@@ -28,16 +37,38 @@ from .serializers import (
     ProjectSerializer,
     ProjectUpdateSerializer,
 )
-from .services import ProjectService, projects_visible_to
+from .services import ProjectService, can_create_projects, project_event_feed, projects_visible_to
 
 
 @extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("status", str, OpenApiParameter.QUERY),
+        ],
+        responses={
+            200: ProjectSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+    ),
+    create=extend_schema(
+        request=ProjectCreateSerializer,
+        responses={
+            201: ProjectSerializer,
+            400: OpenApiResponse(description="Project validation failed"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Project creation forbidden"),
+        },
+    ),
     retrieve=extend_schema(
+        parameters=[OpenApiParameter("sinceEventId", str, OpenApiParameter.QUERY)],
         responses={
             200: ProjectDashboardSerializer,
+            401: OpenApiResponse(description="Authentication required"),
             403: OpenApiResponse(description="Project access forbidden"),
+            404: OpenApiResponse(description="Project not found"),
         }
-    )
+    ),
 )
 class ProjectViewSet(
     mixins.CreateModelMixin,
@@ -63,8 +94,31 @@ class ProjectViewSet(
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        project = serializer.save()
+        try:
+            project = serializer.save()
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
         return Response(ProjectSerializer(project).data, status=status.HTTP_201_CREATED)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        status_filter = request.query_params.get("status")
+        query = request.query_params.get("q")
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if query:
+            queryset = queryset.filter(title__icontains=query)
+        page = self.paginate_queryset(queryset)
+        target = page if page is not None else queryset
+        serializer = self.get_serializer(target, many=True)
+        capabilities = {"canCreateProject": can_create_projects(request.user)}
+        if page is not None:
+            response = self.get_paginated_response(serializer.data)
+            response.data["capabilities"] = capabilities
+            return response
+        return Response({"results": serializer.data, "capabilities": capabilities})
 
     def perform_update(self, serializer):
         project = ProjectService(self.request.user).update_project(
@@ -77,7 +131,9 @@ class ProjectViewSet(
         request=MembershipCreateSerializer,
         responses={
             201: ProjectMembershipSerializer,
+            400: OpenApiResponse(description="Membership validation failed"),
             403: OpenApiResponse(description="Membership change forbidden"),
+            409: OpenApiResponse(description="Duplicate or stale membership"),
         },
     )
     @extend_schema(methods=["GET"], responses={200: ProjectMembershipSerializer(many=True)})
@@ -122,6 +178,14 @@ class ProjectViewSet(
             raise ValidationError({"message": exc.messages[0]}) from exc
         return Response(ProjectMembershipSerializer(membership).data)
 
+    @extend_schema(
+        methods=["DELETE"],
+        responses={
+            204: OpenApiResponse(description="Membership removed"),
+            403: OpenApiResponse(description="Membership removal forbidden"),
+            404: OpenApiResponse(description="Membership not found"),
+        },
+    )
     @action(detail=True, methods=["delete"], url_path="members/(?P<membership_id>[^/.]+)")
     def delete_member(self, request, pk=None, membership_id=None):
         project = self.get_object()
@@ -146,7 +210,44 @@ class ProjectViewSet(
 
     @extend_schema(
         methods=["GET"],
-        responses={200: ProjectMaterialSerializer(many=True)},
+        parameters=[
+            OpenApiParameter("since", str, OpenApiParameter.QUERY),
+            OpenApiParameter("limit", int, OpenApiParameter.QUERY),
+        ],
+        responses={200: OpenApiResponse(description="Project event feed")},
+    )
+    @action(detail=True, methods=["get"], url_path="events")
+    def events(self, request, pk=None):
+        project = self.get_object()
+        limit = request.query_params.get("limit", "50")
+        try:
+            bounded_limit = int(limit)
+        except ValueError as exc:
+            raise ValidationError({"limit": "Limit must be an integer"}) from exc
+        events = project_event_feed(
+            project,
+            after=request.query_params.get("since") or request.query_params.get("after"),
+            limit=bounded_limit,
+        )
+        return Response(
+            {
+                "results": events,
+                "latestEventId": events[0]["id"] if events else None,
+                "generatedAt": timezone.now(),
+            }
+        )
+
+    @extend_schema(
+        methods=["GET"],
+        parameters=[
+            OpenApiParameter("type", str, OpenApiParameter.QUERY),
+            OpenApiParameter("visibility", str, OpenApiParameter.QUERY),
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+        ],
+        responses={
+            200: ProjectMaterialSerializer(many=True),
+            403: OpenApiResponse(description="Project material access forbidden"),
+        },
     )
     @extend_schema(
         methods=["POST"],
@@ -229,6 +330,31 @@ class ProjectViewSet(
         except DjangoValidationError as exc:
             raise ValidationError({"message": exc.messages[0]}) from exc
         return Response(ProjectMaterialSerializer(material, context={"request": request}).data)
+
+    @extend_schema(
+        methods=["POST"],
+        responses={
+            200: OpenApiResponse(description="Project material download descriptor"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Download forbidden"),
+            404: OpenApiResponse(description="Project material not found"),
+            410: OpenApiResponse(description="Project material unavailable"),
+        },
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="materials/(?P<material_id>[^/.]+)/download",
+    )
+    def material_download(self, request, pk=None, material_id=None):
+        project = self.get_object()
+        material = get_object_or_404(ProjectMaterial, source_project=project, pk=material_id)
+        try:
+            return Response(describe_project_material_download(request.user, material))
+        except (DjangoPermissionDenied, PermissionError) as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DownloadUnavailable as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_410_GONE)
 
 
 class LegacyBoundaryLinkView(views.APIView):
