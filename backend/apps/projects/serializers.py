@@ -7,7 +7,7 @@ from .material_services import (
     project_material_display_name,
 )
 from .models import ProjectMaterial, ProjectMembership, ResearchProject
-from .services import ProjectService, project_event_feed
+from .services import ProjectService, project_capabilities, project_event_feed
 
 
 class ProjectMembershipSerializer(serializers.ModelSerializer):
@@ -91,6 +91,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     startsOn = serializers.DateField(source="starts_on", read_only=True)
     endsOn = serializers.DateField(source="ends_on", read_only=True)
     archivedAt = serializers.DateTimeField(source="archived_at", read_only=True)
+    capabilities = serializers.SerializerMethodField()
 
     class Meta:
         model = ResearchProject
@@ -108,7 +109,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             "endsOn",
             "archivedAt",
             "memberships",
+            "capabilities",
         ]
+
+    @extend_schema_field(serializers.DictField())
+    def get_capabilities(self, obj):
+        request = self.context.get("request")
+        return project_capabilities(getattr(request, "user", None), obj)
 
 
 class ProjectUpdateSerializer(serializers.ModelSerializer):

@@ -2,6 +2,7 @@ import pytest
 
 from apps.audit.services import record_event
 from apps.projects.models import ProjectMaterial, ProjectMembership, ResearchProject
+from apps.tasks.models import Task
 from tests.factories.accounts import UserFactory
 from tests.factories.shared_workspace import project_only_document
 from tests.helpers import authenticate
@@ -37,6 +38,66 @@ def test_student_project_list_exposes_read_only_capabilities(api_client):
     payload = response.json()
     assert [item["title"] for item in payload["results"]] == ["Student Project"]
     assert payload["capabilities"] == {"canCreateProject": False}
+
+
+@pytest.mark.django_db
+def test_project_dashboard_capabilities_are_role_specific(api_client):
+    advisor = UserFactory(global_role="advisor")
+    student = UserFactory(global_role="student")
+    project = ResearchProject.objects.create(title="Role Project", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+
+    advisor_payload = authenticate(api_client, advisor).get(f"/api/projects/{project.id}/").json()
+    student_payload = authenticate(api_client, student).get(f"/api/projects/{project.id}/").json()
+
+    assert advisor_payload["capabilities"]["canManageMembers"] is True
+    assert advisor_payload["capabilities"]["canCreateTasks"] is True
+    assert advisor_payload["capabilities"]["canArchiveProject"] is True
+    assert student_payload["capabilities"]["canManageMembers"] is False
+    assert student_payload["capabilities"]["canCreateTasks"] is False
+    assert student_payload["capabilities"]["canArchiveProject"] is False
+
+
+@pytest.mark.django_db
+def test_admin_can_view_and_manage_all_projects(api_client):
+    admin = UserFactory(global_role="admin")
+    advisor = UserFactory(global_role="advisor")
+    project = ResearchProject.objects.create(title="Admin Visible", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+
+    list_response = authenticate(api_client, admin).get("/api/projects/")
+    detail_response = authenticate(api_client, admin).get(f"/api/projects/{project.id}/")
+
+    assert list_response.status_code == 200
+    assert [item["title"] for item in list_response.json()["results"]] == ["Admin Visible"]
+    assert detail_response.json()["capabilities"]["canManageProject"] is True
+
+
+@pytest.mark.django_db
+def test_advisor_can_delete_empty_project(api_client):
+    advisor = UserFactory(global_role="advisor")
+    project = ResearchProject.objects.create(title="Mistaken Project", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+
+    response = authenticate(api_client, advisor).delete(f"/api/projects/{project.id}/")
+
+    assert response.status_code == 204
+    assert not ResearchProject.objects.filter(id=project.id).exists()
+
+
+@pytest.mark.django_db
+def test_project_delete_rejects_research_activity(api_client):
+    advisor = UserFactory(global_role="advisor")
+    project = ResearchProject.objects.create(title="Active Project", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    Task.objects.create(project=project, title="Real work", created_by=advisor)
+
+    response = authenticate(api_client, advisor).delete(f"/api/projects/{project.id}/")
+
+    assert response.status_code == 400
+    assert "archive" in response.json()["message"]
+    assert ResearchProject.objects.filter(id=project.id).exists()
 
 
 @pytest.mark.django_db

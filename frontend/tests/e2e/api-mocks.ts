@@ -42,6 +42,17 @@ export const selectedProject = {
   title: 'Graphene Lab',
   description: 'Research operations validation',
   status: 'active',
+  capabilities: {
+    canManageProject: true,
+    canEditProject: true,
+    canArchiveProject: true,
+    canReopenProject: false,
+    canDeleteProject: false,
+    canManageMembers: true,
+    canCreateTasks: true,
+    canUpdateTasks: true,
+    deleteDisabledReason: 'Projects with research activity must be archived instead of deleted',
+  },
   memberships: [
     {
       id: 1,

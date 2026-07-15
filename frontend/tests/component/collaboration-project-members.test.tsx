@@ -41,7 +41,7 @@ describe('collaboration project members UI', () => {
       };
     });
 
-    renderWithClient(<ProjectMembersPanel projectId={1} members={[]} />);
+    renderWithClient(<ProjectMembersPanel projectId={1} members={[]} canManageMembers />);
 
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     expect(await screen.findByText('alex.one@example.edu')).toBeInTheDocument();
@@ -62,6 +62,7 @@ describe('collaboration project members UI', () => {
     renderWithClient(
       <ProjectMembersPanel
         projectId={1}
+        canManageMembers
         members={[
           { id: 1, projectId: 1, userId: 10, nickname: 'Teacher', email: 'teacher@example.edu', role: 'advisor', status: 'active' },
           { id: 2, projectId: 1, userId: 11, nickname: 'Student', email: 'student@example.edu', role: 'student', status: 'active' },
@@ -85,7 +86,7 @@ describe('collaboration project members UI', () => {
 
   it('explains when no eligible students match the selector query', async () => {
     mockFetch(() => []);
-    renderWithClient(<ProjectMembersPanel projectId={1} members={[]} />);
+    renderWithClient(<ProjectMembersPanel projectId={1} members={[]} canManageMembers />);
 
     await userEvent.type(screen.getByLabelText('Student nickname'), 'No Match');
 

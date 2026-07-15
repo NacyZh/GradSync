@@ -124,6 +124,17 @@ describe('project work UI', () => {
             title: 'Graphene Lab',
             description: '',
             status: 'active',
+            capabilities: {
+              canManageProject: true,
+              canEditProject: true,
+              canArchiveProject: true,
+              canReopenProject: false,
+              canDeleteProject: false,
+              canManageMembers: true,
+              canCreateTasks: true,
+              canUpdateTasks: true,
+              deleteDisabledReason: 'Projects with research activity must be archived instead of deleted',
+            },
             memberships: [{ id: 1, project_id: 1, user_id: 7, role: 'student', status: 'active' }],
             current_tasks: [
               {
@@ -159,8 +170,68 @@ describe('project work UI', () => {
     expect(screen.getByRole('region', { name: 'Current tasks' })).toHaveTextContent('Analyze sample');
     expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Priority: high');
     expect(screen.getByRole('complementary', { name: 'Members and progress' })).toHaveTextContent('User 7');
+    expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Archive project' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete project' })).toBeDisabled();
     expect(screen.getByRole('region', { name: 'Pending reviews' })).toHaveTextContent('Review progress_report #4');
     expect(screen.getByRole('region', { name: 'Activity' })).toHaveTextContent('Pending review reminder');
+    vi.unstubAllGlobals();
+  });
+
+  it('renders student project dashboard without management actions', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (String(url).includes('/api/projects/1/notifications/')) {
+          return new Response(JSON.stringify({ results: [] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(
+          JSON.stringify({
+            id: 1,
+            title: 'Student Lab',
+            description: '',
+            status: 'active',
+            capabilities: {
+              canManageProject: false,
+              canEditProject: false,
+              canArchiveProject: false,
+              canReopenProject: false,
+              canDeleteProject: false,
+              canManageMembers: false,
+              canCreateTasks: false,
+              canUpdateTasks: false,
+            },
+            memberships: [{ id: 1, project_id: 1, user_id: 7, role: 'student', status: 'active' }],
+            current_tasks: [{ id: 11, title: 'Read protocol', status: 'not_started', priority: 'normal', children: [] }],
+            pending_reviews: [],
+            upcoming_bookings: [],
+            activity: [],
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+      }),
+    );
+
+    renderWithClient(
+      <MemoryRouter initialEntries={['/projects/1']}>
+        <Routes>
+          <Route path="/projects/:projectId" element={<ProjectDashboardPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Student Lab' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add task' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Archive project' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete project' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Add project member' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
     vi.unstubAllGlobals();
   });
 
@@ -218,6 +289,7 @@ describe('project work UI', () => {
     renderWithClient(
       <ProjectMembersPanel
         projectId={1}
+        canManageMembers
         members={[
           {
             id: 1,

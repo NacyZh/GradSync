@@ -75,6 +75,7 @@ class ProjectViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     permission_classes = [IsAuthenticated]
@@ -100,7 +101,10 @@ class ProjectViewSet(
             raise PermissionDenied(str(exc)) from exc
         except DjangoValidationError as exc:
             raise ValidationError({"message": exc.messages[0]}) from exc
-        return Response(ProjectSerializer(project).data, status=status.HTTP_201_CREATED)
+        return Response(
+            ProjectSerializer(project, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -125,6 +129,15 @@ class ProjectViewSet(
             self.get_object(), **serializer.validated_data
         )
         serializer.instance = project
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            ProjectService(request.user).delete_project(self.get_object())
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         methods=["POST"],
@@ -201,12 +214,12 @@ class ProjectViewSet(
     @action(detail=True, methods=["post"])
     def archive(self, request, pk=None):
         project = ProjectService(request.user).archive_project(self.get_object())
-        return Response(ProjectSerializer(project).data)
+        return Response(ProjectSerializer(project, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])
     def reopen(self, request, pk=None):
         project = ProjectService(request.user).reopen_project(self.get_object())
-        return Response(ProjectSerializer(project).data)
+        return Response(ProjectSerializer(project, context={"request": request}).data)
 
     @extend_schema(
         methods=["GET"],

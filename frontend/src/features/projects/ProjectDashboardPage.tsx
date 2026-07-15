@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
-import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, FileStack, RotateCcw } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, FileStack, RotateCcw, Trash2 } from 'lucide-react';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
@@ -16,11 +16,12 @@ import { TaskForm } from '../tasks/TaskForm';
 import { TaskStatusControl } from '../tasks/TaskStatusControl';
 import { TaskTree, type TaskNode } from '../tasks/TaskTree';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
-import { archiveProject, getProject, reopenProject } from './api';
+import { archiveProject, deleteProject, getProject, reopenProject } from './api';
 import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 
 export function ProjectDashboardPage() {
   const projectId = Number(useParams().projectId ?? 0);
+  const navigate = useNavigate();
   const { confirm, notify } = useAppFeedback();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const projectQuery = useQuery({ queryKey: ['project', projectId], queryFn: () => getProject(projectId), enabled: Boolean(projectId) });
@@ -41,6 +42,14 @@ export function ProjectDashboardPage() {
     },
     onError: (error) => notify(error.message, 'error'),
   });
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteProject(projectId),
+    onSuccess: () => {
+      notify('Project deleted', 'success');
+      navigate('/projects');
+    },
+    onError: (error) => notify(error.message, 'error'),
+  });
 
   async function onArchive() {
     const ok = await confirm({
@@ -49,6 +58,15 @@ export function ProjectDashboardPage() {
       actionLabel: 'Archive project',
     });
     if (ok) archiveMutation.mutate();
+  }
+
+  async function onDelete() {
+    const ok = await confirm({
+      title: 'Delete project?',
+      message: 'Only empty projects can be deleted. Projects with tasks, materials, submissions, comments, or bookings should be archived instead.',
+      actionLabel: 'Delete project',
+    });
+    if (ok) deleteMutation.mutate();
   }
 
   if (projectQuery.isLoading) return <DataState state="loading" title="Loading dashboard" message="Loading project dashboard..." />;
@@ -64,6 +82,17 @@ export function ProjectDashboardPage() {
   const blocked = flattenedTasks.filter((task) => task.status === 'blocked').length;
   const progress = flattenedTasks.length ? Math.round((completed / flattenedTasks.length) * 100) : 0;
   const archived = project.status === 'archived';
+  const capabilities = project.capabilities ?? {
+    canManageProject: false,
+    canEditProject: false,
+    canArchiveProject: false,
+    canReopenProject: false,
+    canDeleteProject: false,
+    canManageMembers: false,
+    canCreateTasks: false,
+    canUpdateTasks: false,
+    deleteDisabledReason: '',
+  };
   const nextDeadline = [...flattenedTasks]
     .filter((task) => task.deadline_at)
     .sort((left, right) => new Date(left.deadline_at ?? '').getTime() - new Date(right.deadline_at ?? '').getTime())[0];
@@ -81,19 +110,35 @@ export function ProjectDashboardPage() {
               Materials
             </Link>
           </Button>
-          <Button variant="destructive" type="button" onClick={onArchive} disabled={archived || archiveMutation.isPending}>
-            <Archive className="h-4 w-4" aria-hidden="true" />
-            Archive project
-          </Button>
-          <Button variant="outline" type="button" onClick={() => reopenMutation.mutate()} disabled={!archived || reopenMutation.isPending}>
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-            Reopen project
-          </Button>
+          {capabilities.canArchiveProject ? (
+            <Button variant="destructive" type="button" onClick={onArchive} disabled={archiveMutation.isPending}>
+              <Archive className="h-4 w-4" aria-hidden="true" />
+              Archive project
+            </Button>
+          ) : null}
+          {capabilities.canReopenProject ? (
+            <Button variant="outline" type="button" onClick={() => reopenMutation.mutate()} disabled={reopenMutation.isPending}>
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Reopen project
+            </Button>
+          ) : null}
+          {capabilities.canManageProject ? (
+            <Button
+              variant="outline"
+              type="button"
+              onClick={onDelete}
+              disabled={!capabilities.canDeleteProject || deleteMutation.isPending}
+              title={capabilities.canDeleteProject ? undefined : capabilities.deleteDisabledReason}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Delete project
+            </Button>
+          ) : null}
         </>
       }
       className="project-workspace"
     >
-      <FormStatus error={archiveMutation.error?.message ?? reopenMutation.error?.message} success={archiveMutation.isSuccess || reopenMutation.isSuccess ? 'Project status updated' : undefined} />
+      <FormStatus error={archiveMutation.error?.message ?? reopenMutation.error?.message ?? deleteMutation.error?.message} success={archiveMutation.isSuccess || reopenMutation.isSuccess ? 'Project status updated' : undefined} />
       {liveRefresh.state === 'stale' ? (
         <DataState state="warning" title="Project data may be stale" message="Last successful project data is still visible while live refresh retries." />
       ) : null}
@@ -124,7 +169,7 @@ export function ProjectDashboardPage() {
           {tasks.length ? (
             <>
               <TaskTree tasks={tasks} projectId={projectId} selectedTaskId={primaryTask?.id} onSelectTask={(task) => setSelectedTaskId(task.id)} />
-              {primaryTask ? (
+              {primaryTask && capabilities.canUpdateTasks ? (
                 <div className="mt-4 rounded-lg border bg-muted/40 p-3">
                   <TaskStatusControl projectId={projectId} taskId={primaryTask.id} status={primaryTask.status ?? 'not_started'} disabled={archived} />
                 </div>
@@ -163,7 +208,7 @@ export function ProjectDashboardPage() {
           ) : (
             <DataState state="empty" title="No task selected" message="Select or create a task to start planning." />
           )}
-          <TaskForm projectId={projectId} disabled={archived} />
+          {capabilities.canCreateTasks ? <TaskForm projectId={projectId} disabled={archived} /> : null}
         </section>
         <aside className="panel min-w-0 overflow-hidden" aria-label="Members and progress">
           <h2>Members and progress</h2>
@@ -172,7 +217,7 @@ export function ProjectDashboardPage() {
               <span>{progress}%</span>
             </div>
           </div>
-          <ProjectMembersPanel projectId={projectId} members={project.memberships} disabled={archived} />
+          <ProjectMembersPanel projectId={projectId} members={project.memberships} disabled={archived} canManageMembers={capabilities.canManageMembers} />
         </aside>
       </div>
 

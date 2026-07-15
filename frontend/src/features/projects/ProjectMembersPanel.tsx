@@ -10,7 +10,17 @@ import { FormStatus } from '../../shared/ui/FormStatus';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { StudentSelector } from './StudentSelector';
 
-export function ProjectMembersPanel({ projectId, members = [], disabled = false }: { projectId: number; members?: ProjectMembership[]; disabled?: boolean }) {
+export function ProjectMembersPanel({
+  projectId,
+  members = [],
+  disabled = false,
+  canManageMembers = false,
+}: {
+  projectId: number;
+  members?: ProjectMembership[];
+  disabled?: boolean;
+  canManageMembers?: boolean;
+}) {
   const queryClient = useQueryClient();
   const { confirm } = useAppFeedback();
   const [successMessage, setSuccessMessage] = useState<string>();
@@ -63,7 +73,7 @@ export function ProjectMembersPanel({ projectId, members = [], disabled = false 
             </span>
             <span className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
               <StatusBadge status={member.status} />
-              {member.role === 'student' && member.status === 'active' ? (
+              {canManageMembers && member.role === 'student' && member.status === 'active' ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -80,21 +90,23 @@ export function ProjectMembersPanel({ projectId, members = [], disabled = false 
           </li>
         ))}
       </ul>
-      <form aria-label="Add project member" className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-3">
-        <div>
-          <h3 className="flex items-center gap-2 text-sm font-extrabold">
-            <UserPlus className="h-4 w-4" aria-hidden="true" />
-            Add student
-          </h3>
-          <p className="text-sm text-muted-foreground">Search by nickname or email; duplicate nicknames are disambiguated by email and degree.</p>
-        </div>
-        <StudentSelector onSelect={(student) => addMutation.mutate({ studentId: student.id })} disabled={disabled || addMutation.isPending} />
-        {disabled ? <p className="text-sm text-muted-foreground">Archived projects are read-only until reopened.</p> : null}
-        <FormStatus
-          error={addMutation.error?.message ?? removeMutation.error?.message}
-          success={successMessage}
-        />
-      </form>
+      {canManageMembers ? (
+        <form aria-label="Add project member" className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-extrabold">
+              <UserPlus className="h-4 w-4" aria-hidden="true" />
+              Add student
+            </h3>
+            <p className="text-sm text-muted-foreground">Search by nickname or email; duplicate nicknames are disambiguated by email and degree.</p>
+          </div>
+          <StudentSelector onSelect={(student) => addMutation.mutate({ studentId: student.id })} disabled={disabled || addMutation.isPending} />
+          {disabled ? <p className="text-sm text-muted-foreground">Archived projects are read-only until reopened.</p> : null}
+          <FormStatus
+            error={addMutation.error?.message ?? removeMutation.error?.message}
+            success={successMessage}
+          />
+        </form>
+      ) : null}
     </section>
   );
 }

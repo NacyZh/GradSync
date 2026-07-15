@@ -34,6 +34,19 @@ export type Project = {
   pending_reviews?: unknown[];
   upcoming_bookings?: unknown[];
   activity?: ProjectEvent[];
+  capabilities?: ProjectCapabilities;
+};
+
+export type ProjectCapabilities = {
+  canManageProject: boolean;
+  canEditProject: boolean;
+  canArchiveProject: boolean;
+  canReopenProject: boolean;
+  canDeleteProject: boolean;
+  canManageMembers: boolean;
+  canCreateTasks: boolean;
+  canUpdateTasks: boolean;
+  deleteDisabledReason?: string;
 };
 
 export type ProjectFreshness = {
@@ -110,6 +123,10 @@ export function archiveProject(projectId: number) {
 
 export function reopenProject(projectId: number) {
   return apiRequest<Project>(`/api/projects/${projectId}/reopen/`, { method: 'POST' });
+}
+
+export function deleteProject(projectId: number) {
+  return apiRequest<void>(`/api/projects/${projectId}/`, { method: 'DELETE' });
 }
 
 export function addProjectMember(projectId: number, payload: { studentId: number }) {
