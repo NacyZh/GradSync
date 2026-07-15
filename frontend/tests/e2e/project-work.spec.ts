@@ -47,7 +47,9 @@ test('advisor can create a project and dashboard shows isolated project activity
 
   await page.goto('/projects/1');
   await expect(page.getByRole('heading', { name: 'Graphene Lab' })).toBeVisible();
-  await expect(page.getByLabel('Project actions')).toContainText('Materials');
+  await expect(page.getByRole('navigation', { name: 'Project workflow' })).toContainText('Materials');
+  await expect(page.getByRole('navigation', { name: 'Project workflow' })).toContainText('Reviews');
+  await expect(page.getByRole('navigation', { name: 'Project workflow' })).not.toContainText('Drafts');
   await expect(page.getByRole('region', { name: 'Project summary' })).toContainText('Current tasks');
   await expect(page.getByRole('region', { name: 'Current tasks' })).toContainText('Analyze sample');
   await page.getByRole('link', { name: 'Update status' }).nth(1).click();

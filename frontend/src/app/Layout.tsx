@@ -13,6 +13,7 @@ import { cn } from '@/shared/lib/utils';
 
 import { useAuth } from '../features/auth/AuthProvider';
 import { LanguageSwitcher } from '../features/i18n/LanguageSwitcher';
+import { ProjectContextBanner } from '../features/projects/ProjectContextBanner';
 import { useAppFeedback } from '../shared/ui/AppFeedback';
 
 export function Layout({ children }: PropsWithChildren) {
@@ -110,6 +111,7 @@ export function Layout({ children }: PropsWithChildren) {
           </aside>
         ) : null}
         <div className="content-shell">
+          <ProjectContextBanner />
           <main>{children}</main>
         </div>
       </div>

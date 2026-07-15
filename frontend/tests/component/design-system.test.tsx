@@ -40,7 +40,7 @@ describe('production design system', () => {
     expect(Tooltip).toBeDefined();
   });
 
-  it('renders shadcn-style buttons, labels, fields, badges, and project context', () => {
+  it('renders shadcn-style buttons, labels, fields, badges, and project workflow navigation', () => {
     renderWithClient(
       <div>
         <Label htmlFor="query">Query</Label>
@@ -49,7 +49,7 @@ describe('production design system', () => {
         <StatusBadge status="needs_revision" />
         <FormField id="title" label="Title" error="Title is required" />
         <MemoryRouter>
-          <ProjectContextBar projectId={12} title="Cancer Imaging" status="active" />
+          <ProjectContextBar projectId={12} userRole="advisor" />
         </MemoryRouter>
       </div>,
     );
@@ -58,8 +58,23 @@ describe('production design system', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
     expect(screen.getByText('needs revision')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Title is required');
-    expect(screen.getByLabelText('Selected project context')).toHaveTextContent('Cancer Imaging');
-    expect(screen.getByRole('navigation', { name: 'Project workflow' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected project context')).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Project workflow' })).toHaveTextContent('Materials');
+    expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute('href', '/projects/12/reviews');
+    expect(screen.queryByRole('link', { name: 'Drafts' })).not.toBeInTheDocument();
+  });
+
+  it('shows student project workflow entries without advisor review queue', () => {
+    renderWithClient(
+      <MemoryRouter>
+        <ProjectContextBar projectId={12} userRole="student" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Materials' })).toHaveAttribute('href', '/projects/12/materials');
+    expect(screen.getByRole('link', { name: 'Drafts' })).toHaveAttribute('href', '/projects/12/drafts');
+    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/projects/12/reports');
+    expect(screen.queryByRole('link', { name: 'Reviews' })).not.toBeInTheDocument();
   });
 
   it('announces loading, empty, success, warning, and error data states', () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, FileStack, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, RotateCcw, Trash2 } from 'lucide-react';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
@@ -107,12 +107,6 @@ export function ProjectDashboardPage() {
             <StatusBadge status={project.status} />
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Project actions">
-            <Button asChild variant="outline" type="button">
-              <Link to={`/projects/${projectId}/materials`}>
-                <FileStack className="h-4 w-4" aria-hidden="true" />
-                Materials
-              </Link>
-            </Button>
             {capabilities.canArchiveProject ? (
               <Button variant="destructive" type="button" onClick={onArchive} disabled={archiveMutation.isPending}>
                 <Archive className="h-4 w-4" aria-hidden="true" />

@@ -1,40 +1,53 @@
-import { Link } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import { ClipboardList, FileStack, FileText, Gauge, Inbox, Microscope } from 'lucide-react';
 
 import { Button } from '@/shared/ui/primitives/button';
-import { Skeleton } from '@/shared/ui/primitives/skeleton';
 import { cn } from '@/shared/lib/utils';
-
-import { StatusBadge } from './StatusBadge';
 
 type ProjectContextBarProps = {
   projectId: number;
   title?: string;
   status?: string;
+  userRole?: UserRole;
   isLoading?: boolean;
   className?: string;
 };
 
-const workflowLinks = [
-  ['Dashboard', ''],
-  ['Drafts', 'drafts'],
-  ['Reports', 'reports'],
-  ['Reviews', 'reviews'],
-  ['Resources', 'resources'],
-] as const;
+type UserRole = 'admin' | 'advisor' | 'student';
 
-export function ProjectContextBar({ projectId, title, status, isLoading, className }: ProjectContextBarProps) {
+const workflowLinks: Array<{
+  label: string;
+  suffix: string;
+  icon: typeof Gauge;
+  roles: UserRole[];
+}> = [
+  { label: 'Dashboard', suffix: '', icon: Gauge, roles: ['admin', 'advisor', 'student'] },
+  { label: 'Materials', suffix: 'materials', icon: FileStack, roles: ['admin', 'advisor', 'student'] },
+  { label: 'Drafts', suffix: 'drafts', icon: FileText, roles: ['student'] },
+  { label: 'Reports', suffix: 'reports', icon: ClipboardList, roles: ['student'] },
+  { label: 'Reviews', suffix: 'reviews', icon: Inbox, roles: ['admin', 'advisor'] },
+  { label: 'Resources', suffix: 'resources', icon: Microscope, roles: ['admin', 'advisor', 'student'] },
+];
+
+export function ProjectContextBar({ projectId, userRole = 'student', className }: ProjectContextBarProps) {
+  const links = workflowLinks.filter((link) => link.roles.includes(userRole));
+
   return (
     <section
-      aria-label="Selected project context"
-      className={cn('flex flex-wrap items-center gap-3 border-b bg-muted px-4 py-3 text-sm md:px-7', className)}
+      aria-label="Project workspace navigation"
+      className={cn('mb-5 rounded-lg border bg-card px-3 py-2 shadow-sm md:px-4', className)}
     >
-      <span className="font-bold text-muted-foreground">Selected project</span>
-      {isLoading && !title ? <Skeleton className="h-5 w-40" /> : <strong>{title ?? `Project ${projectId}`}</strong>}
-      {status ? <StatusBadge status={status} /> : null}
-      <nav aria-label="Project workflow" className="ml-auto flex flex-wrap gap-2">
-        {workflowLinks.map(([label, suffix]) => (
+      <nav aria-label="Project workflow" className="flex flex-wrap items-center justify-end gap-2">
+        {links.map(({ label, suffix, icon: Icon }) => (
           <Button key={label} asChild variant="ghost" size="sm">
-            <Link to={`/projects/${projectId}${suffix ? `/${suffix}` : ''}`}>{label}</Link>
+            <NavLink
+              to={`/projects/${projectId}${suffix ? `/${suffix}` : ''}`}
+              end={suffix === ''}
+              className={({ isActive }) => cn('gap-2', isActive && 'bg-accent text-accent-foreground')}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              {label}
+            </NavLink>
           </Button>
         ))}
       </nav>

@@ -170,7 +170,6 @@ describe('project work UI', () => {
     expect(screen.getByRole('region', { name: 'Current tasks' })).toHaveTextContent('Analyze sample');
     expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Priority: high');
     expect(screen.getByRole('complementary', { name: 'Members and progress' })).toHaveTextContent('User 7');
-    expect(within(screen.getByLabelText('Project actions')).getByRole('link', { name: 'Materials' })).toHaveAttribute('href', '/projects/1/materials');
     expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Archive project' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete project' })).toBeDisabled();
@@ -228,7 +227,6 @@ describe('project work UI', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Student Lab' })).toBeInTheDocument();
-    expect(within(screen.getByLabelText('Project actions')).getByRole('link', { name: 'Materials' })).toHaveAttribute('href', '/projects/1/materials');
     expect(screen.queryByRole('button', { name: 'Add task' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Archive project' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete project' })).not.toBeInTheDocument();
