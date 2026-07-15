@@ -59,6 +59,17 @@ async function mockCollaborationApi(page: Page) {
       title: 'Graphene Lab',
       description: 'Research operations validation',
       status: 'active',
+      capabilities: {
+        canManageProject: true,
+        canEditProject: true,
+        canArchiveProject: true,
+        canReopenProject: false,
+        canDeleteProject: false,
+        canManageMembers: true,
+        canCreateTasks: true,
+        canUpdateTasks: true,
+        deleteDisabledReason: 'Projects with research activity must be archived instead of deleted',
+      },
       memberships: [
         { id: 1, projectId: 1, userId: 10, nickname: 'Advisor One', email: 'advisor@example.edu', role: 'advisor', status: 'active' },
         { id: 2, projectId: 1, userId: 12, nickname: 'Student One', email: 'student.one@example.edu', role: 'student', status: 'active' },
