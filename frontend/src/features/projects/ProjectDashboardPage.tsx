@@ -102,39 +102,43 @@ export function ProjectDashboardPage() {
       title={project.title}
       description="Dense project workspace for task planning, membership, review load, bookings, and activity."
       actions={
-        <>
-          <StatusBadge status={project.status} />
-          <Button asChild variant="outline" type="button">
-            <Link to={`/projects/${projectId}/materials`}>
-              <FileStack className="h-4 w-4" aria-hidden="true" />
-              Materials
-            </Link>
-          </Button>
-          {capabilities.canArchiveProject ? (
-            <Button variant="destructive" type="button" onClick={onArchive} disabled={archiveMutation.isPending}>
-              <Archive className="h-4 w-4" aria-hidden="true" />
-              Archive project
+        <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
+          <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Project status">
+            <StatusBadge status={project.status} />
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Project actions">
+            <Button asChild variant="outline" type="button">
+              <Link to={`/projects/${projectId}/materials`}>
+                <FileStack className="h-4 w-4" aria-hidden="true" />
+                Materials
+              </Link>
             </Button>
-          ) : null}
-          {capabilities.canReopenProject ? (
-            <Button variant="outline" type="button" onClick={() => reopenMutation.mutate()} disabled={reopenMutation.isPending}>
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Reopen project
-            </Button>
-          ) : null}
-          {capabilities.canManageProject ? (
-            <Button
-              variant="outline"
-              type="button"
-              onClick={onDelete}
-              disabled={!capabilities.canDeleteProject || deleteMutation.isPending}
-              title={capabilities.canDeleteProject ? undefined : capabilities.deleteDisabledReason}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-              Delete project
-            </Button>
-          ) : null}
-        </>
+            {capabilities.canArchiveProject ? (
+              <Button variant="destructive" type="button" onClick={onArchive} disabled={archiveMutation.isPending}>
+                <Archive className="h-4 w-4" aria-hidden="true" />
+                Archive project
+              </Button>
+            ) : null}
+            {capabilities.canReopenProject ? (
+              <Button variant="outline" type="button" onClick={() => reopenMutation.mutate()} disabled={reopenMutation.isPending}>
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                Reopen project
+              </Button>
+            ) : null}
+            {capabilities.canManageProject ? (
+              <Button
+                variant="outline"
+                type="button"
+                onClick={onDelete}
+                disabled={!capabilities.canDeleteProject || deleteMutation.isPending}
+                title={capabilities.canDeleteProject ? undefined : capabilities.deleteDisabledReason}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                Delete project
+              </Button>
+            ) : null}
+          </div>
+        </div>
       }
       className="project-workspace"
     >

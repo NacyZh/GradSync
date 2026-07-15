@@ -25,7 +25,7 @@ const workspaceCases: ViewportCase[] = [
     height: 950,
     path: '/projects/1',
     theme: 'light',
-    requiredRegions: ['Selected project context', 'Current tasks', 'Task details', 'Activity'],
+    requiredRegions: ['Current tasks', 'Task details', 'Activity'],
   },
   {
     name: 'tablet-review-dark',
@@ -33,7 +33,7 @@ const workspaceCases: ViewportCase[] = [
     height: 950,
     path: '/projects/1/reviews',
     theme: 'dark',
-    requiredRegions: ['Selected project context', 'Submission review', 'Inline comments'],
+    requiredRegions: ['Submission review', 'Inline comments'],
   },
   {
     name: 'mobile-booking-light',
@@ -73,12 +73,7 @@ test.describe('production workspace layout', () => {
       await expect(page.getByRole('banner')).toBeVisible();
       await expect(page.getByRole('main')).toBeVisible();
       await expect(page.getByRole('complementary', { name: 'Workspace navigation' })).toBeVisible();
-      const hasProjectContext = viewport.requiredRegions.includes('Selected project context');
-      if (hasProjectContext) {
-        await expect(page.getByRole('region', { name: 'Selected project context' })).toBeVisible();
-      } else {
-        await expect(page.getByRole('region', { name: 'Selected project context' })).toHaveCount(0);
-      }
+      await expect(page.getByRole('region', { name: 'Selected project context' })).toHaveCount(0);
 
       await setTheme(page, viewport.theme);
       for (const region of viewport.requiredRegions) {
@@ -89,7 +84,6 @@ test.describe('production workspace layout', () => {
         page.getByRole('banner'),
         page.getByRole('complementary', { name: 'Workspace navigation' }),
       ];
-      if (hasProjectContext) shellLandmarks.push(page.getByRole('region', { name: 'Selected project context' }));
       await expectVisibleLandmarksDoNotOverlap(page, shellLandmarks);
 
       await page.screenshot({

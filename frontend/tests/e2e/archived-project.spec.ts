@@ -43,7 +43,8 @@ test('archived project validation controls are available on dashboard', async ({
 
   await page.goto('/projects/1');
   await expect(page.getByRole('banner')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText(fullStackE2E ? 'Graphene Lab' : 'Archived validation project');
+  await expect(page.getByRole('heading', { name: fullStackE2E ? 'Graphene Lab' : 'Archived validation project' })).toBeVisible();
+  await expect(page.getByLabel('Project actions')).toContainText('Materials');
   await expect(page.getByRole('button', { name: 'Archive project' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reopen project' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Activity' })).toBeVisible();

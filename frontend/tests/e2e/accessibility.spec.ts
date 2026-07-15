@@ -22,7 +22,7 @@ test('main application landmarks are present', async ({ page }) => {
   await expect(page.getByLabel('Project title')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create' })).toBeVisible();
   await page.goto('/projects/1/resources');
-  await expect(page.getByRole('region', { name: 'Selected project context' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Selected project context' })).toHaveCount(0);
   await expect(page.getByLabel('Availability start')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Resource filters' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Booking calendar' })).toBeVisible();

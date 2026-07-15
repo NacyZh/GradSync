@@ -46,7 +46,8 @@ test('advisor can create a project and dashboard shows isolated project activity
   await expect(page.getByText('Created project Quantum Thesis')).toBeVisible();
 
   await page.goto('/projects/1');
-  await expect(page.getByRole('region', { name: 'Selected project context' })).toContainText('Graphene Lab');
+  await expect(page.getByRole('heading', { name: 'Graphene Lab' })).toBeVisible();
+  await expect(page.getByLabel('Project actions')).toContainText('Materials');
   await expect(page.getByRole('region', { name: 'Project summary' })).toContainText('Current tasks');
   await expect(page.getByRole('region', { name: 'Current tasks' })).toContainText('Analyze sample');
   await page.getByRole('link', { name: 'Update status' }).nth(1).click();
