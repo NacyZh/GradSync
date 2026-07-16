@@ -332,7 +332,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
   await test.step('project membership by nickname', async () => {
     await page.goto('/projects/1');
     await page.getByLabel('Student nickname').fill('Alex');
-    await expect(page.getByText('alex.two@example.edu')).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Student search results' })).toContainText('alex.two@example.edu');
     await page.getByLabel('Student account').selectOption('14');
     await page.getByRole('button', { name: 'Select student' }).click();
     await expect(page.getByText('Member added')).toBeVisible();

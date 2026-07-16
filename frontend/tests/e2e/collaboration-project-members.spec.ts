@@ -88,7 +88,7 @@ test('teacher manages project membership by student nickname', async ({ page }) 
 
   if (!fullStackE2E) {
     await page.getByLabel('Student nickname').fill('Alex');
-    await expect(page.getByText('alex.one@example.edu')).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Student search results' })).toContainText('alex.one@example.edu');
     await expect(page.getByText('doctoral')).toBeVisible();
     await page.getByLabel('Student account').selectOption('14');
     await page.getByRole('button', { name: 'Select student' }).click();
@@ -111,7 +111,7 @@ test('teacher creates a project with selected student accounts', async ({ page }
 
   if (!fullStackE2E) {
     await page.getByLabel('Student nickname').fill('Alex');
-    await expect(page.getByText('alex.one@example.edu')).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Student search results' })).toContainText('alex.one@example.edu');
     await page.getByLabel('Student account').selectOption('14');
     await page.getByRole('button', { name: 'Select student' }).click();
     await expect(page.getByRole('list', { name: 'Selected students' })).toContainText('Alex <alex.two@example.edu>');

@@ -8,7 +8,16 @@ import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui
 import { FieldGroup, FormField } from '../../shared/ui/FormField';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { createTask } from './api';
-import type { ProjectMembership } from '../projects/api';
+
+type TaskAssignableMember = {
+  id: number;
+  user_id?: number;
+  userId?: number;
+  nickname?: string;
+  name?: string;
+  email?: string;
+  status: 'active' | 'removed';
+};
 
 export function TaskForm({
   projectId,
@@ -16,7 +25,7 @@ export function TaskForm({
   disabled = false,
 }: {
   projectId: number;
-  members?: ProjectMembership[];
+  members?: TaskAssignableMember[];
   disabled?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
