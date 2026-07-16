@@ -46,8 +46,7 @@ describe('collaboration project members UI', () => {
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     expect(await screen.findByText('alex.one@example.edu')).toBeInTheDocument();
     expect(screen.getByText('doctoral')).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('Student account'), '8');
-    await userEvent.click(screen.getByRole('button', { name: 'Select student' }));
+    await userEvent.click(within(screen.getByRole('listbox', { name: 'Student search results' })).getByRole('option', { name: /alex.two@example.edu/ }));
 
     await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
     expect(await screen.findByText('Member added')).toBeInTheDocument();
@@ -112,8 +111,7 @@ describe('collaboration project members UI', () => {
     await userEvent.type(screen.getByLabelText('Project title'), 'Dropdown Project');
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     expect(await screen.findByText('alex.one@example.edu')).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('Student account'), '8');
-    await userEvent.click(screen.getByRole('button', { name: 'Select student' }));
+    await userEvent.click(within(screen.getByRole('listbox', { name: 'Student search results' })).getByRole('option', { name: /alex.two@example.edu/ }));
     expect(screen.getByRole('list', { name: 'Selected students' })).toHaveTextContent('Alex <alex.two@example.edu>');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -134,9 +132,9 @@ describe('collaboration project members UI', () => {
 
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     await screen.findByText('alex.one@example.edu');
-    await userEvent.click(screen.getByRole('button', { name: 'Select student' }));
+    await userEvent.click(screen.getByRole('option', { name: /alex.one@example.edu/ }));
 
-    expect(screen.getByRole('button', { name: 'Select student' })).toBeDisabled();
+    expect(screen.getByRole('option', { name: /alex.one@example.edu/ })).toBeDisabled();
     expect(screen.getByText('Selected')).toBeInTheDocument();
   });
 });

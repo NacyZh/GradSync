@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -83,8 +83,7 @@ describe('collaboration registration UI', () => {
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     expect(await screen.findByText('alex1@example.com')).toBeInTheDocument();
     expect(screen.getByText('doctoral')).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('Student account'), '2');
-    await userEvent.click(screen.getByRole('button', { name: 'Select student' }));
+    await userEvent.click(within(screen.getByRole('listbox', { name: 'Student search results' })).getByRole('option', { name: /alex2@example.com/ }));
     await waitFor(() => expect(onSelect).toHaveBeenCalled());
   });
 });

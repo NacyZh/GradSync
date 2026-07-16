@@ -185,7 +185,10 @@ describe('project work UI', () => {
     expect(screen.getByRole('complementary', { name: 'Members and progress' })).toHaveTextContent('Student One');
     expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Task title'), 'Prepare slides');
-    await userEvent.selectOptions(screen.getByLabelText('Assignees'), ['7', '8']);
+    await userEvent.type(screen.getByLabelText('Assignees'), 'Student');
+    await userEvent.click(within(screen.getByRole('listbox', { name: 'Assignee options' })).getByRole('option', { name: 'Student One' }));
+    await userEvent.type(screen.getByLabelText('Assignees'), 'Student');
+    await userEvent.click(within(screen.getByRole('listbox', { name: 'Assignee options' })).getByRole('option', { name: 'Student Two' }));
     await userEvent.click(screen.getByRole('button', { name: 'Add task' }));
     await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
     expect(JSON.parse(String(requests.find((request) => request.method === 'POST')?.body))).toMatchObject({

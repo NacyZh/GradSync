@@ -88,10 +88,9 @@ test('teacher manages project membership by student nickname', async ({ page }) 
 
   if (!fullStackE2E) {
     await page.getByLabel('Student nickname').fill('Alex');
-    await expect(page.getByRole('list', { name: 'Student search results' })).toContainText('alex.one@example.edu');
+    await expect(page.getByRole('listbox', { name: 'Student search results' })).toContainText('alex.one@example.edu');
     await expect(page.getByText('doctoral')).toBeVisible();
-    await page.getByLabel('Student account').selectOption('14');
-    await page.getByRole('button', { name: 'Select student' }).click();
+    await page.getByRole('listbox', { name: 'Student search results' }).getByRole('option', { name: /alex.two@example.edu/ }).click();
     await expect(page.getByText('Member added')).toBeVisible();
 
     await page.getByRole('button', { name: 'Remove Student One' }).click();
@@ -111,9 +110,8 @@ test('teacher creates a project with selected student accounts', async ({ page }
 
   if (!fullStackE2E) {
     await page.getByLabel('Student nickname').fill('Alex');
-    await expect(page.getByRole('list', { name: 'Student search results' })).toContainText('alex.one@example.edu');
-    await page.getByLabel('Student account').selectOption('14');
-    await page.getByRole('button', { name: 'Select student' }).click();
+    await expect(page.getByRole('listbox', { name: 'Student search results' })).toContainText('alex.one@example.edu');
+    await page.getByRole('listbox', { name: 'Student search results' }).getByRole('option', { name: /alex.two@example.edu/ }).click();
     await expect(page.getByRole('list', { name: 'Selected students' })).toContainText('Alex <alex.two@example.edu>');
   }
 
