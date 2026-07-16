@@ -10,6 +10,7 @@ export type TaskNode = {
   priority?: string;
   deadline_at?: string;
   assignee_id?: number;
+  assignee_ids?: number[];
   children?: TaskNode[];
 };
 
@@ -17,6 +18,7 @@ type TaskTreeProps = {
   tasks: TaskNode[];
   projectId?: number;
   selectedTaskId?: number;
+  memberNameById?: Map<number, string>;
   onSelectTask?: (task: TaskNode) => void;
 };
 
@@ -31,7 +33,7 @@ function priorityTone(priority?: string) {
   return 'text-foreground';
 }
 
-export function TaskTree({ tasks, projectId, selectedTaskId, onSelectTask }: TaskTreeProps) {
+export function TaskTree({ tasks, projectId, selectedTaskId, memberNameById, onSelectTask }: TaskTreeProps) {
   return (
     <ul className="task-tree" aria-label="Task hierarchy" data-density="compact">
       {tasks.map((task) => (
@@ -51,7 +53,7 @@ export function TaskTree({ tasks, projectId, selectedTaskId, onSelectTask }: Tas
               <span className={priorityTone(task.priority)}>Priority: {task.priority ?? 'normal'}</span>
               <span className="inline-flex items-center gap-1">
                 <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
-                Assignee: {task.assignee_id ? `User ${task.assignee_id}` : 'Unassigned'}
+                Assignees: {formatAssignees(task, memberNameById)}
               </span>
               {task.deadline_at ? (
                 <span className="inline-flex items-center gap-1">
@@ -70,11 +72,17 @@ export function TaskTree({ tasks, projectId, selectedTaskId, onSelectTask }: Tas
               ) : null}
             </div>
             {task.children && task.children.length > 0 ? (
-              <TaskTree tasks={task.children} projectId={projectId} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} />
+              <TaskTree tasks={task.children} projectId={projectId} selectedTaskId={selectedTaskId} memberNameById={memberNameById} onSelectTask={onSelectTask} />
             ) : null}
           </details>
         </li>
       ))}
     </ul>
   );
+}
+
+function formatAssignees(task: TaskNode, memberNameById?: Map<number, string>) {
+  const assigneeIds = task.assignee_ids?.length ? task.assignee_ids : task.assignee_id ? [task.assignee_id] : [];
+  if (!assigneeIds.length) return 'Unassigned';
+  return assigneeIds.map((userId) => memberNameById?.get(userId) ?? `User ${userId}`).join(', ');
 }

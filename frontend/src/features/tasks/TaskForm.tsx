@@ -8,22 +8,37 @@ import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui
 import { FieldGroup, FormField } from '../../shared/ui/FormField';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { createTask } from './api';
+import type { ProjectMembership } from '../projects/api';
 
-export function TaskForm({ projectId, disabled = false }: { projectId: number; disabled?: boolean }) {
+export function TaskForm({
+  projectId,
+  members = [],
+  disabled = false,
+}: {
+  projectId: number;
+  members?: ProjectMembership[];
+  disabled?: boolean;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const { notify } = useAppFeedback();
   const mutation = useMutation({
-    mutationFn: (payload: { title: string; assignee_id?: number; deadline_at?: string; priority?: string }) => createTask(projectId, payload),
+    mutationFn: (payload: { title: string; assignee_id?: number; assignee_ids?: number[]; deadline_at?: string; priority?: string }) => createTask(projectId, payload),
     onSuccess: () => notify('Task created', 'success'),
     onError: (error) => notify(error.message, 'error'),
   });
+  const activeMembers = members.filter((member) => member.status === 'active' && (member.userId ?? member.user_id));
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const assigneeIds = form
+      .getAll('assigneeIds')
+      .map((value) => Number(value))
+      .filter(Boolean);
     mutation.mutate({
       title: String(form.get('title')),
-      assignee_id: Number(form.get('assigneeId')) || undefined,
+      assignee_id: assigneeIds[0],
+      assignee_ids: assigneeIds,
       deadline_at: String(form.get('deadlineAt') || '') || undefined,
       priority: String(form.get('priority') || 'normal'),
     });
@@ -38,7 +53,26 @@ export function TaskForm({ projectId, disabled = false }: { projectId: number; d
     <form ref={formRef} className="stacked-form" aria-label="Create task" onSubmit={onSubmit}>
       <FieldGroup>
         <FormField id="task-title" name="title" label="Task title" required disabled={disabled || mutation.isPending} />
-        <FormField id="task-assignee" name="assigneeId" label="Assignee ID" type="number" disabled={disabled || mutation.isPending} />
+        <label className="grid gap-1.5 text-sm font-bold text-muted-foreground" htmlFor="task-assignees">
+          Assignees
+          <select
+            id="task-assignees"
+            name="assigneeIds"
+            multiple
+            className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            disabled={disabled || mutation.isPending || activeMembers.length === 0}
+          >
+            {activeMembers.map((member) => {
+              const userId = member.userId ?? member.user_id;
+              const label = member.nickname || member.name || member.email || `User ${userId}`;
+              return (
+                <option key={member.id} value={userId}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
+        </label>
         <FormField id="task-deadline" name="deadlineAt" label="Deadline" type="datetime-local" disabled={disabled || mutation.isPending} />
         <label className="grid gap-1.5 text-sm font-bold text-muted-foreground">
           Priority

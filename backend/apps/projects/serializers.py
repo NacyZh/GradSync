@@ -218,9 +218,9 @@ class ProjectDashboardSerializer(ProjectSerializer):
     def get_current_tasks(self, obj):
         from apps.tasks.serializers import TaskSerializer
 
-        tasks = obj.tasks.exclude(status__in=["completed", "cancelled"]).order_by(
-            "parent_task_id", "id"
-        )[:20]
+        tasks = obj.tasks.exclude(status__in=["completed", "cancelled"]).prefetch_related(
+            "assignees", "children"
+        ).order_by("parent_task_id", "id")[:20]
         return TaskSerializer(
             tasks,
             many=True,

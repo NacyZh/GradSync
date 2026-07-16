@@ -57,7 +57,7 @@ class ProjectTaskViewSet(
                 queryset = queryset.filter(**{field: value})
         if self.action == "list" and not self.request.query_params.get("include_children"):
             queryset = queryset.filter(parent_task__isnull=True)
-        return queryset.prefetch_related("children")
+        return queryset.prefetch_related("assignees", "children")
 
     def perform_create(self, serializer):
         try:

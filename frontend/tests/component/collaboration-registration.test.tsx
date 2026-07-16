@@ -83,7 +83,8 @@ describe('collaboration registration UI', () => {
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     expect(await screen.findByText('alex1@example.com')).toBeInTheDocument();
     expect(screen.getByText('doctoral')).toBeInTheDocument();
-    await userEvent.click(screen.getByText('alex2@example.com'));
+    await userEvent.selectOptions(screen.getByLabelText('Student account'), '2');
+    await userEvent.click(screen.getByRole('button', { name: 'Select student' }));
     await waitFor(() => expect(onSelect).toHaveBeenCalled());
   });
 });

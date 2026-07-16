@@ -29,6 +29,9 @@ class Task(models.Model):
     assignee = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
+    assignees = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True, related_name="assigned_tasks"
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NOT_STARTED)
     priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NORMAL)
     deadline_at = models.DateTimeField(null=True, blank=True)

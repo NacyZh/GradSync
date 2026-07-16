@@ -36,25 +36,29 @@ def create_deadline_reminders() -> int:
         deadline_at__isnull=False,
         deadline_at__lte=now + timezone.timedelta(days=7, hours=1),
     ).exclude(status__in=["completed", "cancelled"])
-    for task in tasks.select_related("project", "assignee"):
-        if not task.assignee_id:
+    for task in tasks.select_related("project", "assignee").prefetch_related("assignees"):
+        recipients = list(task.assignees.all())
+        if not recipients and task.assignee_id:
+            recipients = [task.assignee]
+        if not recipients:
             continue
         window = _deadline_window(now, task.deadline_at)
         if not window:
             continue
-        _, was_created = Notification.objects.get_or_create(
-            project=task.project,
-            recipient=task.assignee,
-            event_type=Notification.EventType.APPROACHING_DEADLINE,
-            target_type="Task",
-            target_id=f"{task.id}:{window}",
-            defaults={
-                "subject": f"Deadline approaching ({window}): {task.title}",
-                "action_path": f"/projects/{task.project_id}/tasks/{task.id}",
-                "eligible_at": now,
-            },
-        )
-        created += int(was_created)
+        for recipient in recipients:
+            _, was_created = Notification.objects.get_or_create(
+                project=task.project,
+                recipient=recipient,
+                event_type=Notification.EventType.APPROACHING_DEADLINE,
+                target_type="Task",
+                target_id=f"{task.id}:{window}",
+                defaults={
+                    "subject": f"Deadline approaching ({window}): {task.title}",
+                    "action_path": f"/projects/{task.project_id}/tasks/{task.id}",
+                    "eligible_at": now,
+                },
+            )
+            created += int(was_created)
     projects = ResearchProject.objects.filter(status="active", ends_on__isnull=False)
     for project in projects.prefetch_related("memberships__user"):
         deadline = timezone.datetime.combine(

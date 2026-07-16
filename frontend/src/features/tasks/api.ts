@@ -7,6 +7,7 @@ export type Task = {
   priority?: string;
   deadline_at?: string;
   assignee_id?: number;
+  assignee_ids?: number[];
   children?: Task[];
 };
 
@@ -14,7 +15,7 @@ export function listProjectTasks(projectId: number) {
   return apiRequest<{ results: Task[] }>(`/api/projects/${projectId}/tasks/`);
 }
 
-export function createTask(projectId: number, payload: { title: string; assignee_id?: number; deadline_at?: string; priority?: string }) {
+export function createTask(projectId: number, payload: { title: string; assignee_id?: number; assignee_ids?: number[]; deadline_at?: string; priority?: string }) {
   return apiRequest<Task>(`/api/projects/${projectId}/tasks/`, {
     method: 'POST',
     body: JSON.stringify(payload),

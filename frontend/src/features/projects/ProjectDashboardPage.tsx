@@ -78,6 +78,13 @@ export function ProjectDashboardPage() {
   const primaryTask = flattenedTasks.find((task) => task.id === selectedTaskId) ?? flattenedTasks[0];
   const pendingReviews = project.pending_reviews ?? [];
   const bookings = project.upcoming_bookings ?? [];
+  const memberNameById = new Map<number, string>();
+  for (const member of project.memberships ?? []) {
+    const userId = member.userId ?? member.user_id;
+    if (userId) {
+      memberNameById.set(userId, member.nickname || member.name || member.email || `User ${userId}`);
+    }
+  }
   const completed = flattenedTasks.filter((task) => task.status === 'completed').length;
   const blocked = flattenedTasks.filter((task) => task.status === 'blocked').length;
   const progress = flattenedTasks.length ? Math.round((completed / flattenedTasks.length) * 100) : 0;
@@ -166,7 +173,7 @@ export function ProjectDashboardPage() {
           </div>
           {tasks.length ? (
             <>
-              <TaskTree tasks={tasks} projectId={projectId} selectedTaskId={primaryTask?.id} onSelectTask={(task) => setSelectedTaskId(task.id)} />
+              <TaskTree tasks={tasks} projectId={projectId} selectedTaskId={primaryTask?.id} memberNameById={memberNameById} onSelectTask={(task) => setSelectedTaskId(task.id)} />
               {primaryTask && capabilities.canUpdateTasks ? (
                 <div className="mt-4 rounded-lg border bg-muted/40 p-3">
                   <TaskStatusControl projectId={projectId} taskId={primaryTask.id} status={primaryTask.status ?? 'not_started'} disabled={archived} />
@@ -192,7 +199,7 @@ export function ProjectDashboardPage() {
                 </div>
                 <div>
                   <dt className="font-bold text-muted-foreground">Assignee</dt>
-                  <dd>{primaryTask.assignee_id ? `User ${primaryTask.assignee_id}` : 'Unassigned'}</dd>
+                  <dd>{formatAssignees(primaryTask, memberNameById)}</dd>
                 </div>
                 <div>
                   <dt className="font-bold text-muted-foreground">Deadline</dt>
@@ -206,7 +213,7 @@ export function ProjectDashboardPage() {
           ) : (
             <DataState state="empty" title="No task selected" message="Select or create a task to start planning." />
           )}
-          {capabilities.canCreateTasks ? <TaskForm projectId={projectId} disabled={archived} /> : null}
+          {capabilities.canCreateTasks ? <TaskForm projectId={projectId} members={project.memberships} disabled={archived} /> : null}
         </section>
         <aside className="panel min-w-0 overflow-hidden" aria-label="Members and progress">
           <h2>Members and progress</h2>
@@ -255,6 +262,12 @@ export function ProjectDashboardPage() {
 
 function flattenTasks(tasks: TaskNode[]): TaskNode[] {
   return tasks.flatMap((task) => [task, ...flattenTasks(task.children ?? [])]);
+}
+
+function formatAssignees(task: TaskNode, memberNameById: Map<number, string>) {
+  const assigneeIds = task.assignee_ids?.length ? task.assignee_ids : task.assignee_id ? [task.assignee_id] : [];
+  if (!assigneeIds.length) return 'Unassigned';
+  return assigneeIds.map((userId) => memberNameById.get(userId) ?? `User ${userId}`).join(', ');
 }
 
 function formatDate(value?: string) {

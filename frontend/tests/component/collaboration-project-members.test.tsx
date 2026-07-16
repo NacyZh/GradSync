@@ -46,7 +46,8 @@ describe('collaboration project members UI', () => {
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     expect(await screen.findByText('alex.one@example.edu')).toBeInTheDocument();
     expect(screen.getByText('doctoral')).toBeInTheDocument();
-    await userEvent.click(screen.getByText('alex.two@example.edu'));
+    await userEvent.selectOptions(screen.getByLabelText('Student account'), '8');
+    await userEvent.click(screen.getByRole('button', { name: 'Select student' }));
 
     await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
     expect(await screen.findByText('Member added')).toBeInTheDocument();
@@ -111,7 +112,8 @@ describe('collaboration project members UI', () => {
     await userEvent.type(screen.getByLabelText('Project title'), 'Dropdown Project');
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     expect(await screen.findByText('alex.one@example.edu')).toBeInTheDocument();
-    await userEvent.click(screen.getByText('alex.two@example.edu'));
+    await userEvent.selectOptions(screen.getByLabelText('Student account'), '8');
+    await userEvent.click(screen.getByRole('button', { name: 'Select student' }));
     expect(screen.getByRole('list', { name: 'Selected students' })).toHaveTextContent('Alex <alex.two@example.edu>');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -131,9 +133,10 @@ describe('collaboration project members UI', () => {
     renderWithClient(<ProjectCreatePage />);
 
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
-    await userEvent.click(await screen.findByText('alex.one@example.edu'));
+    await screen.findByText('alex.one@example.edu');
+    await userEvent.click(screen.getByRole('button', { name: 'Select student' }));
 
-    expect(screen.getByRole('button', { name: /alex.one@example.edu/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Select student' })).toBeDisabled();
     expect(screen.getByText('Selected')).toBeInTheDocument();
   });
 });

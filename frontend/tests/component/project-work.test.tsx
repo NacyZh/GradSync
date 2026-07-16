@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -109,12 +109,20 @@ describe('project work UI', () => {
   });
 
   it('renders production project dashboard task, member, review, and activity regions', async () => {
+    const requests: RequestInit[] = [];
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url) => {
+      vi.fn(async (url, init) => {
+        requests.push(init ?? {});
         if (String(url).includes('/api/projects/1/notifications/')) {
           return new Response(JSON.stringify({ results: [] }), {
             status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        if (String(url).includes('/api/projects/1/tasks/') && init?.method === 'POST') {
+          return new Response(JSON.stringify({ id: 21, title: 'Prepare slides', status: 'not_started', assignee_ids: [7, 8] }), {
+            status: 201,
             headers: { 'Content-Type': 'application/json' },
           });
         }
@@ -135,7 +143,10 @@ describe('project work UI', () => {
               canUpdateTasks: true,
               deleteDisabledReason: 'Projects with research activity must be archived instead of deleted',
             },
-            memberships: [{ id: 1, project_id: 1, user_id: 7, role: 'student', status: 'active' }],
+            memberships: [
+              { id: 1, project_id: 1, user_id: 7, nickname: 'Student One', role: 'student', status: 'active' },
+              { id: 2, project_id: 1, user_id: 8, nickname: 'Student Two', role: 'student', status: 'active' },
+            ],
             current_tasks: [
               {
                 id: 11,
@@ -143,6 +154,7 @@ describe('project work UI', () => {
                 status: 'in_progress',
                 priority: 'high',
                 assignee_id: 7,
+                assignee_ids: [7, 8],
                 children: [{ id: 12, title: 'Draft chart', status: 'blocked', priority: 'normal', children: [] }],
               },
             ],
@@ -169,8 +181,18 @@ describe('project work UI', () => {
     expect(await screen.findByRole('heading', { name: 'Graphene Lab' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Current tasks' })).toHaveTextContent('Analyze sample');
     expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Priority: high');
-    expect(screen.getByRole('complementary', { name: 'Members and progress' })).toHaveTextContent('User 7');
+    expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Student One, Student Two');
+    expect(screen.getByRole('complementary', { name: 'Members and progress' })).toHaveTextContent('Student One');
     expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Task title'), 'Prepare slides');
+    await userEvent.selectOptions(screen.getByLabelText('Assignees'), ['7', '8']);
+    await userEvent.click(screen.getByRole('button', { name: 'Add task' }));
+    await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
+    expect(JSON.parse(String(requests.find((request) => request.method === 'POST')?.body))).toMatchObject({
+      title: 'Prepare slides',
+      assignee_id: 7,
+      assignee_ids: [7, 8],
+    });
     expect(screen.getByRole('button', { name: 'Archive project' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete project' })).toBeDisabled();
     expect(screen.getByRole('region', { name: 'Pending reviews' })).toHaveTextContent('Review progress_report #4');

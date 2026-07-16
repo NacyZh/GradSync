@@ -10,18 +10,26 @@ from tests.helpers import authenticate
 def test_member_can_create_project_task(api_client):
     advisor = UserFactory(global_role="advisor")
     student = UserFactory(global_role="student")
+    second_student = UserFactory(global_role="student")
     project = ResearchProject.objects.create(title="Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
     ProjectMembership.objects.create(project=project, user=student, role="student")
+    ProjectMembership.objects.create(project=project, user=second_student, role="student")
 
     response = authenticate(api_client, advisor).post(
         f"/api/projects/{project.id}/tasks/",
-        {"title": "Parent", "assignee_id": student.id, "priority": "high"},
+        {"title": "Parent", "assignee_ids": [student.id, second_student.id], "priority": "high"},
         format="json",
     )
 
     assert response.status_code == 201
+    assert response.json()["assignee_ids"] == [student.id, second_student.id]
     assert Task.objects.filter(project=project, title="Parent", assignee=student).exists()
+    task = Task.objects.get(project=project, title="Parent")
+    assert list(task.assignees.order_by("id").values_list("id", flat=True)) == [
+        student.id,
+        second_student.id,
+    ]
 
 
 @pytest.mark.django_db
