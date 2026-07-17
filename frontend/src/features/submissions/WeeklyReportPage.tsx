@@ -23,11 +23,14 @@ export function WeeklyReportPage() {
   const reportsQuery = useQuery({
     queryKey: ['reports', projectId],
     queryFn: () => listReports(projectId),
-    enabled: Boolean(projectId) && !canSubmitReports,
+    enabled: Boolean(projectId),
   });
   const mutation = useMutation({
     mutationFn: submitWeeklyReport.bind(null, projectId),
-    onSuccess: () => notify('Weekly report submitted', 'success'),
+    onSuccess: () => {
+      notify('Weekly report submitted', 'success');
+      reportsQuery.refetch();
+    },
     onError: (error) => notify(error.message, 'error'),
   });
 
@@ -50,7 +53,7 @@ export function WeeklyReportPage() {
   return (
     <PageShell
       title="Weekly progress report"
-      description="Summarize completed work, blockers, and next steps for advisor review."
+      description="Submit weekly progress updates, track review decisions, and resubmit revisions when a report is returned."
       className="submission-workspace"
     >
       <div className="grid gap-4 xl:grid-cols-[minmax(24rem,1.2fr)_minmax(18rem,0.8fr)]">
@@ -61,7 +64,7 @@ export function WeeklyReportPage() {
                 <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
                 Report editor
               </CardTitle>
-              <CardDescription>Submit one project-scoped weekly update for review.</CardDescription>
+              <CardDescription>Submit one project-scoped weekly update. Returned weeks can be resubmitted as a new revision.</CardDescription>
             </CardHeader>
             <CardContent>
               <form ref={formRef} className="rich-report-form" aria-label="Weekly progress report" onSubmit={onSubmit}>
@@ -88,13 +91,11 @@ export function WeeklyReportPage() {
             <CardContent>
               {reportsQuery.isLoading ? <DataState state="loading" message="Loading reports" /> : null}
               {reportsQuery.error ? <DataState state="error" message={reportsQuery.error.message} /> : null}
-              {!reportsQuery.isLoading && !reportsQuery.error ? (
-                <DataState state="success" message="Use report history to follow weekly project progress." />
-              ) : null}
+              {!reportsQuery.isLoading && !reportsQuery.error ? <DataState state="success" message="Use report history to follow weekly project progress and returned revisions." /> : null}
             </CardContent>
           </Card>
         )}
-        <WeeklyReportHistory reports={canSubmitReports ? (mutation.data ? [mutation.data] : []) : (reportsQuery.data?.results ?? [])} />
+        <WeeklyReportHistory reports={reportsQuery.data?.results ?? (mutation.data ? [mutation.data] : [])} />
       </div>
     </PageShell>
   );

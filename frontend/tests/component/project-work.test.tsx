@@ -58,7 +58,7 @@ describe('project work UI', () => {
     expect(screen.getByRole('heading', { name: 'Operations queue' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Account operations' })).toHaveAttribute('href', '/admin/accounts');
     expect(screen.getByRole('link', { name: 'Role approvals' })).toHaveAttribute('href', '/admin/role-activations');
-    expect(await screen.findByRole('link', { name: 'Draft oversight' })).toHaveAttribute('href', '/projects/7/drafts');
+    expect(await screen.findByRole('link', { name: 'Report oversight' })).toHaveAttribute('href', '/projects/7/reports');
     expect(screen.queryByRole('heading', { name: 'Advisor work queue' })).not.toBeInTheDocument();
     vi.unstubAllGlobals();
   });
@@ -234,7 +234,8 @@ describe('project work UI', () => {
       assignee_ids: [7, 8],
     });
     expect(screen.getByRole('button', { name: 'Archive project' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete project' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete empty project' })).toBeDisabled();
+    expect(screen.getByText(/Use archive for projects with research activity/)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Pending reviews' })).toHaveTextContent('Review progress_report #4');
     expect(screen.queryByRole('region', { name: 'Activity' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Notifications', exact: true })).not.toBeInTheDocument();

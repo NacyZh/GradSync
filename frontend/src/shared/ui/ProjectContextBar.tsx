@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ClipboardList, FileStack, FileText, Gauge, Inbox, Microscope } from 'lucide-react';
+import { ClipboardList, FileStack, Gauge, Inbox, Microscope } from 'lucide-react';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { cn } from '@/shared/lib/utils';
@@ -23,7 +23,6 @@ const workflowLinks: Array<{
 }> = [
   { label: 'Dashboard', suffix: '', icon: Gauge, roles: ['admin', 'advisor', 'student'] },
   { label: 'Materials', suffix: 'materials', icon: FileStack, roles: ['admin', 'advisor', 'student'] },
-  { label: 'Drafts', suffix: 'drafts', icon: FileText, roles: ['admin', 'student'] },
   { label: 'Reports', suffix: 'reports', icon: ClipboardList, roles: ['admin', 'student'] },
   { label: 'Reviews', suffix: 'reviews', icon: Inbox, roles: ['admin', 'advisor'] },
   { label: 'Resources', suffix: 'resources', icon: Microscope, roles: ['admin', 'advisor', 'student'] },

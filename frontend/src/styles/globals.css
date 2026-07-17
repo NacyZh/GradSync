@@ -295,8 +295,8 @@
   }
 
   .progress-ring {
-    @apply mx-auto mb-4 flex aspect-square max-w-40 items-center justify-center rounded-full;
-    background: conic-gradient(hsl(var(--primary)) 0 60%, hsl(var(--muted)) 60% 100%);
+    @apply mx-auto mb-4 flex h-32 w-32 shrink-0 items-center justify-center rounded-full sm:h-36 sm:w-36;
+    background: conic-gradient(hsl(var(--primary)) 0 var(--progress, 0%), hsl(var(--muted)) var(--progress, 0%) 100%);
   }
 
   .progress-ring span {

@@ -72,7 +72,6 @@ export function HomePage() {
             <article className="panel">
               <h2>Student work queue</h2>
               <div className="workflow-list">
-                {latestProject ? <Link to={`/projects/${latestProject.id}/drafts`}>Submit a draft</Link> : null}
                 {latestProject ? <Link to={`/projects/${latestProject.id}/reports`}>Weekly reports</Link> : null}
                 <Link to="/resources">Book a resource</Link>
               </div>
@@ -87,7 +86,6 @@ export function HomePage() {
                 <Link to="/resources">Resource operations</Link>
                 {latestProject ? <Link to={`/projects/${latestProject.id}`}>Project health dashboard</Link> : null}
                 {latestProject ? <Link to={`/projects/${latestProject.id}/reviews`}>Review queue</Link> : null}
-                {latestProject ? <Link to={`/projects/${latestProject.id}/drafts`}>Draft oversight</Link> : null}
                 {latestProject ? <Link to={`/projects/${latestProject.id}/reports`}>Report oversight</Link> : null}
               </div>
             </article>

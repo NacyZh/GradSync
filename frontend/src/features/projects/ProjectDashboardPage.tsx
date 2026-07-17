@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, RotateCcw, Trash2 } from 'lucide-react';
@@ -134,10 +135,15 @@ export function ProjectDashboardPage() {
                 title={capabilities.canDeleteProject ? undefined : capabilities.deleteDisabledReason}
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
-                Delete project
+                Delete empty project
               </Button>
             ) : null}
           </div>
+          {capabilities.canManageProject && !capabilities.canDeleteProject && capabilities.deleteDisabledReason ? (
+            <p className="max-w-sm text-right text-xs text-muted-foreground">
+              {capabilities.deleteDisabledReason}. Use archive for projects with research activity.
+            </p>
+          ) : null}
         </div>
       }
       className="project-workspace"
@@ -157,7 +163,7 @@ export function ProjectDashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Project summary">
         <MetricCard icon={ClipboardList} label="Current tasks" value={flattenedTasks.length} detail={`${progress}% complete`} />
         <MetricCard icon={CheckCircle2} label="Blocked tasks" value={blocked} detail={blocked ? 'needs attention' : 'clear'} />
-        <MetricCard icon={BookOpenCheck} label="Pending reviews" value={pendingReviews.length} detail="drafts and reports" />
+        <MetricCard icon={BookOpenCheck} label="Pending reviews" value={pendingReviews.length} detail="weekly reports" />
         <MetricCard icon={CalendarDays} label="Upcoming bookings" value={bookings.length} detail={nextDeadline ? `Next due ${formatDate(nextDeadline.deadline_at)}` : 'reserved resources'} />
       </section>
 
@@ -217,7 +223,11 @@ export function ProjectDashboardPage() {
         <aside className="panel min-w-0 overflow-hidden" aria-label="Members and progress">
           <h2>Members and progress</h2>
           <div className="my-4 grid place-items-center">
-            <div className="progress-ring" aria-label={`Project progress ${progress}%`}>
+            <div
+              className="progress-ring"
+              aria-label={`Project progress ${progress}%`}
+              style={{ '--progress': `${progress}%` } as CSSProperties}
+            >
               <span>{progress}%</span>
             </div>
           </div>
@@ -235,7 +245,7 @@ export function ProjectDashboardPage() {
               ))}
             </ul>
           ) : (
-            <DataState state="empty" title="No pending reviews" message="Drafts and reports needing advisor action will appear here." />
+            <DataState state="empty" title="No pending reviews" message="Weekly reports needing advisor action will appear here." />
           )}
         </section>
       </section>

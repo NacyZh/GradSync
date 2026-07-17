@@ -229,16 +229,6 @@ class ProjectDashboardSerializer(ProjectSerializer):
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_pending_reviews(self, obj):
         pending = []
-        for version in obj.draft_versions.filter(review_status="pending_review").order_by(
-            "-submitted_at"
-        )[:10]:
-            pending.append(
-                {
-                    "target_type": "draft_version",
-                    "target_id": str(version.id),
-                    "submitted_at": version.submitted_at,
-                }
-            )
         for report in obj.weekly_reports.filter(review_status="pending_review").order_by(
             "-submitted_at"
         )[:10]:

@@ -58,9 +58,12 @@ class WeeklyReportSerializer(serializers.ModelSerializer):
             "blockers",
             "next_steps",
             "attachment_reference",
+            "revision_number",
             "review_status",
+            "submitted_at",
+            "reviewed_at",
         ]
-        read_only_fields = ["project_id", "student_id", "review_status"]
+        read_only_fields = ["project_id", "student_id", "revision_number", "review_status", "submitted_at", "reviewed_at"]
 
 
 class InlineCommentSerializer(serializers.ModelSerializer):

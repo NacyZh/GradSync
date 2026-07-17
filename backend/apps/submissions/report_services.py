@@ -21,14 +21,21 @@ class WeeklyReportService(ProjectScopedService):
             user=self.user, status="active", role="student"
         ).exists():
             raise PermissionDenied("Only project students can submit weekly reports")
-        if WeeklyProgressReport.objects.filter(
+        existing_reports = WeeklyProgressReport.objects.filter(
             project=self.project,
             student=self.user,
             report_week_start=data["report_week_start"],
-        ).exists():
-            raise ValidationError("A weekly report already exists for this project week")
+        ).order_by("-revision_number", "-submitted_at")
+        latest = existing_reports.first()
+        if latest and latest.review_status != WeeklyProgressReport.ReviewStatus.NEEDS_REVISION:
+            raise ValidationError(
+                "A weekly report already exists for this project week. Wait for review or choose a different week."
+            )
         report = WeeklyProgressReport.objects.create(
-            project=self.project, student=self.user, **data
+            project=self.project,
+            student=self.user,
+            revision_number=(latest.revision_number + 1 if latest else 1),
+            **data,
         )
         for membership in self.project.memberships.filter(
             role__in=["advisor", "reviewer"], status="active"
@@ -48,7 +55,7 @@ class WeeklyReportService(ProjectScopedService):
             self.project,
             self.user,
             "weekly_report.submitted",
-            "Submitted weekly progress report",
+            f"Submitted weekly progress report revision {report.revision_number}",
             report,
         )
         return report

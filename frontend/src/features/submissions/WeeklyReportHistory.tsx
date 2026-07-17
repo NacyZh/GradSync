@@ -22,8 +22,12 @@ export function WeeklyReportHistory({ reports = [] }: { reports?: WeeklyReport[]
             {reports.map((report) => (
               <li key={report.id}>
                 <div>
-                  <strong>Week {report.report_week_start}</strong>
+                  <strong>
+                    Week {report.report_week_start}
+                    {report.revision_number && report.revision_number > 1 ? ` · Revision ${report.revision_number}` : ''}
+                  </strong>
                   <p className="text-sm text-muted-foreground">{report.completed_work}</p>
+                  {report.blockers ? <p className="text-sm text-muted-foreground">Blockers: {report.blockers}</p> : null}
                 </div>
                 <StatusBadge status={report.review_status} />
               </li>

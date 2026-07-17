@@ -72,8 +72,8 @@ describe('production design system', () => {
     );
 
     expect(screen.getByRole('link', { name: 'Materials' })).toHaveAttribute('href', '/projects/12/materials');
-    expect(screen.getByRole('link', { name: 'Drafts' })).toHaveAttribute('href', '/projects/12/drafts');
     expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/projects/12/reports');
+    expect(screen.queryByRole('link', { name: 'Drafts' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Reviews' })).not.toBeInTheDocument();
   });
 
@@ -86,10 +86,10 @@ describe('production design system', () => {
 
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/projects/12');
     expect(screen.getByRole('link', { name: 'Materials' })).toHaveAttribute('href', '/projects/12/materials');
-    expect(screen.getByRole('link', { name: 'Drafts' })).toHaveAttribute('href', '/projects/12/drafts');
     expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/projects/12/reports');
     expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute('href', '/projects/12/reviews');
     expect(screen.getByRole('link', { name: 'Resources' })).toHaveAttribute('href', '/projects/12/resources');
+    expect(screen.queryByRole('link', { name: 'Drafts' })).not.toBeInTheDocument();
   });
 
   it('announces loading, empty, success, warning, and error data states', () => {

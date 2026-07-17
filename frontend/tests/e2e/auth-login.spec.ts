@@ -8,7 +8,7 @@ test.describe('authentication', () => {
       await fulfillJson(route, { message: 'Authentication required' }, 401);
     });
 
-    const protectedPaths = ['/projects/1', '/projects/new', '/projects/1/drafts', '/projects/1/reports', '/projects/1/reviews', '/resources'];
+    const protectedPaths = ['/projects/1', '/projects/new', '/projects/1/reports', '/projects/1/reviews', '/resources'];
     for (const path of protectedPaths) {
       await page.goto(path);
       await expect(page).toHaveURL(/\/login/);

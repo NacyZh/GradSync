@@ -63,6 +63,7 @@ class WeeklyProgressReport(models.Model):
     blockers = models.TextField(blank=True)
     next_steps = models.TextField()
     attachment_reference = models.CharField(max_length=512, blank=True)
+    revision_number = models.PositiveIntegerField(default=1)
     review_status = models.CharField(
         max_length=30, choices=ReviewStatus.choices, default=ReviewStatus.PENDING_REVIEW
     )
@@ -70,8 +71,8 @@ class WeeklyProgressReport(models.Model):
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        unique_together = [("project", "student", "report_week_start")]
-        ordering = ["-report_week_start"]
+        unique_together = [("project", "student", "report_week_start", "revision_number")]
+        ordering = ["-report_week_start", "-revision_number"]
 
 
 class InlineComment(models.Model):

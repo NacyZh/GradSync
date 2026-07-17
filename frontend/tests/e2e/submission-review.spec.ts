@@ -20,47 +20,33 @@ test.beforeEach(async ({ page }) => {
   if (fullStackE2E) {
     return;
   }
-  await page.route('**/api/projects/1/drafts/', async (route) => {
-    if (route.request().method() === 'POST') {
-      await fulfillJson(route, { id: 51, title: 'Paper A', status: 'active' }, 201);
-      return;
-    }
-    await fulfillJson(route, { results: [{ id: 51, title: 'Paper A', status: 'active' }] });
-  });
-  await page.route('**/api/projects/1/drafts/51/versions/', async (route) => {
-    await fulfillJson(route, { id: 61, version_number: 1, review_status: 'pending_review', content_reference: 'paper-v1.pdf' }, 201);
-  });
+  let reportRevision = 0;
   await page.route('**/api/projects/1/reports/', async (route) => {
     if (route.request().method() === 'POST') {
-      await fulfillJson(route, { id: 71, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', review_status: 'pending_review' }, 201);
+      reportRevision += 1;
+      await fulfillJson(route, { id: 70 + reportRevision, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', revision_number: reportRevision, review_status: 'pending_review' }, 201);
       return;
     }
     await fulfillJson(route, {
-      results: [{ id: 71, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', review_status: 'pending_review' }],
+      results: reportRevision
+        ? [{ id: 70 + reportRevision, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', revision_number: reportRevision, review_status: 'pending_review' }]
+        : [],
     });
   });
   await page.route('**/api/projects/1/reports/71/review/', async (route) => {
-    await fulfillJson(route, { id: 71, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', review_status: 'reviewed' });
+    await fulfillJson(route, { id: 71, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', revision_number: 1, review_status: 'needs_revision' });
+  });
+  await page.route('**/api/projects/1/reports/72/review/', async (route) => {
+    await fulfillJson(route, { id: 72, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', revision_number: 2, review_status: 'reviewed' });
   });
 });
 
-test('student submits draft/report and advisor updates review status', async ({ page }) => {
+test('student submits report revision and advisor updates review status', async ({ page }) => {
   if (fullStackE2E) {
     await loginAs(page, 'student@example.edu');
   }
-  await page.goto('/projects/1/drafts');
-  await expect(page.getByRole('banner')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Submit draft' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Student draft actions' })).toBeVisible();
-  await page.getByLabel('Draft title').fill('Paper A');
-  await page.getByRole('button', { name: 'Create draft' }).click();
-  await expect(page.getByLabel('Create draft').getByRole('status')).toContainText('Draft created');
-  await page.getByLabel('Content reference').fill('paper-v1.pdf');
-  await page.getByLabel('Summary').fill('Initial submission');
-  await page.keyboard.press('Control+Enter');
-  await expect(page.getByLabel('Submit draft').getByRole('status')).toContainText('Draft version submitted');
-
   await page.goto('/projects/1/reports');
+  await expect(page.getByRole('banner')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Weekly progress report' })).toBeVisible();
   await page.getByLabel('Week start').fill('2026-06-22');
   await page.getByLabel('Completed work').fill('Completed experiments');
@@ -85,6 +71,25 @@ test('student submits draft/report and advisor updates review status', async ({ 
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Submission review' })).toContainText('Week 2026-06-22');
   await expect(page.getByRole('complementary', { name: 'Inline comments' })).toBeVisible();
-  await page.getByRole('listitem').filter({ hasText: 'Week 2026-06-22' }).getByLabel('Review status').selectOption('reviewed');
+  await page.getByRole('listitem').filter({ hasText: 'Week 2026-06-22' }).getByLabel('Review status').selectOption('needs_revision');
+  await expect(page.getByLabel('Report reviews').getByRole('status')).toContainText('Review status updated');
+
+  await page.unroute('**/api/accounts/me/');
+  await page.route('**/api/accounts/me/', async (route) => {
+    await fulfillJson(route, studentUser);
+  });
+  await page.goto('/projects/1/reports');
+  await page.getByLabel('Week start').fill('2026-06-22');
+  await page.getByLabel('Completed work').fill('Completed experiments revised');
+  await page.getByLabel('Next steps').fill('Write results');
+  await page.getByRole('button', { name: 'Submit report' }).click();
+  await expect(page.getByText(/Revision 2/)).toBeVisible();
+
+  await page.unroute('**/api/accounts/me/');
+  await page.route('**/api/accounts/me/', async (route) => {
+    await fulfillJson(route, currentUser);
+  });
+  await page.goto('/projects/1/reviews');
+  await page.getByRole('listitem').filter({ hasText: 'Revision 2' }).getByLabel('Review status').selectOption('reviewed');
   await expect(page.getByLabel('Report reviews').getByRole('status')).toContainText('Review status updated');
 });

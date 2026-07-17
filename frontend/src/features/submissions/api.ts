@@ -20,8 +20,12 @@ export type WeeklyReport = {
   id: number;
   report_week_start: string;
   completed_work: string;
+  blockers?: string;
   next_steps: string;
+  revision_number?: number;
   review_status: string;
+  submitted_at?: string;
+  reviewed_at?: string | null;
 };
 
 export type InlineComment = {

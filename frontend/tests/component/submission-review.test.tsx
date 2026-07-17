@@ -19,25 +19,20 @@ describe('submission review UI', () => {
     expect(screen.getByLabelText('Review status')).toBeInTheDocument();
   });
 
-  it('renders weekly report history with review status badges', () => {
-    renderWithClient(<WeeklyReportHistory reports={[{ id: 7, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', review_status: 'needs_revision' }]} />);
+  it('renders weekly report history with review status badges and revisions', () => {
+    renderWithClient(<WeeklyReportHistory reports={[{ id: 7, report_week_start: '2026-06-22', completed_work: 'Done', next_steps: 'Next', revision_number: 2, review_status: 'needs_revision' }]} />);
     expect(screen.getByRole('heading', { name: 'Report history' })).toBeInTheDocument();
+    expect(screen.getByText(/Revision 2/)).toBeInTheDocument();
     expect(screen.getByText('needs revision')).toBeInTheDocument();
   });
 
-  it('renders production review queue surfaces for reports, drafts, and comments', async () => {
+  it('renders production review queue surfaces for reports and comments', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url) => {
         const value = String(url);
-        if (value.includes('/api/projects/1/drafts/')) {
-          return new Response(JSON.stringify({ results: [{ id: 51, title: 'Paper A', status: 'active' }] }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
         if (value.includes('/api/projects/1/reports/')) {
-          return new Response(JSON.stringify({ results: [{ id: 71, report_week_start: '2026-06-22', completed_work: 'Completed experiments', next_steps: 'Next', review_status: 'pending_review' }] }), {
+          return new Response(JSON.stringify({ results: [{ id: 71, report_week_start: '2026-06-22', completed_work: 'Completed experiments', next_steps: 'Next', revision_number: 2, review_status: 'pending_review' }] }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -64,7 +59,8 @@ describe('submission review UI', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Review queue' })).toBeInTheDocument();
-    expect(await screen.findByText('Week 2026-06-22')).toBeInTheDocument();
+    expect(await screen.findByText(/Week 2026-06-22/)).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Drafts' })).not.toBeInTheDocument();
     expect(await screen.findByText('Clarify sample count')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Submission review' })).toHaveTextContent('Week 2026-06-22');
     expect(screen.getByRole('complementary', { name: 'Inline comments' })).toHaveTextContent('Clarify sample count');

@@ -179,7 +179,6 @@ describe('role-aware navigation', () => {
       'projectCreate',
       'projectDashboard',
       'projectMaterials',
-      'draftSubmission',
       'weeklyReport',
       'reviewQueue',
       'writingProjects',
