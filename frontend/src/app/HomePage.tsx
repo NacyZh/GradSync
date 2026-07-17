@@ -15,13 +15,22 @@ export function HomePage() {
 
   const projects = projectsQuery.data?.results ?? [];
   const role = user?.global_role;
+  const latestProject = projects[0];
+  const heading =
+    role === 'student' ? 'Student workspace' : role === 'advisor' ? 'Advisor workspace' : role === 'admin' ? 'Operations workspace' : 'GradSync dashboard';
+  const description =
+    role === 'student'
+      ? 'Open assigned projects and continue submission work.'
+      : role === 'admin'
+        ? 'Oversee project health, account operations, approvals, and shared research resources.'
+        : 'Review project work and keep active research moving.';
 
   return (
     <>
       <section className="page-heading dashboard-hero">
         <div>
-          <h1>{role === 'student' ? 'Student workspace' : role === 'advisor' ? 'Advisor workspace' : 'GradSync dashboard'}</h1>
-          <p>{role === 'student' ? 'Open assigned projects and continue submission work.' : 'Review project work and keep active research moving.'}</p>
+          <h1>{heading}</h1>
+          <p>{description}</p>
         </div>
       </section>
 
@@ -63,9 +72,23 @@ export function HomePage() {
             <article className="panel">
               <h2>Student work queue</h2>
               <div className="workflow-list">
-                {projects[0] ? <Link to={`/projects/${projects[0].id}/drafts`}>Submit a draft</Link> : null}
-                {projects[0] ? <Link to={`/projects/${projects[0].id}/reports`}>Weekly reports</Link> : null}
+                {latestProject ? <Link to={`/projects/${latestProject.id}/drafts`}>Submit a draft</Link> : null}
+                {latestProject ? <Link to={`/projects/${latestProject.id}/reports`}>Weekly reports</Link> : null}
                 <Link to="/resources">Book a resource</Link>
+              </div>
+            </article>
+          ) : role === 'admin' ? (
+            <article className="panel">
+              <h2>Operations queue</h2>
+              <div className="workflow-list">
+                <Link to="/projects/new">New project</Link>
+                <Link to="/admin/accounts">Account operations</Link>
+                <Link to="/admin/role-activations">Role approvals</Link>
+                <Link to="/resources">Resource operations</Link>
+                {latestProject ? <Link to={`/projects/${latestProject.id}`}>Project health dashboard</Link> : null}
+                {latestProject ? <Link to={`/projects/${latestProject.id}/reviews`}>Review queue</Link> : null}
+                {latestProject ? <Link to={`/projects/${latestProject.id}/drafts`}>Draft oversight</Link> : null}
+                {latestProject ? <Link to={`/projects/${latestProject.id}/reports`}>Report oversight</Link> : null}
               </div>
             </article>
           ) : (
@@ -73,8 +96,8 @@ export function HomePage() {
               <h2>Advisor work queue</h2>
               <div className="workflow-list">
                 <Link to="/resources">Reserve lab equipment or seats</Link>
-                {projects[0] ? <Link to={`/projects/${projects[0].id}/reviews`}>Open review queue</Link> : null}
-                {projects[0] ? <Link to={`/projects/${projects[0].id}`}>Open project dashboard</Link> : null}
+                {latestProject ? <Link to={`/projects/${latestProject.id}/reviews`}>Open review queue</Link> : null}
+                {latestProject ? <Link to={`/projects/${latestProject.id}`}>Open project dashboard</Link> : null}
               </div>
             </article>
           )}

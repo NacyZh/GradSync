@@ -27,6 +27,42 @@ describe('project work UI', () => {
     expect(screen.getByRole('status')).toHaveAttribute('data-state', 'loading');
   });
 
+  it('renders admin home as an operations workspace', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (String(url).includes('/api/accounts/me/')) {
+          return new Response(
+            JSON.stringify({ id: 1, email: 'admin@test.local', name: 'Admin', global_role: 'admin', status: 'active' }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            results: [{ id: 7, title: 'Graphene Lab', description: 'Materials study', status: 'active' }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }),
+    );
+
+    renderWithClient(
+      <MemoryRouter>
+        <AuthProvider>
+          <HomePage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Operations workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Operations queue' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Account operations' })).toHaveAttribute('href', '/admin/accounts');
+    expect(screen.getByRole('link', { name: 'Role approvals' })).toHaveAttribute('href', '/admin/role-activations');
+    expect(await screen.findByRole('link', { name: 'Draft oversight' })).toHaveAttribute('href', '/projects/7/drafts');
+    expect(screen.queryByRole('heading', { name: 'Advisor work queue' })).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
   it('shows selected project context', () => {
     render(<ProjectSelector projects={[{ id: 1, title: 'Project A' }]} selectedProjectId={1} onSelect={() => undefined} />);
 

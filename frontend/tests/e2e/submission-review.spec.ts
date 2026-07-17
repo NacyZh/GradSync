@@ -1,9 +1,22 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
+import { currentUser, fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
+
+const studentUser = {
+  id: 12,
+  email: 'student@example.edu',
+  name: 'Student One',
+  global_role: 'student',
+  status: 'active',
+};
 
 test.beforeEach(async ({ page }) => {
   await mockAuthenticatedApi(page);
+  if (!fullStackE2E) {
+    await page.route('**/api/accounts/me/', async (route) => {
+      await fulfillJson(route, studentUser);
+    });
+  }
   if (fullStackE2E) {
     return;
   }
@@ -61,6 +74,12 @@ test('student submits draft/report and advisor updates review status', async ({ 
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page.getByLabel('Email')).toBeVisible();
     await loginAs(page);
+    await page.goto('/projects/1/reviews');
+  } else {
+    await page.unroute('**/api/accounts/me/');
+    await page.route('**/api/accounts/me/', async (route) => {
+      await fulfillJson(route, currentUser);
+    });
     await page.goto('/projects/1/reviews');
   }
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();

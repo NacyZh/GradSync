@@ -23,8 +23,8 @@ const workflowLinks: Array<{
 }> = [
   { label: 'Dashboard', suffix: '', icon: Gauge, roles: ['admin', 'advisor', 'student'] },
   { label: 'Materials', suffix: 'materials', icon: FileStack, roles: ['admin', 'advisor', 'student'] },
-  { label: 'Drafts', suffix: 'drafts', icon: FileText, roles: ['student'] },
-  { label: 'Reports', suffix: 'reports', icon: ClipboardList, roles: ['student'] },
+  { label: 'Drafts', suffix: 'drafts', icon: FileText, roles: ['admin', 'student'] },
+  { label: 'Reports', suffix: 'reports', icon: ClipboardList, roles: ['admin', 'student'] },
   { label: 'Reviews', suffix: 'reviews', icon: Inbox, roles: ['admin', 'advisor'] },
   { label: 'Resources', suffix: 'resources', icon: Microscope, roles: ['admin', 'advisor', 'student'] },
 ];
