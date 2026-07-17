@@ -3,19 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../shared/api/client';
 import { downloadFile } from '../../shared/api/downloads';
 
-export type DraftVersion = {
-  id: number;
-  version_number: number;
-  review_status: string;
-  content_reference?: string;
-};
-
-export type Draft = {
-  id: number;
-  title: string;
-  status: string;
-};
-
 export type WeeklyReport = {
   id: number;
   report_week_start: string;
@@ -73,31 +60,6 @@ export type WritingProject = {
   status: 'active' | 'closed' | 'archived';
   versions: WritingVersion[];
 };
-
-export function listDrafts(projectId: number) {
-  return apiRequest<{ results: Draft[] }>(`/api/projects/${projectId}/drafts/`);
-}
-
-export function createDraft(projectId: number, title: string) {
-  return apiRequest<Draft>(`/api/projects/${projectId}/drafts/`, {
-    method: 'POST',
-    body: JSON.stringify({ title }),
-  });
-}
-
-export function submitDraftVersion(projectId: number, draftId: number, payload: { content_reference: string; summary?: string }) {
-  return apiRequest<DraftVersion>(`/api/projects/${projectId}/drafts/${draftId}/versions/`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function reviewDraftVersion(projectId: number, draftId: number, versionId: number, review_status: string) {
-  return apiRequest<DraftVersion>(`/api/projects/${projectId}/drafts/${draftId}/versions/${versionId}/review/`, {
-    method: 'PATCH',
-    body: JSON.stringify({ review_status }),
-  });
-}
 
 export function listReports(projectId: number) {
   return apiRequest<{ results: WeeklyReport[] }>(`/api/projects/${projectId}/reports/`);

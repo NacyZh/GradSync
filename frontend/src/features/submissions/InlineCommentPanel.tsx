@@ -17,7 +17,7 @@ export function InlineCommentPanel({ projectId, targetType, targetId, disabled =
   });
   const mutation = useMutation({
     mutationFn: (payload: { anchor: string; body: string }) =>
-      createComment(projectId ?? 0, { target_type: targetType ?? 'draft_version', target_id: targetId ?? 0, ...payload }),
+      createComment(projectId ?? 0, { target_type: targetType ?? 'progress_report', target_id: targetId ?? 0, ...payload }),
     onSuccess: () => {
       notify('Comment added', 'success');
       commentsQuery.refetch();
@@ -38,9 +38,9 @@ export function InlineCommentPanel({ projectId, targetType, targetId, disabled =
         Inline comments
       </h2>
       <p className="mb-4 text-sm text-muted-foreground">
-        Target: {targetType ?? 'draft_version'} #{targetId ?? 'not selected'}
+        Target: {targetType ?? 'progress_report'} #{targetId ?? 'not selected'}
       </p>
-      {!targetId ? <DataState state="warning" title="No review target" message="Select a draft version or progress report before adding anchored comments." /> : null}
+      {!targetId ? <DataState state="warning" title="No review target" message="Select a progress report before adding anchored comments." /> : null}
       <CommentThread projectId={projectId} comments={commentsQuery.data?.results ?? []} />
       <form className="stacked-form" onSubmit={onSubmit}>
         <FieldGroup>

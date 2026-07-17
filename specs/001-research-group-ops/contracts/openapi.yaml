@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: >
     Project-scoped API contract for research projects, hierarchical tasks,
-    versioned drafts, weekly reports, inline advisor comments, configurable
+    weekly reports, inline advisor comments, configurable
     resource bookings, paper team libraries, code team libraries, locale
     preferences, downloads, and email notification records.
 servers:
@@ -147,68 +147,6 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "422":
           $ref: "#/components/responses/ValidationError"
-  /projects/{projectId}/drafts:
-    get:
-      summary: List project drafts
-      operationId: listProjectDrafts
-      tags: [Drafts]
-      parameters:
-        - $ref: "#/components/parameters/ProjectId"
-      responses:
-        "200":
-          description: Draft families visible in the project
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Draft"
-    post:
-      summary: Create a draft family
-      operationId: createDraft
-      tags: [Drafts]
-      parameters:
-        - $ref: "#/components/parameters/ProjectId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DraftCreate"
-      responses:
-        "201":
-          description: Draft created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Draft"
-  /projects/{projectId}/drafts/{draftId}/versions:
-    post:
-      summary: Submit a new draft version
-      operationId: submitDraftVersion
-      tags: [Drafts]
-      parameters:
-        - $ref: "#/components/parameters/ProjectId"
-        - name: draftId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DraftVersionCreate"
-      responses:
-        "201":
-          description: Draft version submitted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DraftVersion"
-        "403":
-          $ref: "#/components/responses/Forbidden"
   /projects/{projectId}/reports:
     get:
       summary: List weekly progress reports
@@ -248,7 +186,7 @@ paths:
           description: Report already exists for this student and week
   /projects/{projectId}/comments:
     post:
-      summary: Add an inline comment to a draft version or weekly report
+      summary: Add an inline comment to a weekly report
       operationId: createInlineComment
       tags: [Comments]
       parameters:
@@ -804,59 +742,6 @@ components:
         deadlineAt:
           type: string
           format: date-time
-    Draft:
-      type: object
-      required: [id, projectId, title, studentId, status]
-      properties:
-        id:
-          type: string
-        projectId:
-          type: string
-        title:
-          type: string
-        studentId:
-          type: string
-        status:
-          type: string
-          enum: [active, closed]
-    DraftCreate:
-      type: object
-      required: [title]
-      properties:
-        title:
-          type: string
-    DraftVersion:
-      type: object
-      required: [id, draftId, projectId, versionNumber, submittedById, reviewStatus]
-      properties:
-        id:
-          type: string
-        draftId:
-          type: string
-        projectId:
-          type: string
-        versionNumber:
-          type: integer
-        submittedById:
-          type: string
-        contentReference:
-          type: string
-        summary:
-          type: string
-        reviewStatus:
-          type: string
-          enum: [pending_review, reviewed, needs_revision, closed]
-        submittedAt:
-          type: string
-          format: date-time
-    DraftVersionCreate:
-      type: object
-      required: [contentReference]
-      properties:
-        contentReference:
-          type: string
-        summary:
-          type: string
     WeeklyReport:
       type: object
       required: [id, projectId, studentId, reportWeekStart, reviewStatus]
@@ -904,7 +789,7 @@ components:
           type: string
         targetType:
           type: string
-          enum: [draft_version, progress_report]
+          enum: [progress_report]
         targetId:
           type: string
         authorId:
@@ -922,7 +807,7 @@ components:
       properties:
         targetType:
           type: string
-          enum: [draft_version, progress_report]
+          enum: [progress_report]
         targetId:
           type: string
         anchor:

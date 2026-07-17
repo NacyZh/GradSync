@@ -2,27 +2,21 @@ import { useMutation } from '@tanstack/react-query';
 
 import { Label } from '@/shared/ui/primitives/label';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
-import type { DraftVersion, WeeklyReport } from './api';
-import { reviewDraftVersion, reviewWeeklyReport } from './api';
+import type { WeeklyReport } from './api';
+import { reviewWeeklyReport } from './api';
 
 type Props = {
   status: string;
   projectId?: number;
-  draftId?: number;
-  versionId?: number;
   reportId?: number;
-  targetType?: 'draft' | 'report';
   disabled?: boolean;
 };
 
-export function ReviewStatusControl({ status, projectId, draftId, versionId, reportId, targetType = 'report', disabled = false }: Props) {
+export function ReviewStatusControl({ status, projectId, reportId, disabled = false }: Props) {
   const { notify } = useAppFeedback();
-  const mutation = useMutation<DraftVersion | WeeklyReport | null, Error, string>({
+  const mutation = useMutation<WeeklyReport | null, Error, string>({
     mutationFn: (reviewStatus: string) => {
       if (!projectId) return Promise.resolve(null);
-      if (targetType === 'draft' && draftId && versionId) {
-        return reviewDraftVersion(projectId, draftId, versionId, reviewStatus);
-      }
       if (reportId) {
         return reviewWeeklyReport(projectId, reportId, reviewStatus);
       }
@@ -34,9 +28,9 @@ export function ReviewStatusControl({ status, projectId, draftId, versionId, rep
 
   return (
     <div className="grid gap-2">
-      <Label htmlFor={`review-status-${targetType}-${reportId ?? versionId ?? 'target'}`}>Review status</Label>
+      <Label htmlFor={`review-status-report-${reportId ?? 'target'}`}>Review status</Label>
       <select
-        id={`review-status-${targetType}-${reportId ?? versionId ?? 'target'}`}
+        id={`review-status-report-${reportId ?? 'target'}`}
         defaultValue={status}
         onChange={(event) => mutation.mutate(event.target.value)}
         aria-label="Review status"

@@ -13,11 +13,8 @@ from apps.common.search import apply_text_search
 from apps.projects.services import projects_visible_to
 
 from .comment_services import InlineCommentService
-from .draft_services import DraftService
 from .feedback_services import TeacherFeedbackService
 from .models import (
-    Draft,
-    DraftVersion,
     InlineComment,
     TeacherFeedback,
     WeeklyProgressReport,
@@ -26,8 +23,6 @@ from .models import (
 )
 from .report_services import WeeklyReportService
 from .serializers import (
-    DraftSerializer,
-    DraftVersionSerializer,
     InlineCommentSerializer,
     InlineCommentStatusSerializer,
     ReviewStatusSerializer,
@@ -50,62 +45,6 @@ from .writing_services import (
     require_writing_version_download_access,
     upload_standalone_writing_version,
 )
-
-
-class DraftViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
-    serializer_class = DraftSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_project(self):
-        return get_object_or_404(
-            projects_visible_to(self.request.user), pk=self.kwargs["project_id"]
-        )
-
-    def get_queryset(self):
-        queryset = Draft.objects.filter(project=self.get_project()).prefetch_related("versions")
-        queryset = apply_text_search(queryset, self.request.query_params.get("search"), ["title"])
-        status_filter = self.request.query_params.get("status")
-        if status_filter:
-            queryset = queryset.filter(status=status_filter)
-        else:
-            queryset = queryset.exclude(status=WritingProject.Status.ARCHIVED)
-        return queryset
-
-    def perform_create(self, serializer):
-        draft = DraftService(self.request.user, self.get_project()).create_draft(
-            **serializer.validated_data
-        )
-        serializer.instance = draft
-
-    @extend_schema(
-        request=DraftVersionSerializer,
-        responses={
-            201: DraftVersionSerializer,
-            403: OpenApiResponse(description="Draft submission forbidden"),
-        },
-    )
-    @action(detail=True, methods=["post"], url_path="versions")
-    def submit_version(self, request, project_id=None, pk=None):
-        project = self.get_project()
-        draft = get_object_or_404(Draft, project=project, pk=pk)
-        serializer = DraftVersionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        version = DraftService(request.user, project).submit_version(
-            draft=draft, **serializer.validated_data
-        )
-        return Response(DraftVersionSerializer(version).data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=["patch"], url_path="versions/(?P<version_id>[^/.]+)/review")
-    def review_version(self, request, project_id=None, pk=None, version_id=None):
-        project = self.get_project()
-        draft = get_object_or_404(Draft, project=project, pk=pk)
-        version = get_object_or_404(DraftVersion, project=project, draft=draft, pk=version_id)
-        serializer = ReviewStatusSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        version = DraftService(request.user, project).update_review_status(
-            version, serializer.validated_data["review_status"]
-        )
-        return Response(DraftVersionSerializer(version).data)
 
 
 class WeeklyReportViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):

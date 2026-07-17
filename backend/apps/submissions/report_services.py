@@ -29,7 +29,8 @@ class WeeklyReportService(ProjectScopedService):
         latest = existing_reports.first()
         if latest and latest.review_status != WeeklyProgressReport.ReviewStatus.NEEDS_REVISION:
             raise ValidationError(
-                "A weekly report already exists for this project week. Wait for review or choose a different week."
+                "A weekly report already exists for this project week. "
+                "Wait for review or choose a different week."
             )
         report = WeeklyProgressReport.objects.create(
             project=self.project,

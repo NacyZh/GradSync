@@ -10,7 +10,7 @@ from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 from apps.resources.models import Booking, ResourceItem, ResourceType
-from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
+from apps.submissions.models import InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
 
 
@@ -97,14 +97,6 @@ class Command(BaseCommand):
             deadline_at=timezone.now() + timezone.timedelta(hours=12),
         )
 
-        draft = Draft.objects.create(project=project, student=student, title="Paper A")
-        DraftVersion.objects.create(
-            project=project,
-            draft=draft,
-            version_number=1,
-            submitted_by=student,
-            content_reference="paper-v1.pdf",
-        )
         report = WeeklyProgressReport.objects.create(
             project=project,
             student=student,

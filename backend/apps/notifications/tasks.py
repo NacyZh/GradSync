@@ -85,16 +85,14 @@ def create_deadline_reminders() -> int:
 
 
 def create_pending_review_reminders() -> int:
-    from apps.submissions.models import DraftVersion, WeeklyProgressReport
+    from apps.submissions.models import WeeklyProgressReport
 
     now = timezone.now()
     created = 0
-    versions = DraftVersion.objects.filter(project__status="active", review_status="pending_review")
     reports = WeeklyProgressReport.objects.filter(
         project__status="active", review_status="pending_review"
     )
     for target, target_type, submitted_at in [
-        *[(version, "DraftVersion", version.submitted_at) for version in versions],
         *[(report, "WeeklyProgressReport", report.submitted_at) for report in reports],
     ]:
         if submitted_at > now - timezone.timedelta(days=3):

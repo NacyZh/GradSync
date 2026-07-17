@@ -12,8 +12,7 @@ from apps.projects.models import ProjectMembership, ResearchProject
 from apps.resources.models import ResourceItem, ResourceType
 from apps.resources.services import BookingService
 from apps.submissions.comment_services import InlineCommentService
-from apps.submissions.draft_services import DraftService
-from apps.submissions.models import DraftVersion, InlineComment
+from apps.submissions.models import InlineComment
 from apps.submissions.report_services import WeeklyReportService
 from apps.tasks.models import Task
 from tests.factories.accounts import UserFactory
@@ -80,12 +79,14 @@ def test_review_status_comments_booking_cancel_and_notification_delivery(api_cli
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
     ProjectMembership.objects.create(project=project, user=student, role="student")
 
-    draft = DraftService(student, project).create_draft(title="Paper")
-    version = DraftService(student, project).submit_version(
-        draft=draft, content_reference="paper-v1"
+    report = WeeklyReportService(student, project).submit_report(
+        report_week_start=timezone.localdate(),
+        completed_work="Paper progress",
+        blockers="",
+        next_steps="Revise paper",
     )
     review_response = authenticate(api_client, advisor).patch(
-        f"/api/projects/{project.id}/drafts/{draft.id}/versions/{version.id}/review/",
+        f"/api/projects/{project.id}/reports/{report.id}/review/",
         {"review_status": "needs_revision"},
         format="json",
     )
@@ -94,8 +95,8 @@ def test_review_status_comments_booking_cancel_and_notification_delivery(api_cli
     comment_response = api_client.post(
         f"/api/projects/{project.id}/comments/",
         {
-            "target_type": "draft_version",
-            "target_id": version.id,
+            "target_type": "progress_report",
+            "target_id": report.id,
             "anchor": "p1",
             "body": "Clarify",
         },
@@ -128,10 +129,10 @@ def test_review_status_comments_booking_cancel_and_notification_delivery(api_cli
         recipient=advisor,
         sender=student,
         event_type=Notification.EventType.NEW_SUBMISSION,
-        target_type="DraftVersion",
-        target_id=str(version.id),
-        subject="New draft",
-        action_path=f"/projects/{project.id}/drafts/{draft.id}",
+        target_type="WeeklyProgressReport",
+        target_id=str(report.id),
+        subject="New weekly report",
+        action_path=f"/projects/{project.id}/reports",
         eligible_at=timezone.now(),
     )
     assert deliver_due_notifications() >= 1
@@ -182,17 +183,16 @@ def test_dashboard_notifications_and_reminder_jobs_are_project_scoped(api_client
         deadline_at=timezone.now() + timezone.timedelta(days=1),
         created_by=advisor,
     )
-    version = DraftVersion.objects.create(
-        project=project,
-        draft=DraftService(student, project).create_draft(title="Dash Paper"),
-        submitted_by=student,
-        version_number=1,
-        content_reference="paper",
+    report = WeeklyReportService(student, project).submit_report(
+        report_week_start=timezone.localdate(),
+        completed_work="Dashboard progress",
+        blockers="",
+        next_steps="Review progress",
     )
-    DraftVersion.objects.filter(pk=version.pk).update(
+    project.weekly_reports.filter(pk=report.pk).update(
         submitted_at=timezone.now() - timezone.timedelta(days=4)
     )
-    version.refresh_from_db()
+    report.refresh_from_db()
 
     assert create_deadline_reminders() >= 1
     assert create_pending_review_reminders() >= 1
@@ -205,7 +205,7 @@ def test_dashboard_notifications_and_reminder_jobs_are_project_scoped(api_client
     assert notifications.status_code == 200
     assert notifications.json()["results"]
     assert project.notifications.filter(target_id=f"{task.id}:1d").exists()
-    assert project.notifications.filter(target_id=str(version.id)).exists()
+    assert project.notifications.filter(target_id=str(report.id)).exists()
 
 
 @pytest.mark.django_db
@@ -233,8 +233,6 @@ def test_project_scoped_search_filters_and_resource_availability(api_client):
         assignee=student,
         created_by=advisor,
     )
-    DraftService(student, project).create_draft(title="Cell migration manuscript")
-    DraftService(student, project).create_draft(title="Unrelated notes")
     report = WeeklyReportService(student, project).submit_report(
         report_week_start=timezone.localdate(),
         completed_work="Finished microscopy search target",
@@ -271,7 +269,6 @@ def test_project_scoped_search_filters_and_resource_availability(api_client):
     authenticate(api_client, advisor)
 
     tasks = api_client.get(f"/api/projects/{project.id}/tasks/?search=cells&priority=high")
-    drafts = api_client.get(f"/api/projects/{project.id}/drafts/?search=migration")
     reports = api_client.get(
         f"/api/projects/{project.id}/reports/?search=microscopy&review_status=pending_review"
     )
@@ -289,8 +286,6 @@ def test_project_scoped_search_filters_and_resource_availability(api_client):
 
     assert tasks.status_code == 200
     assert [item["title"] for item in tasks.json()["results"]] == ["Analyze cells"]
-    assert drafts.status_code == 200
-    assert [item["title"] for item in drafts.json()["results"]] == ["Cell migration manuscript"]
     assert reports.status_code == 200
     assert len(reports.json()["results"]) == 1
     assert comments.status_code == 200

@@ -49,7 +49,7 @@ export function ReviewQueuePage() {
                     <p>{report.completed_work}</p>
                     <small className="text-muted-foreground">Target progress_report #{report.id}</small>
                   </div>
-                  <ReviewStatusControl projectId={projectId} reportId={report.id} status={report.review_status} targetType="report" />
+                  <ReviewStatusControl projectId={projectId} reportId={report.id} status={report.review_status} />
                 </li>
               ))}
             </ul>

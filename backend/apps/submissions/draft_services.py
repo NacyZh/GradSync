@@ -55,7 +55,7 @@ class DraftService(ProjectScopedService):
                 target_type="DraftVersion",
                 target_id=str(version.id),
                 subject=f"New draft submitted: {draft.title}",
-                action_path=f"/projects/{self.project.id}/drafts/{draft.id}/versions/{version.id}",
+                action_path="/writing",
                 sender=self.user,
                 eligible_at=timezone.now(),
             )

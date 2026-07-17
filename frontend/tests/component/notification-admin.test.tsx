@@ -21,9 +21,9 @@ describe('notification and account administration UI', () => {
               id: 1,
               project_id: 7,
               event_type: 'pending_review',
-              target_type: 'draft_version',
+              target_type: 'progress_report',
               target_id: '12',
-              subject: 'Draft review pending',
+              subject: 'Report review pending',
               action_path: '/projects/7/reviews',
               status: 'failed',
               eligible_at: '2026-06-25T10:00:00Z',
@@ -37,10 +37,10 @@ describe('notification and account administration UI', () => {
 
     renderWithClient(<NotificationList projectId={7} />);
 
-    expect(await screen.findByText('Draft review pending')).toBeInTheDocument();
+    expect(await screen.findByText('Report review pending')).toBeInTheDocument();
     expect(screen.getByText('pending review')).toBeInTheDocument();
     expect(screen.getByText('Project #7')).toBeInTheDocument();
-    expect(screen.getByText('draft version #12')).toBeInTheDocument();
+    expect(screen.getByText('progress report #12')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('SMTP provider rejected the recipient');
     expect(screen.getByRole('link', { name: 'Open record' })).toHaveAttribute('href', '/projects/7/reviews');
     expect(screen.getByRole('button', { name: 'Retry queued by worker' })).toBeDisabled();

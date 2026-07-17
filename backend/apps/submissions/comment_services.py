@@ -5,7 +5,7 @@ from apps.audit.services import record_event
 from apps.common.project_scope import ProjectScopedService
 from apps.projects.archive_services import ensure_project_writable
 
-from .models import DraftVersion, InlineComment, WeeklyProgressReport
+from .models import InlineComment, WeeklyProgressReport
 
 
 class InlineCommentService(ProjectScopedService):
@@ -18,10 +18,9 @@ class InlineCommentService(ProjectScopedService):
     ) -> InlineComment:
         self.require_project_reviewer(self.project)
         ensure_project_writable(self.project)
-        if target_type == InlineComment.TargetType.DRAFT_VERSION:
-            target = DraftVersion.objects.get(pk=target_id)
-        else:
-            target = WeeklyProgressReport.objects.get(pk=target_id)
+        if target_type != InlineComment.TargetType.PROGRESS_REPORT:
+            raise ValidationError("Inline comments are only supported for weekly reports")
+        target = WeeklyProgressReport.objects.get(pk=target_id)
         if target.project_id != self.project.id:
             raise ValidationError("Comment target must belong to the same project")
         comment = InlineComment.objects.create(

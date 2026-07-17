@@ -1,8 +1,6 @@
 from rest_framework import serializers
 
 from .models import (
-    Draft,
-    DraftVersion,
     InlineComment,
     TeacherFeedback,
     WeeklyProgressReport,
@@ -11,39 +9,8 @@ from .models import (
 )
 
 
-class DraftSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Draft
-        fields = ["id", "project_id", "title", "student_id", "status"]
-        read_only_fields = ["project_id", "student_id", "status"]
-
-
-class DraftVersionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DraftVersion
-        fields = [
-            "id",
-            "draft_id",
-            "project_id",
-            "version_number",
-            "submitted_by_id",
-            "content_reference",
-            "summary",
-            "review_status",
-            "submitted_at",
-        ]
-        read_only_fields = [
-            "draft_id",
-            "project_id",
-            "version_number",
-            "submitted_by_id",
-            "review_status",
-            "submitted_at",
-        ]
-
-
 class ReviewStatusSerializer(serializers.Serializer):
-    review_status = serializers.ChoiceField(choices=DraftVersion.ReviewStatus.choices)
+    review_status = serializers.ChoiceField(choices=WeeklyProgressReport.ReviewStatus.choices)
 
 
 class WeeklyReportSerializer(serializers.ModelSerializer):
@@ -63,7 +30,14 @@ class WeeklyReportSerializer(serializers.ModelSerializer):
             "submitted_at",
             "reviewed_at",
         ]
-        read_only_fields = ["project_id", "student_id", "revision_number", "review_status", "submitted_at", "reviewed_at"]
+        read_only_fields = [
+            "project_id",
+            "student_id",
+            "revision_number",
+            "review_status",
+            "submitted_at",
+            "reviewed_at",
+        ]
 
 
 class InlineCommentSerializer(serializers.ModelSerializer):

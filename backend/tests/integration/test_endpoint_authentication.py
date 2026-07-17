@@ -6,7 +6,6 @@ ANONYMOUS_REJECTED_ENDPOINTS = [
     "/api/projects/",
     "/api/resource-items/",
     "/api/projects/1/tasks/",
-    "/api/projects/1/drafts/",
     "/api/projects/1/reports/",
     "/api/projects/1/comments/",
     "/api/projects/1/bookings/",

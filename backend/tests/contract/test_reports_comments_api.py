@@ -1,7 +1,7 @@
 import pytest
 
 from apps.projects.models import ProjectMembership, ResearchProject
-from apps.submissions.models import Draft, DraftVersion, WeeklyProgressReport
+from apps.submissions.models import WeeklyProgressReport
 from tests.factories.accounts import UserFactory
 from tests.helpers import authenticate
 
@@ -27,25 +27,24 @@ def test_student_can_submit_weekly_report(api_client):
 
 
 @pytest.mark.django_db
-def test_advisor_can_comment_on_draft_version(api_client):
+def test_advisor_can_comment_on_weekly_report(api_client):
     advisor = UserFactory(global_role="advisor")
     student = UserFactory(global_role="student")
     project = ResearchProject.objects.create(title="Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
-    draft = Draft.objects.create(project=project, student=student, title="Paper")
-    version = DraftVersion.objects.create(
+    report = WeeklyProgressReport.objects.create(
         project=project,
-        draft=draft,
-        submitted_by=student,
-        version_number=1,
-        content_reference="paper-v1",
+        student=student,
+        report_week_start="2026-06-22",
+        completed_work="Done",
+        next_steps="Next",
     )
 
     response = authenticate(api_client, advisor).post(
         f"/api/projects/{project.id}/comments/",
         {
-            "target_type": "draft_version",
-            "target_id": version.id,
+            "target_type": "progress_report",
+            "target_id": report.id,
             "anchor": "p1",
             "body": "Clarify claim",
         },

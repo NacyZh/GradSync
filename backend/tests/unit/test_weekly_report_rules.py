@@ -1,4 +1,5 @@
 import pytest
+
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.submissions.models import WeeklyProgressReport
 from tests.factories.accounts import UserFactory

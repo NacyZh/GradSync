@@ -8,7 +8,7 @@ from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.repositories.models import CodeArtifact, CodeArtifactVersion
 from apps.resources.models import Booking, ResourceItem, ResourceType
-from apps.submissions.models import Draft, DraftVersion, InlineComment, WeeklyProgressReport
+from apps.submissions.models import InlineComment, WeeklyProgressReport
 from apps.tasks.models import Task
 
 VALIDATION_ACCOUNTS = [
@@ -144,15 +144,6 @@ class Command(BaseCommand):
             defaults={"purpose": "Microscopy validation session"},
         )
 
-        draft, _ = Draft.objects.get_or_create(
-            project=project, student=student, title="Graphene manuscript"
-        )
-        version, _ = DraftVersion.objects.get_or_create(
-            draft=draft,
-            project=project,
-            version_number=1,
-            defaults={"submitted_by": student, "content_reference": "manuscript-v1.pdf"},
-        )
         report, _ = WeeklyProgressReport.objects.get_or_create(
             project=project,
             student=student,
@@ -165,10 +156,10 @@ class Command(BaseCommand):
         )
         InlineComment.objects.get_or_create(
             project=project,
-            target_type="draft_version",
-            target_id=version.id,
+            target_type="progress_report",
+            target_id=report.id,
             author=advisor,
-            anchor="abstract",
+            anchor="summary",
             defaults={"body": "Clarify the primary contribution."},
         )
         Notification.objects.get_or_create(

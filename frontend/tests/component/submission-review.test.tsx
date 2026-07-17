@@ -2,18 +2,12 @@ import { screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
-import { DraftVersionHistory } from '../../src/features/submissions/DraftVersionHistory';
 import { ReviewQueuePage } from '../../src/features/submissions/ReviewQueuePage';
 import { ReviewStatusControl } from '../../src/features/submissions/ReviewStatusControl';
 import { WeeklyReportHistory } from '../../src/features/submissions/WeeklyReportHistory';
 import { renderWithClient } from './test-utils';
 
 describe('submission review UI', () => {
-  it('renders draft versions', () => {
-    renderWithClient(<DraftVersionHistory versions={[{ id: 1, versionNumber: 1, reviewStatus: 'pending_review' }]} />);
-    expect(screen.getByText(/Version 1/)).toBeInTheDocument();
-  });
-
   it('renders review status control', () => {
     renderWithClient(<ReviewStatusControl status="pending_review" />);
     expect(screen.getByLabelText('Review status')).toBeInTheDocument();
