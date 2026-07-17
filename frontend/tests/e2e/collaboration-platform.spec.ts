@@ -402,7 +402,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
 
   await test.step('notification degradation status', async () => {
     await page.goto('/projects/1');
-    await page.getByRole('link', { name: 'Open notifications' }).click();
+    await page.getByRole('button', { name: 'Open notifications' }).click();
     await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toContainText('Feedback available');
     await expect(page.getByRole('alert')).toContainText('SMTP provider unavailable');
   });

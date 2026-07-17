@@ -45,7 +45,7 @@ describe('role-aware navigation', () => {
     await screen.findByText('admin');
     expect(screen.getByRole('link', { name: 'Team' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects');
-    expect(screen.getByRole('link', { name: 'Open notifications' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open notifications' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.getByRole('banner')).toBeInTheDocument();

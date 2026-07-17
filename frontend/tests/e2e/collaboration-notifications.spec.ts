@@ -7,7 +7,7 @@ test('notification degradation flow exposes retry status', async ({ page }) => {
   if (fullStackE2E) {
     await loginAs(page);
     await page.goto('/projects/1');
-    await page.getByRole('link', { name: 'Open notifications' }).click();
+    await page.getByRole('button', { name: 'Open notifications' }).click();
     await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toContainText(
       'Pending review reminder',
     );
@@ -51,7 +51,7 @@ test('notification degradation flow exposes retry status', async ({ page }) => {
   });
 
   await page.goto('/projects/1');
-  await page.getByRole('link', { name: 'Open notifications' }).click();
+  await page.getByRole('button', { name: 'Open notifications' }).click();
 
   await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toContainText('Feedback available');
   await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toContainText('1 needs retry');

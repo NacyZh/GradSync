@@ -21,8 +21,9 @@ describe('project work UI', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'GradSync dashboard' })).toBeInTheDocument();
-    expect(screen.getByText(/Research group operations/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Resources' })).toBeInTheDocument();
+    expect(screen.getByText(/Review project work/)).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Primary actions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Notifications', exact: true })).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveAttribute('data-state', 'loading');
   });
 

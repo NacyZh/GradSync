@@ -35,10 +35,10 @@ test.describe('role workspaces', () => {
     await expect(
       page.getByLabel('Primary workspace').getByRole('link', { name: 'Projects' })
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Open notifications' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open notifications' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Switch to dark theme' })).toBeVisible();
 
-    await page.getByRole('link', { name: 'Manage accounts' }).click();
+    await page.getByRole('link', { name: 'Team' }).click();
     await expect(page).toHaveURL('/admin/accounts');
     await expect(page.getByRole('heading', { name: 'Account administration' })).toBeVisible();
   });

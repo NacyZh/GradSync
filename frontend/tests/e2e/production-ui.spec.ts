@@ -50,7 +50,7 @@ const routeCases = [
   { path: '/projects/1/resources', label: 'resource booking' },
   { path: '/projects/1/papers', label: 'paper library' },
   { path: '/projects/1/code', label: 'code repository' },
-  { path: '/', label: 'notifications dashboard' },
+  { path: '/', label: 'home dashboard' },
   { path: '/admin/accounts', label: 'account administration' },
 ];
 

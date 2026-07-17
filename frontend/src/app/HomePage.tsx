@@ -1,11 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
-import { Button } from '@/shared/ui/primitives/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
-
 import { useAuth } from '../features/auth/AuthProvider';
-import { NotificationList } from '../features/notifications/NotificationList';
 import { listProjects } from '../features/projects/api';
 import { AsyncState } from '../shared/ui/AsyncState';
 
@@ -25,43 +21,24 @@ export function HomePage() {
       <section className="page-heading dashboard-hero">
         <div>
           <h1>{role === 'student' ? 'Student workspace' : role === 'advisor' ? 'Advisor workspace' : 'GradSync dashboard'}</h1>
-          <p>Research group operations for projects, reviews, reports, bookings, and reminders.</p>
+          <p>{role === 'student' ? 'Open assigned projects and continue submission work.' : 'Review project work and keep active research moving.'}</p>
         </div>
-        <nav aria-label="Primary actions" className="action-row">
-          <Button asChild variant="outline"><Link to="/projects">Projects</Link></Button>
-          {(role === 'admin' || role === 'advisor') ? (
-            <Button asChild><Link to="/projects/new">New project</Link></Button>
-          ) : null}
-          {role === 'admin' ? (
-            <Button asChild variant="outline"><Link to="/admin/accounts">Manage accounts</Link></Button>
-          ) : null}
-          <Button asChild variant="outline"><Link to="/resources">Resources</Link></Button>
-        </nav>
       </section>
 
       {isLoadingUser ? <AsyncState state="loading" message="Loading account" /> : null}
 
       {user && (
-        <section className="dashboard-grid" aria-label="Application overview">
-          <Card>
-            <CardHeader>
-              <CardDescription>Projects</CardDescription>
-              <CardTitle className="text-2xl">{projects.length}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">visible workspaces</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Pending reviews</CardDescription>
-              <CardTitle className="text-2xl">{role === 'student' ? 'Track' : 'Review'}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">{role === 'student' ? 'drafts and reports' : 'student submissions'}</CardContent>
-          </Card>
-          <div id="notifications">
-            <NotificationList />
-          </div>
+        <section className="grid gap-4 xl:grid-cols-[minmax(24rem,1.25fr)_minmax(18rem,0.75fr)]" aria-label="Dashboard work overview">
           <article className="panel">
-            <h2>Your projects</h2>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2>Your projects</h2>
+                <p className="text-sm text-muted-foreground">{projects.length} visible workspaces</p>
+              </div>
+              {(role === 'admin' || role === 'advisor') ? (
+                <Link className="inline-action font-bold text-primary" to="/projects/new">New project</Link>
+              ) : null}
+            </div>
             {projectsQuery.isLoading ? <AsyncState state="loading" message="Loading projects" /> : null}
             {projectsQuery.error ? (
               <AsyncState state="error" message={projectsQuery.error.message} />
@@ -84,7 +61,7 @@ export function HomePage() {
           </article>
           {role === 'student' ? (
             <article className="panel">
-              <h2>Next actions</h2>
+              <h2>Student work queue</h2>
               <div className="workflow-list">
                 {projects[0] ? <Link to={`/projects/${projects[0].id}/drafts`}>Submit a draft</Link> : null}
                 {projects[0] ? <Link to={`/projects/${projects[0].id}/reports`}>Weekly reports</Link> : null}
@@ -93,32 +70,14 @@ export function HomePage() {
             </article>
           ) : (
             <article className="panel">
-              <h2>Review workflow</h2>
+              <h2>Advisor work queue</h2>
               <div className="workflow-list">
-                <Link to="/projects/new">Create project and memberships</Link>
                 <Link to="/resources">Reserve lab equipment or seats</Link>
                 {projects[0] ? <Link to={`/projects/${projects[0].id}/reviews`}>Open review queue</Link> : null}
+                {projects[0] ? <Link to={`/projects/${projects[0].id}`}>Open project dashboard</Link> : null}
               </div>
             </article>
           )}
-
-          <article className="panel">
-            <h2>System status</h2>
-            <dl className="status-list">
-              <div>
-                <dt>Account</dt>
-                <dd>{user.email}</dd>
-              </div>
-              <div>
-                <dt>Role</dt>
-                <dd>{user.global_role}</dd>
-              </div>
-              <div>
-                <dt>Visible projects</dt>
-                <dd>{projects.length}</dd>
-              </div>
-            </dl>
-          </article>
         </section>
       )}
     </>

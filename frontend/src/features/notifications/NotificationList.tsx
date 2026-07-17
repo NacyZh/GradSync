@@ -3,12 +3,13 @@ import { AlertCircle, BellRing, ExternalLink, MailCheck, RotateCcw } from 'lucid
 
 import { Badge } from '@/shared/ui/primitives/badge';
 import { Button } from '@/shared/ui/primitives/button';
+import { cn } from '@/shared/lib/utils';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { NotificationRecord } from './api';
 import { listNotifications, listProjectNotifications } from './api';
 
-export function NotificationList({ projectId }: { projectId?: number }) {
+export function NotificationList({ projectId, compact = false }: { projectId?: number; compact?: boolean }) {
   const notificationsQuery = useQuery({
     queryKey: ['notifications', projectId],
     queryFn: async () => {
@@ -23,7 +24,7 @@ export function NotificationList({ projectId }: { projectId?: number }) {
   const skippedCount = notifications.filter((notification) => notification.status === 'skipped').length;
 
   return (
-    <section className="panel notification-center" aria-labelledby="notifications-heading">
+    <section className={cn('panel notification-center', compact && 'rounded-md border-0 shadow-none')} aria-labelledby="notifications-heading">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="notifications-heading" className="flex items-center gap-2">
@@ -43,7 +44,7 @@ export function NotificationList({ projectId }: { projectId?: number }) {
       {!notificationsQuery.isLoading && !notificationsQuery.error && notifications.length === 0 ? (
         <DataState state="empty" title="No notifications" message="No delivery records are loaded." />
       ) : null}
-      <ul className="notification-list">
+      <ul className={cn('notification-list', compact && 'max-h-[26rem] overflow-auto')}>
         {notifications.map((notification) => (
           <NotificationRow key={notification.id} notification={notification} />
         ))}
