@@ -25,7 +25,7 @@ const workspaceCases: ViewportCase[] = [
     height: 950,
     path: '/projects/1',
     theme: 'light',
-    requiredRegions: ['Current tasks', 'Task details', 'Activity'],
+    requiredRegions: ['Current tasks', 'Task details', 'Pending reviews'],
   },
   {
     name: 'tablet-review-dark',

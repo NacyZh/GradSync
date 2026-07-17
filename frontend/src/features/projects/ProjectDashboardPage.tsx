@@ -11,7 +11,6 @@ import { DataState } from '../../shared/ui/DataState';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
-import { NotificationList } from '../notifications/NotificationList';
 import { TaskForm } from '../tasks/TaskForm';
 import { TaskStatusControl } from '../tasks/TaskStatusControl';
 import { TaskTree, type TaskNode } from '../tasks/TaskTree';
@@ -107,7 +106,7 @@ export function ProjectDashboardPage() {
   return (
     <PageShell
       title={project.title}
-      description="Dense project workspace for task planning, membership, review load, bookings, and activity."
+      description="Dense project workspace for task planning, membership, review load, and bookings."
       actions={
         <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
           <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Project status">
@@ -239,23 +238,7 @@ export function ProjectDashboardPage() {
             <DataState state="empty" title="No pending reviews" message="Drafts and reports needing advisor action will appear here." />
           )}
         </section>
-        <section className="panel" aria-label="Activity">
-          <h2>Recent activity</h2>
-          {project.activity?.length ? (
-            <ul className="timeline">
-              {project.activity.map((event, index) => (
-                <li key={`${event.eventType ?? event.event_type ?? 'event'}-${index}`}>
-                  <strong>{(event.eventType ?? event.event_type ?? 'activity').replaceAll('_', ' ')}</strong>
-                  <span>{event.summary}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <DataState state="empty" title="No activity yet" message="Task, submission, comment, booking, and notification events will appear here." />
-          )}
-        </section>
       </section>
-      <NotificationList projectId={projectId} />
     </PageShell>
   );
 }

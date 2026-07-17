@@ -48,7 +48,7 @@ test('archived project validation controls are available on dashboard', async ({
   await expect(page.getByRole('navigation', { name: 'Project workflow' })).toContainText('Reviews');
   await expect(page.getByRole('button', { name: 'Archive project' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reopen project' })).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'Activity' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Activity' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Archive project' }).click();
   await expect(page.getByRole('dialog', { name: 'Archive project?' })).toBeVisible();
   await page.getByRole('dialog', { name: 'Archive project?' }).getByRole('button', { name: 'Archive project' }).click();

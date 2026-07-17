@@ -22,7 +22,7 @@ test('advisor can enter projects from primary navigation', async ({ page }) => {
   }
 });
 
-test('advisor can create a project and dashboard shows isolated project activity', async ({ page }) => {
+test('advisor can create a project and dashboard shows isolated project work', async ({ page }) => {
   if (!fullStackE2E) {
     await page.route('**/api/projects/', async (route) => {
       if (route.request().method() === 'POST') {
@@ -55,8 +55,8 @@ test('advisor can create a project and dashboard shows isolated project activity
   await page.getByRole('link', { name: 'Update status' }).nth(1).click();
   await expect(page.getByRole('region', { name: 'Task details' })).toContainText('Priority: high');
   await expect(page.getByRole('region', { name: 'Pending reviews' })).toContainText(/Review progress_report #\d+/);
-  await expect(page.getByRole('region', { name: 'Activity' })).toContainText('Pending review reminder');
-  await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toContainText('Pending review reminder');
+  await expect(page.getByRole('region', { name: 'Activity' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toHaveCount(0);
   await page.getByLabel('Task status').selectOption('completed');
   await expect(page.getByRole('region', { name: 'Current tasks' }).getByRole('status')).toContainText('Task status updated');
 

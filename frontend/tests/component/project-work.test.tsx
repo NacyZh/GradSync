@@ -108,7 +108,7 @@ describe('project work UI', () => {
     expect(screen.getByText('in progress')).toBeInTheDocument();
   });
 
-  it('renders production project dashboard task, member, review, and activity regions', async () => {
+  it('renders production project dashboard task, member, and review regions', async () => {
     const requests: RequestInit[] = [];
     vi.stubGlobal(
       'fetch',
@@ -199,7 +199,8 @@ describe('project work UI', () => {
     expect(screen.getByRole('button', { name: 'Archive project' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete project' })).toBeDisabled();
     expect(screen.getByRole('region', { name: 'Pending reviews' })).toHaveTextContent('Review progress_report #4');
-    expect(screen.getByRole('region', { name: 'Activity' })).toHaveTextContent('Pending review reminder');
+    expect(screen.queryByRole('region', { name: 'Activity' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Notifications', exact: true })).not.toBeInTheDocument();
     vi.unstubAllGlobals();
   });
 

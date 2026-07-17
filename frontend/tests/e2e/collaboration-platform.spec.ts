@@ -290,7 +290,7 @@ async function mockCollaborationApi(page: Page) {
     }
     await fulfillJson(route, { results: [] });
   });
-  await page.route('**/api/projects/1/notifications/', async (route) => {
+  await page.route('**/api/notifications', async (route) => {
     await fulfillJson(route, { results: [{ id: 31, project_id: 1, event_type: 'teacher_feedback_available', target_type: 'TeacherFeedback', target_id: '17', subject: 'Feedback available', action_path: '/writing', status: 'retry_needed', eligible_at: '2026-07-03T09:05:00Z', last_attempt_at: '2026-07-03T09:00:00Z', retry_count: 1, failure_reason: 'SMTP provider unavailable' }] });
   });
 
@@ -402,6 +402,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
 
   await test.step('notification degradation status', async () => {
     await page.goto('/projects/1');
+    await page.getByRole('link', { name: 'Open notifications' }).click();
     await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toContainText('Feedback available');
     await expect(page.getByRole('alert')).toContainText('SMTP provider unavailable');
   });

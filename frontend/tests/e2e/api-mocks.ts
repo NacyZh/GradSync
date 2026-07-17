@@ -325,6 +325,13 @@ export async function mockAuthenticatedApi(page: Page) {
       },
     });
   });
+  await page.route('**/api/notifications', async (route) => {
+    await route.fulfill({
+      json: {
+        results: [{ id: 1, event_type: 'pending_review', target_type: 'progress_report', target_id: '21', subject: 'Pending review reminder', action_path: '/projects/1/reviews', status: 'queued', eligible_at: '2026-06-25T08:05:00Z' }],
+      },
+    });
+  });
   await page.route('**/api/projects/1/events/', async (route) => {
     await fulfillJson(route, { results: [] });
   });

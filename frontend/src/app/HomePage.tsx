@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
-import { Badge } from '@/shared/ui/primitives/badge';
 import { Button } from '@/shared/ui/primitives/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
 
 import { useAuth } from '../features/auth/AuthProvider';
+import { NotificationList } from '../features/notifications/NotificationList';
 import { listProjects } from '../features/projects/api';
 import { AsyncState } from '../shared/ui/AsyncState';
 
@@ -57,13 +57,9 @@ export function HomePage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">{role === 'student' ? 'drafts and reports' : 'student submissions'}</CardContent>
           </Card>
-          <Card id="notifications">
-            <CardHeader>
-              <CardDescription>Notifications</CardDescription>
-              <CardTitle className="text-2xl">Live</CardTitle>
-            </CardHeader>
-            <CardContent><Badge variant="success">delivery status and reminders</Badge></CardContent>
-          </Card>
+          <div id="notifications">
+            <NotificationList />
+          </div>
           <article className="panel">
             <h2>Your projects</h2>
             {projectsQuery.isLoading ? <AsyncState state="loading" message="Loading projects" /> : null}
