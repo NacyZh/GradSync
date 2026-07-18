@@ -107,11 +107,11 @@ export function ProjectDashboardPage() {
       title={project.title}
       description="Dense project workspace for task planning, membership, review load, and bookings."
       actions={
-        <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
+        <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Project status">
             <StatusBadge status={project.status} />
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Project actions">
+          <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end" aria-label="Project actions">
             {capabilities.canArchiveProject ? (
               <Button variant="destructive" type="button" onClick={onArchive} disabled={archiveMutation.isPending}>
                 <Archive className="h-4 w-4" aria-hidden="true" />
@@ -165,7 +165,7 @@ export function ProjectDashboardPage() {
       </section>
 
       <div className="grid min-w-0 gap-4 overflow-hidden xl:grid-cols-[minmax(18rem,0.9fr)_minmax(22rem,1fr)_minmax(18rem,0.75fr)]">
-        <section className="panel grid h-[min(34rem,calc(100vh-12rem))] min-h-[28rem] grid-rows-[auto_1fr] overflow-hidden" aria-label="Current tasks">
+        <section className="panel grid min-h-0 grid-rows-[auto_1fr] overflow-hidden xl:h-[min(34rem,calc(100vh-12rem))] xl:min-h-[28rem]" aria-label="Current tasks">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2>Task plan</h2>
@@ -191,7 +191,7 @@ export function ProjectDashboardPage() {
             <DataState state="empty" title="No tasks" message="No tasks are defined for this project." />
           )}
         </section>
-        <section className="panel grid h-[min(34rem,calc(100vh-12rem))] min-h-[28rem] grid-rows-[auto_1fr] overflow-hidden" aria-label="Task details">
+        <section className="panel grid min-h-0 grid-rows-[auto_1fr] overflow-hidden xl:h-[min(34rem,calc(100vh-12rem))] xl:min-h-[28rem]" aria-label="Task details">
           <h2>Task details</h2>
           {primaryTask ? (
             <article className="mt-4 grid min-h-0 gap-3 overflow-y-auto rounded-lg border bg-muted/40 p-4">
@@ -227,7 +227,7 @@ export function ProjectDashboardPage() {
             <DataState state="empty" title="No task selected" message="Select or create a task to start planning." />
           )}
         </section>
-        <aside className="panel h-[min(34rem,calc(100vh-12rem))] min-h-[28rem] min-w-0 overflow-y-auto" aria-label="Members and progress">
+        <aside className="panel min-h-0 min-w-0 overflow-y-auto xl:h-[min(34rem,calc(100vh-12rem))] xl:min-h-[28rem]" aria-label="Members and progress">
           <h2>Members and progress</h2>
           <div className="my-4 grid place-items-center">
             <div
