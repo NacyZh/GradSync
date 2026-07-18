@@ -1,5 +1,6 @@
 import { Button } from '@/shared/ui/primitives/button';
 
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { useI18n } from '../i18n/I18nProvider';
 import { usePaperImportReview, type PaperImportJob, type PaperRecord } from './api';
 
@@ -19,6 +20,19 @@ function basisText(value: string | undefined, noMatchLabel: string) {
   return value.replaceAll('_', ' ');
 }
 
+function reviewResultText(job: PaperImportJob, t: ReturnType<typeof useI18n>['t']) {
+  if (job.status === 'accepted' && job.acceptedPaper) {
+    return `${t('paperLibraryAcceptedPrefix')} ${paperTitle(job.acceptedPaper, t('paperLibraryCandidateUnavailable'))}`;
+  }
+  if (job.status === 'duplicate' && job.duplicatePaper) {
+    return `${t('paperLibraryDuplicatePrefix')} ${paperTitle(job.duplicatePaper, t('paperLibraryCandidateUnavailable'))}`;
+  }
+  if (job.status === 'maintainer_review') {
+    return t('paperLibraryMaintainerReviewRequired');
+  }
+  return job.userMessage || job.status.replaceAll('_', ' ');
+}
+
 export function DuplicateReviewPanel({
   job,
   isMaintainer = false,
@@ -26,6 +40,7 @@ export function DuplicateReviewPanel({
   onSelectPaper,
 }: DuplicateReviewPanelProps) {
   const { t } = useI18n();
+  const { notify } = useAppFeedback();
   const reviewMutation = usePaperImportReview();
   if (!job || !job.duplicateDetection) return null;
 
@@ -36,8 +51,13 @@ export function DuplicateReviewPanel({
 
   async function review(decision: 'confirm_duplicate' | 'confirm_distinct') {
     if (!job) return;
-    const result = await reviewMutation.mutateAsync({ importJobId: job.id, decision });
-    onReviewed?.(result);
+    try {
+      const result = await reviewMutation.mutateAsync({ importJobId: job.id, decision });
+      notify(reviewResultText(result, t), result.status === 'failed' || result.status === 'rejected' ? 'error' : 'success');
+      onReviewed?.(result);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : t('paperLibraryProcessingFailed'), 'error');
+    }
   }
 
   return (
@@ -87,11 +107,6 @@ export function DuplicateReviewPanel({
             {t('paperLibraryConfirmDistinct')}
           </Button>
         </div>
-      ) : null}
-      {reviewMutation.error ? (
-        <p role="alert" className="font-medium text-destructive">
-          {reviewMutation.error.message}
-        </p>
       ) : null}
     </section>
   );

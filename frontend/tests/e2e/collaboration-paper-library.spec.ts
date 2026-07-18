@@ -1064,7 +1064,7 @@ test('shared paper library search and download does not require project membersh
       buffer: Buffer.from('%PDF-1.4'),
     });
     await page.getByRole('button', { name: 'Import PDF' }).click();
-    await expect(page.getByText('Accepted: Extracted Local PDF Title')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Accepted: Extracted Local PDF Title' }).first()).toBeVisible();
     await page.getByPlaceholder('Search title, author, year, keyword').fill('Extracted');
     await expect(page.getByRole('button', { name: /Select paper Extracted Local PDF Title/ })).toBeVisible();
 
@@ -1074,7 +1074,7 @@ test('shared paper library search and download does not require project membersh
       buffer: Buffer.from('%PDF-1.4 duplicate'),
     });
     await page.getByRole('button', { name: 'Import PDF' }).click();
-    await expect(page.getByText('Duplicate: Graph Neural Methods for Research Groups')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Duplicate: Graph Neural Methods for Research Groups' }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'View existing paper' })).toBeVisible();
 
     await page.getByLabel('PDF file').setInputFiles({
@@ -1087,7 +1087,7 @@ test('shared paper library search and download does not require project membersh
       page.getByRole('status').filter({ hasText: 'Maintainer review required' }).first(),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Confirm duplicate' }).click();
-    await expect(page.getByText('Duplicate: Graph Neural Methods for Research Groups')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Duplicate: Graph Neural Methods for Research Groups' }).first()).toBeVisible();
 
     await page.getByLabel('PDF file').setInputFiles({
       name: 'fuzzy-distinct.pdf',
@@ -1099,6 +1099,6 @@ test('shared paper library search and download does not require project membersh
       page.getByRole('status').filter({ hasText: 'Maintainer review required' }).first(),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Confirm distinct' }).click();
-    await expect(page.getByText('Accepted: Graph Neural Method for Research Group Distinct')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Accepted: Graph Neural Method for Research Group Distinct' }).first()).toBeVisible();
   }
 });
