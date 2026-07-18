@@ -22,7 +22,7 @@ from .legacy_link_services import resolve_legacy_project_link
 from .material_services import (
     change_project_material_visibility,
     create_project_material,
-    describe_project_material_download,
+    project_material_download_response,
     project_material_queryset_for,
 )
 from .models import ProjectMaterial, ProjectMembership, ResearchProject
@@ -347,7 +347,7 @@ class ProjectViewSet(
     @extend_schema(
         methods=["POST"],
         responses={
-            200: OpenApiResponse(description="Project material download descriptor"),
+            200: OpenApiResponse(description="Project material file download"),
             401: OpenApiResponse(description="Authentication required"),
             403: OpenApiResponse(description="Download forbidden"),
             404: OpenApiResponse(description="Project material not found"),
@@ -356,14 +356,14 @@ class ProjectViewSet(
     )
     @action(
         detail=True,
-        methods=["post"],
+        methods=["get", "post"],
         url_path="materials/(?P<material_id>[^/.]+)/download",
     )
     def material_download(self, request, pk=None, material_id=None):
         project = self.get_object()
         material = get_object_or_404(ProjectMaterial, source_project=project, pk=material_id)
         try:
-            return Response(describe_project_material_download(request.user, material))
+            return project_material_download_response(request.user, material)
         except (DjangoPermissionDenied, PermissionError) as exc:
             raise PermissionDenied(str(exc)) from exc
         except DownloadUnavailable as exc:

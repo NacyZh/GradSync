@@ -1,4 +1,5 @@
 import { apiRequest } from '../../shared/api/client';
+import { downloadFile, type DownloadDescriptor } from '../../shared/api/downloads';
 
 export type ProjectMaterial = {
   id: string;
@@ -160,8 +161,12 @@ export function searchStudents(query: string, projectId?: number) {
   return apiRequest<StudentOption[]>(`/api/accounts/students/?${params.toString()}`);
 }
 
-export function listProjectMaterials(projectId: number) {
-  return apiRequest<{ count: number; results: ProjectMaterial[] }>(`/api/projects/${projectId}/materials/`);
+export function listProjectMaterials(projectId: number, filters: { type?: ProjectMaterial['materialType']; search?: string } = {}) {
+  const params = new URLSearchParams();
+  if (filters.type) params.set('type', filters.type);
+  if (filters.search?.trim()) params.set('q', filters.search.trim());
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest<{ count: number; results: ProjectMaterial[] }>(`/api/projects/${projectId}/materials/${suffix}`);
 }
 
 export function createProjectMaterial(projectId: number, payload: { materialType: ProjectMaterial['materialType']; file: File; title?: string; visibility: ProjectMaterial['visibility'] }) {
@@ -184,8 +189,5 @@ export function updateProjectMaterialVisibility(projectId: number, materialId: s
 }
 
 export function downloadProjectMaterial(projectId: number, materialId: string) {
-  return apiRequest<{ filename: string; deliveryMode: 'direct_response' | 'signed_url'; url: string; expiresAt: string }>(
-    `/api/projects/${projectId}/materials/${materialId}/download/`,
-    { method: 'POST' },
-  );
+  return downloadFile(`/api/projects/${projectId}/materials/${materialId}/download/`, 'project-material') as Promise<DownloadDescriptor>;
 }

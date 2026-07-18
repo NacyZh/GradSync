@@ -6,12 +6,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProjectMaterialsPage } from '../../src/features/projects/ProjectMaterialsPage';
 import { renderWithClient } from './test-utils';
 
-function mockFetch(handler: (url: string, init?: RequestInit) => { payload: unknown; status?: number }) {
+function mockFetch(handler: (url: string, init?: RequestInit) => { payload?: unknown; body?: BodyInit; status?: number; headers?: HeadersInit }) {
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const { payload, status = 200 } = handler(String(input), init);
-    return new Response(JSON.stringify(payload), {
+    const { payload, body, status = 200, headers } = handler(String(input), init);
+    return new Response(body ?? JSON.stringify(payload), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers ?? { 'Content-Type': 'application/json' },
     });
   }) as typeof fetch;
 }
@@ -109,6 +109,36 @@ describe('project materials UI', () => {
     expect(screen.queryByRole('button', { name: 'Set group-wide' })).not.toBeInTheDocument();
   });
 
+  it('filters project materials by category and search text', async () => {
+    const requests: string[] = [];
+    mockFetch((url) => {
+      requests.push(url);
+      return {
+        payload: {
+          count: 1,
+          results: [{
+            id: '46',
+            materialType: 'code',
+            backingRecordId: '12',
+            displayName: 'Analysis Code',
+            sourceProject: { id: '1', title: 'Boundary Project' },
+            visibility: 'project-only',
+            classificationState: 'active',
+            actionCapabilities: { canView: true, canDownload: true, canChangeVisibility: false },
+          }],
+        },
+      };
+    });
+
+    renderProjectMaterials();
+
+    await screen.findByText('Analysis Code');
+    await userEvent.click(screen.getByRole('tab', { name: 'Show Code materials' }));
+    await userEvent.type(screen.getByLabelText('Search project materials'), 'analysis');
+
+    await waitFor(() => expect(requests.some((request) => request.includes('type=code') && request.includes('q=analysis'))).toBe(true));
+  });
+
   it('uses the shared file picker pattern and clears a selected material', async () => {
     mockFetch(() => ({ payload: { count: 0, results: [] } }));
     renderProjectMaterials();
@@ -123,10 +153,21 @@ describe('project materials UI', () => {
 
   it('downloads permitted project materials and reports unavailable errors', async () => {
     const requests: string[] = [];
+    const createObjectURL = vi.fn(() => 'blob:project-material');
+    const revokeObjectURL = vi.fn();
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
     mockFetch((url, init) => {
       requests.push(`${init?.method ?? 'GET'} ${url}`);
       if (url.includes('/download/')) {
-        return { payload: { filename: 'Protocol.pdf', deliveryMode: 'direct_response', url: '', expiresAt: '2026-07-15T00:00:00Z' } };
+        return {
+          body: 'project material',
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="Protocol.pdf"',
+          },
+        };
       }
       return {
         payload: {
@@ -165,6 +206,8 @@ describe('project materials UI', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Download Protocol' }));
 
     await waitFor(() => expect(requests.some((request) => request.includes('/download/'))).toBe(true));
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
     expect(await screen.findByText('Download ready: Protocol.pdf')).toBeInTheDocument();
   });
 

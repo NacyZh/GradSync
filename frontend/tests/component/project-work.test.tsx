@@ -174,11 +174,11 @@ describe('project work UI', () => {
               canEditProject: true,
               canArchiveProject: true,
               canReopenProject: false,
-              canDeleteProject: false,
+              canDeleteProject: true,
               canManageMembers: true,
               canCreateTasks: true,
               canUpdateTasks: true,
-              deleteDisabledReason: 'Projects with research activity must be archived instead of deleted',
+              deleteDisabledReason: '',
             },
             memberships: [
               { id: 1, project_id: 1, user_id: 7, nickname: 'Student One', role: 'student', status: 'active' },
@@ -234,8 +234,8 @@ describe('project work UI', () => {
       assignee_ids: [7, 8],
     });
     expect(screen.getByRole('button', { name: 'Archive project' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete empty project' })).toBeDisabled();
-    expect(screen.getByText(/Use archive for projects with research activity/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete project' })).toBeEnabled();
+    expect(screen.queryByText(/Use archive for projects with research activity/)).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Pending reviews' })).toHaveTextContent('Review progress_report #4');
     expect(screen.queryByRole('region', { name: 'Activity' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Notifications', exact: true })).not.toBeInTheDocument();

@@ -47,11 +47,11 @@ export const selectedProject = {
     canEditProject: true,
     canArchiveProject: true,
     canReopenProject: false,
-    canDeleteProject: false,
+    canDeleteProject: true,
     canManageMembers: true,
     canCreateTasks: true,
     canUpdateTasks: true,
-    deleteDisabledReason: 'Projects with research activity must be archived instead of deleted',
+    deleteDisabledReason: '',
   },
   memberships: [
     {

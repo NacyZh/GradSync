@@ -1,4 +1,6 @@
 import pytest
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.projects.models import ProjectMaterial
@@ -13,6 +15,12 @@ from tests.helpers import authenticate
 
 def _pdf(name="protocol.pdf", body=b"project-material"):
     return SimpleUploadedFile(name, body, content_type="application/pdf")
+
+
+def _put_file(storage_key: str, content: bytes = b"project material"):
+    if default_storage.exists(storage_key):
+        default_storage.delete(storage_key)
+    default_storage.save(storage_key, ContentFile(content))
 
 
 @pytest.mark.django_db
@@ -76,11 +84,12 @@ def test_project_material_visibility_change_denies_ordinary_member(api_client):
 
 
 @pytest.mark.django_db
-def test_project_material_download_contract_authorized_for_descriptor(api_client):
+def test_project_material_download_contract_authorized_for_file_response(api_client):
     advisor = active_teacher()
     student = active_student()
     project = project_with_members(advisor=advisor, students=[student])
     document = project_only_document(project)
+    _put_file(document.document_file.stored_name)
     material = ProjectMaterial.objects.create(
         source_project=project,
         material_type=ProjectMaterial.MaterialType.DOCUMENT,
@@ -96,8 +105,7 @@ def test_project_material_download_contract_authorized_for_descriptor(api_client
     )
 
     assert response.status_code == 200
-    assert response.data["deliveryMode"] == "direct_response"
-    assert response.data["filename"]
+    assert response.headers["Content-Disposition"].startswith("attachment;")
 
 
 @pytest.mark.django_db

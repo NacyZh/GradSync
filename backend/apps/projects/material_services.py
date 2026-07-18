@@ -8,7 +8,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit.boundary_events import record_boundary_event
-from apps.common.downloads import DownloadUnavailable
+from apps.common.downloads import DownloadUnavailable, storage_file_download_response
 from apps.common.file_services import store_uploaded_file
 from apps.common.models import UploadedFile
 from apps.library.models.documents import DocumentCategory, DocumentRecord
@@ -274,6 +274,53 @@ def describe_project_material_download(user, material: ProjectMaterial) -> dict:
         from apps.repositories.download_services import describe_code_artifact_download
 
         return describe_code_artifact_download(user, record)
+    raise DownloadUnavailable("Project material is no longer available")
+
+
+def project_material_download_response(user, material: ProjectMaterial):
+    _require_project_member_or_admin(user, material.source_project)
+    record = backing_record_for(material)
+    if record is None or not project_material_download_available(material):
+        raise DownloadUnavailable("Project material is no longer available")
+    if material.material_type == ProjectMaterial.MaterialType.DOCUMENT:
+        describe_project_material_download(user, material)
+        return storage_file_download_response(
+            record.document_file.stored_name,
+            filename=record.document_file.original_filename,
+            content_type=record.document_file.content_type or "application/octet-stream",
+        )
+    if material.material_type == ProjectMaterial.MaterialType.PAPER:
+        describe_project_material_download(user, material)
+        if getattr(record, "uploaded_file_id", None):
+            return storage_file_download_response(
+                record.uploaded_file.stored_name,
+                filename=record.uploaded_file.original_filename,
+                content_type=record.uploaded_file.content_type or "application/pdf",
+            )
+        attachment = record.attachments.filter(status="active").first()
+        if attachment is None:
+            raise DownloadUnavailable("Project material is no longer available")
+        return storage_file_download_response(
+            attachment.storage_key,
+            filename=attachment.filename,
+            content_type=attachment.content_type or "application/pdf",
+        )
+    if material.material_type == ProjectMaterial.MaterialType.CODE:
+        describe_project_material_download(user, material)
+        if getattr(record, "archive_file_id", None):
+            return storage_file_download_response(
+                record.archive_file.stored_name,
+                filename=record.archive_file.original_filename,
+                content_type=record.archive_file.content_type or "application/octet-stream",
+            )
+        version = record.versions.filter(status=CodeArtifactVersion.Status.ACTIVE).first()
+        if version is None:
+            raise DownloadUnavailable("Project material is no longer available")
+        return storage_file_download_response(
+            version.storage_key,
+            filename=version.filename,
+            content_type=version.content_type or "application/octet-stream",
+        )
     raise DownloadUnavailable("Project material is no longer available")
 
 

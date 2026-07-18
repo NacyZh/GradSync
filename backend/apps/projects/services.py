@@ -74,11 +74,6 @@ class ProjectService:
 
     def delete_project(self, project: ResearchProject) -> None:
         ensure_project_advisor(self.actor, project)
-        blockers = project_delete_blockers(project)
-        if blockers:
-            raise ValidationError(
-                "Projects with research activity cannot be deleted; archive the project instead"
-            )
         project.delete()
 
     def reopen_project(self, project: ResearchProject) -> ResearchProject:
@@ -192,41 +187,19 @@ def can_manage_project(user, project: ResearchProject) -> bool:
     ).exists()
 
 
-def project_delete_blockers(project: ResearchProject) -> list[str]:
-    checks = {
-        "tasks": project.tasks,
-        "materials": project.materials,
-        "drafts": project.drafts,
-        "draft versions": project.draft_versions,
-        "weekly reports": project.weekly_reports,
-        "comments": project.inline_comments,
-        "writing projects": project.writing_projects,
-        "bookings": project.bookings,
-        "paper records": project.paper_records,
-        "document records": project.document_records,
-        "code artifacts": project.code_artifacts,
-    }
-    return [label for label, manager in checks.items() if manager.exists()]
-
-
 def project_capabilities(user, project: ResearchProject) -> dict:
     can_manage = can_manage_project(user, project)
     writable = project.status == ResearchProject.Status.ACTIVE
-    delete_blockers = project_delete_blockers(project)
     return {
         "canManageProject": can_manage,
         "canEditProject": can_manage,
         "canArchiveProject": can_manage and writable,
         "canReopenProject": can_manage and project.status == ResearchProject.Status.ARCHIVED,
-        "canDeleteProject": can_manage and not delete_blockers,
+        "canDeleteProject": can_manage,
         "canManageMembers": can_manage and writable,
         "canCreateTasks": can_manage and writable,
         "canUpdateTasks": can_manage and writable,
-        "deleteDisabledReason": (
-            "Projects with research activity must be archived instead of deleted"
-            if can_manage and delete_blockers
-            else ""
-        ),
+        "deleteDisabledReason": "",
     }
 
 

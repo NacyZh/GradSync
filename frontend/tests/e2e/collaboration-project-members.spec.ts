@@ -18,11 +18,11 @@ test.beforeEach(async ({ page }) => {
         canEditProject: true,
         canArchiveProject: true,
         canReopenProject: false,
-        canDeleteProject: false,
+        canDeleteProject: true,
         canManageMembers: true,
         canCreateTasks: true,
         canUpdateTasks: true,
-        deleteDisabledReason: 'Projects with research activity must be archived instead of deleted',
+        deleteDisabledReason: '',
       },
       memberships: [
         { id: 1, projectId: 1, userId: 10, nickname: 'Advisor One', email: 'advisor@example.edu', role: 'advisor', status: 'active' },

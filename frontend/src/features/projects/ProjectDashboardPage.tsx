@@ -63,7 +63,7 @@ export function ProjectDashboardPage() {
   async function onDelete() {
     const ok = await confirm({
       title: 'Delete project?',
-      message: 'Only empty projects can be deleted. Projects with tasks, materials, submissions, comments, or bookings should be archived instead.',
+      message: 'This permanently deletes the project and its project-scoped tasks, materials, submissions, comments, bookings, and notifications. This action cannot be undone.',
       actionLabel: 'Delete project',
     });
     if (ok) deleteMutation.mutate();
@@ -135,13 +135,13 @@ export function ProjectDashboardPage() {
                 title={capabilities.canDeleteProject ? undefined : capabilities.deleteDisabledReason}
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
-                Delete empty project
+                Delete project
               </Button>
             ) : null}
           </div>
           {capabilities.canManageProject && !capabilities.canDeleteProject && capabilities.deleteDisabledReason ? (
             <p className="max-w-sm text-right text-xs text-muted-foreground">
-              {capabilities.deleteDisabledReason}. Use archive for projects with research activity.
+              {capabilities.deleteDisabledReason}
             </p>
           ) : null}
         </div>

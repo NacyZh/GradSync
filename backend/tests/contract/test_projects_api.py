@@ -1,4 +1,6 @@
 import pytest
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 
 from apps.audit.services import record_event
 from apps.projects.models import ProjectMaterial, ProjectMembership, ResearchProject
@@ -6,6 +8,12 @@ from apps.tasks.models import Task
 from tests.factories.accounts import UserFactory
 from tests.factories.shared_workspace import project_only_document
 from tests.helpers import authenticate
+
+
+def _put_file(storage_key: str, content: bytes = b"project material"):
+    if default_storage.exists(storage_key):
+        default_storage.delete(storage_key)
+    default_storage.save(storage_key, ContentFile(content))
 
 
 @pytest.mark.django_db
@@ -87,17 +95,17 @@ def test_advisor_can_delete_empty_project(api_client):
 
 
 @pytest.mark.django_db
-def test_project_delete_rejects_research_activity(api_client):
+def test_advisor_can_delete_project_with_research_activity_after_confirmation(api_client):
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Active Project", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
-    Task.objects.create(project=project, title="Real work", created_by=advisor)
+    task = Task.objects.create(project=project, title="Real work", created_by=advisor)
 
     response = authenticate(api_client, advisor).delete(f"/api/projects/{project.id}/")
 
-    assert response.status_code == 400
-    assert "archive" in response.json()["message"]
-    assert ResearchProject.objects.filter(id=project.id).exists()
+    assert response.status_code == 204
+    assert not ResearchProject.objects.filter(id=project.id).exists()
+    assert not Task.objects.filter(id=task.id).exists()
 
 
 @pytest.mark.django_db
@@ -223,11 +231,12 @@ def test_project_material_list_includes_download_capability(api_client):
 
 
 @pytest.mark.django_db
-def test_project_material_download_returns_descriptor(api_client):
+def test_project_material_download_returns_file_response(api_client):
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Scoped", advisor=advisor)
     ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
     document = project_only_document(project)
+    _put_file(document.document_file.stored_name)
     material = ProjectMaterial.objects.create(
         source_project=project,
         material_type=ProjectMaterial.MaterialType.DOCUMENT,
@@ -243,6 +252,4 @@ def test_project_material_download_returns_descriptor(api_client):
     )
 
     assert response.status_code == 200
-    payload = response.json()
-    assert payload["deliveryMode"] == "direct_response"
-    assert payload["filename"]
+    assert response.headers["Content-Disposition"].startswith("attachment;")

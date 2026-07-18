@@ -33,17 +33,19 @@ async function mockDocumentLibrary(page: Page) {
     });
   });
   await page.route('**/api/projects/1/materials/44/download/', async (route) => {
-    await fulfillJson(route, {
-      filename: 'Project Protocol.pdf',
-      deliveryMode: 'direct_response',
-      url: '',
-      expiresAt: '2026-07-15T00:00:00Z',
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename="Project Protocol.pdf"',
+      },
+      body: Buffer.from('project document'),
     });
   });
   await page.route('**/api/projects/1/materials/45/download/', async (route) => {
     await fulfillJson(route, { message: 'Project material is no longer available' }, 410);
   });
-  await page.route('**/api/projects/1/materials/', async (route) => {
+  await page.route(/\/api\/projects\/1\/materials\/(\?.*)?$/, async (route) => {
     await fulfillJson(route, {
       count: 1,
       results: [
@@ -197,7 +199,12 @@ test('project material document download stays inside project materials workspac
   await page.goto('/projects/1/materials');
   await expect(page.getByRole('heading', { name: 'Project materials' })).toBeVisible();
   await expect(page.getByText('Project Protocol', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Material category')).toBeVisible();
+  await expect(page.getByLabel('Search project materials')).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download Project Protocol' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Project Protocol.pdf');
   await expect(page.getByText('Download ready: Project Protocol.pdf', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Download Stale Project Protocol' }).click();
   await expect(page.getByText('Project material is no longer available', { exact: true })).toBeVisible();

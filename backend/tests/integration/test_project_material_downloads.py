@@ -1,4 +1,6 @@
 import pytest
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 
 from apps.audit.models import AuditEvent, DownloadEvent
 from apps.projects.models import ProjectMaterial
@@ -25,6 +27,12 @@ def _material(project, record, material_type):
     )
 
 
+def _put_file(storage_key: str, content: bytes = b"project material"):
+    if default_storage.exists(storage_key):
+        default_storage.delete(storage_key)
+    default_storage.save(storage_key, ContentFile(content))
+
+
 @pytest.mark.django_db
 def test_project_material_downloads_document_paper_and_code_with_audit(api_client):
     advisor = active_teacher()
@@ -37,7 +45,10 @@ def test_project_material_downloads_document_paper_and_code_with_audit(api_clien
         visibility="project_members",
     )
     code = group_wide_project_code(project, visibility="project_members")
-    CodeArtifactVersionFactory(artifact=code, project=project)
+    code_version = CodeArtifactVersionFactory(artifact=code, project=project)
+    _put_file(document.document_file.stored_name)
+    _put_file(paper.uploaded_file.stored_name)
+    _put_file(code_version.storage_key)
     materials = [
         _material(project, document, ProjectMaterial.MaterialType.DOCUMENT),
         _material(project, paper, ProjectMaterial.MaterialType.PAPER),
@@ -48,7 +59,7 @@ def test_project_material_downloads_document_paper_and_code_with_audit(api_clien
     for material in materials:
         response = client.post(f"/api/projects/{project.id}/materials/{material.id}/download/")
         assert response.status_code == 200
-        assert response.data["filename"]
+        assert response.headers["Content-Disposition"].startswith("attachment;")
 
     assert DownloadEvent.objects.filter(project=project, actor=student).count() == 3
     assert (

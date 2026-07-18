@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, FileUp, FolderOpen, X } from 'lucide-react';
+import { Code2, Download, FileText, FileUp, FolderOpen, Newspaper, Search, X } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 
@@ -27,6 +27,8 @@ export function ProjectMaterialsPage() {
   const liveRefresh = useProjectLiveRefresh(projectId);
   const [title, setTitle] = useState('');
   const [materialType, setMaterialType] = useState<ProjectMaterial['materialType']>('document');
+  const [materialFilter, setMaterialFilter] = useState<ProjectMaterial['materialType']>('document');
+  const [materialSearch, setMaterialSearch] = useState('');
   const [visibility, setVisibility] = useState<ProjectMaterial['visibility']>('project-only');
   const [file, setFile] = useState<File | undefined>();
   const [error, setError] = useState('');
@@ -37,8 +39,8 @@ export function ProjectMaterialsPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
   const materialsQuery = useQuery({
-    queryKey: ['projectMaterials', projectId],
-    queryFn: () => listProjectMaterials(projectId),
+    queryKey: ['projectMaterials', projectId, materialFilter, materialSearch],
+    queryFn: () => listProjectMaterials(projectId, { type: materialFilter, search: materialSearch }),
     enabled: Boolean(projectId),
   });
   const createMutation = useMutation({
@@ -71,6 +73,13 @@ export function ProjectMaterialsPage() {
       setError(err instanceof Error ? err.message : 'Project material upload failed');
     }
   }
+
+  const materialCategories: Array<{ value: ProjectMaterial['materialType']; label: string; icon: typeof FileText }> = [
+    { value: 'document', label: 'Document', icon: FileText },
+    { value: 'code', label: 'Code', icon: Code2 },
+    { value: 'paper', label: 'Paper', icon: Newspaper },
+  ];
+  const filteredMaterials = materialsQuery.data?.results ?? [];
 
   return (
     <PageShell title="Project materials" description="Project-owned papers, code, and documents with controlled project-only or group-wide visibility.">
@@ -120,18 +129,56 @@ export function ProjectMaterialsPage() {
           </form>
         </section>
 
-        <section className="panel" aria-label="Project material list">
-          <h2>Materials</h2>
+        <section className="panel grid h-[min(36rem,calc(100vh-10rem))] min-h-[30rem] grid-rows-[auto_auto_auto_1fr] overflow-hidden" aria-label="Project material list">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2>Materials</h2>
+              <p className="text-sm text-muted-foreground">{materialsQuery.data?.count ?? 0} {materialFilter} materials</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3">
+            <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Material category">
+              {materialCategories.map((category) => {
+                const Icon = category.icon;
+                const active = materialFilter === category.value;
+                return (
+                  <Button
+                    key={category.value}
+                    type="button"
+                    variant={active ? 'default' : 'outline'}
+                    className="min-w-0 px-2"
+                    role="tab"
+                    aria-selected={active}
+                    aria-label={`Show ${category.label} materials`}
+                    onClick={() => setMaterialFilter(category.value)}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{category.label}</span>
+                  </Button>
+                );
+              })}
+            </div>
+            <label className="relative block min-w-0">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                aria-label="Search project materials"
+                className="pl-9"
+                value={materialSearch}
+                onChange={(event) => setMaterialSearch(event.target.value)}
+                placeholder={`Search ${materialFilter} materials`}
+              />
+            </label>
+          </div>
           {liveRefresh.state === 'stale' ? (
             <DataState state="warning" title="Materials may be stale" message="Last successful material list is still visible while live refresh retries." />
           ) : null}
           {materialsQuery.isLoading ? <DataState state="loading" title="Loading materials" message="Loading project materials." /> : null}
           {materialsQuery.error ? <DataState state="error" title="Materials unavailable" message={materialsQuery.error.message} /> : null}
-          {!materialsQuery.isLoading && !materialsQuery.data?.results.length ? (
-            <DataState state="empty" title="No project materials" message="Upload a project-owned material to manage its visibility." />
+          {!materialsQuery.isLoading && !filteredMaterials.length ? (
+            <DataState state="empty" title="No matching materials" message={`No ${materialFilter} materials match the current search.`} />
           ) : null}
-          <ul className="mt-4 grid gap-3">
-            {(materialsQuery.data?.results ?? []).map((material) => (
+          <ul className="mt-4 grid min-h-0 gap-3 overflow-y-auto pr-1" aria-label={`${materialFilter} material results`}>
+            {filteredMaterials.map((material) => (
               <li key={material.id} className="rounded-md border p-3">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <strong>{material.displayName || `${material.materialType} ${material.backingRecordId}`}</strong>
