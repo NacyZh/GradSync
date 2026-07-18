@@ -40,14 +40,32 @@ export function ReviewQueuePage() {
             <ul className="resource-list">
               {reports.map((report) => (
                 <li key={report.id}>
-                  <div className="min-w-0">
+                  <div className="grid min-w-0 gap-3">
                     <strong className="flex items-center gap-2">
                       <NotebookPen className="h-4 w-4 text-primary" aria-hidden="true" />
                       Week {report.report_week_start}
                       {report.revision_number && report.revision_number > 1 ? ` · Revision ${report.revision_number}` : ''}
                     </strong>
-                    <p>{report.completed_work}</p>
-                    <small className="text-muted-foreground">Target progress_report #{report.id}</small>
+                    <div className="grid gap-2 text-sm">
+                      <section className="grid gap-1" aria-label={`Completed work for report ${report.id}`}>
+                        <span className="font-semibold">Completed work</span>
+                        <p className="whitespace-pre-wrap text-muted-foreground">{report.completed_work}</p>
+                      </section>
+                      {report.blockers ? (
+                        <section className="grid gap-1" aria-label={`Blockers for report ${report.id}`}>
+                          <span className="font-semibold">Blockers</span>
+                          <p className="whitespace-pre-wrap text-muted-foreground">{report.blockers}</p>
+                        </section>
+                      ) : null}
+                      <section className="grid gap-1" aria-label={`Next steps for report ${report.id}`}>
+                        <span className="font-semibold">Next steps</span>
+                        <p className="whitespace-pre-wrap text-muted-foreground">{report.next_steps}</p>
+                      </section>
+                    </div>
+                    <small className="text-muted-foreground">
+                      Target progress_report #{report.id} · Status {report.review_status.replaceAll('_', ' ')}
+                      {report.submitted_at ? ` · Submitted ${new Date(report.submitted_at).toLocaleString()}` : ''}
+                    </small>
                   </div>
                   <ReviewStatusControl projectId={projectId} reportId={report.id} status={report.review_status} />
                 </li>

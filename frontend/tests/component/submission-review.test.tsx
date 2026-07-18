@@ -26,7 +26,7 @@ describe('submission review UI', () => {
       vi.fn(async (url) => {
         const value = String(url);
         if (value.includes('/api/projects/1/reports/')) {
-          return new Response(JSON.stringify({ results: [{ id: 71, report_week_start: '2026-06-22', completed_work: 'Completed experiments', next_steps: 'Next', revision_number: 2, review_status: 'pending_review' }] }), {
+          return new Response(JSON.stringify({ results: [{ id: 71, report_week_start: '2026-06-22', completed_work: 'Completed experiments', blockers: 'Waiting for microscope time', next_steps: 'Analyze sample images', revision_number: 2, review_status: 'pending_review', submitted_at: '2026-06-23T08:00:00Z' }] }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -54,6 +54,9 @@ describe('submission review UI', () => {
 
     expect(await screen.findByRole('heading', { name: 'Review queue' })).toBeInTheDocument();
     expect(await screen.findByText(/Week 2026-06-22/)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Completed work for report 71' })).toHaveTextContent('Completed experiments');
+    expect(screen.getByRole('region', { name: 'Blockers for report 71' })).toHaveTextContent('Waiting for microscope time');
+    expect(screen.getByRole('region', { name: 'Next steps for report 71' })).toHaveTextContent('Analyze sample images');
     expect(screen.queryByRole('tab', { name: 'Drafts' })).not.toBeInTheDocument();
     expect(await screen.findByText('Clarify sample count')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Submission review' })).toHaveTextContent('Week 2026-06-22');

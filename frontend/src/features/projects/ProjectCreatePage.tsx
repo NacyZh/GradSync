@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { CalendarRange, UsersRound, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
@@ -13,6 +14,7 @@ import { createProject, type StudentOption } from './api';
 import { StudentSelector } from './StudentSelector';
 
 export function ProjectCreatePage() {
+  const navigate = useNavigate();
   const [success, setSuccess] = useState('');
   const [clientError, setClientError] = useState('');
   const [students, setStudents] = useState<StudentOption[]>([]);
@@ -21,6 +23,7 @@ export function ProjectCreatePage() {
     onSuccess: (project) => {
       setClientError('');
       setSuccess(`Created project ${project.title}`);
+      navigate(`/projects/${project.id}`);
     },
   });
 

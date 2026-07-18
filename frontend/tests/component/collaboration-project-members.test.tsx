@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ProjectMembersPanel } from '../../src/features/projects/ProjectMembersPanel';
@@ -17,6 +18,17 @@ function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
       headers: { 'Content-Type': 'application/json' },
     });
   }) as typeof fetch;
+}
+
+function renderProjectCreatePage() {
+  renderWithClient(
+    <MemoryRouter initialEntries={['/projects/new']}>
+      <Routes>
+        <Route path="/projects/new" element={<ProjectCreatePage />} />
+        <Route path="/projects/:projectId" element={<h1>Project workspace</h1>} />
+      </Routes>
+    </MemoryRouter>,
+  );
 }
 
 describe('collaboration project members UI', () => {
@@ -106,7 +118,7 @@ describe('collaboration project members UI', () => {
       return { id: 44, title: 'Dropdown Project', description: '', status: 'active' };
     });
 
-    renderWithClient(<ProjectCreatePage />);
+    renderProjectCreatePage();
 
     await userEvent.type(screen.getByLabelText('Project title'), 'Dropdown Project');
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
@@ -128,7 +140,7 @@ describe('collaboration project members UI', () => {
       return { id: 44, title: 'Dropdown Project', description: '', status: 'active' };
     });
 
-    renderWithClient(<ProjectCreatePage />);
+    renderProjectCreatePage();
 
     await userEvent.type(screen.getByLabelText('Student nickname'), 'Alex');
     await screen.findByText('alex.one@example.edu');

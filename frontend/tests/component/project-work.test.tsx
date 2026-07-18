@@ -388,7 +388,14 @@ describe('project work UI', () => {
       }),
     );
     const { ProjectCreatePage } = await import('../../src/features/projects/ProjectCreatePage');
-    renderWithClient(<ProjectCreatePage />);
+    renderWithClient(
+      <MemoryRouter initialEntries={['/projects/new']}>
+        <Routes>
+          <Route path="/projects/new" element={<ProjectCreatePage />} />
+          <Route path="/projects/:projectId" element={<h1>Created project workspace</h1>} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
     await userEvent.type(screen.getByLabelText('Project title'), 'Dated project');
     await userEvent.type(screen.getByLabelText('Start date'), '2026-06-25');
@@ -396,6 +403,7 @@ describe('project work UI', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     expect(calls[0]).toMatchObject({ starts_on: '2026-06-25', ends_on: '2026-07-25' });
+    expect(await screen.findByRole('heading', { name: 'Created project workspace' })).toBeInTheDocument();
     vi.unstubAllGlobals();
   });
 
@@ -403,7 +411,11 @@ describe('project work UI', () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
     const { ProjectCreatePage } = await import('../../src/features/projects/ProjectCreatePage');
-    renderWithClient(<ProjectCreatePage />);
+    renderWithClient(
+      <MemoryRouter>
+        <ProjectCreatePage />
+      </MemoryRouter>,
+    );
 
     await userEvent.type(screen.getByLabelText('Project title'), 'Invalid dates');
     await userEvent.type(screen.getByLabelText('Start date'), '2026-07-25');

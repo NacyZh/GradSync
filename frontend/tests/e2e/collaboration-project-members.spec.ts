@@ -73,6 +73,32 @@ test.beforeEach(async ({ page }) => {
     }
     await fulfillJson(route, { capabilities: { canCreateProject: true }, results: [] });
   });
+  await page.route('**/api/projects/9/', async (route) => {
+    await fulfillJson(route, {
+      id: 9,
+      title: 'Selected Student Project',
+      description: '',
+      status: 'active',
+      capabilities: {
+        canManageProject: true,
+        canEditProject: true,
+        canArchiveProject: true,
+        canReopenProject: false,
+        canDeleteProject: true,
+        canManageMembers: true,
+        canCreateTasks: true,
+        canUpdateTasks: true,
+        deleteDisabledReason: '',
+      },
+      memberships: [
+        { id: 8, projectId: 9, userId: 14, nickname: 'Alex', email: 'alex.two@example.edu', role: 'student', status: 'active' },
+      ],
+      current_tasks: [],
+      pending_reviews: [],
+      upcoming_bookings: [],
+      activity: [],
+    });
+  });
 });
 
 test('teacher manages project membership by student nickname', async ({ page }) => {
@@ -116,5 +142,6 @@ test('teacher creates a project with selected student accounts', async ({ page }
   }
 
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page.getByText('Created project Selected Student Project')).toBeVisible();
+  await expect(page).toHaveURL(/\/projects\/\d+$/);
+  await expect(page.getByRole('heading', { name: 'Selected Student Project' })).toBeVisible();
 });

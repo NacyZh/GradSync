@@ -31,6 +31,30 @@ test('advisor can create a project and dashboard shows isolated project work', a
       }
       await fulfillJson(route, { results: [] });
     });
+    await page.route('**/api/projects/2/', async (route) => {
+      await fulfillJson(route, {
+        id: 2,
+        title: 'Quantum Thesis',
+        description: '',
+        status: 'active',
+        capabilities: {
+          canManageProject: true,
+          canEditProject: true,
+          canArchiveProject: true,
+          canReopenProject: false,
+          canDeleteProject: true,
+          canManageMembers: true,
+          canCreateTasks: true,
+          canUpdateTasks: true,
+          deleteDisabledReason: '',
+        },
+        memberships: [],
+        current_tasks: [],
+        pending_reviews: [],
+        upcoming_bookings: [],
+        activity: [],
+      });
+    });
   }
 
   if (fullStackE2E) {
@@ -43,7 +67,8 @@ test('advisor can create a project and dashboard shows isolated project work', a
   await expect(page.getByRole('complementary', { name: 'Project setup guidance' })).toContainText('Project-scoped by default');
   await page.getByLabel('Project title').fill('Quantum Thesis');
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page.getByText('Created project Quantum Thesis')).toBeVisible();
+  await expect(page).toHaveURL(/\/projects\/\d+$/);
+  await expect(page.getByRole('heading', { name: 'Quantum Thesis' })).toBeVisible();
 
   await page.goto('/projects/1');
   await expect(page.getByRole('heading', { name: 'Graphene Lab' })).toBeVisible();
