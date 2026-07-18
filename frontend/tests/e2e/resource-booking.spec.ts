@@ -173,7 +173,7 @@ test('student submits and cancels a resource use request', async ({ page }) => {
   await useForm.getByLabel('Purpose').fill('Imaging cells');
   await useForm.getByRole('button', { name: 'Submit use request' }).click();
 
-  await expect(page.getByRole('status').filter({ hasText: 'Use request pending review' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Use request pending review' }).first()).toBeVisible();
   await expect(page.getByRole('region', { name: 'Resource use submissions' })).toContainText('pending');
 
   await page
@@ -181,7 +181,7 @@ test('student submits and cancels a resource use request', async ({ page }) => {
     .getByRole('button', { name: 'Cancel request' })
     .first()
     .click();
-  await expect(page.getByRole('status').filter({ hasText: 'Request cancelled' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Request cancelled' }).first()).toBeVisible();
 });
 
 test('advisor approves and rejects student resource use requests', async ({ page }) => {
@@ -251,7 +251,7 @@ test('advisor approves and rejects student resource use requests', async ({ page
   await expect(submissions).toContainText('Student Two');
 
   await submissions.getByRole('button', { name: 'Approve request' }).first().click();
-  await expect(page.getByRole('status').filter({ hasText: 'Submission confirmed' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Submission confirmed' }).first()).toBeVisible();
 
   await submissions.getByRole('button', { name: 'Reject request' }).first().click();
   await expect(submissions).toContainText('0 pending');
@@ -305,5 +305,5 @@ test('advisor records direct resource use without review', async ({ page }) => {
   await useForm.getByLabel('Purpose').fill('Calibration');
   await useForm.getByRole('button', { name: 'Record use' }).click();
 
-  await expect(page.getByRole('status').filter({ hasText: 'Use recorded' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Use recorded' }).first()).toBeVisible();
 });

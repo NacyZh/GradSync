@@ -83,7 +83,7 @@ test('advisor can create a project and dashboard shows isolated project work', a
   await expect(page.getByRole('region', { name: 'Activity' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toHaveCount(0);
   await page.getByLabel('Task status').selectOption('completed');
-  await expect(page.getByRole('status').filter({ hasText: 'Task status updated' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Task status updated' }).first()).toBeVisible();
 
   if (fullStackE2E) {
     await page.getByRole('button', { name: 'Sign out' }).click();

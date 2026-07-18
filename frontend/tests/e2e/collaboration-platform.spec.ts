@@ -316,16 +316,16 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
     await page.getByLabel('Nickname').fill('Student One');
     await page.getByLabel('Password').fill('StrongPass1!');
     await page.getByRole('button', { name: 'Register' }).click();
-    await expect(page.getByText('Verification email sent')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Verification email sent' }).first()).toBeVisible();
     await page.getByLabel('Verification code').fill('123456');
     await page.getByRole('button', { name: 'Verify email' }).click();
-    await expect(page.getByText('Email verified')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Email verified' }).first()).toBeVisible();
 
     auth.setAdmin();
     await page.goto('/admin/role-activations');
     await expect(page.getByText('teacher@example.edu')).toBeVisible();
     await page.getByRole('button', { name: 'Approve' }).click();
-    await expect(page.getByText('Activation updated')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Activation updated' }).first()).toBeVisible();
     auth.setAdvisor();
   });
 
@@ -334,7 +334,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
     await page.getByLabel('Student nickname').fill('Alex');
     await expect(page.getByRole('listbox', { name: 'Student search results' })).toContainText('alex.two@example.edu');
     await page.getByRole('listbox', { name: 'Student search results' }).getByRole('option', { name: /alex.two@example.edu/ }).click();
-    await expect(page.getByText('Member added')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Member added' }).first()).toBeVisible();
   });
 
   await test.step('shared paper library import and download', async () => {
@@ -347,9 +347,9 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
       buffer: validPdfBuffer('Uploaded Graph Paper'),
     });
     await page.getByRole('button', { name: 'Import PDF' }).click();
-    await expect(page.getByText('Accepted: Uploaded Graph Paper')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Accepted: Uploaded Graph Paper' }).first()).toBeVisible();
     await page.getByRole('button', { name: /Download Uploaded Graph Paper/ }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Download started' })).toContainText('Uploaded Graph Paper.pdf');
+    await expect(page.getByRole('status').filter({ hasText: 'Download started' }).first()).toContainText('Uploaded Graph Paper.pdf');
   });
 
   await test.step('code archive library', async () => {
@@ -359,7 +359,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
     await page.getByLabel('Artifact name').fill('Uploaded Archive');
     await page.getByLabel('Artifact description').fill('Searchable implementation archive');
     await page.getByRole('button', { name: 'Upload archive' }).click();
-    await expect(page.getByText('Upload complete')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Upload complete' }).first()).toBeVisible();
   });
 
   await test.step('document categories and document library', async () => {
@@ -377,7 +377,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
     await page.getByLabel('Document title').fill('Uploaded Protocol');
     await page.getByLabel('Document description').fill('Shared instructions');
     await page.getByRole('button', { name: 'Upload document' }).click();
-    await expect(page.getByText('Upload complete')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Upload complete' }).first()).toBeVisible();
   });
 
   await test.step('writing versions and teacher feedback notification', async () => {
@@ -386,7 +386,7 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
     await page.getByLabel('Annotated file').setInputFiles({ name: 'annotated.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('notes') });
     await page.getByLabel('Feedback comments').fill('More notes');
     await page.getByRole('button', { name: 'Submit feedback' }).click();
-    await expect(page.getByText('Feedback saved and notification recorded')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Feedback saved and notification recorded' }).first()).toBeVisible();
   });
 
   await test.step('laboratory resource inventory and student use', async () => {

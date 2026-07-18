@@ -15,10 +15,10 @@ test('registration and role approval flow is reachable', async ({ page }) => {
   await page.getByLabel('Nickname').fill('Student');
   await page.getByLabel('Password').fill('StrongPass1!');
   await page.getByRole('button', { name: 'Register' }).click();
-  await expect(page.getByText('Verification email sent')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Verification email sent' }).first()).toBeVisible();
   await page.getByLabel('Verification code').fill('123456');
   await page.getByRole('button', { name: 'Verify email' }).click();
-  await expect(page.getByText('Email verified')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Email verified' }).first()).toBeVisible();
 });
 
 test('administrator can review role activation requests', async ({ page }) => {
@@ -36,5 +36,5 @@ test('administrator can review role activation requests', async ({ page }) => {
   await page.goto('/admin/role-activations');
   await expect(page.getByText('teacher@example.edu')).toBeVisible();
   await page.getByRole('button', { name: 'Approve' }).click();
-  await expect(page.getByText('Activation updated')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Activation updated' }).first()).toBeVisible();
 });

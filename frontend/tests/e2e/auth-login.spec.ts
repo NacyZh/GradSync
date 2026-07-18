@@ -136,7 +136,7 @@ test.describe('authentication', () => {
     await page.getByLabel('Password').fill('wrong-password');
     await page.getByRole('button', { name: 'Sign in' }).click();
 
-    await expect(page.getByText('Invalid email or password')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Invalid email or password' }).first()).toBeVisible();
     // Should remain on login page after failed attempt
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();

@@ -170,7 +170,7 @@ test('document library upload, shared category, search, list, detail, and downlo
     buffer: Buffer.from('# protocol'),
   });
   await page.getByRole('button', { name: 'Upload document' }).click();
-  await expect(page.getByText('Upload complete')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Upload complete' }).first()).toBeVisible();
   if (fullStackE2E) {
     await expect(page.getByRole('button', { name: /Select document uploaded-document/ })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Selected document download' })).toContainText('uploaded-document');
@@ -188,7 +188,7 @@ test('document library upload, shared category, search, list, detail, and downlo
     await page.getByRole('button', { name: /Download/ }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe('protocol.pdf');
-    await expect(page.getByText(/protocol.pdf/)).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'protocol.pdf' }).first()).toBeVisible();
   }
 });
 
@@ -205,9 +205,9 @@ test('project material document download stays inside project materials workspac
   await page.getByRole('button', { name: 'Download Project Protocol' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Project Protocol.pdf');
-  await expect(page.getByText('Download ready: Project Protocol.pdf', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Download ready: Project Protocol.pdf' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Download Stale Project Protocol' }).click();
-  await expect(page.getByText('Project material is no longer available', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Project material is no longer available' }).first()).toBeVisible();
 });
 
 test('standalone shared documents hide project-level rename and delete actions', async ({ page }) => {

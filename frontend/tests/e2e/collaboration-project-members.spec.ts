@@ -117,12 +117,12 @@ test('teacher manages project membership by student nickname', async ({ page }) 
     await expect(page.getByRole('listbox', { name: 'Student search results' })).toContainText('alex.one@example.edu');
     await expect(page.getByText('doctoral')).toBeVisible();
     await page.getByRole('listbox', { name: 'Student search results' }).getByRole('option', { name: /alex.two@example.edu/ }).click();
-    await expect(page.getByText('Member added')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Member added' }).first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Remove Student One' }).click();
     await expect(page.getByRole('dialog', { name: 'Remove student?' })).toBeVisible();
     await page.getByRole('dialog', { name: 'Remove student?' }).getByRole('button', { name: 'Remove student' }).click();
-    await expect(page.getByText('Member removed')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Member removed' }).first()).toBeVisible();
   }
 });
 

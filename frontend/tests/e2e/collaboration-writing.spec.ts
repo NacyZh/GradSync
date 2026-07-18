@@ -141,12 +141,12 @@ test('writing project feedback flow is reachable', async ({ page }) => {
   });
   await page.getByLabel('Feedback comments').fill('More notes');
   await page.getByRole('button', { name: 'Submit feedback' }).click();
-  await expect(page.getByText('Feedback saved and notification recorded')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Feedback saved and notification recorded' }).first()).toBeVisible();
   expect(feedbackSubmitted).toBe(true);
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: /Download annotated file/ }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('annotated.docx');
-  await expect(page.getByText(/annotated.docx/)).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'annotated.docx' }).first()).toBeVisible();
 });

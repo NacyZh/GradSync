@@ -143,7 +143,7 @@ test('paper import, code download, and locale persistence workflow is reachable'
   await page.getByRole('button', { name: 'Import PDF' }).click();
   await expect(
     page
-      .locator('#paper-import-status, [role="alert"]')
+      .getByRole('status')
       .filter({
         hasText:
           /Accepted|Duplicate|Rejected|Failed|Maintainer review|required|corrupted|unreadable|PDF|missing/i,
@@ -151,7 +151,7 @@ test('paper import, code download, and locale persistence workflow is reachable'
       .first(),
   ).toBeVisible();
   await page.getByRole('button', { name: /Download Graph Neural Methods/ }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Download started' })).toContainText('Graph Neural Methods.pdf');
+  await expect(page.getByRole('status').filter({ hasText: 'Download started' }).first()).toContainText('Graph Neural Methods.pdf');
 
   await page.goto('/library/code');
   await expect(page.getByRole('heading', { name: 'Shared code' })).toBeVisible();
@@ -282,7 +282,7 @@ test('English paper-library upload, rename, delete, viewer, and download states 
     buffer: Buffer.from('%PDF-1.4 locale'),
   });
   await page.getByRole('button', { name: 'Import PDF' }).click();
-  await expect(page.getByText('Accepted: Imported Locale Paper')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Accepted: Imported Locale Paper' }).first()).toBeVisible();
 
   await page.getByRole('button', { name: /Open paper Locale Review Paper/ }).click();
   await expect(page.getByText('In-page viewer')).toBeVisible();
@@ -292,7 +292,7 @@ test('English paper-library upload, rename, delete, viewer, and download states 
   await expect(page.getByText('Renamed Locale Paper').first()).toBeVisible();
 
   await page.getByRole('button', { name: /Download Renamed Locale Paper/ }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Download started' })).toContainText(
+  await expect(page.getByRole('status').filter({ hasText: 'Download started' }).first()).toContainText(
     'Download started: Renamed Locale Paper.pdf',
   );
 

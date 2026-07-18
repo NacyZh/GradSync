@@ -597,7 +597,7 @@ test('mobile paper workflow keeps search browse select open upload and download 
     buffer: Buffer.from('%PDF-1.4 mobile layout'),
   });
   await page.getByRole('button', { name: 'Import PDF' }).click();
-  await expect(page.getByText('Accepted: Imported Responsive Layout Paper')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Accepted: Imported Responsive Layout Paper' }).first()).toBeVisible();
   await expectPaperLayoutStable(page);
 });
 
@@ -711,7 +711,7 @@ test('paper upload size guidance uses backend policy and repeats it on rejection
     buffer: Buffer.alloc(2048, '%'),
   });
   await page.getByRole('button', { name: 'Import PDF' }).click();
-  await expect(page.getByText('Accepted: Boundary Upload Paper')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Accepted: Boundary Upload Paper' }).first()).toBeVisible();
 
   await page.getByLabel('PDF file').setInputFiles({
     name: 'too-large.pdf',
@@ -752,7 +752,7 @@ for (const viewport of [
       buffer: Buffer.from('%PDF-1.4 layout'),
     });
     await page.getByRole('button', { name: 'Import PDF' }).click();
-    await expect(page.getByText('Accepted: Responsive Reference Systems')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Accepted: Responsive Reference Systems' }).first()).toBeVisible();
     await expect(page.getByRole('region', { name: 'Selected paper download' })).toContainText('Responsive Reference Systems');
     await expectNoControlOverflow(page);
   });

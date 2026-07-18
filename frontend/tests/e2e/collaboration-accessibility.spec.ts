@@ -151,7 +151,7 @@ test('paper library controls are keyboard reachable and announce import and down
     buffer: Buffer.from('%PDF-1.4 missing title'),
   });
   await page.getByRole('button', { name: 'Import PDF' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Rejected: missing_reliable_title' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Rejected: missing_reliable_title' }).first()).toBeVisible();
   await expectNoLayoutOverflow(page);
 });
 
