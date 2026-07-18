@@ -167,24 +167,19 @@ export function ProjectDashboardPage() {
         <MetricCard icon={CalendarDays} label="Upcoming bookings" value={bookings.length} detail={nextDeadline ? `Next due ${formatDate(nextDeadline.deadline_at)}` : 'reserved resources'} />
       </section>
 
-      <div className="grid min-w-0 gap-4 overflow-hidden xl:grid-cols-[minmax(20rem,1.1fr)_minmax(22rem,0.95fr)_minmax(18rem,0.75fr)]">
-        <section className="panel" aria-label="Current tasks">
+      <div className="grid min-w-0 gap-4 overflow-hidden xl:grid-cols-[minmax(18rem,0.9fr)_minmax(22rem,1fr)_minmax(18rem,0.75fr)]">
+        <section className="panel grid h-[min(34rem,calc(100vh-12rem))] min-h-[28rem] grid-rows-[auto_1fr]" aria-label="Current tasks">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2>Task plan</h2>
-              <p className="text-sm text-muted-foreground">Hierarchy, deadlines, assignees, and status at a glance.</p>
+              <p className="text-sm text-muted-foreground">Select a task to inspect details and update status.</p>
             </div>
             <StatusBadge status={`${progress}% complete`} />
           </div>
           {tasks.length ? (
-            <>
-              <TaskTree tasks={tasks} projectId={projectId} selectedTaskId={primaryTask?.id} memberNameById={memberNameById} onSelectTask={(task) => setSelectedTaskId(task.id)} />
-              {primaryTask && capabilities.canUpdateTasks ? (
-                <div className="mt-4 rounded-lg border bg-muted/40 p-3">
-                  <TaskStatusControl projectId={projectId} taskId={primaryTask.id} status={primaryTask.status ?? 'not_started'} disabled={archived} />
-                </div>
-              ) : null}
-            </>
+            <div className="min-h-0 overflow-y-auto pr-1">
+              <TaskTree tasks={tasks} selectedTaskId={primaryTask?.id} onSelectTask={(task) => setSelectedTaskId(task.id)} />
+            </div>
           ) : (
             <DataState state="empty" title="No tasks" message="No tasks are defined for this project." />
           )}
@@ -211,14 +206,19 @@ export function ProjectDashboardPage() {
                   <dd>{primaryTask.deadline_at ? formatDate(primaryTask.deadline_at) : 'No deadline'}</dd>
                 </div>
               </dl>
-              <p className="text-sm text-muted-foreground">
-                Use the task plan status control to update this task while keeping the hierarchy visible.
-              </p>
+              <section className="grid gap-1 text-sm" aria-label="Selected task description">
+                <h4 className="font-bold text-muted-foreground">Description</h4>
+                <p className="whitespace-pre-wrap text-muted-foreground">{primaryTask.description || 'No task description provided.'}</p>
+              </section>
+              {capabilities.canUpdateTasks ? (
+                <div className="rounded-lg border bg-background p-3">
+                  <TaskStatusControl projectId={projectId} taskId={primaryTask.id} status={primaryTask.status ?? 'not_started'} disabled={archived} />
+                </div>
+              ) : null}
             </article>
           ) : (
             <DataState state="empty" title="No task selected" message="Select or create a task to start planning." />
           )}
-          {capabilities.canCreateTasks ? <TaskForm projectId={projectId} members={project.memberships} disabled={archived} /> : null}
         </section>
         <aside className="panel min-w-0 overflow-hidden" aria-label="Members and progress">
           <h2>Members and progress</h2>
@@ -234,6 +234,16 @@ export function ProjectDashboardPage() {
           <ProjectMembersPanel projectId={projectId} members={project.memberships} disabled={archived} canManageMembers={capabilities.canManageMembers} />
         </aside>
       </div>
+
+      {capabilities.canCreateTasks ? (
+        <section className="panel" aria-label="Create task">
+          <div className="mb-4">
+            <h2>Create task</h2>
+            <p className="text-sm text-muted-foreground">Add a scoped task with assignees, description, priority, and deadline.</p>
+          </div>
+          <TaskForm projectId={projectId} members={project.memberships} disabled={archived} />
+        </section>
+      ) : null}
 
       <section className="dashboard-grid">
         <section className="panel" aria-label="Pending reviews">

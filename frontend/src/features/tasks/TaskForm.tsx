@@ -7,7 +7,7 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 
 import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui/AppFeedback';
-import { FieldGroup, FormField } from '../../shared/ui/FormField';
+import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';
 import { FormStatus } from '../../shared/ui/FormStatus';
 import { createTask } from './api';
 
@@ -33,7 +33,7 @@ export function TaskForm({
   const formRef = useRef<HTMLFormElement>(null);
   const { notify } = useAppFeedback();
   const mutation = useMutation({
-    mutationFn: (payload: { title: string; assignee_id?: number; assignee_ids?: number[]; deadline_at?: string; priority?: string }) => createTask(projectId, payload),
+    mutationFn: (payload: { title: string; description?: string; assignee_id?: number; assignee_ids?: number[]; deadline_at?: string; priority?: string }) => createTask(projectId, payload),
     onSuccess: () => notify('Task created', 'success'),
     onError: (error) => notify(error.message, 'error'),
   });
@@ -70,6 +70,7 @@ export function TaskForm({
     const form = new FormData(event.currentTarget);
     mutation.mutate({
       title: String(form.get('title')),
+      description: String(form.get('description') ?? ''),
       assignee_id: selectedAssigneeIds[0],
       assignee_ids: selectedAssigneeIds,
       deadline_at: String(form.get('deadlineAt') || '') || undefined,
@@ -86,6 +87,7 @@ export function TaskForm({
     <form ref={formRef} className="stacked-form" aria-label="Create task" onSubmit={onSubmit}>
       <FieldGroup>
         <FormField id="task-title" name="title" label="Task title" required disabled={disabled || mutation.isPending} />
+        <TextareaField id="task-description" name="description" label="Task description" placeholder="Scope, expected output, acceptance criteria, or useful context." disabled={disabled || mutation.isPending} />
         <div className="grid gap-2">
           <label className="grid gap-1.5 text-sm font-bold text-muted-foreground" htmlFor="task-assignees">
             Assignees

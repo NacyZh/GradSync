@@ -77,13 +77,13 @@ test('advisor can create a project and dashboard shows isolated project work', a
   await expect(page.getByRole('navigation', { name: 'Project workflow' })).not.toContainText('Drafts');
   await expect(page.getByRole('region', { name: 'Project summary' })).toContainText('Current tasks');
   await expect(page.getByRole('region', { name: 'Current tasks' })).toContainText('Analyze sample');
-  await page.getByRole('link', { name: 'Update status' }).nth(1).click();
+  await page.getByRole('region', { name: 'Current tasks' }).getByRole('button', { name: /Draft chart/ }).click();
   await expect(page.getByRole('region', { name: 'Task details' })).toContainText('Priority: high');
   await expect(page.getByRole('region', { name: 'Pending reviews' })).toContainText(/Review progress_report #\d+/);
   await expect(page.getByRole('region', { name: 'Activity' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toHaveCount(0);
   await page.getByLabel('Task status').selectOption('completed');
-  await expect(page.getByRole('region', { name: 'Current tasks' }).getByRole('status')).toContainText('Task status updated');
+  await expect(page.getByRole('region', { name: 'Task details' }).getByRole('status')).toContainText('Task status updated');
 
   if (fullStackE2E) {
     await page.getByRole('button', { name: 'Sign out' }).click();

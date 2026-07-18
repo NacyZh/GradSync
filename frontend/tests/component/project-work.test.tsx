@@ -190,9 +190,10 @@ describe('project work UI', () => {
                 title: 'Analyze sample',
                 status: 'in_progress',
                 priority: 'high',
+                description: 'Run analysis and summarize evidence.',
                 assignee_id: 7,
                 assignee_ids: [7, 8],
-                children: [{ id: 12, title: 'Draft chart', status: 'blocked', priority: 'normal', children: [] }],
+                children: [{ id: 12, title: 'Draft chart', status: 'blocked', priority: 'normal', description: 'Prepare the figure for review.', children: [] }],
               },
             ],
             pending_reviews: [{ target_type: 'progress_report', target_id: 4 }],
@@ -217,11 +218,14 @@ describe('project work UI', () => {
 
     expect(await screen.findByRole('heading', { name: 'Graphene Lab' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Current tasks' })).toHaveTextContent('Analyze sample');
+    expect(screen.getByRole('region', { name: 'Current tasks' })).not.toHaveTextContent('Student One, Student Two');
     expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Priority: high');
     expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Student One, Student Two');
+    expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Run analysis and summarize evidence.');
     expect(screen.getByRole('complementary', { name: 'Members and progress' })).toHaveTextContent('Student One');
     expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Task title'), 'Prepare slides');
+    await userEvent.type(screen.getByLabelText('Task description'), 'Summarize results for group meeting.');
     await userEvent.type(screen.getByLabelText('Assignees'), 'Student');
     await userEvent.click(within(screen.getByRole('listbox', { name: 'Assignee options' })).getByRole('option', { name: 'Student One' }));
     await userEvent.type(screen.getByLabelText('Assignees'), 'Student');
@@ -230,6 +234,7 @@ describe('project work UI', () => {
     await waitFor(() => expect(requests.some((request) => request.method === 'POST')).toBe(true));
     expect(JSON.parse(String(requests.find((request) => request.method === 'POST')?.body))).toMatchObject({
       title: 'Prepare slides',
+      description: 'Summarize results for group meeting.',
       assignee_id: 7,
       assignee_ids: [7, 8],
     });
