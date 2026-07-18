@@ -70,6 +70,7 @@ test('student submits report revision and advisor updates review status', async 
   }
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Review queue list' })).toContainText('Week 2026-06-22');
+  await page.getByRole('button', { name: /Week 2026-06-22/ }).click();
   await expect(page.getByRole('region', { name: 'Submission review' })).toContainText('Week 2026-06-22');
   await expect(page.getByRole('complementary', { name: 'Inline comments' })).toBeVisible();
   await page.getByRole('region', { name: 'Submission review' }).getByLabel('Review status').selectOption('needs_revision');
