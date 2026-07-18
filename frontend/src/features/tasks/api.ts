@@ -29,3 +29,9 @@ export function updateTask(projectId: number, taskId: number, payload: Partial<T
     body: JSON.stringify(payload),
   });
 }
+
+export function deleteTask(projectId: number, taskId: number) {
+  return apiRequest<void>(`/api/projects/${projectId}/tasks/${taskId}/`, {
+    method: 'DELETE',
+  });
+}

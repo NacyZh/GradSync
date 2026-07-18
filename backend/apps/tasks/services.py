@@ -94,6 +94,17 @@ class TaskService(ProjectScopedService):
             )
         return task
 
+    def delete_task(self, task: Task) -> None:
+        self.require_project_member(self.project)
+        ensure_project_writable(self.project)
+        if not self.project.memberships.filter(
+            user=self.user, status="active", role__in=["advisor", "reviewer"]
+        ).exists():
+            raise PermissionDenied("Only advisors can delete project tasks")
+        title = task.title
+        record_event(self.project, self.user, "task.deleted", f"Deleted task {title}", task)
+        task.delete()
+
     def _resolve_assignees(self, assignee_ids):
         if assignee_ids is None:
             return []

@@ -50,7 +50,6 @@ export function ProjectDashboardPage() {
     },
     onError: (error) => notify(error.message, 'error'),
   });
-
   async function onArchive() {
     const ok = await confirm({
       title: 'Archive project?',
@@ -168,7 +167,7 @@ export function ProjectDashboardPage() {
       </section>
 
       <div className="grid min-w-0 gap-4 overflow-hidden xl:grid-cols-[minmax(18rem,0.9fr)_minmax(22rem,1fr)_minmax(18rem,0.75fr)]">
-        <section className="panel grid h-[min(34rem,calc(100vh-12rem))] min-h-[28rem] grid-rows-[auto_1fr]" aria-label="Current tasks">
+        <section className="panel grid h-[min(34rem,calc(100vh-12rem))] min-h-[28rem] grid-rows-[auto_1fr] overflow-hidden" aria-label="Current tasks">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2>Task plan</h2>
@@ -178,16 +177,26 @@ export function ProjectDashboardPage() {
           </div>
           {tasks.length ? (
             <div className="min-h-0 overflow-y-auto pr-1">
-              <TaskTree tasks={tasks} selectedTaskId={primaryTask?.id} onSelectTask={(task) => setSelectedTaskId(task.id)} />
+              <TaskTree
+                tasks={tasks}
+                projectId={projectId}
+                selectedTaskId={primaryTask?.id}
+                onSelectTask={(task) => setSelectedTaskId(task.id)}
+                canDeleteTasks={capabilities.canCreateTasks && !archived}
+                onTaskDeleted={async () => {
+                  setSelectedTaskId(null);
+                  await projectQuery.refetch();
+                }}
+              />
             </div>
           ) : (
             <DataState state="empty" title="No tasks" message="No tasks are defined for this project." />
           )}
         </section>
-        <section className="panel" aria-label="Task details">
+        <section className="panel grid h-[min(34rem,calc(100vh-12rem))] min-h-[28rem] grid-rows-[auto_1fr] overflow-hidden" aria-label="Task details">
           <h2>Task details</h2>
           {primaryTask ? (
-            <article className="mb-5 grid gap-3 rounded-lg border bg-muted/40 p-4">
+            <article className="mt-4 grid min-h-0 gap-3 overflow-y-auto rounded-lg border bg-muted/40 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-lg font-extrabold">{primaryTask.title}</h3>
                 <StatusBadge status={primaryTask.status ?? 'not_started'} />
@@ -220,7 +229,7 @@ export function ProjectDashboardPage() {
             <DataState state="empty" title="No task selected" message="Select or create a task to start planning." />
           )}
         </section>
-        <aside className="panel min-w-0 overflow-hidden" aria-label="Members and progress">
+        <aside className="panel h-[min(34rem,calc(100vh-12rem))] min-h-[28rem] min-w-0 overflow-y-auto" aria-label="Members and progress">
           <h2>Members and progress</h2>
           <div className="my-4 grid place-items-center">
             <div

@@ -80,3 +80,43 @@ def test_member_can_update_child_task_from_project_detail_endpoint(api_client):
     assert response.status_code == 200
     child.refresh_from_db()
     assert child.status == "completed"
+
+
+@pytest.mark.django_db
+def test_advisor_can_delete_project_task(api_client):
+    advisor = UserFactory(global_role="advisor")
+    student = UserFactory(global_role="student")
+    project = ResearchProject.objects.create(title="Project", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    task = Task.objects.create(project=project, title="Parent", created_by=advisor)
+    child = Task.objects.create(
+        project=project,
+        title="Child",
+        parent_task=task,
+        created_by=advisor,
+    )
+
+    response = authenticate(api_client, advisor).delete(
+        f"/api/projects/{project.id}/tasks/{task.id}/"
+    )
+
+    assert response.status_code == 204
+    assert not Task.objects.filter(id__in=[task.id, child.id]).exists()
+
+
+@pytest.mark.django_db
+def test_student_cannot_delete_project_task(api_client):
+    advisor = UserFactory(global_role="advisor")
+    student = UserFactory(global_role="student")
+    project = ResearchProject.objects.create(title="Project", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    task = Task.objects.create(project=project, title="Student visible task", created_by=advisor)
+
+    response = authenticate(api_client, student).delete(
+        f"/api/projects/{project.id}/tasks/{task.id}/"
+    )
+
+    assert response.status_code == 403
+    assert Task.objects.filter(id=task.id).exists()

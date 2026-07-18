@@ -157,6 +157,9 @@ describe('project work UI', () => {
             headers: { 'Content-Type': 'application/json' },
           });
         }
+        if (String(url).includes('/api/projects/1/tasks/11/') && init?.method === 'DELETE') {
+          return new Response(null, { status: 204 });
+        }
         if (String(url).includes('/api/projects/1/tasks/') && init?.method === 'POST') {
           return new Response(JSON.stringify({ id: 21, title: 'Prepare slides', status: 'not_started', assignee_ids: [7, 8] }), {
             status: 201,
@@ -238,6 +241,9 @@ describe('project work UI', () => {
       assignee_id: 7,
       assignee_ids: [7, 8],
     });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Delete task' })[0]);
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete task' }));
+    await waitFor(() => expect(requests.some((request) => request.method === 'DELETE')).toBe(true));
     expect(screen.getByRole('button', { name: 'Archive project' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete project' })).toBeEnabled();
     expect(screen.queryByText(/Use archive for projects with research activity/)).not.toBeInTheDocument();

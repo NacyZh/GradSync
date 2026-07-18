@@ -1,9 +1,10 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from apps.common.search import apply_text_search
 from apps.projects.services import projects_visible_to
@@ -14,7 +15,11 @@ from .services import TaskService
 
 
 class ProjectTaskViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
 ):
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
@@ -39,6 +44,22 @@ class ProjectTaskViewSet(
     )
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
+
+    @extend_schema(
+        responses={
+            204: OpenApiResponse(description="Task deleted"),
+            403: OpenApiResponse(description="Task deletion forbidden"),
+        },
+    )
+    def destroy(self, request, *args, **kwargs):
+        try:
+            project = self.get_project()
+            TaskService(request.user, project).delete_task(self.get_object())
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            ) from exc
 
     def get_project(self):
         return get_object_or_404(
