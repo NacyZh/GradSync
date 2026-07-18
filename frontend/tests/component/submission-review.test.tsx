@@ -53,7 +53,8 @@ describe('submission review UI', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Review queue' })).toBeInTheDocument();
-    expect(await screen.findByText(/Week 2026-06-22/)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Week 2026-06-22/ })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Review queue list' })).toHaveTextContent('Week 2026-06-22');
     expect(screen.getByRole('region', { name: 'Completed work for report 71' })).toHaveTextContent('Completed experiments');
     expect(screen.getByRole('region', { name: 'Blockers for report 71' })).toHaveTextContent('Waiting for microscope time');
     expect(screen.getByRole('region', { name: 'Next steps for report 71' })).toHaveTextContent('Analyze sample images');

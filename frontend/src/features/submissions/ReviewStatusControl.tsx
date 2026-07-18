@@ -1,4 +1,5 @@
-import { useMutation } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { Label } from '@/shared/ui/primitives/label';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
@@ -14,6 +15,13 @@ type Props = {
 
 export function ReviewStatusControl({ status, projectId, reportId, disabled = false }: Props) {
   const { notify } = useAppFeedback();
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(status);
+
+  useEffect(() => {
+    setValue(status);
+  }, [status]);
+
   const mutation = useMutation<WeeklyReport | null, Error, string>({
     mutationFn: (reviewStatus: string) => {
       if (!projectId) return Promise.resolve(null);
@@ -22,8 +30,16 @@ export function ReviewStatusControl({ status, projectId, reportId, disabled = fa
       }
       return Promise.resolve(null);
     },
-    onSuccess: () => notify('Review status updated', 'success'),
-    onError: (error) => notify(error.message, 'error'),
+    onSuccess: async () => {
+      notify('Review status updated', 'success');
+      if (projectId) {
+        await queryClient.invalidateQueries({ queryKey: ['review-reports', projectId] });
+      }
+    },
+    onError: (error) => {
+      setValue(status);
+      notify(error.message, 'error');
+    },
   });
 
   return (
@@ -31,8 +47,11 @@ export function ReviewStatusControl({ status, projectId, reportId, disabled = fa
       <Label htmlFor={`review-status-report-${reportId ?? 'target'}`}>Review status</Label>
       <select
         id={`review-status-report-${reportId ?? 'target'}`}
-        defaultValue={status}
-        onChange={(event) => mutation.mutate(event.target.value)}
+        value={value}
+        onChange={(event) => {
+          setValue(event.target.value);
+          mutation.mutate(event.target.value);
+        }}
         aria-label="Review status"
         disabled={disabled || mutation.isPending}
       >

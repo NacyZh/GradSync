@@ -8,16 +8,27 @@ import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { InlineComment } from './api';
 import { updateCommentStatus } from './api';
 
-export function CommentThread({ projectId, comments = [] }: { projectId?: number; comments?: InlineComment[] }) {
+export function CommentThread({
+  projectId,
+  comments = [],
+  onStatusChanged,
+}: {
+  projectId?: number;
+  comments?: InlineComment[];
+  onStatusChanged?: () => void;
+}) {
   const { notify } = useAppFeedback();
   const mutation = useMutation({
     mutationFn: (commentId: number) => updateCommentStatus(projectId ?? 0, commentId, 'resolved'),
-    onSuccess: () => notify('Comment resolved', 'success'),
+    onSuccess: () => {
+      notify('Comment resolved', 'success');
+      onStatusChanged?.();
+    },
     onError: (error) => notify(error.message, 'error'),
   });
 
   return (
-    <section aria-label="Comment thread">
+    <section className="min-h-0 overflow-y-auto pr-1" aria-label="Comment thread">
       {comments.length === 0 ? <DataState state="empty" title="No comments" message="No comments for this target yet." /> : null}
       <ul className="timeline">
         {comments.map((comment) => (

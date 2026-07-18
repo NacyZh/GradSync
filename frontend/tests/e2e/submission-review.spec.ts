@@ -69,9 +69,10 @@ test('student submits report revision and advisor updates review status', async 
     await page.goto('/projects/1/reviews');
   }
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Review queue list' })).toContainText('Week 2026-06-22');
   await expect(page.getByRole('region', { name: 'Submission review' })).toContainText('Week 2026-06-22');
   await expect(page.getByRole('complementary', { name: 'Inline comments' })).toBeVisible();
-  await page.getByRole('listitem').filter({ hasText: 'Week 2026-06-22' }).getByLabel('Review status').selectOption('needs_revision');
+  await page.getByRole('region', { name: 'Submission review' }).getByLabel('Review status').selectOption('needs_revision');
   await expect(page.getByRole('status').filter({ hasText: 'Review status updated' }).first()).toBeVisible();
 
   if (fullStackE2E) {
@@ -102,6 +103,7 @@ test('student submits report revision and advisor updates review status', async 
     });
   }
   await page.goto('/projects/1/reviews');
-  await page.getByRole('listitem').filter({ hasText: 'Revision 2' }).getByLabel('Review status').selectOption('reviewed');
+  await page.getByRole('button', { name: /Revision 2/ }).click();
+  await page.getByRole('region', { name: 'Submission review' }).getByLabel('Review status').selectOption('reviewed');
   await expect(page.getByRole('status').filter({ hasText: 'Review status updated' }).first()).toBeVisible();
 });
