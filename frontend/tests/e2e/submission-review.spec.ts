@@ -74,10 +74,16 @@ test('student submits report revision and advisor updates review status', async 
   await page.getByRole('listitem').filter({ hasText: 'Week 2026-06-22' }).getByLabel('Review status').selectOption('needs_revision');
   await expect(page.getByLabel('Report reviews').getByRole('status')).toContainText('Review status updated');
 
-  await page.unroute('**/api/accounts/me/');
-  await page.route('**/api/accounts/me/', async (route) => {
-    await fulfillJson(route, studentUser);
-  });
+  if (fullStackE2E) {
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await loginAs(page, 'student@example.edu');
+  } else {
+    await page.unroute('**/api/accounts/me/');
+    await page.route('**/api/accounts/me/', async (route) => {
+      await fulfillJson(route, studentUser);
+    });
+  }
   await page.goto('/projects/1/reports');
   await page.getByLabel('Week start').fill('2026-06-22');
   await page.getByLabel('Completed work').fill('Completed experiments revised');
@@ -85,10 +91,16 @@ test('student submits report revision and advisor updates review status', async 
   await page.getByRole('button', { name: 'Submit report' }).click();
   await expect(page.getByText(/Revision 2/)).toBeVisible();
 
-  await page.unroute('**/api/accounts/me/');
-  await page.route('**/api/accounts/me/', async (route) => {
-    await fulfillJson(route, currentUser);
-  });
+  if (fullStackE2E) {
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await loginAs(page);
+  } else {
+    await page.unroute('**/api/accounts/me/');
+    await page.route('**/api/accounts/me/', async (route) => {
+      await fulfillJson(route, currentUser);
+    });
+  }
   await page.goto('/projects/1/reviews');
   await page.getByRole('listitem').filter({ hasText: 'Revision 2' }).getByLabel('Review status').selectOption('reviewed');
   await expect(page.getByLabel('Report reviews').getByRole('status')).toContainText('Review status updated');
