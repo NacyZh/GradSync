@@ -112,7 +112,7 @@ test('resource booking shows availability and handles conflict before success', 
     await expect(page.getByRole('status').filter({ hasText: /Booking (confirmed|submitted)/ }).first()).toBeVisible();
     return;
   }
-  await expect(page.getByRole('alert')).toContainText('no remaining capacity');
+  await expect(page.getByRole('status').filter({ hasText: 'Resource has no remaining capacity' }).first()).toBeVisible();
   await reserveForm.getByRole('button', { name: 'Reserve' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Booking confirmed' }).first()).toBeVisible();
 });

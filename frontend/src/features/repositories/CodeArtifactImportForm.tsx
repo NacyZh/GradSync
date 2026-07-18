@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
@@ -50,8 +51,8 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
   const [tags, setTags] = useState('');
   const [visibility, setVisibility] = useState<'project_members' | 'group_wide'>('project_members');
   const [archive, setArchive] = useState<File | undefined>();
-  const [uploadComplete, setUploadComplete] = useState(false);
   const [error, setError] = useState('');
+  const { notify } = useAppFeedback();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useCodeArtifactUpload(projectId);
   const sharedUploadMutation = useSharedCodeArtifactUpload();
@@ -78,12 +79,9 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
     fileInputRef.current?.click();
   }
 
-  function clearArchive(options: { keepComplete?: boolean } = {}) {
+  function clearArchive() {
     setArchive(undefined);
     setError('');
-    if (!options.keepComplete) {
-      setUploadComplete(false);
-    }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -94,7 +92,6 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
     const selectedArchive = archive;
     if (!selectedArchive || archiveError) return;
     setError('');
-    setUploadComplete(false);
     try {
       const uploadedArtifact = await activeUploadMutation.mutateAsync({
         archive: selectedArchive,
@@ -103,14 +100,16 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
         tags,
         visibility: standalone ? undefined : visibility,
       });
-      setUploadComplete(true);
+      notify('Upload complete', 'success');
       onUploaded?.(uploadedArtifact);
       setName('');
       setDescription('');
       setTags('');
-      clearArchive({ keepComplete: true });
+      clearArchive();
     } catch (err) {
-      setError(errorMessage(err));
+      const message = errorMessage(err);
+      setError(message);
+      notify(message, 'error');
     }
   }
 
@@ -133,7 +132,6 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
           onChange={(event) => {
             setArchive(event.target.files?.[0]);
             setError('');
-            setUploadComplete(false);
           }}
           required
         />
@@ -181,7 +179,6 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
       <Button type="submit" disabled={!canUpload}>Upload archive</Button>
       {activeUploadMutation.isPending ? <UploadProgress label="Uploading archive" value={65} /> : null}
       <LocalizedValidation message={visibleError} />
-      {uploadComplete ? <p role="status" className="text-sm font-medium text-success">Upload complete</p> : null}
     </form>
   );
 }

@@ -15,7 +15,6 @@ import {
 import { Textarea } from '@/shared/ui/primitives/textarea';
 import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import type { ResourceItem, ResourceType } from './api';
 import { createBooking } from './api';
 
@@ -141,7 +140,6 @@ export function BookingForm({ resources = [], resourceTypes = [], defaultStartsA
         Reserve
       </Button>
       <KeyboardHint>Ctrl+Enter reserves</KeyboardHint>
-      <FormStatus error={mutation.error?.message} success={mutation.isSuccess ? 'Booking confirmed' : undefined} />
     </form>
   );
 }

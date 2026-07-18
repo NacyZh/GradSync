@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 import { useAuth } from './AuthProvider';
 import { I18nProvider, type Locale, useI18n } from '../i18n/I18nProvider';
 import { AsyncState } from '../../shared/ui/AsyncState';
-import { FormStatus } from '../../shared/ui/FormStatus';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 
 export function LoginPage() {
   const [locale, setLocale] = useState<Locale>('en');
@@ -26,10 +26,17 @@ function LoginContent({
 }) {
   const { user, isLoading, login, isLoggingIn, loginError } = useAuth();
   const { t } = useI18n();
+  const { notify } = useAppFeedback();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (loginError) {
+      notify(loginError, 'error');
+    }
+  }, [loginError, notify]);
 
   if (isLoading) {
     return <AsyncState state="loading" message="Loading account" />;
@@ -118,7 +125,6 @@ function LoginContent({
             >
               {isLoggingIn ? `${t('signingIn')}...` : t('signIn')}
             </button>
-            <FormStatus error={loginError ?? undefined} />
           </form>
         </div>
       </section>

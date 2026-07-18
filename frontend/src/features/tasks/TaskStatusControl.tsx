@@ -31,8 +31,6 @@ export function TaskStatusControl({ projectId, taskId, status, disabled = false 
         <option value="cancelled">Cancelled</option>
       </select>
       {disabled ? <span className="text-sm text-muted-foreground">Archived projects are read-only until reopened.</span> : null}
-      {mutation.isSuccess ? <span role="status">Task status updated</span> : null}
-      {mutation.error ? <span role="alert">{mutation.error.message}</span> : null}
     </div>
   );
 }

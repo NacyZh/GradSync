@@ -52,12 +52,12 @@ test('archived project validation controls are available on dashboard', async ({
   await page.getByRole('button', { name: 'Archive project' }).click();
   await expect(page.getByRole('dialog', { name: 'Archive project?' })).toBeVisible();
   await page.getByRole('dialog', { name: 'Archive project?' }).getByRole('button', { name: 'Archive project' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Project status updated' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Project archived' })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Project is archived' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add task' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Reopen project' })).toBeVisible();
   await page.getByRole('button', { name: 'Reopen project' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Project status updated' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Project reopened' })).toBeVisible();
 });
 
 function projectCapabilities(status: string) {

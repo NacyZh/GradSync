@@ -13,19 +13,17 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
 import { Textarea } from '@/shared/ui/primitives/textarea';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import type { ConfirmationPolicy, LaboratoryResource, ResourceWrite } from './api';
 
 type Props = {
   open: boolean;
   resource?: LaboratoryResource;
   pending?: boolean;
-  error?: string;
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: ResourceWrite & { version?: number }) => void;
 };
 
-export function ResourceInventoryDialog({ open, resource, pending, error, onOpenChange, onSubmit }: Props) {
+export function ResourceInventoryDialog({ open, resource, pending, onOpenChange, onSubmit }: Props) {
   const [policy, setPolicy] = useState<ConfirmationPolicy | 'inherit'>('inherit');
 
   useEffect(() => setPolicy(resource?.confirmationPolicyOverride ?? 'inherit'), [resource, open]);
@@ -60,7 +58,6 @@ export function ResourceInventoryDialog({ open, resource, pending, error, onOpen
           <div className="grid gap-1.5"><Label>Confirmation policy (optional)</Label><Select value={policy} onValueChange={(value) => setPolicy(value as ConfirmationPolicy | 'inherit')}><SelectTrigger aria-label="Confirmation policy"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="inherit">Inherit type default</SelectItem><SelectItem value="immediate">Immediate</SelectItem><SelectItem value="approval_required">Approval required</SelectItem></SelectContent></Select></div>
           <div className="grid gap-1.5"><Label htmlFor="inventory-description">Description (optional)</Label><Textarea id="inventory-description" name="description" defaultValue={resource?.description} /></div>
           <div className="grid gap-1.5"><Label htmlFor="inventory-instructions">Use instructions (optional)</Label><Textarea id="inventory-instructions" name="useInstructions" defaultValue={resource?.useInstructions} /></div>
-          <FormStatus error={error} />
           <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={pending}>{resource ? 'Save changes' : 'Create resource'}</Button></DialogFooter>
         </form>
       </DialogContent>

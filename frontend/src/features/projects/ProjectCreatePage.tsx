@@ -6,25 +6,24 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/ui/primitives/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
 
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import { PageShell } from '../../shared/ui/PageShell';
 import { createProject, type StudentOption } from './api';
 import { StudentSelector } from './StudentSelector';
 
 export function ProjectCreatePage() {
   const navigate = useNavigate();
-  const [success, setSuccess] = useState('');
-  const [clientError, setClientError] = useState('');
+  const { notify } = useAppFeedback();
   const [students, setStudents] = useState<StudentOption[]>([]);
   const mutation = useMutation({
     mutationFn: createProject,
     onSuccess: (project) => {
-      setClientError('');
-      setSuccess(`Created project ${project.title}`);
+      notify(`Created project ${project.title}`, 'success');
       navigate(`/projects/${project.id}`);
     },
+    onError: (error) => notify(error.message, 'error'),
   });
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -32,12 +31,10 @@ export function ProjectCreatePage() {
     const form = new FormData(event.currentTarget);
     const startsOn = String(form.get('startsOn') ?? '');
     const endsOn = String(form.get('endsOn') ?? '');
-    setSuccess('');
     if (startsOn && endsOn && endsOn < startsOn) {
-      setClientError('Project end date cannot be before start date');
+      notify('Project end date cannot be before start date', 'error');
       return;
     }
-    setClientError('');
     mutation.mutate({
       title: String(form.get('title') ?? ''),
       description: String(form.get('description') ?? ''),
@@ -95,7 +92,6 @@ export function ProjectCreatePage() {
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending ? 'Creating' : 'Create'}
               </Button>
-              <FormStatus error={clientError || mutation.error?.message} success={success} />
             </form>
           </CardContent>
         </Card>

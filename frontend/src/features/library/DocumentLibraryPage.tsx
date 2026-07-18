@@ -10,6 +10,7 @@ import { Textarea } from '@/shared/ui/primitives/textarea';
 import { DataState } from '../../shared/ui/DataState';
 import { DownloadStatus } from '../../shared/ui/DownloadStatus';
 import { PageShell } from '../../shared/ui/PageShell';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { VisibilityBadge } from '../../shared/ui/VisibilityBadge';
@@ -110,14 +111,15 @@ function DocumentUploadForm({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'project_members' | 'group_wide'>('project_members');
-  const [complete, setComplete] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const { notify } = useAppFeedback();
   const uploadMutation = useDocumentUpload(projectId);
   const sharedUploadMutation = useSharedDocumentUpload();
   const activeUploadMutation = standalone ? sharedUploadMutation : uploadMutation;
 
   function clearFile() {
     setFile(undefined);
-    setComplete(false);
+    setUploadError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -126,23 +128,29 @@ function DocumentUploadForm({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!file || !selectedCategory) return;
-    setComplete(false);
-    const uploaded = await activeUploadMutation.mutateAsync({
-      file,
-      title,
-      categoryId: selectedCategory.id,
-      description,
-      visibility: !standalone && canUploadGroupWide && visibility === 'group_wide' ? 'group_wide' : undefined,
-    });
-    onUploaded(uploaded);
-    setFile(undefined);
-    setTitle('');
-    setDescription('');
-    setVisibility('project_members');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    setUploadError('');
+    try {
+      const uploaded = await activeUploadMutation.mutateAsync({
+        file,
+        title,
+        categoryId: selectedCategory.id,
+        description,
+        visibility: !standalone && canUploadGroupWide && visibility === 'group_wide' ? 'group_wide' : undefined,
+      });
+      onUploaded(uploaded);
+      setFile(undefined);
+      setTitle('');
+      setDescription('');
+      setVisibility('project_members');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      notify('Upload complete', 'success');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Document upload failed');
+      setUploadError(message);
+      notify(message, 'error');
     }
-    setComplete(true);
   }
 
   return (
@@ -160,7 +168,7 @@ function DocumentUploadForm({
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,application/pdf,text/plain,text/markdown"
         onChange={(event) => {
           setFile(event.target.files?.[0]);
-          setComplete(false);
+          setUploadError('');
         }}
       />
       <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -213,10 +221,14 @@ function DocumentUploadForm({
       ) : null}
       <Button type="submit" disabled={!file || !selectedCategory || activeUploadMutation.isPending}>Upload document</Button>
       {activeUploadMutation.isPending ? <UploadProgress label="Uploading document" value={65} /> : null}
-      {activeUploadMutation.error ? <p role="alert" className="min-w-0 break-words text-sm font-medium text-destructive">{activeUploadMutation.error.message}</p> : null}
-      {complete ? <p role="status" className="text-sm font-medium text-success">Upload complete</p> : null}
+      <LocalizedUploadError message={uploadError} />
     </form>
   );
+}
+
+function LocalizedUploadError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="min-w-0 break-words text-sm font-medium text-destructive">{message}</p>;
 }
 
 function SelectedDownloadPanel({ document, standalone = false }: { document?: DocumentRecord; standalone?: boolean }) {

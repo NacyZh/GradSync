@@ -433,7 +433,7 @@ describe('project work UI', () => {
     await userEvent.type(screen.getByLabelText('End date'), '2026-06-25');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Project end date cannot be before start date');
+    expect(await screen.findByText('Project end date cannot be before start date')).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });

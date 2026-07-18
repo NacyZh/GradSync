@@ -8,7 +8,6 @@ import { Input } from '@/shared/ui/primitives/input';
 
 import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui/AppFeedback';
 import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import { createTask } from './api';
 
 type TaskAssignableMember = {
@@ -152,7 +151,6 @@ export function TaskForm({
       </Button>
       <KeyboardHint>Ctrl+Enter saves</KeyboardHint>
       {disabled ? <p className="text-sm text-muted-foreground">Archived projects are read-only until reopened.</p> : null}
-      <FormStatus error={mutation.error?.message} success={mutation.isSuccess ? 'Task created' : undefined} />
     </form>
   );
 }

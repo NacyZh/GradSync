@@ -1,8 +1,9 @@
 import { Download } from 'lucide-react';
-import { useState } from 'react';
 
 import { Button } from '@/shared/ui/primitives/button';
 
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
+import { getErrorMessage } from '../../shared/api/errors';
 import {
   downloadTeacherFeedback,
   downloadWritingVersion,
@@ -18,21 +19,18 @@ type WritingVersionHistoryProps = {
 };
 
 export function WritingVersionHistory({ versions, onSelectVersion, selectedVersionId }: WritingVersionHistoryProps) {
-  const [downloadMessage, setDownloadMessage] = useState('');
-  const [error, setError] = useState('');
+  const { notify } = useAppFeedback();
 
   if (!versions.length) {
     return <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No versions uploaded.</p>;
   }
 
   async function onDownloadVersion(version: WritingVersion) {
-    setError('');
-    setDownloadMessage('');
     try {
       const descriptor = await downloadWritingVersion(version.id, version.draftFileName ?? 'writing-version');
-      setDownloadMessage(`Download started: ${descriptor.filename}`);
+      notify(`Download started: ${descriptor.filename}`, 'success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Version download failed');
+      notify(getErrorMessage(err), 'error');
     }
   }
 
@@ -64,28 +62,23 @@ export function WritingVersionHistory({ versions, onSelectVersion, selectedVersi
           </li>
         ))}
       </ol>
-      {downloadMessage ? <p role="status" className="text-sm font-medium text-success">{downloadMessage}</p> : null}
-      {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
     </div>
   );
 }
 
 export function FeedbackDownloadList({ feedback }: { feedback: TeacherFeedback[] }) {
-  const [downloadMessage, setDownloadMessage] = useState('');
-  const [error, setError] = useState('');
+  const { notify } = useAppFeedback();
 
   if (!feedback.length) {
     return <p className="text-sm text-muted-foreground">No teacher feedback yet.</p>;
   }
 
   async function onDownload(item: TeacherFeedback) {
-    setError('');
-    setDownloadMessage('');
     try {
       const descriptor = await downloadTeacherFeedback(item.id, item.annotatedFileName ?? 'teacher-feedback');
-      setDownloadMessage(`Download started: ${descriptor.filename}`);
+      notify(`Download started: ${descriptor.filename}`, 'success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Download failed');
+      notify(getErrorMessage(err), 'error');
     }
   }
 
@@ -104,8 +97,6 @@ export function FeedbackDownloadList({ feedback }: { feedback: TeacherFeedback[]
           </Button>
         </article>
       ))}
-      {downloadMessage ? <p role="status" className="text-sm font-medium text-success">{downloadMessage}</p> : null}
-      {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
     </div>
   );
 }

@@ -52,7 +52,7 @@ test('student submits report revision and advisor updates review status', async 
   await page.getByLabel('Completed work').fill('Completed experiments');
   await page.getByLabel('Next steps').fill('Write results');
   await page.getByRole('button', { name: 'Submit report' }).click();
-  await expect(page.getByLabel('Weekly progress report').getByRole('status')).toContainText('Weekly report submitted');
+  await expect(page.getByRole('status').filter({ hasText: 'Weekly report submitted' })).toBeVisible();
 
   await page.goto('/projects/1/reviews');
   if (fullStackE2E) {
@@ -72,7 +72,7 @@ test('student submits report revision and advisor updates review status', async 
   await expect(page.getByRole('region', { name: 'Submission review' })).toContainText('Week 2026-06-22');
   await expect(page.getByRole('complementary', { name: 'Inline comments' })).toBeVisible();
   await page.getByRole('listitem').filter({ hasText: 'Week 2026-06-22' }).getByLabel('Review status').selectOption('needs_revision');
-  await expect(page.getByLabel('Report reviews').getByRole('status')).toContainText('Review status updated');
+  await expect(page.getByRole('status').filter({ hasText: 'Review status updated' })).toBeVisible();
 
   if (fullStackE2E) {
     await page.getByRole('button', { name: 'Sign out' }).click();
@@ -103,5 +103,5 @@ test('student submits report revision and advisor updates review status', async 
   }
   await page.goto('/projects/1/reviews');
   await page.getByRole('listitem').filter({ hasText: 'Revision 2' }).getByLabel('Review status').selectOption('reviewed');
-  await expect(page.getByLabel('Report reviews').getByRole('status')).toContainText('Review status updated');
+  await expect(page.getByRole('status').filter({ hasText: 'Review status updated' })).toBeVisible();
 });

@@ -126,9 +126,8 @@ describe('login page', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    // After the mutation fails, the error message should appear.
-    await screen.findByRole('alert');
-    expect(screen.getByRole('alert')).toHaveTextContent('Invalid email or password');
+    // After the mutation fails, the global toast should show the error message.
+    expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
 
     // Verify fetch was called with the login endpoint and correct payload.
     const loginCall = fetchSpy.mock.calls.find(

@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { TaskForm } from '../tasks/TaskForm';
@@ -147,7 +146,6 @@ export function ProjectDashboardPage() {
       }
       className="project-workspace"
     >
-      <FormStatus error={archiveMutation.error?.message ?? reopenMutation.error?.message ?? deleteMutation.error?.message} success={archiveMutation.isSuccess || reopenMutation.isSuccess ? 'Project status updated' : undefined} />
       {liveRefresh.state === 'stale' ? (
         <DataState state="warning" title="Project data may be stale" message="Last successful project data is still visible while live refresh retries." />
       ) : null}

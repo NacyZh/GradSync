@@ -7,6 +7,7 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Textarea } from '@/shared/ui/primitives/textarea';
 
 import { getErrorMessage } from '../../shared/api/errors';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
@@ -22,8 +23,8 @@ type TeacherFeedbackPanelProps = {
 export function TeacherFeedbackPanel({ participantRole, projectId, version }: TeacherFeedbackPanelProps) {
   const [comments, setComments] = useState('');
   const [annotatedFile, setAnnotatedFile] = useState<File | undefined>();
-  const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const { notify } = useAppFeedback();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const feedbackMutation = useSubmitTeacherFeedback(projectId, version?.id ?? '');
   const canSubmitFeedback = participantRole === 'bound_advisor'
@@ -33,16 +34,17 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!version || !annotatedFile || !canSubmitFeedback) return;
-    setSuccess('');
     setError('');
     try {
       await feedbackMutation.mutateAsync({ annotatedFile, comments });
       setComments('');
       setAnnotatedFile(undefined);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      setSuccess('Feedback saved and notification recorded');
+      notify('Feedback saved and notification recorded', 'success');
     } catch (err) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      notify(message, 'error');
     }
   }
 
@@ -111,7 +113,6 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
         </Button>
         {feedbackMutation.isPending ? <UploadProgress label="Uploading feedback" value={70} /> : null}
         <LocalizedValidation message={error} />
-        {success ? <p role="status" className="text-sm font-medium text-success">{success}</p> : null}
       </form>
       ) : null}
     </div>

@@ -1,12 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserMinus, UserPlus, UsersRound } from 'lucide-react';
-import { useState } from 'react';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import type { ProjectMembership } from './api';
 import { addProjectMember, removeProjectMember } from './api';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { StudentSelector } from './StudentSelector';
 
@@ -22,23 +20,22 @@ export function ProjectMembersPanel({
   canManageMembers?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const { confirm } = useAppFeedback();
-  const [successMessage, setSuccessMessage] = useState<string>();
+  const { confirm, notify } = useAppFeedback();
   const addMutation = useMutation({
     mutationFn: (payload: { studentId: number }) => addProjectMember(projectId, payload),
-    onMutate: () => setSuccessMessage(undefined),
     onSuccess: () => {
-      setSuccessMessage('Member added');
+      notify('Member added', 'success');
       return queryClient.invalidateQueries({ queryKey: ['project', projectId] });
     },
+    onError: (error) => notify(error.message, 'error'),
   });
   const removeMutation = useMutation({
     mutationFn: (membershipId: number) => removeProjectMember(projectId, membershipId),
-    onMutate: () => setSuccessMessage(undefined),
     onSuccess: () => {
-      setSuccessMessage('Member removed');
+      notify('Member removed', 'success');
       return queryClient.invalidateQueries({ queryKey: ['project', projectId] });
     },
+    onError: (error) => notify(error.message, 'error'),
   });
 
   async function onRemove(member: ProjectMembership) {
@@ -101,10 +98,6 @@ export function ProjectMembersPanel({
           </div>
           <StudentSelector onSelect={(student) => addMutation.mutate({ studentId: student.id })} disabled={disabled || addMutation.isPending} />
           {disabled ? <p className="text-sm text-muted-foreground">Archived projects are read-only until reopened.</p> : null}
-          <FormStatus
-            error={addMutation.error?.message ?? removeMutation.error?.message}
-            success={successMessage}
-          />
         </form>
       ) : null}
     </section>

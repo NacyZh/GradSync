@@ -7,8 +7,8 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
 import { Textarea } from '@/shared/ui/primitives/textarea';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { Booking, LaboratoryResource } from './api';
 import {
@@ -25,11 +25,11 @@ type ResourceUseSubmissionPanelProps = {
 
 export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUseSubmissionPanelProps) {
   const queryClient = useQueryClient();
+  const { notify } = useAppFeedback();
   const [resourceId, setResourceId] = useState(resources[0]?.id ? String(resources[0].id) : '');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [quantity, setQuantity] = useState('1');
-  const [formError, setFormError] = useState('');
   const bookingsQuery = useQuery({
     queryKey: canManage ? ['bookings', 'review-queue'] : ['bookings'],
     queryFn: () => listBookings(canManage ? { reviewQueue: true } : undefined),
@@ -73,16 +73,28 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
   const createMutation = useMutation({
     mutationFn: (payload: { resourceId: number; startsAt: string; endsAt: string; quantity: number; purpose?: string }) =>
       createBooking(payload),
-    onSuccess: refreshResourceState,
+    onSuccess: () => {
+      notify(canManage ? 'Use recorded' : 'Use request pending review', 'success');
+      refreshResourceState();
+    },
+    onError: (error) => notify(error.message, 'error'),
   });
   const decisionMutation = useMutation({
     mutationFn: (payload: { bookingId: number; approve: boolean; decisionNote?: string }) =>
       decideBooking(payload.bookingId, payload.approve, payload.decisionNote),
-    onSuccess: refreshResourceState,
+    onSuccess: () => {
+      notify('Submission confirmed', 'success');
+      refreshResourceState();
+    },
+    onError: (error) => notify(error.message, 'error'),
   });
   const cancelMutation = useMutation({
     mutationFn: cancelBooking,
-    onSuccess: refreshResourceState,
+    onSuccess: () => {
+      notify('Request cancelled', 'success');
+      refreshResourceState();
+    },
+    onError: (error) => notify(error.message, 'error'),
   });
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -94,30 +106,29 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
     const startMs = new Date(startValue).getTime();
     const endMs = new Date(endValue).getTime();
     if (!selectedResource) {
-      setFormError('Choose a resource before submitting.');
+      notify('Choose a resource before submitting.', 'error');
       return;
     }
     if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
-      setFormError('Quantity must be a positive whole number.');
+      notify('Quantity must be a positive whole number.', 'error');
       return;
     }
     if (requestedQuantity > selectedResource.totalQuantity) {
-      setFormError(`Quantity cannot exceed ${selectedResource.totalQuantity}.`);
+      notify(`Quantity cannot exceed ${selectedResource.totalQuantity}.`, 'error');
       return;
     }
     if (!Number.isFinite(startMs) || (!canManage && startMs <= Date.now())) {
-      setFormError('Student requests must start in the future.');
+      notify('Student requests must start in the future.', 'error');
       return;
     }
     if (canManage && (!Number.isFinite(endMs) || endMs <= Date.now())) {
-      setFormError('Direct use cannot be recorded after it has ended.');
+      notify('Direct use cannot be recorded after it has ended.', 'error');
       return;
     }
     if (!Number.isFinite(endMs) || endMs <= startMs) {
-      setFormError('Use end time must be after start time.');
+      notify('Use end time must be after start time.', 'error');
       return;
     }
-    setFormError('');
     createMutation.mutate({
       resourceId: Number(form.get('resourceId')),
       startsAt: new Date(startValue).toISOString(),
@@ -198,10 +209,6 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
           <Send className="h-4 w-4" aria-hidden="true" />
           {canManage ? 'Record use' : 'Submit use request'}
         </Button>
-        <FormStatus
-          error={formError || createMutation.error?.message}
-          success={createMutation.isSuccess ? (canManage ? 'Use recorded' : 'Use request pending review') : undefined}
-        />
       </form>
 
       <section className="panel" aria-label="Resource use submissions">
@@ -252,10 +259,6 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
             </li>
           ))}
         </ul>
-        <FormStatus
-          error={decisionMutation.error?.message ?? cancelMutation.error?.message}
-          success={decisionMutation.isSuccess ? 'Submission confirmed' : cancelMutation.isSuccess ? 'Request cancelled' : undefined}
-        />
       </section>
     </div>
   );

@@ -8,6 +8,7 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
 import { useAuth } from '../auth/AuthProvider';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -28,6 +29,7 @@ import { ResourceUseSubmissionPanel } from './ResourceUseSubmissionPanel';
 export function ResourceListPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { notify } = useAppFeedback();
   const canManage = user?.global_role === 'advisor' || user?.global_role === 'admin';
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -68,20 +70,26 @@ export function ResourceListPage() {
 
   const createMutation = useMutation({
     mutationFn: createLaboratoryResource,
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setInventoryOpen(false); },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setInventoryOpen(false); notify('Resource created', 'success'); },
+    onError: (error) => notify(error.message, 'error'),
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: ResourceWrite & { version: number } }) => updateLaboratoryResource(id, payload),
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setInventoryOpen(false); setEditing(undefined); },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setInventoryOpen(false); setEditing(undefined); notify('Resource updated', 'success'); },
+    onError: (error) => notify(error.message, 'error'),
   });
   const deleteMutation = useMutation({
     mutationFn: deleteLaboratoryResource,
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setLifecycle(undefined); setCanRetire(false); },
-    onError: () => setCanRetire(true),
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setLifecycle(undefined); setCanRetire(false); notify('Resource deleted', 'success'); },
+    onError: (error) => {
+      setCanRetire(true);
+      notify(error.message, 'error');
+    },
   });
   const retireMutation = useMutation({
     mutationFn: (resource: LaboratoryResource) => retireLaboratoryResource(resource.id, resource.version),
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setLifecycle(undefined); setCanRetire(false); },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['resource-availability'] })]); setLifecycle(undefined); setCanRetire(false); notify('Resource retired', 'success'); },
+    onError: (error) => notify(error.message, 'error'),
   });
 
   function openCreate() { setEditing(undefined); setInventoryOpen(true); }
@@ -168,8 +176,8 @@ export function ResourceListPage() {
 
       <ResourceUseSubmissionPanel resources={filtered} canManage={canManage} />
 
-      <ResourceInventoryDialog open={inventoryOpen} resource={editing} pending={createMutation.isPending || updateMutation.isPending} error={createMutation.error?.message ?? updateMutation.error?.message} onOpenChange={(open) => { setInventoryOpen(open); if (!open) setEditing(undefined); }} onSubmit={save} />
-      <ResourceLifecycleDialog resource={lifecycle} open={Boolean(lifecycle)} pending={deleteMutation.isPending || retireMutation.isPending} error={deleteMutation.error?.message ?? retireMutation.error?.message} canRetire={canRetire} onOpenChange={(open) => { if (!open) { setLifecycle(undefined); setCanRetire(false); } }} onDelete={() => lifecycle && deleteMutation.mutate(lifecycle.id)} onRetire={() => lifecycle && retireMutation.mutate(lifecycle)} />
+      <ResourceInventoryDialog open={inventoryOpen} resource={editing} pending={createMutation.isPending || updateMutation.isPending} onOpenChange={(open) => { setInventoryOpen(open); if (!open) setEditing(undefined); }} onSubmit={save} />
+      <ResourceLifecycleDialog resource={lifecycle} open={Boolean(lifecycle)} pending={deleteMutation.isPending || retireMutation.isPending} canRetire={canRetire} onOpenChange={(open) => { if (!open) { setLifecycle(undefined); setCanRetire(false); } }} onDelete={() => lifecycle && deleteMutation.mutate(lifecycle.id)} onRetire={() => lifecycle && retireMutation.mutate(lifecycle)} />
     </PageShell>
   );
 }

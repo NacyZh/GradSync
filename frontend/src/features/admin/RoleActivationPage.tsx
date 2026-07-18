@@ -4,21 +4,26 @@ import { Check, X } from 'lucide-react';
 import { Badge } from '@/shared/ui/primitives/badge';
 import { Button } from '@/shared/ui/primitives/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/primitives/table';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { decideRoleActivation, listRoleActivations } from './api';
 
 export function RoleActivationPage() {
   const queryClient = useQueryClient();
+  const { notify } = useAppFeedback();
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['role-activations'],
     queryFn: listRoleActivations,
   });
   const mutation = useMutation({
     mutationFn: ({ id, action }: { id: number; action: 'approve' | 'reject' }) => decideRoleActivation(id, action),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['role-activations'] }),
+    onSuccess: () => {
+      notify('Activation updated', 'success');
+      return queryClient.invalidateQueries({ queryKey: ['role-activations'] });
+    },
+    onError: (activationError) => notify(activationError.message, 'error'),
   });
 
   return (
@@ -27,7 +32,6 @@ export function RoleActivationPage() {
       description="Approve or reject verified teacher and administrator requests."
       actions={<Badge variant="secondary">{data.filter((item) => item.status === 'pending').length} pending</Badge>}
     >
-      <FormStatus error={mutation.error?.message} success={mutation.isSuccess ? 'Activation updated' : undefined} />
       {isLoading ? <DataState state="loading" message="Loading role activation requests." /> : null}
       {error ? <DataState state="error" title="Role activations unavailable" message={(error as { message?: string }).message ?? 'Failed'} /> : null}
       {!isLoading && data.length === 0 ? <DataState state="empty" title="No requests" message="No elevated role requests are waiting." /> : null}

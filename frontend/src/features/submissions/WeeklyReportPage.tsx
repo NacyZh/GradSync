@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import { PageShell } from '../../shared/ui/PageShell';
 import { useAuth } from '../auth/AuthProvider';
 import { WeeklyReportHistory } from './WeeklyReportHistory';
@@ -78,7 +77,6 @@ export function WeeklyReportPage() {
                   <Button type="submit" disabled={mutation.isPending}>Submit report</Button>
                   <KeyboardHint>Ctrl+Enter submits</KeyboardHint>
                 </div>
-                <FormStatus error={mutation.error?.message} success={mutation.isSuccess ? 'Weekly report submitted' : undefined} />
               </form>
             </CardContent>
           </Card>

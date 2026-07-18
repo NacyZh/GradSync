@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
-import { FormStatus } from '../../shared/ui/FormStatus';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { useAuth } from './AuthProvider';
@@ -14,10 +14,15 @@ import { updateNickname } from './api';
 export function ProfilePage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { notify } = useAppFeedback();
   const [nickname, setNickname] = useState(user?.nickname || user?.name || '');
   const mutation = useMutation({
     mutationFn: updateNickname,
-    onSuccess: (updated) => queryClient.setQueryData(['current-user'], updated),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['current-user'], updated);
+      notify('Profile updated', 'success');
+    },
+    onError: (error) => notify(error.message, 'error'),
   });
 
   return (
@@ -43,7 +48,6 @@ export function ProfilePage() {
             <Save className="h-4 w-4" aria-hidden="true" />
             Save
           </Button>
-          <FormStatus error={mutation.error?.message} success={mutation.isSuccess ? 'Profile updated' : undefined} />
         </form>
       </section>
     </PageShell>

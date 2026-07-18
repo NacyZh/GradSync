@@ -8,21 +8,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/shared/ui/primitives/alert-dialog';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import type { LaboratoryResource } from './api';
 
 type Props = {
   resource?: LaboratoryResource;
   open: boolean;
   pending?: boolean;
-  error?: string;
   canRetire?: boolean;
   onOpenChange: (open: boolean) => void;
   onDelete: () => void;
   onRetire: () => void;
 };
 
-export function ResourceLifecycleDialog({ resource, open, pending, error, canRetire, onOpenChange, onDelete, onRetire }: Props) {
+export function ResourceLifecycleDialog({ resource, open, pending, canRetire, onOpenChange, onDelete, onRetire }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -32,7 +30,6 @@ export function ResourceLifecycleDialog({ resource, open, pending, error, canRet
             {canRetire ? 'This resource has retained history. Retirement preserves it and blocks new use.' : 'This permanently removes the catalog record. An immutable deletion audit snapshot remains.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <FormStatus error={error} />
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <Button type="button" variant="destructive" disabled={pending} onClick={canRetire ? onRetire : onDelete}>{canRetire ? 'Retire resource' : 'Delete resource'}</Button>

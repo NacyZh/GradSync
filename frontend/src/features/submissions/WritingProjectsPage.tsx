@@ -8,6 +8,7 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Textarea } from '@/shared/ui/primitives/textarea';
 
 import { getErrorMessage } from '../../shared/api/errors';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { PageShell } from '../../shared/ui/PageShell';
@@ -31,6 +32,7 @@ function WritingProjectCreateForm({ projectId }: { projectId?: number }) {
   const [title, setTitle] = useState('');
   const [writingType, setWritingType] = useState<WritingProject['writingType']>('thesis');
   const [error, setError] = useState('');
+  const { notify } = useAppFeedback();
   const createMutation = useCreateWritingProject(projectId);
 
   async function onSubmit(event: FormEvent) {
@@ -40,8 +42,11 @@ function WritingProjectCreateForm({ projectId }: { projectId?: number }) {
       await createMutation.mutateAsync({ title, writingType });
       setTitle('');
       setWritingType('thesis');
+      notify('Writing project created', 'success');
     } catch (err) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      notify(message, 'error');
     }
   }
 
@@ -73,8 +78,8 @@ function WritingProjectCreateForm({ projectId }: { projectId?: number }) {
 function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: number; writingProject?: WritingProject }) {
   const [file, setFile] = useState<File | undefined>();
   const [summary, setSummary] = useState('');
-  const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const { notify } = useAppFeedback();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useUploadWritingVersion(projectId, writingProject?.id ?? '');
 
@@ -86,15 +91,16 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!writingProject || !file) return;
-    setSuccess('');
     setError('');
     try {
       await uploadMutation.mutateAsync({ file, summary });
       clearFile();
       setSummary('');
-      setSuccess('Version uploaded');
+      notify('Version uploaded', 'success');
     } catch (err) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      notify(message, 'error');
     }
   }
 
@@ -138,7 +144,6 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
       </Button>
       {uploadMutation.isPending ? <UploadProgress label="Uploading version" value={65} /> : null}
       <LocalizedValidation message={error} />
-      {success ? <p role="status" className="text-sm font-medium text-success">{success}</p> : null}
     </form>
   );
 }
@@ -167,7 +172,7 @@ export function WritingProjectsPage() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameTitle, setRenameTitle] = useState('');
   const [managementError, setManagementError] = useState('');
-  const [managementMessage, setManagementMessage] = useState('');
+  const { notify } = useAppFeedback();
   const writingQuery = useWritingProjects(projectId, query);
   const renameMutation = useRenameWritingProject(projectId);
   const deleteMutation = useDeleteWritingProject(projectId);
@@ -187,20 +192,17 @@ export function WritingProjectsPage() {
     setSelectedVersion(project.versions[0]);
     setIsRenaming(false);
     setManagementError('');
-    setManagementMessage('');
   }
 
   function startRename(project: WritingProject) {
     setRenameTitle(project.title);
     setIsRenaming(true);
     setManagementError('');
-    setManagementMessage('');
   }
 
   async function saveRename() {
     if (!activeProject) return;
     setManagementError('');
-    setManagementMessage('');
     try {
       const renamed = await renameMutation.mutateAsync({
         writingProjectId: activeProject.id,
@@ -209,9 +211,11 @@ export function WritingProjectsPage() {
       setRenamedProjects((current) => ({ ...current, [renamed.id]: renamed }));
       setSelectedProject(renamed);
       setIsRenaming(false);
-      setManagementMessage('Writing project renamed');
+      notify('Writing project renamed', 'success');
     } catch (err) {
-      setManagementError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setManagementError(message);
+      notify(message, 'error');
     }
   }
 
@@ -219,16 +223,17 @@ export function WritingProjectsPage() {
     if (!activeProject) return;
     if (!window.confirm(`Delete ${formatWritingProjectTitle(activeProject)}?`)) return;
     setManagementError('');
-    setManagementMessage('');
     try {
       await deleteMutation.mutateAsync(activeProject.id);
       setArchivedProjectIds((current) => new Set(current).add(activeProject.id));
       setSelectedProject(undefined);
       setSelectedVersion(undefined);
       setIsRenaming(false);
-      setManagementMessage('Writing project deleted');
+      notify('Writing project deleted', 'success');
     } catch (err) {
-      setManagementError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setManagementError(message);
+      notify(message, 'error');
     }
   }
 
@@ -282,7 +287,6 @@ export function WritingProjectsPage() {
         </section>
         <section className="panel" aria-label="Writing project detail">
           <LocalizedValidation message={managementError} />
-          {managementMessage ? <p role="status" className="mb-3 text-sm font-medium text-success">{managementMessage}</p> : null}
           {activeProject ? (
             <div className="grid gap-4">
               <div>

@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 
 import { Button } from '@/shared/ui/primitives/button';
 
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
 import { useI18n } from '../i18n/I18nProvider';
@@ -40,6 +41,7 @@ function statusText(job: PaperImportJob | undefined, t: PaperLibraryT) {
 
 export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = false }: PaperImportPanelProps) {
   const { t } = useI18n();
+  const { notify } = useAppFeedback();
   const [files, setFiles] = useState<File[]>([]);
   const [jobs, setJobs] = useState<PaperImportJob[]>([]);
   const [uploadError, setUploadError] = useState<string | undefined>();
@@ -47,7 +49,6 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
   const importMutation = useSharedPaperPdfImport();
   const uploadPolicyQuery = usePaperUploadPolicy();
   const maxSizeLabel = uploadPolicyQuery.data?.displayLabel ?? t('paperLibraryLoadingPolicy');
-  const latestJob = jobs.at(-1);
   const reviewJob = [...jobs]
     .reverse()
     .find((item) => item.status === 'duplicate' || item.status === 'maintainer_review');
@@ -57,9 +58,7 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
       : files.length > 1
         ? `${files.length} ${t('paperLibrarySelectedPdfsSuffix')}`
         : '';
-  const currentStatus = importMutation.isPending
-    ? t('paperLibraryProcessingPdf')
-    : statusText(latestJob, t) || selectedFileSummary;
+  const currentStatus = selectedFileSummary;
 
   function clearSelectedFiles() {
     setFiles([]);
@@ -96,6 +95,7 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         const result = await importMutation.mutateAsync(selectedFile);
         importedJobs.push(result);
         setJobs([...importedJobs]);
+        notify(statusText(result, t), result.status === 'rejected' || result.status === 'failed' ? 'error' : 'success');
         if (result.status === 'rejected' || result.status === 'failed') {
           failedFiles.push(selectedFile);
           failedMessages.push(`${selectedFile.name}: ${statusText(result, t)}`);
@@ -109,6 +109,7 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         }
       } catch (err) {
         const message = err && typeof err === 'object' && 'message' in err ? String(err.message) : t('paperLibraryProcessingFailed');
+        notify(message, 'error');
         failedFiles.push(selectedFile);
         failedMessages.push(`${selectedFile.name}: ${message}`);
       }
@@ -200,9 +201,7 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
       {currentStatus ? (
         <p
           id="paper-import-status"
-          role="status"
-          aria-live="polite"
-          className="min-w-0 break-words text-sm font-medium text-success"
+          className="min-w-0 break-words text-sm text-muted-foreground"
         >
           {currentStatus}
         </p>

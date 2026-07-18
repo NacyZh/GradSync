@@ -7,7 +7,7 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
-import { FormStatus } from '../../shared/ui/FormStatus';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { register, verifyEmail, type RegisterPayload } from './api';
 
@@ -16,17 +16,24 @@ export function RegisterPage() {
   const [role, setRole] = useState<RegisterPayload['requestedRole']>('student');
   const [degreeType, setDegreeType] = useState<'masters' | 'doctoral'>('masters');
   const [status, setStatus] = useState<string | null>(null);
+  const { notify } = useAppFeedback();
 
   const registerMutation = useMutation({
     mutationFn: register,
     onSuccess: (result) => {
       setEmail(result.email);
       setStatus(result.status);
+      notify('Verification email sent', 'success');
     },
+    onError: (error) => notify(error.message, 'error'),
   });
   const verifyMutation = useMutation({
     mutationFn: verifyEmail,
-    onSuccess: (user) => setStatus(user.status),
+    onSuccess: (user) => {
+      setStatus(user.status);
+      notify('Email verified', 'success');
+    },
+    onError: (error) => notify(error.message, 'error'),
   });
 
   function onRegister(event: React.FormEvent<HTMLFormElement>) {
@@ -101,7 +108,6 @@ export function RegisterPage() {
               <UserPlus className="h-4 w-4" aria-hidden="true" />
               {registerMutation.isPending ? 'Registering' : 'Register'}
             </Button>
-            <FormStatus error={registerMutation.error?.message} success={registerMutation.isSuccess ? 'Verification email sent' : undefined} />
           </form>
 
           {email ? (
@@ -114,7 +120,6 @@ export function RegisterPage() {
                 <MailCheck className="h-4 w-4" aria-hidden="true" />
                 Verify email
               </Button>
-              <FormStatus error={verifyMutation.error?.message} success={verifyMutation.isSuccess ? 'Email verified' : undefined} />
               {status === 'active' ? <p className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4" /> Account active</p> : null}
             </form>
           ) : null}

@@ -42,8 +42,6 @@ export function ReviewStatusControl({ status, projectId, reportId, disabled = fa
         <option value="closed">Closed</option>
       </select>
       {disabled ? <span className="text-sm text-muted-foreground">Review controls are disabled for archived or unauthorized targets.</span> : null}
-      {mutation.isSuccess ? <span role="status">Review status updated</span> : null}
-      {mutation.error ? <span role="alert">{mutation.error.message}</span> : null}
     </div>
   );
 }

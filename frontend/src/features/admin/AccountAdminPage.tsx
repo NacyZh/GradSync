@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/primitives/table';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
-import { FormStatus } from '../../shared/ui/FormStatus';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { CurrentUser } from '../auth/AuthProvider';
@@ -20,7 +19,6 @@ export function AccountAdminPage() {
   const queryClient = useQueryClient();
   const { confirm, notify } = useAppFeedback();
   const [pageUrl, setPageUrl] = useState<string | undefined>(undefined);
-  const [statusMsg, setStatusMsg] = useState<{ error?: string; success?: string }>({});
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');
@@ -34,11 +32,9 @@ export function AccountAdminPage() {
     mutationFn: createAccount,
     onSuccess: (user) => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      setStatusMsg({ success: `Created account for ${user.email}` });
       notify(`Created account for ${user.email}`, 'success');
     },
     onError: (err: { message?: string }) => {
-      setStatusMsg({ error: err?.message ?? 'Failed to create account' });
       notify(err?.message ?? 'Failed to create account', 'error');
     },
   });
@@ -48,18 +44,15 @@ export function AccountAdminPage() {
       accountAction(id, action),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      setStatusMsg({ success: 'Account updated' });
       notify('Account updated', 'success');
     },
     onError: (err: { message?: string }) => {
-      setStatusMsg({ error: err?.message ?? 'Action failed' });
       notify(err?.message ?? 'Action failed', 'error');
     },
   });
 
   function onCreateSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setStatusMsg({});
     const form = new FormData(e.currentTarget);
     createMutation.mutate({
       email: String(form.get('email')),
@@ -85,7 +78,6 @@ export function AccountAdminPage() {
   const adminCount = accounts.filter((account) => account.global_role === 'admin').length;
 
   async function runAccountAction(account: CurrentUser, action: 'suspend' | 'reactivate' | 'archive') {
-    setStatusMsg({});
     if (action === 'archive') {
       const ok = await confirm({
         title: 'Archive account?',
@@ -109,9 +101,6 @@ export function AccountAdminPage() {
         </>
       }
     >
-
-      <FormStatus error={statusMsg.error} success={statusMsg.success} />
-
       <section className="panel">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
