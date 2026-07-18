@@ -141,7 +141,7 @@ test.describe('shared workspace boundaries helpers', () => {
         actionCapabilities: { canView: true, canDownload: true, canChangeVisibility: true },
       });
     });
-    await page.route('**/api/projects/1/materials/', async (route) => {
+    await page.route(/\/api\/projects\/1\/materials\/(\?.*)?$/, async (route) => {
       await fulfillJson(route, {
         count: 1,
         results: [{
