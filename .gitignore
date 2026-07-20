@@ -53,5 +53,7 @@ postgres-data/
 redis-data/
 media/
 staticfiles/
-specs
+specs/*
+!specs/015-dashboard-calendar/
+!specs/015-dashboard-calendar/**
 TODO.txt

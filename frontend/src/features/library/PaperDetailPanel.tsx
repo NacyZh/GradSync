@@ -72,7 +72,7 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
         projectId
           ? await downloadPaper(projectId, paper.id)
           : await downloadSharedPaper(paper.id, paper.defaultDownloadFilename ?? `${displayTitle}.pdf`);
-      notify(`${t('paperLibraryDownloadStarted')}: ${descriptor.filename}`, 'success');
+      notify(`${t('paperLibraryDownloadStarted')} ${descriptor.filename}`, 'success');
     } catch (err) {
       notify(getErrorMessage(err, t('paperLibraryDownloadFallbackError')), 'error');
     }

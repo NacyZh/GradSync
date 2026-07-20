@@ -1,0 +1,838 @@
+openapi: 3.0.3
+info:
+  title: GradSync Dashboard Calendar and Scheduling
+  version: 1.0.0
+  description: Feature 015 contracts for authorized calendar aggregation, private planning, group publication, recurrence changes, reminders, and delivery oversight.
+servers:
+  - url: /api
+security:
+  - sessionAuth: []
+tags:
+  - name: Calendar
+  - name: Schedules
+  - name: Schedule Audiences
+  - name: Schedule Operations
+  - name: Project Report Schedules
+paths:
+  /notifications:
+    get:
+      tags: [Calendar]
+      operationId: listNotifications
+      description: Existing authorized notification list with additive schedule event delivery-policy fields.
+      responses:
+        '200':
+          description: Authorized notifications, including schedule publication/change/cancellation/reminder events.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Notification'}
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /calendar/occurrences/:
+    get:
+      tags: [Calendar]
+      operationId: listCalendarOccurrences
+      description: Returns authorized private, group, and system-derived occurrences for a bounded period.
+      parameters:
+        - $ref: '#/components/parameters/StartsAt'
+        - $ref: '#/components/parameters/EndsAt'
+        - name: sources
+          in: query
+          description: Optional comma-separated source filter.
+          schema:
+            type: string
+            example: schedule,task,booking
+        - name: categories
+          in: query
+          schema: {type: string}
+        - name: cursor
+          in: query
+          description: Agenda pagination cursor; omitted for bounded grid views.
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 200, default: 100}
+      responses:
+        '200':
+          description: Authorized occurrence page and freshness marker.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarOccurrencePage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /calendar/events/:
+    get:
+      tags: [Calendar]
+      operationId: listCalendarEvents
+      description: Returns visibility-filtered invalidation events after an opaque cursor.
+      parameters:
+        - name: since
+          in: query
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: Incremental calendar event cursor response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEventPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /schedules/:
+    post:
+      tags: [Schedules]
+      operationId: createSchedule
+      description: Creates a private schedule or atomically publishes a staff-owned group schedule.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleCreate'
+      responses:
+        '201':
+          description: Created private or published group schedule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDetail'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Non-blocking overlap warnings require explicit confirmation or recipient resolution changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /schedules/{schedule_id}/:
+    get:
+      tags: [Schedules]
+      operationId: retrieveSchedule
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      responses:
+        '200':
+          description: Authorized schedule detail. Private detail is owner-only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Schedules]
+      operationId: updateSchedule
+      description: Updates one occurrence, current/future occurrences, or the full series using optimistic concurrency.
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleUpdate'
+      responses:
+        '200':
+          description: Updated schedule/occurrence detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDetail'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+    delete:
+      tags: [Schedules]
+      operationId: deletePrivateSchedule
+      description: Confirmed deletion of an owner-only private occurrence/future segment/series. Group schedules must use cancel.
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleDelete'
+      responses:
+        '204':
+          description: Private schedule scope deleted.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /schedules/{schedule_id}/publish/:
+    post:
+      tags: [Schedule Operations]
+      operationId: publishSchedule
+      description: Explicitly converts an owned private schedule to a group publication and resolves recipients atomically.
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulePublish'
+      responses:
+        '200':
+          description: Published group schedule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDetail'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /schedules/{schedule_id}/cancel/:
+    post:
+      tags: [Schedule Operations]
+      operationId: cancelGroupSchedule
+      description: Cancels one group occurrence, future occurrences, or the full published series and queues recipient notices.
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleCancel'
+      responses:
+        '200':
+          description: Cancelled schedule/occurrence detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /schedules/{schedule_id}/revisions/:
+    get:
+      tags: [Schedule Operations]
+      operationId: listScheduleRevisions
+      description: Returns published group revision metadata to authorized recipients/publishers; private history is never exposed.
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, default: 1}
+      responses:
+        '200':
+          description: Paginated revision metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleRevisionPage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /schedules/{schedule_id}/delivery-status/:
+    get:
+      tags: [Schedule Operations]
+      operationId: retrieveScheduleDeliveryStatus
+      description: Publisher/administrator delivery totals and privacy-safe failures for a group schedule.
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      responses:
+        '200':
+          description: Delivery summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDeliveryStatus'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /schedules/audience-options/:
+    get:
+      tags: [Schedule Audiences]
+      operationId: searchScheduleAudienceOptions
+      description: Staff-only bounded search. Advisors receive visible manageable projects and active members of those projects; administrators may receive any active account. No all-account broadcast option is returned.
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema: {type: string, enum: [project, account]}
+        - name: q
+          in: query
+          schema: {type: string, maxLength: 100}
+        - name: cursor
+          in: query
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 50, default: 20}
+      responses:
+        '200':
+          description: Searchable dropdown options with minimized identity data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudienceOptionPage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /schedules/conflicts/:
+    post:
+      tags: [Schedule Operations]
+      operationId: checkScheduleConflicts
+      description: Returns non-blocking overlaps visible to the current user without disclosing unauthorized item content.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConflictCheck'
+      responses:
+        '200':
+          description: Bounded overlap warnings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    maxItems: 20
+                    items:
+                      $ref: '#/components/schemas/ScheduleConflict'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /projects/{projectId}/report-schedule/:
+    get:
+      tags: [Project Report Schedules]
+      operationId: retrieveProjectReportSchedule
+      description: Returns the optional project weekly report deadline policy to authorized project members.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Configured project report schedule.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectReportSchedule'}
+        '204':
+          description: Project has no configured weekly report schedule.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Project Report Schedules]
+      operationId: configureProjectReportSchedule
+      description: Project advisor/authorized teacher or administrator creates or replaces the weekly report deadline policy.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProjectReportScheduleWrite'}
+      responses:
+        '200':
+          description: Updated policy.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectReportSchedule'}
+        '201':
+          description: Created policy.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectReportSchedule'}
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+    delete:
+      tags: [Project Report Schedules]
+      operationId: deleteProjectReportSchedule
+      description: Removes the configured future report deadline policy after confirmation; historical reports remain.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion, confirmed]
+              properties:
+                expectedVersion: {type: integer, minimum: 1}
+                confirmed: {type: boolean, enum: [true]}
+      responses:
+        '204':
+          description: Policy removed.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+  parameters:
+    ScheduleId:
+      name: schedule_id
+      in: path
+      required: true
+      schema: {type: integer}
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: {type: integer}
+    StartsAt:
+      name: startsAt
+      in: query
+      required: true
+      description: Inclusive period start in ISO 8601 with timezone.
+      schema: {type: string, format: date-time}
+    EndsAt:
+      name: endsAt
+      in: query
+      required: true
+      description: Exclusive period end; requested range may not exceed 62 days.
+      schema: {type: string, format: date-time}
+  responses:
+    Unauthorized:
+      description: Authentication required.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Forbidden:
+      description: Authenticated account lacks permission for the operation.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Record does not exist or is intentionally hidden by authorization.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ValidationError'}
+    VersionConflict:
+      description: The expected version is stale; current safe state is returned for review.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/VersionConflictError'}
+    RateLimited:
+      description: Bounded calendar/audience request rate exceeded.
+      headers:
+        Retry-After:
+          schema: {type: integer}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    CalendarOccurrencePage:
+      type: object
+      required: [results, generatedAt, latestEventId]
+      properties:
+        results:
+          type: array
+          maxItems: 10000
+          items: {$ref: '#/components/schemas/CalendarOccurrence'}
+        nextCursor: {type: string, nullable: true}
+        generatedAt: {type: string, format: date-time}
+        latestEventId: {type: string}
+    CalendarOccurrence:
+      type: object
+      required: [occurrenceId, sourceType, sourceId, scope, category, title, allDay, status, capabilities]
+      properties:
+        occurrenceId: {type: string}
+        sourceType:
+          type: string
+          enum: [schedule, project, task, report, booking]
+        sourceId: {type: string}
+        scheduleId: {type: integer, nullable: true}
+        scope: {type: string, enum: [personal, group, system]}
+        category:
+          type: string
+          enum: [personal, meeting, seminar, milestone, defense, deadline, other, project, task, report, booking]
+        title: {type: string}
+        description: {type: string}
+        allDay: {type: boolean}
+        startsAt: {type: string, format: date-time, nullable: true}
+        endsAt: {type: string, format: date-time, nullable: true}
+        startsOn: {type: string, format: date, nullable: true}
+        endsOn: {type: string, format: date, nullable: true, description: Exclusive end date.}
+        timezone: {type: string}
+        status: {type: string, enum: [active, completed, cancelled, pending, confirmed, rejected]}
+        organizer: {$ref: '#/components/schemas/SafeAccount', nullable: true}
+        audienceSummary: {$ref: '#/components/schemas/AudienceSummary', nullable: true}
+        actionPath: {type: string, nullable: true}
+        version: {type: integer, nullable: true}
+        capabilities: {$ref: '#/components/schemas/ScheduleCapabilities'}
+    ScheduleCreate:
+      allOf:
+        - $ref: '#/components/schemas/ScheduleFields'
+        - type: object
+          required: [scope]
+          properties:
+            scope: {type: string, enum: [personal, group]}
+            audience: {$ref: '#/components/schemas/AudienceSelection'}
+            confirmConflicts: {type: boolean, default: false}
+    ScheduleUpdate:
+      type: object
+      required: [expectedVersion, changeScope]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        changeScope: {type: string, enum: [occurrence, future, series]}
+        occurrenceKey: {type: string, nullable: true, description: Required for occurrence/future changes.}
+        fields: {$ref: '#/components/schemas/ScheduleFields'}
+        audience: {$ref: '#/components/schemas/AudienceSelection'}
+        confirmConflicts: {type: boolean, default: false}
+    ScheduleDelete:
+      type: object
+      required: [expectedVersion, changeScope, confirmed]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        changeScope: {type: string, enum: [occurrence, future, series]}
+        occurrenceKey: {type: string, nullable: true}
+        confirmed: {type: boolean, enum: [true]}
+    SchedulePublish:
+      type: object
+      required: [expectedVersion, audience, confirmed]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        audience: {$ref: '#/components/schemas/AudienceSelection'}
+        reminders:
+          type: array
+          maxItems: 3
+          items: {$ref: '#/components/schemas/ReminderInput'}
+        confirmed: {type: boolean, enum: [true]}
+        confirmConflicts: {type: boolean, default: false}
+    ScheduleCancel:
+      type: object
+      required: [expectedVersion, changeScope, confirmed]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        changeScope: {type: string, enum: [occurrence, future, series]}
+        occurrenceKey: {type: string, nullable: true}
+        reason: {type: string, maxLength: 500}
+        confirmed: {type: boolean, enum: [true]}
+    ScheduleFields:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [personal, meeting, seminar, milestone, defense, deadline, other]
+        title: {type: string, minLength: 1, maxLength: 255}
+        description: {type: string, maxLength: 4000}
+        allDay: {type: boolean}
+        startsAt: {type: string, format: date-time, nullable: true}
+        endsAt: {type: string, format: date-time, nullable: true}
+        startsOn: {type: string, format: date, nullable: true}
+        endsOn: {type: string, format: date, nullable: true}
+        timezone: {type: string, maxLength: 64}
+        recurrence: {$ref: '#/components/schemas/RecurrenceInput'}
+        reminders:
+          type: array
+          maxItems: 3
+          items: {$ref: '#/components/schemas/ReminderInput'}
+    ScheduleDetail:
+      allOf:
+        - $ref: '#/components/schemas/CalendarOccurrence'
+        - type: object
+          required: [owner, recurrence, reminders]
+          properties:
+            owner: {$ref: '#/components/schemas/SafeAccount'}
+            recurrence: {$ref: '#/components/schemas/RecurrenceInput'}
+            reminders:
+              type: array
+              items: {$ref: '#/components/schemas/ReminderInput'}
+            audience: {$ref: '#/components/schemas/AudienceSelection'}
+            publishedAt: {type: string, format: date-time, nullable: true}
+            cancelledAt: {type: string, format: date-time, nullable: true}
+    RecurrenceInput:
+      type: object
+      required: [frequency, interval]
+      properties:
+        frequency: {type: string, enum: [none, daily, weekly, monthly]}
+        interval: {type: integer, minimum: 1, maximum: 30, default: 1}
+        weekdays:
+          type: array
+          uniqueItems: true
+          maxItems: 7
+          items: {type: integer, minimum: 1, maximum: 7}
+        until: {type: string, format: date, nullable: true}
+    ReminderInput:
+      type: object
+      required: [offsetMinutes]
+      properties:
+        offsetMinutes:
+          type: integer
+          enum: [0, 15, 30, 60, 1440, 10080]
+        mandatory: {type: boolean, readOnly: true}
+    AudienceSelection:
+      type: object
+      description: At least one selected project/account is required for group publication; there is no platform-wide all-account field.
+      properties:
+        projectIds:
+          type: array
+          uniqueItems: true
+          maxItems: 50
+          items: {type: integer}
+        accountIds:
+          type: array
+          uniqueItems: true
+          maxItems: 500
+          items: {type: integer}
+    AudienceSummary:
+      type: object
+      required: [projectCount, accountCount, resolvedRecipientCount]
+      properties:
+        projectCount: {type: integer}
+        accountCount: {type: integer}
+        resolvedRecipientCount: {type: integer}
+    ScheduleCapabilities:
+      type: object
+      required: [canView, canEdit, canDelete, canPublish, canCancel, canViewDeliveryStatus, isReadOnly]
+      properties:
+        canView: {type: boolean}
+        canEdit: {type: boolean}
+        canDelete: {type: boolean}
+        canPublish: {type: boolean}
+        canCancel: {type: boolean}
+        canViewDeliveryStatus: {type: boolean}
+        isReadOnly: {type: boolean}
+    AudienceOptionPage:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/AudienceOption'}
+        nextCursor: {type: string, nullable: true}
+    AudienceOption:
+      type: object
+      required: [id, type, label, eligible]
+      properties:
+        id: {type: integer}
+        type: {type: string, enum: [project, account]}
+        label: {type: string}
+        secondaryLabel: {type: string}
+        role: {type: string, nullable: true}
+        status: {type: string}
+        eligible: {type: boolean}
+        eligibilityScope:
+          type: string
+          enum: [manageable_project_member, active_account]
+          description: Advisors receive manageable_project_member options; administrators may receive active_account options.
+    ConflictCheck:
+      type: object
+      required: [allDay]
+      properties:
+        scheduleId: {type: integer, nullable: true}
+        occurrenceKey: {type: string, nullable: true}
+        allDay: {type: boolean}
+        startsAt: {type: string, format: date-time, nullable: true}
+        endsAt: {type: string, format: date-time, nullable: true}
+        startsOn: {type: string, format: date, nullable: true}
+        endsOn: {type: string, format: date, nullable: true}
+        timezone: {type: string}
+    ScheduleConflict:
+      type: object
+      required: [occurrenceId, title, allDay, scope]
+      properties:
+        occurrenceId: {type: string}
+        title: {type: string, description: Safe visible title or generic Busy label.}
+        allDay: {type: boolean}
+        startsAt: {type: string, format: date-time, nullable: true}
+        endsAt: {type: string, format: date-time, nullable: true}
+        startsOn: {type: string, format: date, nullable: true}
+        endsOn: {type: string, format: date, nullable: true}
+        scope: {type: string, enum: [personal, group, system]}
+    ScheduleRevisionPage:
+      type: object
+      required: [count, results]
+      properties:
+        count: {type: integer}
+        results:
+          type: array
+          items: {$ref: '#/components/schemas/ScheduleRevision'}
+    ScheduleRevision:
+      type: object
+      required: [id, revisionNumber, actor, changeType, changedFields, audienceSummary, createdAt]
+      properties:
+        id: {type: integer}
+        revisionNumber: {type: integer}
+        actor: {$ref: '#/components/schemas/SafeAccount'}
+        changeType: {type: string, enum: [published, content_changed, time_changed, audience_changed, occurrence_changed, cancelled]}
+        changedFields:
+          type: array
+          items: {type: string}
+        audienceSummary: {$ref: '#/components/schemas/AudienceSummary'}
+        effectiveFrom: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time}
+    ScheduleDeliveryStatus:
+      type: object
+      required: [scheduleId, resolvedRecipients, notifications]
+      properties:
+        scheduleId: {type: integer}
+        resolvedRecipients:
+          type: object
+          required: [active, removed]
+          properties:
+            active: {type: integer}
+            removed: {type: integer}
+        notifications:
+          type: object
+          additionalProperties: {type: integer}
+          example: {inAppCreated: 20, emailSent: 8, emailFailed: 1, skipped: 1}
+        deliveryPolicy:
+          type: object
+          required: [publication, ordinaryChange, cancellation, reminder]
+          properties:
+            publication: {type: string, enum: [in_app]}
+            ordinaryChange: {type: string, enum: [in_app]}
+            cancellation: {type: string, enum: [in_app_email]}
+            reminder: {type: string, enum: [in_app_email]}
+        failureCodes:
+          type: array
+          items:
+            type: object
+            properties:
+              code: {type: string}
+              count: {type: integer}
+        updatedAt: {type: string, format: date-time}
+    CalendarEventPage:
+      type: object
+      required: [results, latestEventId, generatedAt]
+      properties:
+        results:
+          type: array
+          items: {$ref: '#/components/schemas/CalendarEvent'}
+        latestEventId: {type: string}
+        generatedAt: {type: string, format: date-time}
+    CalendarEvent:
+      type: object
+      required: [eventId, eventType, occurredAt]
+      properties:
+        eventId: {type: string}
+        eventType:
+          type: string
+          enum: [schedule_changed, audience_changed, source_changed, notification_changed]
+        scheduleId: {type: integer, nullable: true}
+        sourceType: {type: string, nullable: true}
+        sourceId: {type: string, nullable: true}
+        occurredAt: {type: string, format: date-time}
+    SafeAccount:
+      type: object
+      required: [id, name]
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        role: {type: string}
+    ConflictError:
+      type: object
+      required: [code, message, conflicts]
+      properties:
+        code: {type: string, enum: [schedule_conflict_confirmation_required, audience_changed]}
+        message: {type: string}
+        conflicts:
+          type: array
+          items: {$ref: '#/components/schemas/ScheduleConflict'}
+    VersionConflictError:
+      type: object
+      required: [code, message, currentVersion]
+      properties:
+        code: {type: string, enum: [stale_schedule_version]}
+        message: {type: string}
+        currentVersion: {type: integer}
+        current:
+          oneOf:
+            - $ref: '#/components/schemas/ScheduleDetail'
+            - $ref: '#/components/schemas/ProjectReportSchedule'
+    ValidationError:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string, enum: [validation_error]}
+        message: {type: string}
+        fields:
+          type: object
+          additionalProperties:
+            type: array
+            items: {type: string}
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string}
+        message: {type: string}
+    ProjectReportScheduleWrite:
+      type: object
+      required: [weekday, deadlineLocalTime, timezone]
+      properties:
+        weekday: {type: integer, minimum: 1, maximum: 7}
+        deadlineLocalTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          example: '18:00'
+        timezone: {type: string, maxLength: 64, example: Asia/Shanghai}
+        expectedVersion: {type: integer, minimum: 1, nullable: true}
+    ProjectReportSchedule:
+      allOf:
+        - $ref: '#/components/schemas/ProjectReportScheduleWrite'
+        - type: object
+          required: [id, projectId, version, updatedBy, createdAt, updatedAt]
+          properties:
+            id: {type: integer}
+            projectId: {type: integer}
+            version: {type: integer}
+            updatedBy: {$ref: '#/components/schemas/SafeAccount'}
+            createdAt: {type: string, format: date-time}
+            updatedAt: {type: string, format: date-time}
+    Notification:
+      type: object
+      required: [id, eventType, subject, actionPath, status, deliveryPolicy, eligibleAt]
+      properties:
+        id: {type: integer}
+        eventType:
+          type: string
+          enum: [verification_code, role_activation, new_submission, pending_review, approaching_deadline, booking_changed, teacher_feedback, teacher_feedback_available, membership_changed, resource_use_decision, schedule_published, schedule_changed, schedule_cancelled, schedule_recipient_removed, schedule_reminder]
+        subject: {type: string}
+        actionPath: {type: string}
+        status:
+          type: string
+          enum: [pending, queued, sent, failed, retry_needed, skipped, in_app_only]
+        deliveryPolicy: {type: string, enum: [in_app, in_app_email]}
+        eligibleAt: {type: string, format: date-time}
+        sentAt: {type: string, format: date-time, nullable: true}
+        failureReason: {type: string}
