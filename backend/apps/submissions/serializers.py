@@ -17,6 +17,10 @@ class ProjectReportScheduleWriteSerializer(serializers.Serializer):
     expectedVersion = serializers.IntegerField(min_value=0, required=False, allow_null=True)
 
 
+class ProjectReportScheduleDeleteSerializer(serializers.Serializer):
+    expectedVersion = serializers.IntegerField(min_value=1)
+
+
 class ProjectReportScheduleSerializer(serializers.ModelSerializer):
     projectId = serializers.IntegerField(source="project_id", read_only=True)
     deadlineLocalTime = serializers.TimeField(source="deadline_time", format="%H:%M")

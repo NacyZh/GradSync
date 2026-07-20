@@ -2,13 +2,14 @@ from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import mixins, serializers, status, views, viewsets
+from rest_framework import mixins, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.downloads import DownloadUnavailable, storage_file_download_response
+from apps.common.openapi import delete_json_request_body
 from apps.common.search import apply_text_search
 from apps.projects.services import projects_visible_to
 
@@ -26,6 +27,7 @@ from .report_services import WeeklyReportService
 from .serializers import (
     InlineCommentSerializer,
     InlineCommentStatusSerializer,
+    ProjectReportScheduleDeleteSerializer,
     ProjectReportScheduleSerializer,
     ProjectReportScheduleWriteSerializer,
     ReviewStatusSerializer,
@@ -114,6 +116,14 @@ class ProjectReportScheduleView(views.APIView):
     def get_project(self, request, project_id):
         return get_object_or_404(projects_visible_to(request.user), pk=project_id)
 
+    @extend_schema(
+        responses={
+            200: ProjectReportScheduleSerializer,
+            204: OpenApiResponse(description="Project has no configured report schedule"),
+            403: OpenApiResponse(description="Forbidden"),
+            404: OpenApiResponse(description="Project not found"),
+        }
+    )
     def get(self, request, project_id):
         project = self.get_project(request, project_id)
         policy = (
@@ -125,6 +135,16 @@ class ProjectReportScheduleView(views.APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(ProjectReportScheduleSerializer(policy).data)
 
+    @extend_schema(
+        request=ProjectReportScheduleWriteSerializer,
+        responses={
+            200: ProjectReportScheduleSerializer,
+            201: ProjectReportScheduleSerializer,
+            400: OpenApiResponse(description="Validation error"),
+            403: OpenApiResponse(description="Forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
     def put(self, request, project_id):
         project = self.get_project(request, project_id)
         serializer = ProjectReportScheduleWriteSerializer(data=request.data)
@@ -155,10 +175,24 @@ class ProjectReportScheduleView(views.APIView):
             )
         return Response(ProjectReportScheduleSerializer(policy).data)
 
+    @extend_schema(
+        request=ProjectReportScheduleDeleteSerializer,
+        extensions=delete_json_request_body(
+            {
+                "type": "object",
+                "required": ["expectedVersion"],
+                "properties": {"expectedVersion": {"type": "integer", "minimum": 1}},
+            }
+        ),
+        responses={
+            204: OpenApiResponse(description="Report schedule removed"),
+            403: OpenApiResponse(description="Forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
     def delete(self, request, project_id):
         project = self.get_project(request, project_id)
-        serializer = serializers.Serializer(data=request.data)
-        serializer.fields["expectedVersion"] = serializers.IntegerField(min_value=1)
+        serializer = ProjectReportScheduleDeleteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             remove_project_report_schedule(

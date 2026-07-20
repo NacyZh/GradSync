@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics, mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 
@@ -8,6 +9,14 @@ from .serializers import NotificationSerializer
 from .services import notifications_visible_to
 
 
+@extend_schema_view(
+    get=extend_schema(
+        responses={
+            200: NotificationSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        }
+    )
+)
 class NotificationStatusListView(generics.ListAPIView):
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]

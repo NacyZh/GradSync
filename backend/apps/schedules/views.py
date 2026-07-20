@@ -3,10 +3,13 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import serializers, status, views
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from apps.common.openapi import delete_json_request_body
 
 from .audience_services import audience_options
 from .conflict_services import visible_conflicts
@@ -99,6 +102,21 @@ class CalendarOccurrenceView(views.APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "calendar"
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("startsAt", str, required=True),
+            OpenApiParameter("endsAt", str, required=True),
+            OpenApiParameter("sources", str),
+            OpenApiParameter("cursor", str),
+            OpenApiParameter("limit", int),
+        ],
+        responses={
+            200: ScheduleOccurrenceSerializer(many=True),
+            400: OpenApiResponse(description="Invalid period"),
+            401: OpenApiResponse(description="Authentication required"),
+            429: OpenApiResponse(description="Rate limited"),
+        },
+    )
     def get(self, request):
         serializer = CalendarPeriodSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -122,6 +140,13 @@ class CalendarEventView(views.APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "calendar"
 
+    @extend_schema(
+        parameters=[OpenApiParameter("since", str), OpenApiParameter("limit", int)],
+        responses={
+            200: ScheduleOccurrenceSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+    )
     def get(self, request):
         try:
             limit = min(max(int(request.query_params.get("limit", 50)), 1), 100)
@@ -154,6 +179,16 @@ class ScheduleCollectionView(views.APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "calendar"
 
+    @extend_schema(
+        request=ScheduleCreateSerializer,
+        responses={
+            201: ScheduleItemSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Forbidden"),
+            409: OpenApiResponse(description="Confirmation required"),
+            429: OpenApiResponse(description="Rate limited"),
+        },
+    )
     def post(self, request):
         serializer = ScheduleCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -193,9 +228,26 @@ class ScheduleDetailView(views.APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "calendar"
 
+    @extend_schema(
+        responses={
+            200: ScheduleItemSerializer,
+            403: OpenApiResponse(description="Forbidden"),
+            404: OpenApiResponse(description="Not found"),
+        }
+    )
     def get(self, request, schedule_id):
         return Response(schedule_detail(_visible_schedule(request.user, schedule_id), request.user))
 
+    @extend_schema(
+        request=ScheduleUpdateSerializer,
+        responses={
+            200: ScheduleItemSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Forbidden"),
+            404: OpenApiResponse(description="Not found"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
     def patch(self, request, schedule_id):
         item = _visible_schedule(request.user, schedule_id)
         serializer = ScheduleUpdateSerializer(data=request.data)
@@ -214,6 +266,30 @@ class ScheduleDetailView(views.APIView):
         updated = _visible_schedule(request.user, updated.id)
         return Response(schedule_detail(updated, request.user))
 
+    @extend_schema(
+        request=ScheduleActionSerializer,
+        extensions=delete_json_request_body(
+            {
+                "type": "object",
+                "required": ["expectedVersion", "changeScope", "confirmed"],
+                "properties": {
+                    "expectedVersion": {"type": "integer", "minimum": 1},
+                    "changeScope": {
+                        "type": "string",
+                        "enum": ["occurrence", "future", "series"],
+                    },
+                    "occurrenceKey": {"type": "string", "nullable": True},
+                    "confirmed": {"type": "boolean", "enum": [True]},
+                },
+            }
+        ),
+        responses={
+            204: None,
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
     def delete(self, request, schedule_id):
         item = _visible_schedule(request.user, schedule_id)
         serializer = ScheduleActionSerializer(data=request.data)
@@ -258,6 +334,13 @@ class ScheduleConflictView(views.APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "calendar"
 
+    @extend_schema(
+        request=ConflictCheckSerializer,
+        responses={
+            200: ScheduleOccurrenceSerializer(many=True),
+            400: OpenApiResponse(description="Validation failed"),
+        },
+    )
     def post(self, request):
         serializer = ConflictCheckSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -278,6 +361,19 @@ class ScheduleAudienceOptionsView(views.APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "calendar"
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("type", str, required=True),
+            OpenApiParameter("q", str),
+            OpenApiParameter("cursor", str),
+            OpenApiParameter("limit", int),
+        ],
+        responses={
+            200: ScheduleItemSerializer(many=True),
+            403: OpenApiResponse(description="Forbidden"),
+            429: OpenApiResponse(description="Rate limited"),
+        },
+    )
     def get(self, request):
         option_type = request.query_params.get("type", "")
         query = request.query_params.get("q", "")[:100]
@@ -298,6 +394,15 @@ class SchedulePublishView(views.APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "calendar"
 
+    @extend_schema(
+        request=SchedulePublishSerializer,
+        responses={
+            200: ScheduleItemSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
     def post(self, request, schedule_id):
         item = _visible_schedule(request.user, schedule_id)
         serializer = SchedulePublishSerializer(data=request.data)
@@ -322,6 +427,14 @@ class ScheduleCancelView(views.APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "calendar"
 
+    @extend_schema(
+        request=ScheduleCancelSerializer,
+        responses={
+            200: ScheduleItemSerializer,
+            403: OpenApiResponse(description="Forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
     def post(self, request, schedule_id):
         item = _visible_schedule(request.user, schedule_id)
         serializer = ScheduleCancelSerializer(data=request.data)
@@ -343,6 +456,12 @@ class ScheduleRevisionView(views.APIView):
     serializer_class = ScheduleItemSerializer
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={
+            200: ScheduleItemSerializer(many=True),
+            403: OpenApiResponse(description="Forbidden"),
+        }
+    )
     def get(self, request, schedule_id):
         item = _visible_schedule(request.user, schedule_id)
         if item.scope != ScheduleItem.Scope.GROUP:
@@ -377,6 +496,12 @@ class ScheduleDeliveryStatusView(views.APIView):
     serializer_class = ScheduleItemSerializer
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={
+            200: ScheduleItemSerializer,
+            403: OpenApiResponse(description="Forbidden"),
+        }
+    )
     def get(self, request, schedule_id):
         item = _visible_schedule(request.user, schedule_id)
         if not can_manage_group_item(request.user, item):

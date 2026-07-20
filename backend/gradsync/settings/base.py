@@ -145,6 +145,10 @@ AUTH_PASSWORD_VALIDATORS = [
 SPECTACULAR_SETTINGS = {
     "TITLE": "GradSync Research Group Operations API",
     "VERSION": "0.1.0",
+    "POSTPROCESSING_HOOKS": [
+        "apps.common.openapi.include_delete_request_bodies",
+        "drf_spectacular.hooks.postprocess_schema_enums",
+    ],
 }
 
 CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")

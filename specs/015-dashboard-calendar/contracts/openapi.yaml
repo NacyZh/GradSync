@@ -43,9 +43,6 @@ paths:
           schema:
             type: string
             example: schedule,task,booking
-        - name: categories
-          in: query
-          schema: {type: string}
         - name: cursor
           in: query
           description: Agenda pagination cursor; omitted for bounded grid views.
@@ -239,9 +236,6 @@ paths:
       description: Returns published group revision metadata to authorized recipients/publishers; private history is never exposed.
       parameters:
         - $ref: '#/components/parameters/ScheduleId'
-        - name: page
-          in: query
-          schema: {type: integer, minimum: 1, default: 1}
       responses:
         '200':
           description: Paginated revision metadata.
@@ -383,10 +377,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [expectedVersion, confirmed]
+              required: [expectedVersion]
               properties:
                 expectedVersion: {type: integer, minimum: 1}
-                confirmed: {type: boolean, enum: [true]}
       responses:
         '204':
           description: Policy removed.
