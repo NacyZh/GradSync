@@ -292,6 +292,7 @@
 
   .calendar-grid-month {
     @apply grid-cols-7;
+    grid-auto-rows: 8rem;
   }
 
   .calendar-grid-week {
@@ -332,7 +333,7 @@
   }
 
   .calendar-grid-month .calendar-occurrence {
-    @apply grid-cols-1;
+    @apply min-h-0 grid-cols-1 py-0.5;
   }
 
   .calendar-grid-month .calendar-occurrence > span {
@@ -383,7 +384,44 @@
   }
 
   .calendar-more {
-    @apply w-fit rounded-sm px-1 py-0.5 text-left text-xs font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply min-h-0 w-fit rounded-sm px-1 py-0.5 text-left text-xs font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .calendar-day-popover {
+    @apply w-80 max-w-[calc(100vw-2rem)] p-0;
+  }
+
+  .calendar-day-popover > header {
+    @apply border-b px-4 py-3;
+  }
+
+  .calendar-day-popover h3 {
+    @apply text-sm font-extrabold;
+  }
+
+  .calendar-day-popover header p {
+    @apply mt-1 text-xs text-muted-foreground;
+  }
+
+  .calendar-day-popover ol {
+    @apply m-0 grid max-h-72 list-none gap-1 overflow-y-auto p-2;
+  }
+
+  .calendar-day-popover-item {
+    @apply grid w-full grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-2 border-l-[3px] px-2.5 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring;
+  }
+
+  .calendar-day-popover-item span,
+  .calendar-day-popover-item small {
+    @apply text-xs text-muted-foreground;
+  }
+
+  .calendar-day-popover-item strong {
+    @apply truncate text-sm;
+  }
+
+  .calendar-day-popover-item small {
+    @apply capitalize;
   }
 
   .calendar-detail {

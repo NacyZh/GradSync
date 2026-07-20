@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
+import { buildCalendarOccurrence, buildCalendarResponse, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
 test.beforeEach(async ({ page }) => {
   await mockAuthenticatedApi(page);
@@ -38,6 +38,37 @@ test('calendar source item opens a read-only detail before navigation', async ({
   await expect(page.getByRole('complementary', { name: 'Schedule details' })).toContainText('Read-only project data');
   await expect(page.getByRole('link', { name: 'Open source' })).toHaveAttribute('href', '/projects/1?task=11');
   await expect(page.getByRole('button', { name: /Edit/ })).toHaveCount(0);
+});
+
+test('dense month days open a scrollable list without growing the calendar', async ({ page }) => {
+  test.skip(fullStackE2E, 'Deterministic dense-day data is covered by the mocked browser journey.');
+  const occurrences = Array.from({ length: 6 }, (_, index) => buildCalendarOccurrence({
+    occurrenceId: `task:${index + 1}:2026-07-24T${String(index + 8).padStart(2, '0')}:00:00Z`,
+    sourceId: String(index + 1),
+    title: `Dense schedule ${index + 1}`,
+    startsAt: `2026-07-24T${String(index + 8).padStart(2, '0')}:00:00Z`,
+    endsAt: `2026-07-24T${String(index + 9).padStart(2, '0')}:00:00Z`,
+  }));
+  await page.unroute('**/api/calendar/occurrences/**');
+  await page.route('**/api/calendar/occurrences/**', async (route) => {
+    await route.fulfill({ json: buildCalendarResponse(occurrences) });
+  });
+
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await page.goto('/');
+  const monthGrid = page.getByRole('grid', { name: 'month calendar' });
+  await expect(monthGrid).toBeVisible();
+  const heightBefore = (await monthGrid.boundingBox())?.height;
+
+  await page.getByRole('button', { name: 'View all 6 schedules on Friday, July 24' }).click();
+  const overflowList = page.getByRole('list', { name: 'Schedules on Friday, July 24' });
+  await expect(overflowList).toBeVisible();
+  await expect(overflowList.getByRole('button')).toHaveCount(6);
+  expect((await monthGrid.boundingBox())?.height).toBe(heightBefore);
+
+  await overflowList.getByRole('button', { name: /Dense schedule 6/ }).click();
+  await expect(page.getByRole('complementary', { name: 'Schedule details' })).toContainText('Dense schedule 6');
+  await expect(overflowList).toHaveCount(0);
 });
 
 test('advisor dashboard includes configured project report deadline', async ({ page }) => {

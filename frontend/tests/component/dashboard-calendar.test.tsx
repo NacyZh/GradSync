@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -73,6 +73,35 @@ describe('dashboard calendar', () => {
     await userEvent.click(screen.getAllByRole('button', { name: /Analyze samples/ })[0]);
     expect(onSelect).toHaveBeenCalledWith(task);
     expect(screen.getAllByText('Task', { selector: 'span' }).length).toBeGreaterThan(0);
+  });
+
+  it('keeps dense month days fixed and opens overflow schedules in a popover', async () => {
+    const onSelect = vi.fn();
+    const occurrences = Array.from({ length: 5 }, (_, index) => ({
+      ...task,
+      occurrenceId: `task:${index + 1}:2026-07-20T${String(index + 8).padStart(2, '0')}:00:00Z`,
+      sourceId: String(index + 1),
+      title: `Schedule item ${index + 1}`,
+      startsAt: `2026-07-20T${String(index + 8).padStart(2, '0')}:00:00Z`,
+    }));
+
+    renderWithClient(
+      <CalendarGrid
+        anchor={new Date('2026-07-20T00:00:00Z')}
+        view="month"
+        occurrences={occurrences}
+        selectedId={null}
+        onSelect={onSelect}
+      />,
+    );
+
+    expect(within(screen.getByRole('grid')).getAllByRole('button', { name: /Schedule item/ })).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: 'View all 5 schedules on Monday, July 20' }));
+    const overflowList = screen.getByRole('list', { name: 'Schedules on Monday, July 20' });
+    expect(overflowList).toBeInTheDocument();
+    await userEvent.click(within(overflowList).getByRole('button', { name: /Schedule item 5/ }));
+    expect(onSelect).toHaveBeenCalledWith(occurrences[4]);
+    expect(screen.queryByRole('list', { name: 'Schedules on Monday, July 20' })).not.toBeInTheDocument();
   });
 
   it('shows read-only source details without unsupported actions', () => {
