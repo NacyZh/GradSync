@@ -43,3 +43,24 @@ test('project dashboard member focus remains stable during refresh window', asyn
   await page.waitForTimeout(5200);
   await expect(selector).toBeFocused();
 });
+
+test('dashboard calendar supports keyboard views, filters, and schedule dialog', async ({ page }) => {
+  await mockAuthenticatedApi(page);
+  if (fullStackE2E) {
+    await loginAs(page);
+  }
+  await page.goto('/');
+  const calendar = page.getByRole('region', { name: 'Dashboard calendar' });
+  await expect(calendar).toBeVisible();
+  await calendar.getByRole('button', { name: 'Week', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(calendar.getByRole('button', { name: 'Week', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await calendar.getByRole('button', { name: /Filter calendar sources/ }).click();
+  await expect(page.getByRole('group', { name: 'Calendar sources' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await calendar.getByRole('button', { name: 'New schedule' }).click();
+  const dialog = page.getByRole('dialog', { name: /schedule/i });
+  await expect(dialog.locator(':focus-visible')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});

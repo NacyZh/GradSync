@@ -15,6 +15,18 @@ export type WeeklyReport = {
   reviewed_at?: string | null;
 };
 
+export type ProjectReportSchedule = {
+  id: number;
+  projectId: number;
+  weekday: number;
+  deadlineLocalTime: string;
+  timezone: string;
+  version: number;
+  updatedBy: { id: number; name: string; role: string };
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type InlineComment = {
   id: number;
   target_type: string;
@@ -69,6 +81,27 @@ export function submitWeeklyReport(projectId: number, payload: { report_week_sta
   return apiRequest<WeeklyReport>(`/api/projects/${projectId}/reports/`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export function getProjectReportSchedule(projectId: number) {
+  return apiRequest<ProjectReportSchedule | undefined>(`/api/projects/${projectId}/report-schedule/`);
+}
+
+export function saveProjectReportSchedule(
+  projectId: number,
+  payload: { weekday: number; deadlineLocalTime: string; timezone: string; expectedVersion?: number },
+) {
+  return apiRequest<ProjectReportSchedule>(`/api/projects/${projectId}/report-schedule/`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteProjectReportSchedule(projectId: number, expectedVersion: number) {
+  return apiRequest<void>(`/api/projects/${projectId}/report-schedule/`, {
+    method: 'DELETE',
+    body: JSON.stringify({ expectedVersion }),
   });
 }
 

@@ -111,6 +111,14 @@ test.describe('production workspace layout', () => {
         if (routeCase.path === '/projects/1') {
           await expectMembersPanelContentStaysInside(page);
         }
+        if (routeCase.path === '/') {
+          const calendar = page.getByRole('region', { name: 'Dashboard calendar' });
+          await expect(calendar).toBeVisible();
+          const overflow = await calendar.evaluate((element) => ({
+            horizontal: element.scrollWidth - element.clientWidth,
+          }));
+          expect(overflow.horizontal).toBeLessThanOrEqual(1);
+        }
       });
     }
   }

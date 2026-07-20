@@ -2,7 +2,7 @@ from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import mixins, status, views, viewsets
+from rest_framework import mixins, serializers, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -16,6 +16,7 @@ from .comment_services import InlineCommentService
 from .feedback_services import TeacherFeedbackService
 from .models import (
     InlineComment,
+    ProjectReportSchedule,
     TeacherFeedback,
     WeeklyProgressReport,
     WritingProject,
@@ -25,6 +26,8 @@ from .report_services import WeeklyReportService
 from .serializers import (
     InlineCommentSerializer,
     InlineCommentStatusSerializer,
+    ProjectReportScheduleSerializer,
+    ProjectReportScheduleWriteSerializer,
     ReviewStatusSerializer,
     TeacherFeedbackCreateSerializer,
     TeacherFeedbackSerializer,
@@ -34,6 +37,11 @@ from .serializers import (
     WritingProjectSerializer,
     WritingVersionSerializer,
     WritingVersionUploadSerializer,
+)
+from .services import (
+    ReportScheduleVersionConflict,
+    configure_project_report_schedule,
+    remove_project_report_schedule,
 )
 from .writing_participant_services import writing_projects_for_user
 from .writing_services import (
@@ -97,6 +105,79 @@ class WeeklyReportViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
             report, serializer.validated_data["review_status"]
         )
         return Response(WeeklyReportSerializer(report).data)
+
+
+class ProjectReportScheduleView(views.APIView):
+    serializer_class = ProjectReportScheduleSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_project(self, request, project_id):
+        return get_object_or_404(projects_visible_to(request.user), pk=project_id)
+
+    def get(self, request, project_id):
+        project = self.get_project(request, project_id)
+        policy = (
+            ProjectReportSchedule.objects.select_related("updated_by")
+            .filter(project=project)
+            .first()
+        )
+        if policy is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(ProjectReportScheduleSerializer(policy).data)
+
+    def put(self, request, project_id):
+        project = self.get_project(request, project_id)
+        serializer = ProjectReportScheduleWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            policy = configure_project_report_schedule(
+                actor=request.user,
+                project=project,
+                weekday=data["weekday"],
+                deadline_time=data["deadlineLocalTime"],
+                timezone_name=data["timezone"],
+                expected_version=data.get("expectedVersion"),
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"project": exc.messages}) from exc
+        except ReportScheduleVersionConflict as exc:
+            return Response(
+                {
+                    "code": "version_conflict",
+                    "message": str(exc),
+                    "currentVersion": exc.current.version,
+                    "current": ProjectReportScheduleSerializer(exc.current).data,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(ProjectReportScheduleSerializer(policy).data)
+
+    def delete(self, request, project_id):
+        project = self.get_project(request, project_id)
+        serializer = serializers.Serializer(data=request.data)
+        serializer.fields["expectedVersion"] = serializers.IntegerField(min_value=1)
+        serializer.is_valid(raise_exception=True)
+        try:
+            remove_project_report_schedule(
+                actor=request.user,
+                project=project,
+                expected_version=serializer.validated_data["expectedVersion"],
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except ReportScheduleVersionConflict as exc:
+            return Response(
+                {
+                    "code": "version_conflict",
+                    "message": str(exc),
+                    "currentVersion": exc.current.version,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class InlineCommentViewSet(
@@ -347,8 +428,7 @@ class WritingVersionUploadView(views.APIView):
         serializer.is_valid(raise_exception=True)
         try:
             version = upload_standalone_writing_version(
-                request.user,
-                writing_project=writing_project, **serializer.validated_data
+                request.user, writing_project=writing_project, **serializer.validated_data
             )
         except DjangoValidationError as exc:
             return Response({"message": _error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)

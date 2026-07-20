@@ -17,6 +17,18 @@ class Notification(models.Model):
         )
         MEMBERSHIP_CHANGED = "membership_changed", "Membership changed"
         RESOURCE_USE_DECISION = "resource_use_decision", "Resource use decision"
+        SCHEDULE_PUBLISHED = "schedule_published", "Schedule published"
+        SCHEDULE_CHANGED = "schedule_changed", "Schedule changed"
+        SCHEDULE_CANCELLED = "schedule_cancelled", "Schedule cancelled"
+        SCHEDULE_RECIPIENT_REMOVED = (
+            "schedule_recipient_removed",
+            "Schedule recipient removed",
+        )
+        SCHEDULE_REMINDER = "schedule_reminder", "Schedule reminder"
+
+    class DeliveryPolicy(models.TextChoices):
+        IN_APP = "in_app", "In app"
+        IN_APP_EMAIL = "in_app_email", "In app and email"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -25,6 +37,7 @@ class Notification(models.Model):
         FAILED = "failed", "Failed"
         RETRY_NEEDED = "retry_needed", "Retry needed"
         SKIPPED = "skipped", "Skipped"
+        IN_APP_ONLY = "in_app_only", "In app only"
 
     project = models.ForeignKey(
         "projects.ResearchProject",
@@ -48,6 +61,11 @@ class Notification(models.Model):
     subject = models.CharField(max_length=255)
     action_path = models.CharField(max_length=512, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    delivery_policy = models.CharField(
+        max_length=20,
+        choices=DeliveryPolicy.choices,
+        default=DeliveryPolicy.IN_APP_EMAIL,
+    )
     eligible_at = models.DateTimeField()
     queued_at = models.DateTimeField(null=True, blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)

@@ -295,6 +295,20 @@ Alert on backend or frontend healthcheck failures, database readiness failures,
 Redis readiness failures, worker absence, scheduler absence, pending
 notifications above the expected reminder window, repeated notification delivery
 failures, and elevated 5xx responses grouped by request ID.
+
+### Calendar Reminder Signals
+
+- Run `python manage.py ensure_notification_schedule` after migrations. It
+  idempotently registers `GradSync schedule reminders` on the existing
+  five-minute interval and does not introduce another queue or secret.
+- Monitor `gradsync_schedule_dispatch_lag_seconds` and
+  `gradsync_schedule_dispatch_total{channel,status}`. These metrics contain no
+  schedule title, description, reminder content, or recipient identity.
+- Publication/change notifications remain `in_app`; cancellation/reminder
+  notifications are `in_app_email` and follow the existing retry worker.
+- Before an application-only rollback, disable the schedule reminder periodic
+  task, retain additive schedule/notification tables, and leave historical
+  grants, revisions, and dispatch rows intact.
 # Shared resource inventory migration and rollback (Feature 012)
 
 Feature 012 uses an expand-and-switch rollout. Apply the additive audit and

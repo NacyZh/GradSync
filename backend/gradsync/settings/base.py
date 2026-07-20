@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "apps.operations",
     "apps.notifications",
     "apps.audit",
+    "apps.schedules",
 ]
 
 MIDDLEWARE = [
@@ -121,6 +122,7 @@ REST_FRAMEWORK = {
         "invite": os.getenv("THROTTLE_INVITE_RATE", "10/min"),
         "paper_library": os.getenv("THROTTLE_PAPER_LIBRARY_RATE", "120/min"),
         "paper_import": os.getenv("THROTTLE_PAPER_IMPORT_RATE", "30/hour"),
+        "calendar": os.getenv("THROTTLE_CALENDAR_RATE", "120/min"),
     },
 }
 

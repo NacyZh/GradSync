@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     InlineCommentViewSet,
+    ProjectReportScheduleView,
     StandaloneWritingProjectViewSet,
     TeacherFeedbackDownloadView,
     TeacherFeedbackSubmitView,
@@ -22,6 +23,11 @@ router.register("comments", InlineCommentViewSet, basename="project-comments")
 router.register("writing-projects", WritingProjectViewSet, basename="project-writing")
 
 urlpatterns = [
+    path(
+        "projects/<int:project_id>/report-schedule/",
+        ProjectReportScheduleView.as_view(),
+        name="project-report-schedule",
+    ),
     path("", include(standalone_router.urls)),
     path("projects/<int:project_id>/", include(router.urls)),
     path(

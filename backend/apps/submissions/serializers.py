@@ -2,11 +2,48 @@ from rest_framework import serializers
 
 from .models import (
     InlineComment,
+    ProjectReportSchedule,
     TeacherFeedback,
     WeeklyProgressReport,
     WritingProject,
     WritingVersion,
 )
+
+
+class ProjectReportScheduleWriteSerializer(serializers.Serializer):
+    weekday = serializers.IntegerField(min_value=1, max_value=7)
+    deadlineLocalTime = serializers.TimeField()
+    timezone = serializers.CharField(max_length=64)
+    expectedVersion = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+
+
+class ProjectReportScheduleSerializer(serializers.ModelSerializer):
+    projectId = serializers.IntegerField(source="project_id", read_only=True)
+    deadlineLocalTime = serializers.TimeField(source="deadline_time", format="%H:%M")
+    updatedBy = serializers.SerializerMethodField()
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+    updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
+
+    class Meta:
+        model = ProjectReportSchedule
+        fields = [
+            "id",
+            "projectId",
+            "weekday",
+            "deadlineLocalTime",
+            "timezone",
+            "version",
+            "updatedBy",
+            "createdAt",
+            "updatedAt",
+        ]
+
+    def get_updatedBy(self, obj):
+        return {
+            "id": obj.updated_by_id,
+            "name": obj.updated_by.name,
+            "role": obj.updated_by.global_role,
+        }
 
 
 class ReviewStatusSerializer(serializers.Serializer):

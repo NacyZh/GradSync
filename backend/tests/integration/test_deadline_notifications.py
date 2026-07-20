@@ -51,9 +51,15 @@ def test_project_deadline_reminders_and_periodic_schedule_are_created():
     assert project.notifications.filter(
         target_type="ResearchProject", target_id=f"{project.id}:due_soon", recipient=student
     ).exists()
-    assert schedule_created == 3
+    assert schedule_created == 4
     assert PeriodicTask.objects.filter(
         name="GradSync deadline reminders",
+        interval__every=5,
+        interval__period="minutes",
+        enabled=True,
+    ).exists()
+    assert PeriodicTask.objects.filter(
+        name="GradSync schedule reminders",
         interval__every=5,
         interval__period="minutes",
         enabled=True,

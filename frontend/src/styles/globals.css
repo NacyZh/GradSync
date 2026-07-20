@@ -182,6 +182,403 @@
     @apply mb-3 font-bold;
   }
 
+  .calendar-workspace {
+    @apply mb-6 min-w-0 overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm;
+  }
+
+  .calendar-toolbar {
+    @apply grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-4 border-b bg-muted/20 p-4;
+  }
+
+  .calendar-toolbar-heading {
+    @apply min-w-0;
+  }
+
+  .calendar-toolbar-heading h2 {
+    @apply m-0 truncate text-xl font-extrabold;
+  }
+
+  .calendar-toolbar-kicker,
+  .calendar-detail-kicker {
+    @apply mb-1 flex items-center gap-1.5 text-xs font-bold uppercase text-muted-foreground;
+  }
+
+  .calendar-toolbar-actions {
+    @apply flex items-start justify-end;
+  }
+
+  .calendar-filter-count {
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1 text-[0.6875rem];
+  }
+
+  .calendar-toolbar-lower {
+    @apply col-span-full flex min-w-0 flex-wrap items-center justify-between gap-3;
+  }
+
+  .calendar-period-controls,
+  .calendar-view-switch {
+    @apply flex min-w-0 items-center;
+  }
+
+  .calendar-period-controls {
+    @apply gap-1;
+  }
+
+  .calendar-view-switch {
+    @apply overflow-hidden rounded-md border bg-background p-0.5;
+  }
+
+  .calendar-view-switch button {
+    @apply rounded-sm px-3;
+  }
+
+  .calendar-view-switch button.active {
+    @apply bg-foreground text-background hover:bg-foreground/90;
+  }
+
+  .calendar-source-filters {
+    @apply grid gap-1;
+  }
+
+  .calendar-source-filters legend {
+    @apply px-2 pb-2 pt-1 text-xs font-extrabold text-muted-foreground;
+  }
+
+  .calendar-source-filters label {
+    @apply grid cursor-pointer grid-cols-[1rem_0.625rem_1fr] items-center gap-2 rounded-sm px-2 py-2 text-sm font-semibold hover:bg-muted;
+  }
+
+  .calendar-source-filters input {
+    @apply h-4 w-4 accent-foreground;
+  }
+
+  .calendar-source-mark {
+    @apply h-2.5 w-2.5 rounded-full;
+  }
+
+  .calendar-source-mark.source-schedule { @apply border-0 bg-cyan-600; }
+  .calendar-source-mark.source-project { @apply border-0 bg-emerald-600; }
+  .calendar-source-mark.source-task { @apply border-0 bg-amber-600; }
+  .calendar-source-mark.source-report { @apply border-0 bg-fuchsia-700; }
+  .calendar-source-mark.source-booking { @apply border-0 bg-rose-600; }
+
+  .calendar-workspace-body {
+    @apply grid min-h-[32rem] min-w-0 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_21rem];
+  }
+
+  .calendar-primary-region {
+    @apply min-w-0 overflow-auto bg-background;
+  }
+
+  .calendar-desktop-surface {
+    @apply hidden min-h-[32rem] min-w-[44rem] sm:block;
+  }
+
+  .calendar-mobile-surface {
+    @apply block sm:hidden;
+  }
+
+  .calendar-weekdays {
+    @apply grid grid-cols-7 border-b bg-muted/30;
+  }
+
+  .calendar-weekdays span {
+    @apply border-r px-3 py-2 text-right text-[0.6875rem] font-extrabold uppercase text-muted-foreground last:border-r-0;
+  }
+
+  .calendar-grid {
+    @apply grid min-h-[29.5rem] min-w-[44rem] auto-rows-fr;
+  }
+
+  .calendar-grid-month {
+    @apply grid-cols-7;
+  }
+
+  .calendar-grid-week {
+    @apply grid-cols-7;
+  }
+
+  .calendar-grid-day {
+    @apply min-w-0 grid-cols-1;
+  }
+
+  .calendar-day {
+    @apply min-h-28 min-w-0 overflow-hidden border-b border-r bg-background p-2.5;
+  }
+
+  .calendar-day[data-outside='true'] {
+    @apply bg-muted/25 text-muted-foreground;
+  }
+
+  .calendar-day[data-today='true'] > time {
+    @apply inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-primary px-1 text-primary-foreground;
+  }
+
+  .calendar-day-items {
+    @apply mt-2 grid min-w-0 gap-1;
+  }
+
+  .calendar-occurrence {
+    @apply grid min-w-0 grid-cols-[auto_1fr] gap-x-1.5 overflow-hidden rounded-sm border border-l-[3px] bg-card px-2 py-1 text-left text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .calendar-occurrence[aria-pressed='true'],
+  .calendar-agenda-item[aria-pressed='true'] {
+    @apply bg-muted ring-1 ring-inset ring-foreground/30;
+  }
+
+  .calendar-occurrence strong {
+    @apply truncate;
+  }
+
+  .calendar-grid-month .calendar-occurrence {
+    @apply grid-cols-1;
+  }
+
+  .calendar-grid-month .calendar-occurrence > span {
+    @apply hidden;
+  }
+
+  .calendar-occurrence small {
+    @apply hidden;
+  }
+
+  .source-schedule { @apply border-l-cyan-600; }
+  .source-project { @apply border-l-emerald-600; }
+  .source-task { @apply border-l-amber-600; }
+  .source-report { @apply border-l-fuchsia-700; }
+  .source-booking { @apply border-l-rose-600; }
+
+  .calendar-agenda {
+    @apply min-w-[38rem];
+  }
+
+  .calendar-agenda-group > header {
+    @apply sticky top-0 z-10 flex items-center justify-between border-b bg-muted/80 px-4 py-2 backdrop-blur-sm;
+  }
+
+  .calendar-agenda-group > header time {
+    @apply text-xs font-extrabold;
+  }
+
+  .calendar-agenda-group > header span {
+    @apply text-xs text-muted-foreground;
+  }
+
+  .calendar-agenda-group ol {
+    @apply m-0 list-none p-0;
+  }
+
+  .calendar-agenda-item {
+    @apply grid w-full grid-cols-[6rem_minmax(10rem,1fr)_6rem_5rem] items-center gap-3 border-b border-l-[3px] p-3 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring;
+  }
+
+  .calendar-agenda-time {
+    @apply text-xs font-semibold text-muted-foreground;
+  }
+
+  .calendar-source-label,
+  .status-badge {
+    @apply inline-flex w-fit rounded-sm border px-2 py-1 text-xs font-bold capitalize;
+  }
+
+  .calendar-more {
+    @apply w-fit rounded-sm px-1 py-0.5 text-left text-xs font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .calendar-detail {
+    @apply min-w-0 border-t bg-muted/15 p-4 lg:max-h-[34rem] lg:overflow-y-auto lg:border-l lg:border-t-0;
+  }
+
+  .calendar-detail h2 {
+    @apply my-3 break-words text-lg font-extrabold;
+  }
+
+  .calendar-detail-heading,
+.calendar-detail-actions {
+    @apply flex flex-wrap items-center justify-between gap-2;
+  }
+
+  .calendar-detail-title {
+    @apply flex items-start justify-between gap-3;
+  }
+
+  .calendar-detail dl {
+    @apply my-4 grid gap-3 text-sm;
+  }
+
+  .calendar-detail dl div {
+    @apply grid grid-cols-[5rem_1fr] gap-2;
+  }
+
+  .calendar-detail dt {
+    @apply font-bold text-muted-foreground;
+  }
+
+  .calendar-readonly,
+  .calendar-updating,
+  .calendar-empty {
+    @apply p-4 text-sm text-muted-foreground;
+  }
+
+  .calendar-upcoming-list {
+    @apply m-0 grid list-none gap-1 p-0;
+  }
+
+  .calendar-upcoming-list button {
+    @apply grid w-full grid-cols-[0.625rem_minmax(0,1fr)] items-start gap-2.5 rounded-sm p-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .calendar-upcoming-list .calendar-source-mark {
+    @apply mt-1.5;
+  }
+
+  .calendar-upcoming-list strong,
+  .calendar-upcoming-list small {
+    @apply block;
+  }
+
+  .calendar-upcoming-list strong {
+    @apply truncate text-sm;
+  }
+
+  .calendar-upcoming-list small {
+    @apply mt-1 text-xs text-muted-foreground;
+  }
+
+  .schedule-form {
+    @apply grid gap-4;
+  }
+
+  .schedule-check {
+    @apply flex min-h-10 cursor-pointer items-center gap-2 text-sm font-semibold;
+  }
+
+  .schedule-check input,
+  .schedule-weekdays input {
+    @apply h-4 w-4 accent-foreground;
+  }
+
+  .schedule-native-select {
+    @apply flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .schedule-weekdays {
+    @apply grid grid-cols-2 gap-2 rounded-md border p-3 sm:grid-cols-4;
+  }
+
+  .schedule-weekdays legend {
+    @apply px-1 text-sm font-bold;
+  }
+
+  .schedule-weekdays label {
+    @apply flex cursor-pointer items-center gap-2 text-sm;
+  }
+
+  .schedule-audience-fieldset {
+    @apply grid gap-4 border-t pt-4;
+  }
+
+  .schedule-audience-fieldset > legend {
+    @apply pr-2 text-sm font-extrabold;
+  }
+
+  .schedule-audience-fieldset > p {
+    @apply text-xs text-muted-foreground;
+  }
+
+  .schedule-recipient-selector {
+    @apply grid gap-1.5;
+  }
+
+  .schedule-recipient-options {
+    @apply absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 max-h-52 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md;
+  }
+
+  .schedule-recipient-options button {
+    @apply flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-60;
+  }
+
+  .schedule-recipient-options strong,
+  .schedule-recipient-options small {
+    @apply block;
+  }
+
+  .schedule-recipient-options small,
+  .schedule-recipient-options p {
+    @apply text-xs text-muted-foreground;
+  }
+
+  .schedule-recipient-options p {
+    @apply p-3;
+  }
+
+  .schedule-recipient-selected {
+    @apply m-0 flex list-none flex-wrap gap-2 p-0;
+  }
+
+  .schedule-recipient-selected li {
+    @apply flex min-w-0 items-center gap-1 rounded-md border bg-muted/40 pl-2 text-xs font-bold;
+  }
+
+  .schedule-recipient-selected li span {
+    @apply max-w-44 truncate;
+  }
+
+  .schedule-recipient-selected li button {
+    @apply h-8 w-8 min-h-8;
+  }
+
+  @media (max-width: 639px) {
+    .calendar-toolbar {
+      @apply p-3;
+    }
+
+    .calendar-toolbar-heading h2 {
+      @apply text-lg;
+    }
+
+    .calendar-toolbar-lower {
+      @apply grid grid-cols-1;
+    }
+
+    .calendar-view-switch {
+      @apply grid w-full grid-cols-4;
+    }
+
+    .calendar-primary-region {
+      @apply max-h-[34rem] overflow-y-auto;
+    }
+
+    .calendar-workspace-body {
+      @apply min-h-0;
+    }
+
+    .calendar-agenda {
+      @apply min-w-0;
+    }
+
+    .calendar-agenda-item {
+      @apply grid-cols-[5.5rem_minmax(0,1fr)_auto];
+    }
+
+    .calendar-agenda-item small {
+      @apply hidden;
+    }
+
+    .calendar-agenda-item .calendar-source-label {
+      @apply col-span-1;
+    }
+
+    .calendar-detail {
+      @apply max-h-[30rem] overflow-y-auto;
+    }
+
+    .calendar-detail[data-empty='true'] {
+      @apply hidden;
+    }
+  }
+
   .metric-card {
     @apply grid gap-1.5;
   }
@@ -440,5 +837,68 @@
 
   .login-button {
     @apply h-11 w-full;
+  }
+}
+
+.schedule-delivery-summary,
+.schedule-revision-history {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 0.875rem;
+}
+
+.schedule-delivery-summary h3,
+.schedule-revision-history h3 {
+  margin: 0 0 0.625rem;
+  font-size: 0.875rem;
+}
+
+.schedule-delivery-summary dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.schedule-delivery-summary dl > div {
+  min-width: 0;
+}
+
+.schedule-delivery-summary dt,
+.schedule-revision-history span {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+
+.schedule-delivery-summary dd {
+  margin: 0.125rem 0 0;
+  font-weight: 700;
+}
+
+.schedule-revision-history ol {
+  display: grid;
+  max-height: 9rem;
+  margin: 0;
+  padding: 0;
+  gap: 0.5rem;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.schedule-revision-history li {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 480px) {
+  .schedule-delivery-summary dl {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-revision-history li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.125rem;
   }
 }

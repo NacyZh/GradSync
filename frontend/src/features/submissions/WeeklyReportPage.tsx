@@ -11,14 +11,21 @@ import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField'
 import { PageShell } from '../../shared/ui/PageShell';
 import { useAuth } from '../auth/AuthProvider';
 import { WeeklyReportHistory } from './WeeklyReportHistory';
-import { listReports, submitWeeklyReport } from './api';
+import {
+  deleteProjectReportSchedule,
+  getProjectReportSchedule,
+  listReports,
+  saveProjectReportSchedule,
+  submitWeeklyReport,
+} from './api';
 
 export function WeeklyReportPage() {
   const projectId = Number(useParams().projectId ?? 0);
   const { user } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
-  const { notify } = useAppFeedback();
+  const { notify, confirm } = useAppFeedback();
   const canSubmitReports = user?.global_role === 'student';
+  const canManageSchedule = user?.global_role === 'advisor' || user?.global_role === 'admin';
   const reportsQuery = useQuery({
     queryKey: ['reports', projectId],
     queryFn: () => listReports(projectId),
@@ -29,6 +36,28 @@ export function WeeklyReportPage() {
     onSuccess: () => {
       notify('Weekly report submitted', 'success');
       reportsQuery.refetch();
+    },
+    onError: (error) => notify(error.message, 'error'),
+  });
+  const reportScheduleQuery = useQuery({
+    queryKey: ['projectReportSchedule', projectId],
+    queryFn: () => getProjectReportSchedule(projectId),
+    enabled: Boolean(projectId && user),
+  });
+  const scheduleMutation = useMutation({
+    mutationFn: (payload: { weekday: number; deadlineLocalTime: string; timezone: string; expectedVersion?: number }) =>
+      saveProjectReportSchedule(projectId, payload),
+    onSuccess: (policy) => {
+      reportScheduleQuery.refetch();
+      notify(`Weekly report deadline saved for ${weekdayLabel(policy.weekday)}`, 'success');
+    },
+    onError: (error) => notify(error.message, 'error'),
+  });
+  const removeScheduleMutation = useMutation({
+    mutationFn: (version: number) => deleteProjectReportSchedule(projectId, version),
+    onSuccess: () => {
+      reportScheduleQuery.refetch();
+      notify('Weekly report deadline removed', 'success');
     },
     onError: (error) => notify(error.message, 'error'),
   });
@@ -44,6 +73,28 @@ export function WeeklyReportPage() {
     });
   }
 
+  function onScheduleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    scheduleMutation.mutate({
+      weekday: Number(form.get('weekday')),
+      deadlineLocalTime: String(form.get('deadlineLocalTime')),
+      timezone: String(form.get('timezone')),
+      expectedVersion: reportScheduleQuery.data?.version,
+    });
+  }
+
+  async function removeSchedule() {
+    const policy = reportScheduleQuery.data;
+    if (!policy) return;
+    const accepted = await confirm({
+      title: 'Remove weekly report deadline?',
+      message: 'Future report deadlines will disappear from member calendars. Submitted reports are unchanged.',
+      actionLabel: 'Remove schedule',
+    });
+    if (accepted) removeScheduleMutation.mutate(policy.version);
+  }
+
   const submitShortcut = useCallback(() => {
     formRef.current?.requestSubmit();
   }, []);
@@ -55,6 +106,37 @@ export function WeeklyReportPage() {
       description="Submit weekly progress updates, track review decisions, and resubmit revisions when a report is returned."
       className="submission-workspace"
     >
+      <Card className="mb-4" aria-label="Weekly report schedule">
+        <CardHeader>
+          <CardTitle>Weekly report deadline</CardTitle>
+          <CardDescription>Project-owned schedule used for future member calendar deadlines.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {reportScheduleQuery.isLoading ? <DataState state="loading" message="Loading report deadline" /> : null}
+          {reportScheduleQuery.error ? <DataState state="error" message={reportScheduleQuery.error.message} /> : null}
+          {!reportScheduleQuery.isLoading && !reportScheduleQuery.error && canManageSchedule ? (
+            <form className="grid gap-3 md:grid-cols-[1fr_1fr_1.4fr_auto] md:items-end" onSubmit={onScheduleSubmit}>
+              <label className="grid gap-1.5 text-sm font-bold">
+                Weekday
+                <select name="weekday" className="min-h-10 rounded-md border bg-background px-3" defaultValue={reportScheduleQuery.data?.weekday ?? 5}>
+                  {[1, 2, 3, 4, 5, 6, 7].map((day) => <option key={day} value={day}>{weekdayLabel(day)}</option>)}
+                </select>
+              </label>
+              <FormField id="report-deadline-time" name="deadlineLocalTime" label="Deadline time" type="time" required defaultValue={reportScheduleQuery.data?.deadlineLocalTime ?? '18:00'} />
+              <FormField id="report-deadline-timezone" name="timezone" label="Timezone" required defaultValue={reportScheduleQuery.data?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} />
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={scheduleMutation.isPending}>Save</Button>
+                {reportScheduleQuery.data ? <Button type="button" variant="outline" disabled={removeScheduleMutation.isPending} onClick={removeSchedule}>Remove</Button> : null}
+              </div>
+            </form>
+          ) : null}
+          {!reportScheduleQuery.isLoading && !reportScheduleQuery.error && !canManageSchedule ? (
+            reportScheduleQuery.data ? (
+              <p className="text-sm"><strong>{weekdayLabel(reportScheduleQuery.data.weekday)}</strong> at {reportScheduleQuery.data.deadlineLocalTime} ({reportScheduleQuery.data.timezone})</p>
+            ) : <DataState state="empty" message="No weekly report deadline is configured." />
+          ) : null}
+        </CardContent>
+      </Card>
       <div className="grid gap-4 xl:grid-cols-[minmax(24rem,1.2fr)_minmax(18rem,0.8fr)]">
         {canSubmitReports ? (
           <Card>
@@ -97,4 +179,8 @@ export function WeeklyReportPage() {
       </div>
     </PageShell>
   );
+}
+
+function weekdayLabel(day: number) {
+  return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day - 1] ?? 'Unknown day';
 }

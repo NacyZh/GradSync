@@ -47,3 +47,23 @@ def record_resource_decision(project, actor, target, action: str) -> AuditEvent:
 
 def record_notification_status(project, actor, target, status: str) -> AuditEvent:
     return record_event(project, actor, f"notification.{status}", f"Notification {status}", target)
+
+
+def record_schedule_event(*, actor, schedule_item, action: str, outcome: str, audience=None):
+    """Record group schedule operations without copying schedule content."""
+    if schedule_item.scope == "personal":
+        return None
+    snapshot = {
+        "scope": schedule_item.scope,
+        "outcome": outcome,
+        "audience": audience or {},
+        "version": schedule_item.version,
+    }
+    return record_event(
+        None,
+        actor,
+        f"schedule.{action}",
+        f"Group schedule {action}: {outcome}",
+        schedule_item,
+        target_snapshot=snapshot,
+    )

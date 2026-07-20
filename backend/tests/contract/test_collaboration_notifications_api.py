@@ -5,6 +5,7 @@ from apps.notifications.models import Notification
 from apps.notifications.services import enqueue_notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from tests.factories.accounts import UserFactory
+from tests.factories.schedules import ScheduleItemFactory
 from tests.helpers import authenticate
 
 
@@ -93,3 +94,24 @@ def test_project_notification_status_list_filters_by_authorized_project(api_clie
     assert teacher_response.status_code == 200
     assert teacher_response.json()["results"][0]["id"] == notification.id
     assert outsider_response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_schedule_notification_exposes_delivery_policy_and_safe_action_path(api_client):
+    recipient = UserFactory(global_role="student", status="active")
+    schedule = ScheduleItemFactory(owner=recipient, organizer=recipient)
+    notification = enqueue_notification(
+        recipient=recipient,
+        event_type=Notification.EventType.SCHEDULE_REMINDER,
+        target_type="ScheduleItem",
+        target_id=str(schedule.id),
+        subject="Schedule reminder",
+        action_path=f"/?date=2026-07-24&item=schedule%3A{schedule.id}",
+        delivery_policy=Notification.DeliveryPolicy.IN_APP_EMAIL,
+    )
+    response = authenticate(api_client, recipient).get("/api/notifications")
+    assert response.status_code == 200
+    payload = next(item for item in response.json()["results"] if item["id"] == notification.id)
+    assert payload["deliveryPolicy"] == "in_app_email"
+    assert payload["actionPath"].startswith("/?date=")
+    assert "recipientEmail" in payload

@@ -150,3 +150,21 @@ docker compose -f docker-compose.prod.yml run --rm backend python manage.py chec
 
 Operational runbooks for rollout, rollback, backups, incident response, secret
 rotation, and vulnerability remediation are in `docs/production.md`.
+
+### Dashboard Calendar Operations
+
+Apply schedule and notification migrations before starting application
+containers, then register the idempotent five-minute reminder schedule:
+
+```bash
+cd backend
+python manage.py migrate
+python manage.py ensure_notification_schedule
+celery -A gradsync worker -Q notifications
+celery -A gradsync beat
+```
+
+Schedule publication and ordinary changes are in-app-only. Cancellation and due
+reminders use the existing notification email worker. Application rollback may
+leave the additive schedule tables in place; disable the `GradSync schedule
+reminders` Beat entry before rolling back code that does not know those tables.

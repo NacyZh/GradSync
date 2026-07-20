@@ -1,6 +1,6 @@
 import { apiRequest } from '../../shared/api/client';
 
-export type NotificationStatus = 'pending' | 'queued' | 'sent' | 'failed' | 'retry_needed' | 'skipped';
+export type NotificationStatus = 'pending' | 'queued' | 'sent' | 'failed' | 'retry_needed' | 'skipped' | 'in_app_only';
 
 export type NotificationRecord = {
   id: number;
@@ -34,6 +34,8 @@ export type NotificationRecord = {
   retryCount?: number;
   failure_reason?: string | null;
   failureReason?: string | null;
+  delivery_policy?: 'in_app' | 'in_app_email';
+  deliveryPolicy?: 'in_app' | 'in_app_email';
   skipped_reason?: string | null;
   skippedReason?: string | null;
 };

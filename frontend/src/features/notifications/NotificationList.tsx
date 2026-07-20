@@ -65,6 +65,7 @@ function NotificationRow({ notification }: { notification: NotificationRecord })
   const retryCount = notification.retry_count ?? notification.retryCount ?? 0;
   const reason = notification.failure_reason ?? notification.failureReason ?? notification.skipped_reason ?? notification.skippedReason;
   const retryAllowed = notification.status === 'failed' || notification.status === 'retry_needed';
+  const deliveryPolicy = notification.delivery_policy ?? notification.deliveryPolicy;
 
   return (
     <li className="items-start">
@@ -119,6 +120,7 @@ function NotificationRow({ notification }: { notification: NotificationRecord })
             </Badge>
           )}
           {lastAttemptAt ? <Badge variant="muted">Last attempt {formatDateTime(lastAttemptAt)}</Badge> : null}
+          {deliveryPolicy ? <Badge variant="muted">{deliveryPolicy === 'in_app' ? 'In-app only' : 'In-app + email'}</Badge> : null}
         </div>
       </div>
     </li>

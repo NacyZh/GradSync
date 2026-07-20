@@ -1,5 +1,43 @@
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+
+
+class ProjectReportSchedule(models.Model):
+    project = models.OneToOneField(
+        "projects.ResearchProject", on_delete=models.CASCADE, related_name="report_schedule"
+    )
+    weekday = models.PositiveSmallIntegerField()
+    deadline_time = models.TimeField()
+    timezone = models.CharField(max_length=64, default="UTC")
+    version = models.PositiveIntegerField(default=1)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="updated_report_schedules"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["weekday", "project"], name="sub_report_policy_due_idx")]
+
+    def clean(self):
+        errors = {}
+        if self.weekday not in range(1, 8):
+            errors["weekday"] = "Weekday must be an ISO weekday from 1 to 7."
+        try:
+            ZoneInfo(self.timezone)
+        except ZoneInfoNotFoundError:
+            errors["timezone"] = "Enter a valid IANA timezone."
+        if self.project_id and self.project.status != "active":
+            errors["project"] = "Archived projects cannot configure report deadlines."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class Draft(models.Model):

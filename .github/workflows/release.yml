@@ -114,6 +114,11 @@ jobs:
           else
             echo "Skipping projects module OpenAPI contract: specs/014-refine-projects-module/contracts/openapi.yaml is not tracked in this checkout."
           fi
+      - name: Check dashboard calendar OpenAPI contract drift
+        env:
+          PYTHON: python
+          OPENAPI_STRICT_SHAPES: "1"
+        run: bash scripts/check-openapi-contract.sh specs/015-dashboard-calendar/contracts/openapi.yaml
       - name: Run backend tests
         working-directory: backend
         run: python -m pytest

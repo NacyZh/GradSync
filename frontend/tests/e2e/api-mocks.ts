@@ -81,6 +81,60 @@ export const selectedProject = {
   ],
 };
 
+export function buildCalendarOccurrence(overrides: Record<string, unknown> = {}) {
+  return {
+    occurrenceId: 'task:11:2026-07-24T08:00:00Z',
+    sourceType: 'task',
+    sourceId: '11',
+    scheduleId: null,
+    scope: 'system',
+    category: 'task',
+    title: 'Analyze sample',
+    startsAt: '2026-07-24T08:00:00Z',
+    endsAt: '2026-07-24T08:30:00Z',
+    allDay: false,
+    timezone: 'UTC',
+    status: 'in_progress',
+    actionPath: '/projects/1?task=11',
+    capabilities: {
+      canView: true,
+      canEdit: false,
+      canDelete: false,
+      canPublish: false,
+      canCancel: false,
+      canViewDeliveryStatus: false,
+      isReadOnly: true,
+    },
+    ...overrides,
+  };
+}
+
+export function buildCalendarResponse(
+  occurrences = [
+    buildCalendarOccurrence(),
+    buildCalendarOccurrence({
+      occurrenceId: 'report:due:1:2026-07-24',
+      sourceType: 'report',
+      sourceId: '1',
+      category: 'report',
+      title: 'Graphene Lab: weekly report due',
+      startsAt: '2026-07-24T10:00:00Z',
+      endsAt: '2026-07-24T10:30:00Z',
+      status: 'pending',
+      actionPath: '/projects/1/reports',
+    }),
+  ],
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    results: occurrences,
+    nextCursor: null,
+    generatedAt: '2026-07-20T08:00:00Z',
+    latestEventId: '',
+    ...overrides,
+  };
+}
+
 export const codeUploadPolicy = {
   category: 'code',
   maxSizeBytes: 100 * 1024 * 1024,
@@ -304,6 +358,62 @@ export async function mockAuthenticatedApi(page: Page) {
   });
   await page.route('**/api/code-artifacts/upload-policy/', async (route) => {
     await fulfillJson(route, codeUploadPolicy);
+  });
+  await page.route('**/api/calendar/occurrences/**', async (route) => {
+    await fulfillJson(route, buildCalendarResponse());
+  });
+  await page.route('**/api/calendar/events/**', async (route) => {
+    await fulfillJson(route, { results: [], latestEventId: '', generatedAt: '2026-07-20T08:00:00Z' });
+  });
+  await page.route('**/api/schedules/audience-options/**', async (route) => {
+    const type = new URL(route.request().url()).searchParams.get('type');
+    await fulfillJson(route, {
+      results: type === 'project' ? [{ id: 1, type: 'project', label: 'Graphene Lab', secondaryLabel: 'Active research project', role: null, status: 'active', eligible: true, eligibilityScope: 'manageable_project_member' }] : [{ id: 12, type: 'account', label: 'Student Member', secondaryLabel: 'student@example.edu', role: 'student', status: 'active', eligible: true, eligibilityScope: 'manageable_project_member' }],
+      nextCursor: null,
+    });
+  });
+  await page.route('**/api/schedules/', async (route) => {
+    const payload = route.request().postDataJSON() as Record<string, unknown>;
+    await fulfillJson(route, {
+      id: 51,
+      occurrenceId: 'schedule:51:2026-07-25T08:00:00Z',
+      sourceType: 'schedule',
+      sourceId: '51',
+      scheduleId: 51,
+      scope: payload.scope ?? 'personal',
+      category: payload.category ?? 'personal',
+      title: payload.title ?? 'Private schedule',
+      description: payload.description ?? '',
+      allDay: payload.allDay ?? false,
+      startsAt: payload.startsAt,
+      endsAt: payload.endsAt,
+      timezone: payload.timezone ?? 'UTC',
+      status: 'active',
+      version: 1,
+      owner: { id: currentUser.id, name: currentUser.name, role: currentUser.global_role },
+      organizer: { id: currentUser.id, name: currentUser.name, role: currentUser.global_role },
+      recurrence: payload.recurrence,
+      reminders: payload.reminders ?? [],
+      audience: { projectIds: [], accountIds: [] },
+      capabilities: { canView: true, canEdit: true, canDelete: true, canPublish: true, canCancel: false, canViewDeliveryStatus: false, isReadOnly: false },
+    }, 201);
+  });
+  await page.route('**/api/projects/1/report-schedule/', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await fulfillJson(route, {
+      id: 1,
+      projectId: 1,
+      weekday: 5,
+      deadlineLocalTime: '18:00',
+      timezone: 'Asia/Shanghai',
+      version: 1,
+      updatedBy: { id: currentUser.id, name: currentUser.name, role: currentUser.global_role },
+      createdAt: '2026-07-20T08:00:00Z',
+      updatedAt: '2026-07-20T08:00:00Z',
+    });
   });
   await page.route('**/api/projects/', async (route) => {
     await fulfillJson(route, {

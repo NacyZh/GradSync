@@ -1,4 +1,5 @@
 from celery import shared_task
+from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
@@ -13,6 +14,8 @@ from .services import (
     mark_notification_status,
     notification_is_deliverable,
 )
+
+logger = get_task_logger(__name__)
 
 
 def _deadline_window(now, deadline):
@@ -121,6 +124,7 @@ def deliver_due_notifications(limit: int = 100) -> int:
     delivered = 0
     notifications = Notification.objects.filter(
         status__in=[Notification.Status.PENDING, Notification.Status.RETRY_NEEDED],
+        delivery_policy=Notification.DeliveryPolicy.IN_APP_EMAIL,
         eligible_at__lte=now,
     ).select_related("recipient", "project", "sender")[:limit]
     for notification in notifications:
@@ -130,6 +134,7 @@ def deliver_due_notifications(limit: int = 100) -> int:
                 Notification.Status.SKIPPED,
                 "Recipient is no longer an active project member",
             )
+            _sync_schedule_dispatch(notification, "skipped")
             continue
         mark_notification_status(notification, Notification.Status.QUEUED)
         project_label = notification.project.title if notification.project_id else "GradSync"
@@ -154,10 +159,23 @@ def deliver_due_notifications(limit: int = 100) -> int:
             Exception
         ) as exc:  # pragma: no cover - exercised by integration error paths in real mail setup
             mark_notification_attempt_failed(notification, exc)
+            _sync_schedule_dispatch(notification, "failed")
             continue
         mark_notification_status(notification, Notification.Status.SENT)
+        _sync_schedule_dispatch(notification, "created")
         delivered += 1
     return delivered
+
+
+def _sync_schedule_dispatch(notification, status):
+    if notification.target_type != "ScheduleItem":
+        return
+    from apps.schedules.models import ScheduleNotificationDispatch
+
+    ScheduleNotificationDispatch.objects.filter(
+        notification=notification,
+        channel=ScheduleNotificationDispatch.Channel.EMAIL,
+    ).update(status=status, updated_at=timezone.now())
 
 
 @shared_task(queue="notifications")
@@ -168,6 +186,15 @@ def create_deadline_reminders_task() -> int:
 @shared_task(queue="notifications")
 def create_pending_review_reminders_task() -> int:
     return create_pending_review_reminders()
+
+
+@shared_task(queue="notifications")
+def create_schedule_reminders_task() -> int:
+    from apps.schedules.reminder_services import create_due_schedule_reminders
+
+    created = create_due_schedule_reminders()
+    logger.info("schedule_reminder_scan created=%s", created)
+    return created
 
 
 @shared_task(
@@ -194,6 +221,10 @@ def ensure_periodic_notification_tasks() -> int:
         (
             "GradSync notification delivery",
             "apps.notifications.tasks.deliver_due_notifications_task",
+        ),
+        (
+            "GradSync schedule reminders",
+            "apps.notifications.tasks.create_schedule_reminders_task",
         ),
     ]:
         _, was_created = PeriodicTask.objects.update_or_create(

@@ -1,6 +1,11 @@
 export type ApiError = {
   message: string;
   fields?: Record<string, string[]>;
+  code?: string;
+  status?: number;
+  conflicts?: unknown[];
+  current?: unknown;
+  currentVersion?: number;
 };
 
 function getCsrfToken(): string | null {
@@ -87,6 +92,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     throw {
       message: payload.message ?? (typeof payload.detail === 'string' ? payload.detail : fieldMessages || fallbackMessage),
       fields,
+      code: typeof payload.code === 'string' ? payload.code : undefined,
+      status: response.status,
+      conflicts: Array.isArray(payload.conflicts) ? payload.conflicts : undefined,
+      current: payload.current,
+      currentVersion: typeof payload.currentVersion === 'number' ? payload.currentVersion : undefined,
     };
   }
 

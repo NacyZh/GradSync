@@ -16,6 +16,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     sentAt = serializers.DateTimeField(source="sent_at", read_only=True)
     lastAttemptAt = serializers.DateTimeField(source="last_attempt_at", read_only=True)
     failureReason = serializers.CharField(source="failure_reason", read_only=True)
+    deliveryPolicy = serializers.CharField(source="delivery_policy", read_only=True)
 
     class Meta:
         model = Notification
@@ -38,6 +39,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             "action_path",
             "actionPath",
             "status",
+            "delivery_policy",
+            "deliveryPolicy",
             "eligible_at",
             "eligibleAt",
             "queued_at",

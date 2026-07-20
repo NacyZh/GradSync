@@ -284,6 +284,23 @@ def test_notification_delivery_uses_dedicated_queue():
     assert deliver_due_notifications_task.queue == "notifications"
 
 
+def test_schedule_reminder_uses_existing_queue_and_readiness_registration(db):
+    from django_celery_beat.models import PeriodicTask
+
+    from apps.notifications.tasks import (
+        create_schedule_reminders_task,
+        ensure_periodic_notification_tasks,
+    )
+
+    assert create_schedule_reminders_task.queue == "notifications"
+    ensure_periodic_notification_tasks()
+    periodic = PeriodicTask.objects.get(name="GradSync schedule reminders")
+    assert periodic.task == "apps.notifications.tasks.create_schedule_reminders_task"
+    assert periodic.interval.every == 5
+    readiness = (REPO_ROOT / "scripts/check-production-readiness.sh").read_text()
+    assert "python manage.py ensure_notification_schedule" in readiness
+
+
 def test_paper_library_operational_signals_are_configured(settings):
     from apps.library.models import DuplicateDetectionResult, PaperImportJob, PaperLibraryActivity
 

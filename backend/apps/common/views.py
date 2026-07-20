@@ -2,6 +2,7 @@ from django.apps import apps
 from django.conf import settings
 from django.db import connection
 from django.http import HttpResponse, JsonResponse
+from django.utils import timezone
 from redis import Redis
 
 
@@ -34,6 +35,7 @@ def readyz(_request):
 def metrics(_request):
     Notification = apps.get_model("notifications", "Notification")
     ResearchProject = apps.get_model("projects", "ResearchProject")
+    ScheduleNotificationDispatch = apps.get_model("schedules", "ScheduleNotificationDispatch")
 
     lines = [
         "# HELP gradsync_projects_total Total GradSync projects.",
@@ -42,5 +44,31 @@ def metrics(_request):
         "# HELP gradsync_notifications_pending Pending notification records.",
         "# TYPE gradsync_notifications_pending gauge",
         f"gradsync_notifications_pending {Notification.objects.filter(status='pending').count()}",
+        "# HELP gradsync_schedule_dispatch_total Schedule dispatches by channel and status.",
+        "# TYPE gradsync_schedule_dispatch_total gauge",
     ]
+    oldest_claim = (
+        ScheduleNotificationDispatch.objects.filter(status="claimed").order_by("created_at").first()
+    )
+    lag_seconds = (
+        max(0, int((timezone.now() - oldest_claim.created_at).total_seconds()))
+        if oldest_claim
+        else 0
+    )
+    lines.extend(
+        [
+            "# HELP gradsync_schedule_dispatch_lag_seconds Age of oldest claimed dispatch.",
+            "# TYPE gradsync_schedule_dispatch_lag_seconds gauge",
+            f"gradsync_schedule_dispatch_lag_seconds {lag_seconds}",
+        ]
+    )
+    for channel in ("in_app", "email"):
+        for dispatch_status in ("claimed", "created", "skipped", "failed"):
+            count = ScheduleNotificationDispatch.objects.filter(
+                channel=channel, status=dispatch_status
+            ).count()
+            lines.append(
+                "gradsync_schedule_dispatch_total"
+                f'{{channel="{channel}",status="{dispatch_status}"}} {count}'
+            )
     return HttpResponse("\n".join(lines) + "\n", content_type="text/plain; version=0.0.4")
