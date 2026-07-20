@@ -7,6 +7,7 @@ type LayoutBox = {
   y: number;
   width: number;
   height: number;
+  element?: string;
 };
 
 type ViewportCase = {
@@ -105,12 +106,12 @@ test.describe('production workspace layout', () => {
         await page.goto(routeCase.path);
         await expect(page.getByRole('banner')).toBeVisible();
         await expect(page.getByRole('main')).toBeVisible();
-
-        await expectPrimaryControlsStayInsideViewport(page);
-        await expectNoVisibleTextOverlap(page);
         if (routeCase.path === '/projects/1') {
+          await expect(page.getByRole('region', { name: 'Current tasks' })).toBeVisible();
           await expectMembersPanelContentStaysInside(page);
         }
+        await expectPrimaryControlsStayInsideViewport(page);
+        await expectNoVisibleTextOverlap(page);
         if (routeCase.path === '/') {
           const calendar = page.getByRole('region', { name: 'Dashboard calendar' });
           await expect(calendar).toBeVisible();
@@ -188,7 +189,10 @@ async function expectNoVisibleTextOverlap(page: Page) {
       const overlapX = Math.max(0, Math.min(boxes[leftIndex].x + boxes[leftIndex].width, boxes[rightIndex].x + boxes[rightIndex].width) - Math.max(boxes[leftIndex].x, boxes[rightIndex].x));
       const overlapY = Math.max(0, Math.min(boxes[leftIndex].y + boxes[leftIndex].height, boxes[rightIndex].y + boxes[rightIndex].height) - Math.max(boxes[leftIndex].y, boxes[rightIndex].y));
       const overlapArea = overlapX * overlapY;
-      expect(overlapArea).toBeLessThanOrEqual(1);
+      expect(
+        overlapArea,
+        `Visible text overlap: ${boxes[leftIndex].element ?? 'unknown'} and ${boxes[rightIndex].element ?? 'unknown'}`,
+      ).toBeLessThanOrEqual(1);
     }
   }
 }
@@ -212,26 +216,42 @@ async function expectMembersPanelContentStaysInside(page: Page) {
 
 async function visibleElementBoxes(page: Page, selector: string, limit: number): Promise<LayoutBox[]> {
   return page.locator(selector).evaluateAll((elements, maxCount) => {
-    return elements
-      .filter((element) => {
-        const style = window.getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
-        return (
-          style.visibility !== 'hidden' &&
-          style.display !== 'none' &&
-          rect.width > 0 &&
-          rect.height > 0
-        );
-      })
-      .slice(0, maxCount)
-      .map((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-        };
-      });
+    return elements.flatMap((element) => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (style.visibility === 'hidden' || style.display === 'none' || rect.width <= 0 || rect.height <= 0) {
+        return [];
+      }
+
+      let left = rect.left;
+      let right = rect.right;
+      let top = rect.top;
+      let bottom = rect.bottom;
+      let ancestor = element.parentElement;
+      while (ancestor) {
+        const ancestorStyle = window.getComputedStyle(ancestor);
+        const ancestorRect = ancestor.getBoundingClientRect();
+        if (['auto', 'hidden', 'scroll', 'clip'].includes(ancestorStyle.overflowX)) {
+          left = Math.max(left, ancestorRect.left);
+          right = Math.min(right, ancestorRect.right);
+        }
+        if (['auto', 'hidden', 'scroll', 'clip'].includes(ancestorStyle.overflowY)) {
+          top = Math.max(top, ancestorRect.top);
+          bottom = Math.min(bottom, ancestorRect.bottom);
+        }
+        ancestor = ancestor.parentElement;
+      }
+      if (right <= left || bottom <= top) return [];
+
+      return [
+        {
+          x: left,
+          y: top,
+          width: right - left,
+          height: bottom - top,
+          element: `${element.tagName.toLowerCase()} "${element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 80) ?? ''}"`,
+        },
+      ];
+    }).slice(0, maxCount);
   }, limit);
 }
