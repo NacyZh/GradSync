@@ -4,7 +4,6 @@ import { LockKeyhole, Trash2 } from 'lucide-react';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
-import { DataState } from '../../shared/ui/DataState';
 import { cancelBooking } from './api';
 
 export function BookingActions({
@@ -52,8 +51,6 @@ export function BookingActions({
           Started bookings cannot be changed.
         </span>
       ) : null}
-      {mutation.isSuccess ? <DataState state="success" message="Booking cancelled" className="py-2" /> : null}
-      {mutation.error ? <span role="alert">{mutation.error.message}</span> : null}
     </div>
   );
 }

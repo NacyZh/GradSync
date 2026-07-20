@@ -268,7 +268,9 @@ describe('collaboration code library UI', () => {
     await userEvent.type(screen.getByLabelText('Artifact description'), 'Searchable implementation archive');
     await userEvent.click(screen.getByRole('button', { name: 'Upload archive' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('archive: Code uploads must be a compressed archive.');
+    await waitFor(() => {
+      expect(screen.getAllByText('archive: Code uploads must be a compressed archive.').length).toBeGreaterThan(0);
+    });
     expect(screen.queryByText('Request failed with 400')).not.toBeInTheDocument();
   });
 
@@ -281,7 +283,9 @@ describe('collaboration code library UI', () => {
 
     const archiveInput = screen.getByLabelText('Archive file');
     await userEvent.upload(archiveInput, new File(['bad'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false });
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose a supported archive file');
+    await waitFor(() => {
+      expect(screen.getAllByText(/Choose a supported archive file/).length).toBeGreaterThan(0);
+    });
     expect(screen.getByRole('button', { name: 'Upload archive' })).toBeDisabled();
 
     await userEvent.click(screen.getByRole('button', { name: 'Clear selected archive' }));
@@ -289,7 +293,6 @@ describe('collaboration code library UI', () => {
 
     await userEvent.upload(archiveInput, new File(['zip-again'], 'reselected.tgz', { type: 'application/gzip' }));
     expect(screen.getByText('Selected archive: reselected.tgz')).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reselect archive' })).toBeInTheDocument();
   });
 
@@ -305,7 +308,9 @@ describe('collaboration code library UI', () => {
     Object.defineProperty(oversizedArchive, 'size', { value: codeUploadPolicy.maxSizeBytes + 1 });
     await userEvent.upload(screen.getByLabelText('Archive file'), oversizedArchive);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose an archive no larger than 100 MB.');
+    await waitFor(() => {
+      expect(screen.getAllByText('Choose an archive no larger than 100 MB.').length).toBeGreaterThan(0);
+    });
     expect(screen.getByRole('button', { name: 'Upload archive' })).toBeDisabled();
   });
 

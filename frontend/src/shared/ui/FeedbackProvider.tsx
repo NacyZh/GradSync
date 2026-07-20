@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
 
 import {
@@ -50,6 +50,7 @@ export function FeedbackProvider({ children }: PropsWithChildren) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const nextToastId = useRef(0);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -58,7 +59,8 @@ export function FeedbackProvider({ children }: PropsWithChildren) {
   }, [theme]);
 
   const notify = useCallback((message: string, tone: ToastTone = 'info') => {
-    const id = Date.now();
+    nextToastId.current += 1;
+    const id = nextToastId.current;
     setToasts((items) => [...items, { id, message, tone }]);
   }, []);
 

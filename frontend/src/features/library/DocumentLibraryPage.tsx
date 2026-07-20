@@ -8,7 +8,6 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Textarea } from '@/shared/ui/primitives/textarea';
 
 import { DataState } from '../../shared/ui/DataState';
-import { DownloadStatus } from '../../shared/ui/DownloadStatus';
 import { PageShell } from '../../shared/ui/PageShell';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
@@ -111,7 +110,6 @@ function DocumentUploadForm({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'project_members' | 'group_wide'>('project_members');
-  const [uploadError, setUploadError] = useState('');
   const { notify } = useAppFeedback();
   const uploadMutation = useDocumentUpload(projectId);
   const sharedUploadMutation = useSharedDocumentUpload();
@@ -119,7 +117,6 @@ function DocumentUploadForm({
 
   function clearFile() {
     setFile(undefined);
-    setUploadError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -128,7 +125,6 @@ function DocumentUploadForm({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!file || !selectedCategory) return;
-    setUploadError('');
     try {
       const uploaded = await activeUploadMutation.mutateAsync({
         file,
@@ -148,7 +144,6 @@ function DocumentUploadForm({
       notify('Upload complete', 'success');
     } catch (err) {
       const message = getErrorMessage(err, 'Document upload failed');
-      setUploadError(message);
       notify(message, 'error');
     }
   }
@@ -168,7 +163,6 @@ function DocumentUploadForm({
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,application/pdf,text/plain,text/markdown"
         onChange={(event) => {
           setFile(event.target.files?.[0]);
-          setUploadError('');
         }}
       />
       <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -221,32 +215,20 @@ function DocumentUploadForm({
       ) : null}
       <Button type="submit" disabled={!file || !selectedCategory || activeUploadMutation.isPending}>Upload document</Button>
       {activeUploadMutation.isPending ? <UploadProgress label="Uploading document" value={65} /> : null}
-      <LocalizedUploadError message={uploadError} />
     </form>
   );
 }
 
-function LocalizedUploadError({ message }: { message?: string }) {
-  if (!message) return null;
-  return <p className="min-w-0 break-words text-sm font-medium text-destructive">{message}</p>;
-}
-
 function SelectedDownloadPanel({ document, standalone = false }: { document?: DocumentRecord; standalone?: boolean }) {
-  const [status, setStatus] = useState<{ filename: string; deliveryMode: 'direct_response' | 'signed_url' } | undefined>();
-  const [error, setError] = useState<string | undefined>();
-
-  useEffect(() => {
-    setStatus(undefined);
-    setError(undefined);
-  }, [document?.id]);
+  const { notify } = useAppFeedback();
 
   async function onDownload() {
     if (!document) return;
-    setError(undefined);
     try {
-      setStatus(await (standalone ? downloadSharedDocument(document.id, document.title) : downloadDocument(document.id, document.title)));
+      const descriptor = await (standalone ? downloadSharedDocument(document.id, document.title) : downloadDocument(document.id, document.title));
+      notify(`Download ready: ${descriptor.filename}`, 'success');
     } catch (err) {
-      setError(getErrorMessage(err, 'Download unavailable'));
+      notify(getErrorMessage(err, 'Download unavailable'), 'error');
     }
   }
 
@@ -275,7 +257,6 @@ function SelectedDownloadPanel({ document, standalone = false }: { document?: Do
         <Download className="h-4 w-4" aria-hidden="true" />
         Download
       </Button>
-      <DownloadStatus descriptor={status} error={error} />
     </section>
   );
 }
@@ -291,11 +272,10 @@ function DocumentDetailPanel({
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameTitle, setRenameTitle] = useState('');
-  const [renameError, setRenameError] = useState<string | undefined>();
   const [isSavingRename, setIsSavingRename] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | undefined>();
   const [isDeleting, setIsDeleting] = useState(false);
+  const { notify } = useAppFeedback();
 
   if (!document) {
     return <DataState state="empty" title="No document selected" message="Select a document to inspect details." />;
@@ -307,7 +287,6 @@ function DocumentDetailPanel({
   function startRename() {
     if (!document) return;
     setRenameTitle(document.title);
-    setRenameError(undefined);
     setIsConfirmingDelete(false);
     setIsRenaming(true);
   }
@@ -316,36 +295,35 @@ function DocumentDetailPanel({
     event.preventDefault();
     const cleanedTitle = renameTitle.trim();
     if (!cleanedTitle) {
-      setRenameError('Document title is required');
+      notify('Document title is required', 'error');
       return;
     }
-    setRenameError(undefined);
     setIsSavingRename(true);
     try {
       await onRename(cleanedTitle);
       setIsRenaming(false);
+      notify('Document renamed', 'success');
     } catch (err) {
-      setRenameError(getErrorMessage(err, 'Rename unavailable'));
+      notify(getErrorMessage(err, 'Rename unavailable'), 'error');
     } finally {
       setIsSavingRename(false);
     }
   }
 
   function startDelete() {
-    setDeleteError(undefined);
     setIsRenaming(false);
     setIsConfirmingDelete(true);
   }
 
   async function submitDelete(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setDeleteError(undefined);
     setIsDeleting(true);
     try {
       await onDelete();
       setIsConfirmingDelete(false);
+      notify('Document deleted', 'success');
     } catch (err) {
-      setDeleteError(getErrorMessage(err, 'Delete unavailable'));
+      notify(getErrorMessage(err, 'Delete unavailable'), 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -400,7 +378,6 @@ function DocumentDetailPanel({
               onChange={(event) => setRenameTitle(event.target.value)}
             />
           </label>
-          {renameError ? <p role="alert" className="min-w-0 break-words text-sm text-destructive">{renameError}</p> : null}
           <div className="flex min-w-0 flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={isSavingRename}>Save title</Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setIsRenaming(false)}>Cancel</Button>
@@ -413,7 +390,6 @@ function DocumentDetailPanel({
             <p className="min-w-0 break-words font-semibold text-destructive">Delete {document.title}</p>
             <p className="text-muted-foreground">This archives the selected document and removes it from ordinary search and download.</p>
           </div>
-          {deleteError ? <p role="alert" className="min-w-0 break-words text-sm text-destructive">{deleteError}</p> : null}
           <div className="flex min-w-0 flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={isDeleting}>Confirm delete</Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setIsConfirmingDelete(false)}>Cancel</Button>

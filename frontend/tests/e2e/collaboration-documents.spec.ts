@@ -270,7 +270,7 @@ test('document selected download shows errors and no-selection state clearly', a
   await page.goto('/library/documents');
   await expect(page.getByRole('region', { name: 'Selected document download' })).toContainText('Microscope Protocol');
   await page.getByRole('button', { name: /Download Microscope Protocol/ }).click();
-  await expect(page.getByRole('alert')).toContainText('Document is no longer available');
+  await expect(page.getByRole('status').filter({ hasText: 'Document is no longer available' }).first()).toBeVisible();
 
   hasDocument = false;
   await page.getByPlaceholder('Search title, category, description').fill('empty');

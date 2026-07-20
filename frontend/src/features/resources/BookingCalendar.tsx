@@ -7,6 +7,7 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { DataState } from '../../shared/ui/DataState';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { BookingConflictAlert } from './BookingConflictAlert';
 import { BookingForm } from './BookingForm';
@@ -27,6 +28,7 @@ type BookingCalendarProps = {
 
 export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, onAvailabilityChange }: BookingCalendarProps) {
   const queryClient = useQueryClient();
+  const { notify } = useAppFeedback();
   const defaults = useMemo(() => {
     const start = new Date();
     start.setDate(start.getDate() + 1);
@@ -78,11 +80,19 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
   }
   const returnMutation = useMutation({
     mutationFn: returnBooking,
-    onSuccess: refreshResourceState,
+    onSuccess: () => {
+      refreshResourceState();
+      notify('Use period returned', 'success');
+    },
+    onError: (error) => notify(error.message || 'Unable to update this use period.', 'error'),
   });
   const cancelMutation = useMutation({
     mutationFn: cancelBooking,
-    onSuccess: refreshResourceState,
+    onSuccess: () => {
+      refreshResourceState();
+      notify('Use period cancelled', 'success');
+    },
+    onError: (error) => notify(error.message || 'Unable to update this use period.', 'error'),
   });
 
   const updateWindow = useCallback((nextStartsAt = startsAt, nextEndsAt = endsAt) => {
@@ -180,14 +190,6 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
           cancellingBookingId={cancelMutation.variables}
           onReturn={(bookingId) => returnMutation.mutate(bookingId)}
           onCancel={(bookingId) => cancelMutation.mutate(bookingId)}
-        />
-      ) : null}
-      {(returnMutation.error || cancelMutation.error) ? (
-        <DataState
-          state="error"
-          title="Use period update failed"
-          message={(returnMutation.error ?? cancelMutation.error)?.message ?? 'Unable to update this use period.'}
-          className="mt-4"
         />
       ) : null}
       {resource ? (

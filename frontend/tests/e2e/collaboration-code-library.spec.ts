@@ -147,7 +147,7 @@ test('code archive upload, search, and download flow is reachable', async ({ pag
     mimeType: 'text/plain',
     buffer: Buffer.from('bad'),
   });
-  await expect(page.getByRole('alert')).toContainText('Choose a supported archive file');
+  await expect(page.getByRole('status').filter({ hasText: 'Choose a supported archive file' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Clear selected archive' }).click();
   await expect(page.getByText('draft.txt')).toHaveCount(0);
   await page.getByLabel('Archive file').setInputFiles({

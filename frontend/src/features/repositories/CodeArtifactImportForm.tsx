@@ -6,7 +6,6 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
-import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
 import { useCodeArtifactUpload, useCodeArtifactUploadPolicy, useSharedCodeArtifactUpload, type CodeArtifact } from './api';
@@ -51,7 +50,6 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
   const [tags, setTags] = useState('');
   const [visibility, setVisibility] = useState<'project_members' | 'group_wide'>('project_members');
   const [archive, setArchive] = useState<File | undefined>();
-  const [error, setError] = useState('');
   const { notify } = useAppFeedback();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useCodeArtifactUpload(projectId);
@@ -73,7 +71,6 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
         ? `Choose an archive no larger than ${uploadPolicyQuery.data.displayLabel}.`
       : '';
   const canUpload = Boolean(archive && !archiveError && name.trim() && description.trim() && !activeUploadMutation.isPending);
-  const visibleError = archiveError || error;
 
   function chooseArchive() {
     fileInputRef.current?.click();
@@ -81,7 +78,6 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
 
   function clearArchive() {
     setArchive(undefined);
-    setError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -90,8 +86,11 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const selectedArchive = archive;
-    if (!selectedArchive || archiveError) return;
-    setError('');
+    if (!selectedArchive) return;
+    if (archiveError) {
+      notify(archiveError, 'error');
+      return;
+    }
     try {
       const uploadedArtifact = await activeUploadMutation.mutateAsync({
         archive: selectedArchive,
@@ -108,7 +107,6 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
       clearArchive();
     } catch (err) {
       const message = errorMessage(err);
-      setError(message);
       notify(message, 'error');
     }
   }
@@ -130,8 +128,16 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
           type="file"
           accept={archiveAccept}
           onChange={(event) => {
-            setArchive(event.target.files?.[0]);
-            setError('');
+            const selectedArchive = event.target.files?.[0];
+            setArchive(selectedArchive);
+            if (!selectedArchive) return;
+            if (!isSupportedArchive(selectedArchive, allowedArchiveExtensions)) {
+              notify(`Choose a supported archive file: ${allowedArchiveExtensions.join(', ')}.`, 'error');
+            } else if (selectedArchive.size <= 0) {
+              notify('Choose a non-empty archive file.', 'error');
+            } else if (uploadPolicyQuery.data?.maxSizeBytes && selectedArchive.size > uploadPolicyQuery.data.maxSizeBytes) {
+              notify(`Choose an archive no larger than ${uploadPolicyQuery.data.displayLabel}.`, 'error');
+            }
           }}
           required
         />
@@ -178,7 +184,6 @@ export function CodeArtifactImportForm({ projectId, onUploaded, standalone = fal
       ) : null}
       <Button type="submit" disabled={!canUpload}>Upload archive</Button>
       {activeUploadMutation.isPending ? <UploadProgress label="Uploading archive" value={65} /> : null}
-      <LocalizedValidation message={visibleError} />
     </form>
   );
 }

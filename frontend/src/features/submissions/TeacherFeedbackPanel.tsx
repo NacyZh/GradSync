@@ -8,7 +8,6 @@ import { Textarea } from '@/shared/ui/primitives/textarea';
 
 import { getErrorMessage } from '../../shared/api/errors';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
-import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import { UploadProgress } from '../../shared/ui/UploadProgress';
 import { FeedbackDownloadList } from './WritingVersionHistory';
@@ -23,7 +22,6 @@ type TeacherFeedbackPanelProps = {
 export function TeacherFeedbackPanel({ participantRole, projectId, version }: TeacherFeedbackPanelProps) {
   const [comments, setComments] = useState('');
   const [annotatedFile, setAnnotatedFile] = useState<File | undefined>();
-  const [error, setError] = useState('');
   const { notify } = useAppFeedback();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const feedbackMutation = useSubmitTeacherFeedback(projectId, version?.id ?? '');
@@ -34,7 +32,6 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!version || !annotatedFile || !canSubmitFeedback) return;
-    setError('');
     try {
       await feedbackMutation.mutateAsync({ annotatedFile, comments });
       setComments('');
@@ -43,7 +40,6 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
       notify('Feedback saved and notification recorded', 'success');
     } catch (err) {
       const message = getErrorMessage(err);
-      setError(message);
       notify(message, 'error');
     }
   }
@@ -112,7 +108,6 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
           Submit feedback
         </Button>
         {feedbackMutation.isPending ? <UploadProgress label="Uploading feedback" value={70} /> : null}
-        <LocalizedValidation message={error} />
       </form>
       ) : null}
     </div>

@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 
 import { Button } from '@/shared/ui/primitives/button';
 
-import { DownloadStatus } from '../../shared/ui/DownloadStatus';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { VisibilityBadge } from '../../shared/ui/VisibilityBadge';
 import { useI18n } from '../i18n/I18nProvider';
 import { downloadPaper, downloadSharedPaper, type PaperRecord } from './api';
@@ -26,15 +26,12 @@ function getErrorMessage(err: unknown, fallback: string) {
 
 export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRename, onDelete }: PaperDetailPanelProps) {
   const { t } = useI18n();
-  const [status, setStatus] = useState<{ filename: string; deliveryMode: 'direct_response' | 'signed_url' } | undefined>();
-  const [error, setError] = useState<string | undefined>();
+  const { notify } = useAppFeedback();
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameTitle, setRenameTitle] = useState('');
-  const [renameError, setRenameError] = useState<string | undefined>();
   const [isSavingRename, setIsSavingRename] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
-  const [deleteError, setDeleteError] = useState<string | undefined>();
   const [isDeleting, setIsDeleting] = useState(false);
 
   if (!paper) {
@@ -70,21 +67,19 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
 
   async function onDownload() {
     if (!paper) return;
-    setError(undefined);
     try {
-      setStatus(
+      const descriptor =
         projectId
           ? await downloadPaper(projectId, paper.id)
-          : await downloadSharedPaper(paper.id, paper.defaultDownloadFilename ?? `${displayTitle}.pdf`),
-      );
+          : await downloadSharedPaper(paper.id, paper.defaultDownloadFilename ?? `${displayTitle}.pdf`);
+      notify(`${t('paperLibraryDownloadStarted')}: ${descriptor.filename}`, 'success');
     } catch (err) {
-      setError(getErrorMessage(err, t('paperLibraryDownloadFallbackError')));
+      notify(getErrorMessage(err, t('paperLibraryDownloadFallbackError')), 'error');
     }
   }
 
   function startRename() {
     setRenameTitle(displayTitle);
-    setRenameError(undefined);
     setIsConfirmingDelete(false);
     setIsRenaming(true);
   }
@@ -93,16 +88,16 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
     event.preventDefault();
     const cleanedTitle = renameTitle.trim();
     if (!cleanedTitle) {
-      setRenameError(t('paperLibraryTitleRequired'));
+      notify(t('paperLibraryTitleRequired'), 'error');
       return;
     }
-    setRenameError(undefined);
     setIsSavingRename(true);
     try {
       await onRename?.(cleanedTitle, '');
       setIsRenaming(false);
+      notify(t('paperLibraryRename'), 'success');
     } catch (err) {
-      setRenameError(getErrorMessage(err, t('paperLibraryActionUnavailable')));
+      notify(getErrorMessage(err, t('paperLibraryActionUnavailable')), 'error');
     } finally {
       setIsSavingRename(false);
     }
@@ -110,20 +105,19 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
 
   function startDelete() {
     setDeleteReason('');
-    setDeleteError(undefined);
     setIsRenaming(false);
     setIsConfirmingDelete(true);
   }
 
   async function submitDelete(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setDeleteError(undefined);
     setIsDeleting(true);
     try {
       await onDelete?.(deleteReason.trim());
       setIsConfirmingDelete(false);
+      notify(t('paperLibraryDelete'), 'success');
     } catch (err) {
-      setDeleteError(getErrorMessage(err, t('paperLibraryActionUnavailable')));
+      notify(getErrorMessage(err, t('paperLibraryActionUnavailable')), 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -152,7 +146,6 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
         {!canDownload ? (
           <p className="text-sm text-muted-foreground">{t('paperLibraryDownloadUnavailable')}</p>
         ) : null}
-        <DownloadStatus descriptor={status} error={error} startedLabel={t('paperLibraryDownloadStarted')} />
       </section>
     );
   }
@@ -192,11 +185,6 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
               onChange={(event) => setRenameTitle(event.target.value)}
             />
           </label>
-          {renameError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {renameError}
-            </p>
-          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={isSavingRename}>
               {t('paperLibrarySaveTitle')}
@@ -223,11 +211,6 @@ export function PaperDetailPanel({ projectId, paper, variant = 'detail', onRenam
               onChange={(event) => setDeleteReason(event.target.value)}
             />
           </label>
-          {deleteError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {deleteError}
-            </p>
-          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={isDeleting}>
               {t('paperLibraryConfirmDelete')}

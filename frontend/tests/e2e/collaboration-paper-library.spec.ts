@@ -720,7 +720,7 @@ test('paper upload size guidance uses backend policy and repeats it on rejection
   });
   await page.getByRole('button', { name: 'Import PDF' }).click();
   await expect(
-    page.getByRole('alert').filter({ hasText: 'The selected PDF exceeds the 2 KB upload size limit.' }),
+    page.getByRole('status').filter({ hasText: 'The selected PDF exceeds the 2 KB upload size limit.' }).first(),
   ).toBeVisible();
   await expectNoControlOverflow(page);
 });

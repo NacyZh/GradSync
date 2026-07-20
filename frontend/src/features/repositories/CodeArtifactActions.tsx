@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 
 import { Button } from '@/shared/ui/primitives/button';
 
-import { DownloadStatus } from '../../shared/ui/DownloadStatus';
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { downloadCodeArtifact, type CodeArtifact } from './api';
 
 type CodeArtifactActionsProps = {
@@ -23,32 +23,28 @@ function getErrorMessage(err: unknown, fallback: string) {
 }
 
 export function CodeArtifactActions({ projectId, artifact, onRename, onDelete, showDownload = true }: CodeArtifactActionsProps) {
-  const [descriptor, setDescriptor] = useState<{ filename: string; deliveryMode: 'direct_response' | 'signed_url' } | undefined>();
-  const [error, setError] = useState<string | undefined>();
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameName, setRenameName] = useState('');
-  const [renameError, setRenameError] = useState<string | undefined>();
   const [isSavingRename, setIsSavingRename] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | undefined>();
   const [isDeleting, setIsDeleting] = useState(false);
+  const { notify } = useAppFeedback();
   const hasDownload = Boolean(artifact.archiveFileId || artifact.latestVersion);
   const canDownload = artifact.actionCapabilities?.canDownload ?? hasDownload;
   const canRename = Boolean(onRename && artifact.actionCapabilities?.canRename);
   const canDelete = Boolean(onDelete && artifact.actionCapabilities?.canDelete);
 
   async function onDownload() {
-    setError(undefined);
     try {
-      setDescriptor(await downloadCodeArtifact(projectId, artifact));
+      const descriptor = await downloadCodeArtifact(projectId, artifact);
+      notify(`Download started: ${descriptor.filename}`, 'success');
     } catch (err) {
-      setError(getErrorMessage(err, 'Download unavailable'));
+      notify(getErrorMessage(err, 'Download unavailable'), 'error');
     }
   }
 
   function startRename() {
     setRenameName(artifact.name);
-    setRenameError(undefined);
     setIsConfirmingDelete(false);
     setIsRenaming(true);
   }
@@ -57,36 +53,35 @@ export function CodeArtifactActions({ projectId, artifact, onRename, onDelete, s
     event.preventDefault();
     const cleanedName = renameName.trim();
     if (!cleanedName) {
-      setRenameError('Code artifact name is required');
+      notify('Code artifact name is required', 'error');
       return;
     }
-    setRenameError(undefined);
     setIsSavingRename(true);
     try {
       await onRename?.(cleanedName, '');
       setIsRenaming(false);
+      notify('Code artifact renamed', 'success');
     } catch (err) {
-      setRenameError(getErrorMessage(err, 'Rename unavailable'));
+      notify(getErrorMessage(err, 'Rename unavailable'), 'error');
     } finally {
       setIsSavingRename(false);
     }
   }
 
   function startDelete() {
-    setDeleteError(undefined);
     setIsRenaming(false);
     setIsConfirmingDelete(true);
   }
 
   async function submitDelete(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setDeleteError(undefined);
     setIsDeleting(true);
     try {
       await onDelete?.();
       setIsConfirmingDelete(false);
+      notify('Code artifact deleted', 'success');
     } catch (err) {
-      setDeleteError(getErrorMessage(err, 'Delete unavailable'));
+      notify(getErrorMessage(err, 'Delete unavailable'), 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -126,11 +121,6 @@ export function CodeArtifactActions({ projectId, artifact, onRename, onDelete, s
               onChange={(event) => setRenameName(event.target.value)}
             />
           </label>
-          {renameError ? (
-            <p role="alert" className="min-w-0 break-words text-sm text-destructive">
-              {renameError}
-            </p>
-          ) : null}
           <div className="flex min-w-0 flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={isSavingRename}>
               Save name
@@ -147,11 +137,6 @@ export function CodeArtifactActions({ projectId, artifact, onRename, onDelete, s
             <p className="min-w-0 break-words font-semibold text-destructive">Delete {artifact.name}</p>
             <p className="text-muted-foreground">This archives the selected code artifact and removes it from ordinary search and download.</p>
           </div>
-          {deleteError ? (
-            <p role="alert" className="min-w-0 break-words text-sm text-destructive">
-              {deleteError}
-            </p>
-          ) : null}
           <div className="flex min-w-0 flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={isDeleting}>
               Confirm delete
@@ -162,7 +147,6 @@ export function CodeArtifactActions({ projectId, artifact, onRename, onDelete, s
           </div>
         </form>
       ) : null}
-      <DownloadStatus descriptor={descriptor} error={error} />
     </div>
   );
 }

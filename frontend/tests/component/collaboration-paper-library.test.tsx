@@ -700,7 +700,9 @@ describe('collaboration paper library UI', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Select paper Recoverable Download Paper/ }));
     await userEvent.click(screen.getByRole('button', { name: /Download Recoverable Download Paper/ }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('This paper is no longer available.');
+    await waitFor(() => {
+      expect(screen.getAllByText('This paper is no longer available.').length).toBeGreaterThan(0);
+    });
   });
 
   it('renders an empty state tied to the active shared-library search', async () => {
@@ -927,7 +929,9 @@ describe('collaboration paper library UI', () => {
       expect(postedFiles).toEqual([longName, 'second.pdf', 'third.pdf']);
     });
     expect(await screen.findByText(/Accepted: Batch Paper Three/)).toBeInTheDocument();
-    expect(await screen.findByRole('alert')).toHaveTextContent('The PDF title could not be extracted.');
+    await waitFor(() => {
+      expect(screen.getAllByText(/The PDF title could not be extracted./).length).toBeGreaterThan(0);
+    });
     expect(screen.getByText(longName)).toHaveClass('truncate');
   });
 
@@ -1005,7 +1009,9 @@ describe('collaboration paper library UI', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Import PDF' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('The selected PDF exceeds the 7 MB upload size limit.');
+    await waitFor(() => {
+      expect(screen.getAllByText('too-large.pdf: The selected PDF exceeds the 7 MB upload size limit.').length).toBeGreaterThan(0);
+    });
   });
 
   it('shows duplicate imports with an action for the existing paper', async () => {
@@ -1277,7 +1283,9 @@ describe('collaboration paper library UI', () => {
     await userEvent.clear(screen.getByLabelText('New paper title'));
     await userEvent.click(screen.getByRole('button', { name: 'Save title' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Paper title is required.');
+    await waitFor(() => {
+      expect(screen.getAllByText('Paper title is required.').length).toBeGreaterThan(0);
+    });
   });
 
   it('allows maintainers to delete a selected paper after confirmation without restore controls', async () => {
@@ -1365,7 +1373,7 @@ describe('collaboration paper library UI', () => {
     renderPaperLibrary();
 
     await screen.findByRole('button', { name: /Open paper Stale Deleted Paper/ });
-    expect(screen.getByRole('alert')).toHaveTextContent('This paper is unavailable and cannot be opened.');
+    expect(screen.getByTestId('paper-preview-state')).toHaveTextContent('This paper is unavailable and cannot be opened.');
     expect(screen.queryByRole('button', { name: /restore/i })).not.toBeInTheDocument();
   });
 });

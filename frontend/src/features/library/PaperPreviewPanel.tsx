@@ -1,6 +1,7 @@
 import { FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { useI18n } from '../i18n/I18nProvider';
 import { previewSharedPaperFile, type PaperRecord } from './api';
 
@@ -17,8 +18,8 @@ function getErrorMessage(err: unknown, fallback: string) {
 
 export function PaperPreviewPanel({ paper }: PaperPreviewPanelProps) {
   const { t } = useI18n();
+  const { notify } = useAppFeedback();
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
-  const [previewError, setPreviewError] = useState<string | undefined>();
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const paperId = paper?.id;
   const displayTitle = paper ? paper.canonicalTitle || paper.title : '';
@@ -31,7 +32,6 @@ export function PaperPreviewPanel({ paper }: PaperPreviewPanelProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setPreviewError(undefined);
     setPreviewUrl((current) => {
       if (current) URL.revokeObjectURL(current);
       return undefined;
@@ -51,7 +51,7 @@ export function PaperPreviewPanel({ paper }: PaperPreviewPanelProps) {
       })
       .catch((err) => {
         if (!cancelled) {
-          setPreviewError(getErrorMessage(err, t('paperLibraryPreviewUnavailable')));
+          notify(getErrorMessage(err, t('paperLibraryPreviewUnavailable')), 'error');
         }
       })
       .finally(() => {
@@ -60,7 +60,7 @@ export function PaperPreviewPanel({ paper }: PaperPreviewPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [canPreview, paperId, t]);
+  }, [canPreview, notify, paperId, t]);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -89,13 +89,11 @@ export function PaperPreviewPanel({ paper }: PaperPreviewPanelProps) {
       </div>
       <p
         data-testid="paper-preview-state"
-        role={canPreview ? undefined : 'alert'}
         className={`min-w-0 break-words text-sm ${canPreview ? 'text-muted-foreground' : 'text-destructive'}`}
       >
         {isPreviewLoading
           ? t('paperLibraryPreviewLoading')
-          : previewError ||
-            (canPreview
+          : (canPreview
               ? t('paperLibraryViewerAvailable')
               : t('paperLibraryViewerUnavailable'))}
       </p>

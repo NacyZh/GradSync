@@ -44,7 +44,6 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
   const { notify } = useAppFeedback();
   const [files, setFiles] = useState<File[]>([]);
   const [jobs, setJobs] = useState<PaperImportJob[]>([]);
-  const [uploadError, setUploadError] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importMutation = useSharedPaperPdfImport();
   const uploadPolicyQuery = usePaperUploadPolicy();
@@ -63,7 +62,6 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
   function clearSelectedFiles() {
     setFiles([]);
     setJobs([]);
-    setUploadError(undefined);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -78,14 +76,14 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         selectedFile.size > uploadPolicyQuery.data.maxSizeBytes,
     );
     if (oversized) {
-      setUploadError(
+      notify(
         `${oversized.name}: ${t('paperLibraryUploadLimitExceededPrefix')} ${uploadPolicyQuery.data?.displayLabel} ${t(
           'paperLibraryUploadLimitExceededSuffix',
         )}`,
+        'error',
       );
       return;
     }
-    setUploadError(undefined);
     setJobs([]);
     const importedJobs: PaperImportJob[] = [];
     const failedFiles: File[] = [];
@@ -114,7 +112,9 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         failedMessages.push(`${selectedFile.name}: ${message}`);
       }
     }
-    setUploadError(failedMessages.length ? failedMessages.join(' ') : undefined);
+    if (failedMessages.length) {
+      notify(failedMessages.join(' '), 'error');
+    }
     if (failedFiles.length) {
       setFiles(failedFiles);
     } else {
@@ -146,10 +146,9 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
           type="file"
           accept="application/pdf,.pdf"
           multiple
-          onChange={(event) => {
+            onChange={(event) => {
             setFiles(Array.from(event.target.files ?? []));
             setJobs([]);
-            setUploadError(undefined);
           }}
         />
         <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -193,11 +192,6 @@ export function PaperImportPanel({ onAccepted, onSelectPaper, isMaintainer = fal
         {files.length > 1 ? t('paperLibraryImportPdfsButton') : t('paperLibraryImportPdfButton')}
       </Button>
       {importMutation.isPending ? <UploadProgress label={t('paperLibraryProcessingPdf')} value={65} /> : null}
-      {uploadError || importMutation.error ? (
-        <p role="alert" className="min-w-0 break-words text-sm font-medium text-destructive">
-          {uploadError ?? importMutation.error?.message}
-        </p>
-      ) : null}
       {currentStatus ? (
         <p
           id="paper-import-status"

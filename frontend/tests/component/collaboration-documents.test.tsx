@@ -353,7 +353,9 @@ describe('collaboration document library UI', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: /Download Microscope Protocol/ }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Document is no longer available');
+    await waitFor(() => {
+      expect(screen.getAllByText('Document is no longer available').length).toBeGreaterThan(0);
+    });
     expect(screen.getByRole('region', { name: 'Selected document download' })).toHaveTextContent('Microscope Protocol');
   });
 });
