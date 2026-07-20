@@ -6,8 +6,8 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 
+import { getErrorMessage } from '../../shared/api/errors';
 import { DataState } from '../../shared/ui/DataState';
-import { LocalizedValidation } from '../../shared/ui/LocalizedValidation';
 import { PageShell } from '../../shared/ui/PageShell';
 import { SourceProjectBadge, VisibilityStateBadge } from '../../shared/ui/BoundaryBadges';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
@@ -31,7 +31,6 @@ export function ProjectMaterialsPage() {
   const [materialSearch, setMaterialSearch] = useState('');
   const [visibility, setVisibility] = useState<ProjectMaterial['visibility']>('project-only');
   const [file, setFile] = useState<File | undefined>();
-  const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function clearFile() {
@@ -50,7 +49,9 @@ export function ProjectMaterialsPage() {
       queryClient.invalidateQueries({ queryKey: ['projectMaterials', projectId] });
       setTitle('');
       clearFile();
+      notify('Material uploaded', 'success');
     },
+    onError: (uploadError) => notify(getErrorMessage(uploadError), 'error'),
   });
   const visibilityMutation = useMutation({
     mutationFn: ({ materialId, nextVisibility }: { materialId: string; nextVisibility: ProjectMaterial['visibility'] }) =>
@@ -66,12 +67,7 @@ export function ProjectMaterialsPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!file) return;
-    setError('');
-    try {
-      await createMutation.mutateAsync({ materialType, file, title, visibility });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Project material upload failed');
-    }
+    createMutation.mutate({ materialType, file, title, visibility });
   }
 
   const materialCategories: Array<{ value: ProjectMaterial['materialType']; label: string; icon: typeof FileText }> = [
@@ -86,7 +82,7 @@ export function ProjectMaterialsPage() {
       <div className="grid gap-4 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(24rem,1.2fr)]">
         <section className="panel" aria-label="Create project material">
           <h2>Create material</h2>
-          <form className="mt-4 grid gap-3" onSubmit={onSubmit}>
+          <form className="mt-4 grid gap-3" noValidate onSubmit={onSubmit}>
             <Input aria-label="Material title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material title" />
             <select
               aria-label="Material type"
@@ -125,7 +121,6 @@ export function ProjectMaterialsPage() {
               <FileUp className="h-4 w-4" aria-hidden="true" />
               Upload material
             </Button>
-            <LocalizedValidation message={error} />
           </form>
         </section>
 

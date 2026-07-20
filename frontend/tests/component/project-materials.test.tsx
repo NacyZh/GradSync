@@ -151,6 +151,32 @@ describe('project materials UI', () => {
     expect(screen.getByRole('button', { name: 'Upload material' })).toBeDisabled();
   });
 
+  it('reports project material upload failures through global toast details', async () => {
+    const requests: string[] = [];
+    mockFetch((url, init) => {
+      requests.push(`${init?.method ?? 'GET'} ${url}`);
+      if (init?.method === 'POST' && url.includes('/materials/')) {
+        return {
+          status: 400,
+          payload: { file: ['The selected file exceeds the 7 MB project material limit.'] },
+        };
+      }
+      return { payload: { count: 0, results: [] } };
+    });
+
+    renderProjectMaterials();
+
+    await screen.findByRole('button', { name: 'Choose material' });
+    await userEvent.upload(screen.getByLabelText('Material file'), new File(['oversized'], 'oversized.pdf', { type: 'application/pdf' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Upload material' }));
+
+    await waitFor(() => expect(requests.some((request) => request.startsWith('POST '))).toBe(true));
+    await waitFor(() => {
+      expect(screen.getAllByText('file: The selected file exceeds the 7 MB project material limit.').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText('Project material upload failed')).not.toBeInTheDocument();
+  });
+
   it('downloads permitted project materials and reports unavailable errors', async () => {
     const requests: string[] = [];
     const createObjectURL = vi.fn(() => 'blob:project-material');
