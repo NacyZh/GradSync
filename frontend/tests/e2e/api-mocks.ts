@@ -442,6 +442,15 @@ export async function mockAuthenticatedApi(page: Page) {
       },
     });
   });
+  await page.route('**/api/notifications/read', async (route) => {
+    await route.fulfill({
+      json: {
+        throughId: Number(route.request().postDataJSON().throughId),
+        readAt: '2026-07-20T08:00:00Z',
+        visibleCount: 1,
+      },
+    });
+  });
   await page.route('**/api/projects/1/events/', async (route) => {
     await fulfillJson(route, { results: [] });
   });

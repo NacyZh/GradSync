@@ -38,12 +38,32 @@ export type NotificationRecord = {
   deliveryPolicy?: 'in_app' | 'in_app_email';
   skipped_reason?: string | null;
   skippedReason?: string | null;
+  readAt?: string | null;
 };
+
+export type NotificationResponse = { results: NotificationRecord[] } | NotificationRecord[];
+
+export const notificationQueryKey = ['notifications'] as const;
 
 export function listProjectNotifications(projectId: number) {
   return apiRequest<{ results: NotificationRecord[] }>(`/api/projects/${projectId}/notifications/`);
 }
 
 export function listNotifications() {
-  return apiRequest<{ results: NotificationRecord[] } | NotificationRecord[]>('/api/notifications');
+  return apiRequest<NotificationResponse>('/api/notifications');
+}
+
+export function notificationResults(response?: NotificationResponse) {
+  if (!response) return [];
+  return Array.isArray(response) ? response : response.results;
+}
+
+export function markNotificationsRead(throughId: number) {
+  return apiRequest<{ throughId: number; readAt: string; visibleCount: number }>(
+    '/api/notifications/read',
+    {
+      method: 'POST',
+      body: JSON.stringify({ throughId }),
+    },
+  );
 }

@@ -725,6 +725,26 @@
     @apply relative;
   }
 
+  .notification-drawer {
+    @apply bottom-0 left-auto right-0 top-0 h-dvh translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-y-0 border-r-0 p-0 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right;
+    width: 100vw !important;
+    max-width: none !important;
+  }
+
+  .notification-drawer-center {
+    @apply flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 p-5 shadow-none sm:p-6;
+  }
+
+  .notification-drawer-list {
+    @apply min-h-0 flex-1 overflow-y-auto pr-1;
+  }
+
+  @media (min-width: 768px) {
+    .notification-drawer {
+      width: 50vw !important;
+    }
+  }
+
   .unread-dot {
     @apply absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-destructive;
   }

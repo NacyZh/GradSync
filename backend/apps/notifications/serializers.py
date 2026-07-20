@@ -17,6 +17,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     lastAttemptAt = serializers.DateTimeField(source="last_attempt_at", read_only=True)
     failureReason = serializers.CharField(source="failure_reason", read_only=True)
     deliveryPolicy = serializers.CharField(source="delivery_policy", read_only=True)
+    readAt = serializers.DateTimeField(source="viewer_read_at", read_only=True, allow_null=True)
 
     class Meta:
         model = Notification
@@ -52,4 +53,9 @@ class NotificationSerializer(serializers.ModelSerializer):
             "retry_count",
             "failure_reason",
             "failureReason",
+            "readAt",
         ]
+
+
+class NotificationReadSerializer(serializers.Serializer):
+    throughId = serializers.IntegerField(min_value=1)

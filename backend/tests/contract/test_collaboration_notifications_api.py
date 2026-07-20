@@ -115,3 +115,45 @@ def test_schedule_notification_exposes_delivery_policy_and_safe_action_path(api_
     assert payload["deliveryPolicy"] == "in_app_email"
     assert payload["actionPath"].startswith("/?date=")
     assert "recipientEmail" in payload
+
+
+@pytest.mark.django_db
+def test_notification_read_receipts_are_viewer_scoped_and_preserve_new_notifications(api_client):
+    advisor = UserFactory(global_role="advisor", status="active")
+    student = UserFactory(global_role="student", status="active")
+    project = ResearchProject.objects.create(title="Read receipts", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    first = enqueue_notification(
+        project=project,
+        recipient=student,
+        sender=advisor,
+        event_type=Notification.EventType.PENDING_REVIEW,
+        target_type="WeeklyProgressReport",
+        target_id="1",
+        subject="First notification",
+    )
+
+    student_client = authenticate(api_client, student)
+    assert student_client.get("/api/notifications").json()["results"][0]["readAt"] is None
+    marked = student_client.post("/api/notifications/read", {"throughId": first.id}, format="json")
+    assert marked.status_code == 200
+    assert marked.json()["throughId"] == first.id
+    assert student_client.get("/api/notifications").json()["results"][0]["readAt"]
+
+    advisor_payload = authenticate(api_client, advisor).get("/api/notifications").json()["results"]
+    assert advisor_payload[0]["readAt"] is None
+
+    second = enqueue_notification(
+        project=project,
+        recipient=student,
+        sender=advisor,
+        event_type=Notification.EventType.TEACHER_FEEDBACK_AVAILABLE,
+        target_type="TeacherFeedback",
+        target_id="2",
+        subject="New notification",
+    )
+    student_payload = authenticate(api_client, student).get("/api/notifications").json()["results"]
+    by_id = {item["id"]: item for item in student_payload}
+    assert by_id[first.id]["readAt"]
+    assert by_id[second.id]["readAt"] is None

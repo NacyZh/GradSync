@@ -89,3 +89,54 @@ test('schedule reminder uses one top notification and dashboard deep link', asyn
     '/?date=2026-07-24&item=schedule%3A9%3A2026-07-24T08%3A00%3A00Z',
   );
 });
+
+test('notification drawer clears viewed state and restores the red dot for new records', async ({ page }) => {
+  test.skip(fullStackE2E, 'Read receipt persistence is covered by the backend contract journey.');
+  await mockAuthenticatedApi(page);
+  let notifications = [{
+    id: 51,
+    event_type: 'pending_review',
+    target_type: 'WeeklyProgressReport',
+    target_id: '12',
+    subject: 'Review requested',
+    action_path: '/projects/1/reviews',
+    status: 'pending',
+    eligible_at: '2026-07-20T08:00:00Z',
+    readAt: null as string | null,
+  }];
+  await page.route('**/api/notifications', async (route) => {
+    await fulfillJson(route, { results: notifications });
+  });
+
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await page.goto('/');
+  await expect(page.getByTestId('notification-unread-dot')).toBeVisible();
+  const readRequest = page.waitForRequest((request) => (
+    request.url().endsWith('/api/notifications/read') && request.method() === 'POST'
+  ));
+  await page.getByRole('button', { name: 'Open notifications' }).click();
+  expect((await readRequest).postDataJSON()).toEqual({ throughId: 51 });
+  await expect(page.getByTestId('notification-unread-dot')).toHaveCount(0);
+
+  const drawer = page.getByRole('dialog', { name: 'Notifications' });
+  await expect(drawer).toBeVisible();
+  const drawerBox = await drawer.boundingBox();
+  expect(drawerBox?.width).toBeGreaterThanOrEqual(700);
+  expect(drawerBox?.width).toBeLessThanOrEqual(721);
+  await page.getByRole('button', { name: 'Close' }).click();
+
+  notifications = [
+    {
+      ...notifications[0],
+      readAt: '2026-07-20T08:01:00Z',
+    },
+    {
+      ...notifications[0],
+      id: 52,
+      subject: 'New review requested',
+      readAt: null,
+    },
+  ];
+  await page.reload();
+  await expect(page.getByTestId('notification-unread-dot')).toBeVisible();
+});

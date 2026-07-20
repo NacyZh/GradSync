@@ -7,24 +7,26 @@ import { cn } from '@/shared/lib/utils';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { NotificationRecord } from './api';
-import { listNotifications, listProjectNotifications } from './api';
+import { listNotifications, listProjectNotifications, notificationQueryKey, notificationResults } from './api';
 
 export function NotificationList({ projectId, compact = false }: { projectId?: number; compact?: boolean }) {
   const notificationsQuery = useQuery({
-    queryKey: ['notifications', projectId],
+    queryKey: projectId ? ['notifications', projectId] : notificationQueryKey,
     queryFn: async () => {
       if (projectId) return listProjectNotifications(projectId);
       const response = await listNotifications();
       return Array.isArray(response) ? { results: response } : response;
     },
   });
-  const notifications = notificationsQuery.data?.results ?? [];
+  const notifications = projectId
+    ? (notificationsQuery.data as { results: NotificationRecord[] } | undefined)?.results ?? []
+    : notificationResults(notificationsQuery.data);
   const failedCount = notifications.filter((notification) => notification.status === 'failed' || notification.status === 'retry_needed').length;
   const pendingCount = notifications.filter((notification) => notification.status === 'pending' || notification.status === 'queued').length;
   const skippedCount = notifications.filter((notification) => notification.status === 'skipped').length;
 
   return (
-    <section className={cn('panel notification-center', compact && 'rounded-md border-0 shadow-none')} aria-labelledby="notifications-heading">
+    <section className={cn('panel notification-center', compact && 'notification-drawer-center')} aria-labelledby="notifications-heading">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="notifications-heading" className="flex items-center gap-2">
@@ -44,7 +46,7 @@ export function NotificationList({ projectId, compact = false }: { projectId?: n
       {!notificationsQuery.isLoading && !notificationsQuery.error && notifications.length === 0 ? (
         <DataState state="empty" title="No notifications" message="No delivery records are loaded." />
       ) : null}
-      <ul className={cn('notification-list', compact && 'max-h-[26rem] overflow-auto')}>
+      <ul className={cn('notification-list', compact && 'notification-drawer-list')}>
         {notifications.map((notification) => (
           <NotificationRow key={notification.id} notification={notification} />
         ))}

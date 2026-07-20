@@ -83,3 +83,28 @@ class Notification(models.Model):
             models.Index(fields=["recipient", "status"], name="notificatio_recipie_9b7c1f_idx"),
             models.Index(fields=["status", "eligible_at"], name="notificatio_status_44aaf4_idx"),
         ]
+
+
+class NotificationReadReceipt(models.Model):
+    notification = models.ForeignKey(
+        Notification,
+        on_delete=models.CASCADE,
+        related_name="read_receipts",
+    )
+    viewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notification_read_receipts",
+    )
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["notification", "viewer"],
+                name="unique_notification_viewer_receipt",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["viewer", "viewed_at"], name="notificatio_viewer_10c532_idx")
+        ]

@@ -1,9 +1,9 @@
 import re
 
-from django.db.models import Q
+from django.db.models import DateTimeField, OuterRef, Q, Subquery
 from django.utils import timezone
 
-from .models import Notification
+from .models import Notification, NotificationReadReceipt
 
 RETRY_NEEDED_STATUSES = {Notification.Status.FAILED, Notification.Status.RETRY_NEEDED}
 
@@ -117,7 +117,12 @@ def notification_is_deliverable(notification: Notification) -> bool:
 
 
 def notifications_visible_to(user, *, project=None):
-    queryset = Notification.objects.select_related("project", "recipient", "sender")
+    viewer_receipt = NotificationReadReceipt.objects.filter(
+        notification_id=OuterRef("pk"), viewer=user
+    ).values("viewed_at")[:1]
+    queryset = Notification.objects.select_related("project", "recipient", "sender").annotate(
+        viewer_read_at=Subquery(viewer_receipt, output_field=DateTimeField())
+    )
     if project is not None:
         queryset = queryset.filter(project=project)
     if not getattr(user, "is_administrator", False):
@@ -140,8 +145,7 @@ def notifications_visible_to(user, *, project=None):
     if getattr(user, "is_administrator", False):
         visible_schedules |= ScheduleItem.objects.filter(scope=ScheduleItem.Scope.GROUP)
     visible_ids = [
-        str(value)
-        for value in visible_schedules.values_list("id", flat=True).distinct()
+        str(value) for value in visible_schedules.values_list("id", flat=True).distinct()
     ]
     return queryset.filter(
         ~Q(target_type="ScheduleItem") | Q(target_type="ScheduleItem", target_id__in=visible_ids)

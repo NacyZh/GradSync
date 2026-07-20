@@ -1,14 +1,9 @@
 import type { PropsWithChildren } from 'react';
-import { Bell, BookOpen, BriefcaseBusiness, Code2, FileStack, FileText, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, UserCircle, Users } from 'lucide-react';
+import { BookOpen, BriefcaseBusiness, Code2, FileStack, FileText, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, UserCircle, Users } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/shared/ui/primitives/popover';
 import {
   Tooltip,
   TooltipContent,
@@ -18,7 +13,7 @@ import { cn } from '@/shared/lib/utils';
 
 import { useAuth } from '../features/auth/AuthProvider';
 import { LanguageSwitcher } from '../features/i18n/LanguageSwitcher';
-import { NotificationList } from '../features/notifications/NotificationList';
+import { NotificationCenter } from '../features/notifications/NotificationCenter';
 import { ProjectContextBanner } from '../features/projects/ProjectContextBanner';
 import { useAppFeedback } from '../shared/ui/AppFeedback';
 
@@ -63,17 +58,7 @@ export function Layout({ children }: PropsWithChildren) {
                 <Input className="pl-9" placeholder="Search projects, tasks, reviews" />
               </span>
             </label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="icon" className="relative" type="button" aria-label="Open notifications">
-                  <Bell className="h-4 w-4" aria-hidden="true" />
-                  <span className="unread-dot" aria-hidden="true" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="max-h-[min(42rem,calc(100vh-5rem))] w-[min(32rem,calc(100vw-2rem))] overflow-auto p-0">
-                <NotificationList compact />
-              </PopoverContent>
-            </Popover>
+            <NotificationCenter />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="outline" size="icon" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
