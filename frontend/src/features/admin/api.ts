@@ -13,17 +13,6 @@ export function listAccounts(pageUrl?: string): Promise<PaginatedAccounts> {
   return apiRequest<PaginatedAccounts>(path);
 }
 
-export function createAccount(payload: {
-  email: string;
-  name: string;
-  global_role: 'advisor' | 'student';
-}): Promise<CurrentUser> {
-  return apiRequest<CurrentUser>('/api/accounts/admin/', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
 export function updateAccount(
   id: number,
   payload: { name?: string; global_role?: string },

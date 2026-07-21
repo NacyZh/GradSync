@@ -30,8 +30,10 @@ describe('collaboration registration UI', () => {
 
     renderWithClient(<MemoryRouter><RegisterPage /></MemoryRouter>);
     await userEvent.type(screen.getByLabelText('Email'), 's@example.com');
-    await userEvent.type(screen.getByLabelText('Nickname'), 'Student');
+    await userEvent.type(screen.getByLabelText('Full name'), 'Student Example');
+    await userEvent.type(screen.getByLabelText('Workspace nickname'), 'Student');
     await userEvent.type(screen.getByLabelText('Password'), 'StrongPass1!');
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'StrongPass1!');
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
     expect(await screen.findByText('Verification email sent')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Verification code'), '123456');
@@ -39,7 +41,7 @@ describe('collaboration registration UI', () => {
     expect(await screen.findByText('Email verified')).toBeInTheDocument();
   });
 
-  it('updates profile nickname', async () => {
+  it('updates profile information', async () => {
     mockFetch((url, init) => {
       if (url.includes('/api/accounts/me/') && init?.method === 'PATCH') {
         return { id: 1, email: 'a@example.com', name: 'New Nick', nickname: 'New Nick', global_role: 'admin', status: 'active' };
@@ -55,7 +57,7 @@ describe('collaboration registration UI', () => {
     const input = await screen.findByLabelText('Nickname');
     await userEvent.clear(input);
     await userEvent.type(input, 'New Nick');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save profile' }));
     expect(await screen.findByText('Profile updated')).toBeInTheDocument();
   });
 

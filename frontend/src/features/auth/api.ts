@@ -26,8 +26,9 @@ export function fetchCurrentUser(): Promise<CurrentUser> {
 export type RegisterPayload = {
   email: string;
   password: string;
+  name: string;
   nickname: string;
-  requestedRole: 'student' | 'teacher' | 'administrator';
+  requestedRole: 'student' | 'teacher';
   degreeType?: 'masters' | 'doctoral' | '';
 };
 
@@ -45,9 +46,27 @@ export function verifyEmail(payload: { email: string; code: string }): Promise<C
   });
 }
 
-export function updateNickname(nickname: string): Promise<CurrentUser> {
+export function resendVerification(email: string): Promise<{ message: string }> {
+  return apiRequest('/api/accounts/resend-verification/', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function updateProfile(payload: {
+  name: string;
+  nickname: string;
+  degreeType?: 'masters' | 'doctoral' | null;
+}): Promise<CurrentUser> {
   return apiRequest<CurrentUser>('/api/accounts/me/', {
     method: 'PATCH',
-    body: JSON.stringify({ nickname }),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
+  return apiRequest<void>('/api/accounts/me/password/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }

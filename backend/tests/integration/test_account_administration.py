@@ -20,62 +20,18 @@ def _force_login(api_client, user):
 
 @pytest.mark.django_db
 class TestAdminAccountManagement:
-    def test_admin_can_create_advisor_account(self, api_client):
+    def test_admin_cannot_create_accounts_for_users(self, api_client):
         admin = UserFactory(global_role="admin", status="active")
         _force_login(api_client, admin)
 
         response = api_client.post(
             "/api/accounts/admin/",
-            {"email": "new-advisor@example.com", "name": "New Advisor", "global_role": "advisor"},
+            {"email": "new-user@example.com", "name": "New User", "global_role": "student"},
             format="json",
         )
 
-        assert response.status_code == 201
-        data = response.json()
-        assert data["email"] == "new-advisor@example.com"
-        assert data["global_role"] == "advisor"
-        assert data["status"] == "invited"
-
-    def test_admin_can_create_student_account(self, api_client):
-        admin = UserFactory(global_role="admin", status="active")
-        _force_login(api_client, admin)
-
-        response = api_client.post(
-            "/api/accounts/admin/",
-            {"email": "new-student@example.com", "name": "New Student", "global_role": "student"},
-            format="json",
-        )
-
-        assert response.status_code == 201
-        assert response.json()["status"] == "invited"
-        # Created account has no usable password.
-        user = User.objects.get(email="new-student@example.com")
-        assert not user.has_usable_password()
-
-    def test_duplicate_email_rejected(self, api_client):
-        admin = UserFactory(global_role="admin", status="active")
-        _force_login(api_client, admin)
-        UserFactory(email="exists@example.com")
-
-        response = api_client.post(
-            "/api/accounts/admin/",
-            {"email": "exists@example.com", "name": "Dup", "global_role": "student"},
-            format="json",
-        )
-
-        assert response.status_code == 400
-
-    def test_non_admin_cannot_create_account(self, api_client):
-        advisor = UserFactory(global_role="advisor", status="active")
-        _force_login(api_client, advisor)
-
-        response = api_client.post(
-            "/api/accounts/admin/",
-            {"email": "foo@example.com", "name": "Foo", "global_role": "student"},
-            format="json",
-        )
-
-        assert response.status_code == 403
+        assert response.status_code == 405
+        assert not User.objects.filter(email="new-user@example.com").exists()
 
     def test_non_admin_cannot_list_accounts(self, api_client):
         student = UserFactory(global_role="student", status="active")

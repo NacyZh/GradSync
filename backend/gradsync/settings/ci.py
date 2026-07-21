@@ -16,4 +16,8 @@ DATABASES["default"]["TEST"] = {  # noqa: F405
 }
 
 REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []  # noqa: F405
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {"login": None, "invite": None}  # noqa: F405
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
+    "login": None,
+    "invite": None,
+    "registration": None,
+}

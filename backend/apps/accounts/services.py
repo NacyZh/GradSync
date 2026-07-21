@@ -29,22 +29,6 @@ class AccountsService:
     """
 
     @staticmethod
-    def create_account(*, email: str, name: str, global_role: str, created_by) -> User:
-        if User.objects.filter(email=email).exists():
-            raise ValidationError("An account with this email already exists.")
-
-        user = User.objects.create(
-            email=email,
-            name=name,
-            global_role=global_role,
-            status=User.Status.INVITED,
-            is_active=True,
-        )
-        user.set_unusable_password()
-        user.save(update_fields=["password"])
-        return user
-
-    @staticmethod
     def edit_account(*, user: User, name: str | None, global_role: str | None) -> User:
         if name is not None:
             user.name = name
@@ -134,22 +118,31 @@ def _role_to_global_role(role: str) -> str:
 
 @transaction.atomic
 def register_account(
-    *, email: str, password: str, nickname: str, requested_role: str, degree_type: str | None
+    *,
+    email: str,
+    password: str,
+    name: str,
+    nickname: str,
+    requested_role: str,
+    degree_type: str | None,
 ):
     if User.objects.filter(email=email).exists():
         raise ValidationError("An account with this email already exists.")
-    if requested_role not in {"student", "teacher", "administrator"}:
-        raise ValidationError("Requested role must be student, teacher, or administrator.")
+    if requested_role not in {"student", "teacher"}:
+        raise ValidationError("Requested role must be student or teacher.")
     if requested_role == "student" and degree_type not in {"masters", "doctoral"}:
         raise ValidationError("Student registration requires a masters or doctoral degree type.")
     validate_collaboration_password(password)
     nickname = (nickname or "").strip()
+    name = (name or "").strip()
+    if not name:
+        raise ValidationError("Name is required.")
     if not nickname:
         raise ValidationError("Nickname is required.")
 
     user = User.objects.create(
         email=email,
-        name=nickname,
+        name=name,
         nickname=nickname,
         requested_role=requested_role,
         active_role=User.RequestedRole.PENDING,
@@ -183,24 +176,40 @@ def create_verification_code(*, email: str) -> EmailVerificationCode:
     )
 
 
+def resend_verification_code(*, email: str):
+    user = User.objects.filter(email=email, status=User.Status.PENDING_EMAIL_VERIFICATION).first()
+    if user is None:
+        return None
+    code = create_verification_code(email=email)
+    send_verification_email(email=email, code=code.plain_code, user=user, verification=code)
+    return code
+
+
 def send_verification_email(*, email: str, code: str, user, verification: EmailVerificationCode):
+    prefix = str(getattr(settings, "EMAIL_SUBJECT_PREFIX", "")).strip()
+    subject = f"{prefix} Verify your GradSync email" if prefix else "Verify your GradSync email"
     notification = enqueue_notification(
         recipient=user,
         event_type=Notification.EventType.VERIFICATION_CODE,
         target_type="EmailVerificationCode",
         target_id=str(verification.id),
-        subject="Verify your GradSync email",
+        subject=subject,
         action_path="/verify-email",
     )
     mark_notification_status(notification, Notification.Status.QUEUED)
     try:
-        send_mail(
+        delivered = send_mail(
             notification.subject,
-            f"Your GradSync verification code is {code}.",
+            (
+                f"Your GradSync verification code is {code}.\n"
+                f"It expires in {settings.EMAIL_VERIFICATION_CODE_TTL_MINUTES} minutes."
+            ),
             settings.DEFAULT_FROM_EMAIL,
             [email],
             fail_silently=False,
         )
+        if delivered != 1:
+            raise RuntimeError("SMTP backend did not accept the verification email.")
     except Exception as exc:  # pragma: no cover - covered by integration failure tests
         mark_notification_attempt_failed(notification, exc)
         return notification
@@ -284,11 +293,33 @@ def decide_role_activation(*, activation: RoleActivationRequest, reviewer, actio
     return activation
 
 
-def update_nickname(*, user, nickname: str):
+@transaction.atomic
+def update_profile(*, user, name: str, nickname: str, degree_type: str | None = None):
+    name = (name or "").strip()
     nickname = (nickname or "").strip()
+    if not name:
+        raise ValidationError("Name is required.")
     if not nickname:
         raise ValidationError("Nickname is required.")
     user.nickname = nickname
-    user.name = nickname
+    user.name = name
     user.save(update_fields=["nickname", "name"])
+    if user.global_role == User.GlobalRole.STUDENT:
+        if degree_type not in {"masters", "doctoral"}:
+            raise ValidationError("Student profile requires a masters or doctoral degree type.")
+        profile, _created = StudentProfile.objects.update_or_create(
+            user=user, defaults={"degree_type": degree_type}
+        )
+        user.student_profile = profile
+    return user
+
+
+def change_password(*, user, current_password: str, new_password: str):
+    if not user.check_password(current_password):
+        raise ValidationError("Current password is incorrect.")
+    if current_password == new_password:
+        raise ValidationError("New password must be different from the current password.")
+    validate_collaboration_password(new_password)
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
     return user

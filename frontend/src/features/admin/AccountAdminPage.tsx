@@ -1,11 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Archive, RotateCcw, Search, ShieldCheck, UserPlus, UserX } from 'lucide-react';
+import { Archive, RotateCcw, Search, ShieldCheck, UserX } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Badge } from '@/shared/ui/primitives/badge';
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
-import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/primitives/table';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
@@ -13,7 +12,7 @@ import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { CurrentUser } from '../auth/AuthProvider';
-import { accountAction, createAccount, listAccounts } from './api';
+import { accountAction, listAccounts } from './api';
 
 export function AccountAdminPage() {
   const queryClient = useQueryClient();
@@ -28,17 +27,6 @@ export function AccountAdminPage() {
     queryFn: () => listAccounts(pageUrl),
   });
 
-  const createMutation = useMutation({
-    mutationFn: createAccount,
-    onSuccess: (user) => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      notify(`Created account for ${user.email}`, 'success');
-    },
-    onError: (err: { message?: string }) => {
-      notify(err?.message ?? 'Failed to create account', 'error');
-    },
-  });
-
   const actionMutation = useMutation({
     mutationFn: ({ id, action }: { id: number; action: 'suspend' | 'reactivate' | 'archive' }) =>
       accountAction(id, action),
@@ -50,17 +38,6 @@ export function AccountAdminPage() {
       notify(err?.message ?? 'Action failed', 'error');
     },
   });
-
-  function onCreateSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    createMutation.mutate({
-      email: String(form.get('email')),
-      name: String(form.get('name')),
-      global_role: String(form.get('role')) as 'advisor' | 'student',
-    });
-    e.currentTarget.reset();
-  }
 
   const accounts = useMemo(() => data?.results ?? [], [data?.results]);
   const filteredAccounts = useMemo(
@@ -92,7 +69,7 @@ export function AccountAdminPage() {
   return (
     <PageShell
       title="Account administration"
-      description="Create accounts, review role-safe access, and manage account state with audit-friendly controls."
+      description="Review self-registered users, approve roles, and manage account state with audit-friendly controls."
       actions={
         <>
           <Badge variant="secondary">{activeCount} active</Badge>
@@ -101,45 +78,6 @@ export function AccountAdminPage() {
         </>
       }
     >
-      <section className="panel">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" aria-hidden="true" />
-              Create account
-            </h2>
-            <p className="text-sm text-muted-foreground">New advisor and student accounts start active and inherit role-safe navigation.</p>
-          </div>
-          <StatusBadge status="admin only" />
-        </div>
-        <form aria-label="Create account" onSubmit={onCreateSubmit} className="grid gap-4 lg:grid-cols-[minmax(14rem,1fr)_minmax(12rem,1fr)_12rem_auto]">
-          <div className="grid gap-1.5">
-            <Label htmlFor="accountEmail">Email</Label>
-            <Input id="accountEmail" name="email" type="email" required disabled={createMutation.isPending} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="accountName">Name</Label>
-            <Input id="accountName" name="name" required disabled={createMutation.isPending} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="accountRole">Role</Label>
-            <Select name="role" defaultValue="student" disabled={createMutation.isPending}>
-              <SelectTrigger id="accountRole" aria-label="Role">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="student">Student</SelectItem>
-                <SelectItem value="advisor">Advisor</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button className="self-end" type="submit" disabled={createMutation.isPending}>
-            <UserPlus className="h-4 w-4" aria-hidden="true" />
-            {createMutation.isPending ? 'Creating…' : 'Create account'}
-          </Button>
-        </form>
-      </section>
-
       <section className="panel">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>

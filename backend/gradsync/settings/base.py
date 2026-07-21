@@ -120,6 +120,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "login": os.getenv("THROTTLE_LOGIN_RATE", "10/min"),
         "invite": os.getenv("THROTTLE_INVITE_RATE", "10/min"),
+        "registration": os.getenv("THROTTLE_REGISTRATION_RATE", "5/min"),
         "paper_library": os.getenv("THROTTLE_PAPER_LIBRARY_RATE", "120/min"),
         "paper_import": os.getenv("THROTTLE_PAPER_IMPORT_RATE", "30/hour"),
         "calendar": os.getenv("THROTTLE_CALENDAR_RATE", "120/min"),
@@ -171,6 +172,7 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "false").lower() == "true"
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@gradsync.local")
+EMAIL_SUBJECT_PREFIX = os.getenv("EMAIL_SUBJECT_PREFIX", "[GradSync] ")
 
 PAPER_LIBRARY_MIN_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024
 COLLABORATION_UPLOAD_LIMITS = {

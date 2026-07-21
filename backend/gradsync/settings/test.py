@@ -15,4 +15,8 @@ CELERY_TASK_EAGER_PROPAGATES = True
 # Scope rates set to None make ScopedRateThrottle a no-op even where a view
 # declares throttle_classes explicitly.
 REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []  # noqa: F405
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {"login": None, "invite": None}  # noqa: F405
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
+    "login": None,
+    "invite": None,
+    "registration": None,
+}

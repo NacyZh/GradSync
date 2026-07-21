@@ -77,7 +77,7 @@ describe('notification and account administration UI', () => {
     expect(screen.getByRole('button', { name: 'Reactivate' })).toBeInTheDocument();
   });
 
-  it('creates accounts and confirms destructive archive actions', async () => {
+  it('does not expose account creation and confirms destructive archive actions', async () => {
     const calls: RequestInit[] = [];
     vi.stubGlobal(
       'fetch',
@@ -86,12 +86,6 @@ describe('notification and account administration UI', () => {
         if (init.method === 'POST' && String(init.body).includes('archive')) {
           return new Response(JSON.stringify({ id: 1, email: 'admin@test.local', name: 'Admin', global_role: 'admin', status: 'archived' }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-        if (init.method === 'POST') {
-          return new Response(JSON.stringify({ id: 4, email: 'new@test.local', name: 'New User', global_role: 'student', status: 'active' }), {
-            status: 201,
             headers: { 'Content-Type': 'application/json' },
           });
         }
@@ -110,11 +104,7 @@ describe('notification and account administration UI', () => {
     renderWithClient(<AccountAdminPage />);
 
     await screen.findByText('admin@test.local');
-    await userEvent.type(screen.getByLabelText('Email'), 'new@test.local');
-    await userEvent.type(screen.getByLabelText('Name'), 'New User');
-    await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
-
-    await waitFor(() => expect(calls.some((call) => String(call.body).includes('new@test.local'))).toBe(true));
+    expect(screen.queryByRole('button', { name: 'Create account' })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
     const dialog = await screen.findByRole('dialog', { name: 'Archive account?' });

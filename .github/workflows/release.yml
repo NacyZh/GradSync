@@ -84,6 +84,11 @@ jobs:
           PYTHON: python
           OPENAPI_STRICT_SHAPES: "1"
         run: bash scripts/check-openapi-contract.sh specs/001-research-group-ops/contracts/openapi.yaml
+      - name: Check collaboration registration OpenAPI contract drift
+        env:
+          PYTHON: python
+          OPENAPI_STRICT_SHAPES: "1"
+        run: bash scripts/check-openapi-contract.sh specs/003-research-collab-platform/contracts/openapi.yaml
       - name: Check paper library file actions OpenAPI contract drift
         env:
           PYTHON: python

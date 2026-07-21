@@ -313,8 +313,10 @@ test('quickstart smoke covers all collaboration scenarios', async ({ page }) => 
   await test.step('registration and elevated role activation', async () => {
     await page.goto('/register');
     await page.getByLabel('Email').fill('student@example.com');
-    await page.getByLabel('Nickname').fill('Student One');
-    await page.getByLabel('Password').fill('StrongPass1!');
+    await page.getByLabel('Full name').fill('Student Example');
+    await page.getByLabel('Workspace nickname').fill('Student One');
+    await page.getByLabel('Password', { exact: true }).fill('StrongPass1!');
+    await page.getByLabel('Confirm password').fill('StrongPass1!');
     await page.getByRole('button', { name: 'Register' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Verification email sent' }).first()).toBeVisible();
     await page.getByLabel('Verification code').fill('123456');

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 
 import { useAuth } from './AuthProvider';
 import { I18nProvider, type Locale, useI18n } from '../i18n/I18nProvider';
@@ -126,6 +126,10 @@ function LoginContent({
               {isLoggingIn ? `${t('signingIn')}...` : t('signIn')}
             </button>
           </form>
+          <p className="text-center text-sm text-muted-foreground">
+            New to GradSync?{' '}
+            <Link className="font-semibold text-primary" to="/register">Create your account</Link>
+          </p>
         </div>
       </section>
     </main>

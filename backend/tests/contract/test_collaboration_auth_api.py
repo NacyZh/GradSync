@@ -11,6 +11,7 @@ def test_register_endpoint_accepts_student_registration(api_client):
         {
             "email": "new-student@example.com",
             "password": "StrongPass1!",
+            "name": "New Student",
             "nickname": "New Student",
             "requestedRole": "student",
             "degreeType": "masters",
@@ -29,6 +30,7 @@ def test_verify_email_endpoint_activates_student(api_client):
         {
             "email": "verify-student@example.com",
             "password": "StrongPass1!",
+            "name": "Verify Student",
             "nickname": "Verify Student",
             "requestedRole": "student",
             "degreeType": "doctoral",
@@ -86,7 +88,11 @@ def test_me_patch_and_students_contract(api_client):
     )
     api_client.force_authenticate(admin)
 
-    me_response = api_client.patch("/api/accounts/me/", {"nickname": "Admin Nick"}, format="json")
+    me_response = api_client.patch(
+        "/api/accounts/me/",
+        {"name": "Admin Name", "nickname": "Admin Nick"},
+        format="json",
+    )
     students_response = api_client.get("/api/accounts/students/?q=Alex")
 
     assert me_response.status_code == 200

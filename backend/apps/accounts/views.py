@@ -1,4 +1,4 @@
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.middleware.csrf import get_token
@@ -14,23 +14,26 @@ from apps.common.permissions import IsAdministrator
 from .locale_services import get_locale, set_locale
 from .models import RoleActivationRequest, User
 from .serializers import (
-    AccountCreateSerializer,
     AccountUpdateSerializer,
     EmailVerificationSerializer,
     LocalePreferenceSerializer,
     LoginSerializer,
-    NicknameUpdateSerializer,
+    PasswordChangeSerializer,
+    ProfileUpdateSerializer,
     RegistrationSerializer,
     RoleActivationSerializer,
     RoleActivationUpdateSerializer,
     StudentOptionSerializer,
     UserSerializer,
+    VerificationResendSerializer,
 )
 from .services import (
     AccountsService,
+    change_password,
     decide_role_activation,
     register_account,
-    update_nickname,
+    resend_verification_code,
+    update_profile,
     verify_email,
 )
 
@@ -70,14 +73,16 @@ class CurrentUserView(APIView):
     def get(self, request):
         return Response(UserSerializer(request.user).data)
 
-    @extend_schema(request=NicknameUpdateSerializer, responses={200: UserSerializer})
+    @extend_schema(request=ProfileUpdateSerializer, responses={200: UserSerializer})
     def patch(self, request):
-        serializer = NicknameUpdateSerializer(data=request.data)
+        serializer = ProfileUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            user = update_nickname(
+            user = update_profile(
                 user=request.user,
+                name=serializer.validated_data["name"],
                 nickname=serializer.validated_data["nickname"],
+                degree_type=serializer.validated_data.get("degreeType"),
             )
         except ValidationError as exc:
             return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -101,6 +106,7 @@ class RegistrationView(APIView):
             user, _code = register_account(
                 email=serializer.validated_data["email"],
                 password=serializer.validated_data["password"],
+                name=serializer.validated_data["name"],
                 nickname=serializer.validated_data["nickname"],
                 requested_role=serializer.validated_data["requestedRole"],
                 degree_type=serializer.validated_data.get("degreeType"),
@@ -131,6 +137,47 @@ class EmailVerificationView(APIView):
         except (ValidationError, User.DoesNotExist) as exc:
             return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(UserSerializer(user).data)
+
+
+class VerificationResendView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "registration"
+
+    @extend_schema(
+        request=VerificationResendSerializer,
+        responses={202: OpenApiResponse(description="Verification email queued")},
+    )
+    def post(self, request):
+        serializer = VerificationResendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        resend_verification_code(email=serializer.validated_data["email"])
+        return Response(
+            {"message": "If the account is awaiting verification, a new code has been sent."},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class PasswordChangeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=PasswordChangeSerializer,
+        responses={204: OpenApiResponse(description="Password changed")},
+    )
+    def post(self, request):
+        serializer = PasswordChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            user = change_password(
+                user=request.user,
+                current_password=serializer.validated_data["currentPassword"],
+                new_password=serializer.validated_data["newPassword"],
+            )
+        except ValidationError as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        update_session_auth_hash(request, user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class RoleActivationListView(generics.ListAPIView):
@@ -217,38 +264,12 @@ class LocalePreferenceView(APIView):
 # ── Admin account management ──
 
 
-class AccountListCreateView(generics.ListCreateAPIView):
-    """List all accounts (paginated) or create a new advisor/student account."""
+class AccountListView(generics.ListAPIView):
+    """List accounts for governance; account creation is self-service."""
 
     permission_classes = [IsAuthenticated, IsAdministrator]
     queryset = User.objects.order_by("-date_joined")
     serializer_class = UserSerializer
-
-    def get_serializer_class(self):
-        if self.request.method == "POST":
-            return AccountCreateSerializer
-        return UserSerializer
-
-    def perform_create(self, serializer):
-        try:
-            user = AccountsService.create_account(
-                email=serializer.validated_data["email"],
-                name=serializer.validated_data["name"],
-                global_role=serializer.validated_data["global_role"],
-                created_by=self.request.user,
-            )
-        except ValidationError as e:
-            from rest_framework.exceptions import ValidationError as DRFValidationError
-
-            raise DRFValidationError({"message": str(e)}) from e
-        # Return the created user data.
-        serializer._user = user
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response(UserSerializer(serializer._user).data, status=status.HTTP_201_CREATED)
 
 
 class AccountDetailView(generics.RetrieveUpdateAPIView):

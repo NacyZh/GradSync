@@ -36,6 +36,24 @@ def test_production_readiness_flags_unsafe_settings():
     assert "CSRF_TRUSTED_ORIGINS must be configured" in issues
 
 
+def test_production_readiness_rejects_invalid_smtp_settings():
+    settings = production_ready_settings_stub(
+        EMAIL_PORT=70000,
+        EMAIL_USE_TLS=True,
+        EMAIL_USE_SSL=True,
+        EMAIL_TIMEOUT=0,
+        EMAIL_HOST_USER="smtp-user",
+        EMAIL_HOST_PASSWORD="",
+    )
+
+    issues = collect_production_readiness_issues(settings, REPO_ROOT)
+
+    assert "EMAIL_PORT must be between 1 and 65535" in issues
+    assert "EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be true" in issues
+    assert "EMAIL_TIMEOUT must be positive" in issues
+    assert "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be configured together" in issues
+
+
 def test_frontend_nginx_serves_static_assets_and_proxies_api():
     nginx_conf = (REPO_ROOT / "docker/nginx.conf").read_text()
 
@@ -116,7 +134,7 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert 'OPENAPI_STRICT_SHAPES: "1"' in workflow
     assert "specs/001-research-group-ops/contracts/openapi.yaml" in workflow
     assert "specs/007-code-repository-layout/contracts/openapi.yaml" in workflow
-    assert "specs/003-research-collab-platform/contracts/openapi.yaml" not in workflow
+    assert "specs/003-research-collab-platform/contracts/openapi.yaml" in workflow
     assert "production-image:" in workflow
     assert "frontend-e2e:" in workflow
     assert "docker compose -f docker-compose.prod.yml config --quiet" in workflow
@@ -196,6 +214,7 @@ def test_env_template_names_operational_launch_inputs():
         "GRADSYNC_WORKER_MEM_LIMIT",
         "EMAIL_PROVIDER",
         "EMAIL_DKIM_SELECTOR",
+        "PRODUCTION_SMTP_PROBE_TO",
         "ALERT_WEBHOOK_URL",
         "REGISTRY_IMAGE_PREFIX",
         "BACKEND_IMAGE",
@@ -341,7 +360,7 @@ def test_production_readiness_smtp_probe_uses_delivery_path(settings, tmp_path):
     static_root.mkdir()
     settings.STATIC_ROOT = str(static_root)
     settings.EMAIL_HOST = "localhost"
-    settings.DEFAULT_FROM_EMAIL = "no-reply@example.edu"
+    settings.DEFAULT_FROM_EMAIL = "no-reply@gradsync.edu"
     settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
     settings.CELERY_BROKER_URL = "redis://redis:6379/0"
     settings.PUBLIC_BASE_URL = "https://gradsync.edu"
@@ -350,6 +369,7 @@ def test_production_readiness_smtp_probe_uses_delivery_path(settings, tmp_path):
     settings.EMAIL_PROVIDER = "smtp-provider"
     settings.EMAIL_PROVIDER_DOMAIN = "gradsync.edu"
     settings.EMAIL_DKIM_SELECTOR = "gradsync"
+    settings.PRODUCTION_SMTP_PROBE_TO = "ops@gradsync.edu"
     settings.ALERT_WEBHOOK_URL = "https://alerts.gradsync.edu/hooks/grad-sync"
     settings.ALERT_ONCALL_TARGET = "grad-sync-primary"
     settings.REGISTRY_IMAGE_PREFIX = "ghcr.io/gradsync-prod/gradsync"
@@ -362,8 +382,7 @@ def test_production_readiness_smtp_probe_uses_delivery_path(settings, tmp_path):
         "check_production_readiness",
         repo_root=str(REPO_ROOT),
         skip_database=True,
-        smtp_probe_to="ops@example.edu",
     )
 
     assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == ["ops@example.edu"]
+    assert mail.outbox[0].to == ["ops@gradsync.edu"]

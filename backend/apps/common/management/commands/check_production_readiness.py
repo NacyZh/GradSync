@@ -38,13 +38,15 @@ class Command(BaseCommand):
         probe_to = options["smtp_probe_to"] or getattr(settings, "PRODUCTION_SMTP_PROBE_TO", "")
         if probe_to:
             try:
-                send_mail(
+                delivered_count = send_mail(
                     "GradSync production SMTP probe",
                     "This message verifies the GradSync production notification delivery path.",
                     settings.DEFAULT_FROM_EMAIL,
                     [probe_to],
                     fail_silently=False,
                 )
+                if delivered_count != 1:
+                    issues.append("SMTP delivery probe did not accept exactly one message")
             except Exception as exc:
                 issues.append(f"SMTP delivery probe failed: {exc}")
 

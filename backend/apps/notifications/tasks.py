@@ -129,32 +129,30 @@ def deliver_due_notifications(limit: int = 100) -> int:
     ).select_related("recipient", "project", "sender")[:limit]
     for notification in notifications:
         if not notification_is_deliverable(notification):
+            reason = (
+                "Verification code is expired, revoked, or superseded"
+                if notification.event_type == Notification.EventType.VERIFICATION_CODE
+                else "Recipient is no longer an active project member"
+            )
             mark_notification_status(
                 notification,
                 Notification.Status.SKIPPED,
-                "Recipient is no longer an active project member",
+                reason,
             )
             _sync_schedule_dispatch(notification, "skipped")
             continue
         mark_notification_status(notification, Notification.Status.QUEUED)
-        project_label = notification.project.title if notification.project_id else "GradSync"
-        action_path = notification.action_path
-        if not action_path and notification.project_id:
-            action_path = f"/projects/{notification.project_id}"
-        body = (
-            f"Project: {project_label}\n"
-            f"Record: {notification.target_type} {notification.target_id}\n"
-            f"Action: {notification.subject}\n"
-            f"Sender: {notification.sender.name if notification.sender else 'GradSync'}\n"
-            f"Path: {action_path or '/'}"
-        )
+        body = _notification_email_body(notification)
         try:
-            send_mail(
+            delivered_count = send_mail(
                 notification.subject,
                 body,
                 settings.DEFAULT_FROM_EMAIL,
                 [notification.recipient_email or notification.recipient.email],
+                fail_silently=False,
             )
+            if delivered_count != 1:
+                raise RuntimeError("SMTP backend did not accept the notification email.")
         except (
             Exception
         ) as exc:  # pragma: no cover - exercised by integration error paths in real mail setup
@@ -165,6 +163,28 @@ def deliver_due_notifications(limit: int = 100) -> int:
         _sync_schedule_dispatch(notification, "created")
         delivered += 1
     return delivered
+
+
+def _notification_email_body(notification: Notification) -> str:
+    if notification.event_type == Notification.EventType.VERIFICATION_CODE:
+        from apps.accounts.models import EmailVerificationCode
+
+        verification = EmailVerificationCode.objects.get(pk=notification.target_id)
+        return (
+            f"Your GradSync verification code is {verification.plain_code}.\n"
+            f"It expires in {settings.EMAIL_VERIFICATION_CODE_TTL_MINUTES} minutes."
+        )
+    project_label = notification.project.title if notification.project_id else "GradSync"
+    action_path = notification.action_path
+    if not action_path and notification.project_id:
+        action_path = f"/projects/{notification.project_id}"
+    return (
+        f"Project: {project_label}\n"
+        f"Record: {notification.target_type} {notification.target_id}\n"
+        f"Action: {notification.subject}\n"
+        f"Sender: {notification.sender.name if notification.sender else 'GradSync'}\n"
+        f"Path: {action_path or '/'}"
+    )
 
 
 def _sync_schedule_dispatch(notification, status):

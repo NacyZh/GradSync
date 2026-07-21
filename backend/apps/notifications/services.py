@@ -98,6 +98,15 @@ def enqueue_notification(
 
 
 def notification_is_deliverable(notification: Notification) -> bool:
+    if notification.event_type == Notification.EventType.VERIFICATION_CODE:
+        from apps.accounts.models import EmailVerificationCode
+
+        verification = EmailVerificationCode.objects.filter(pk=notification.target_id).first()
+        return bool(
+            verification
+            and verification.email == notification.recipient_email
+            and verification.is_usable()
+        )
     if notification.target_type == "ScheduleItem":
         from apps.schedules.models import ScheduleItem
 

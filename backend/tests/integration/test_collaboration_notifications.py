@@ -1,5 +1,7 @@
 import pytest
+from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 
 from apps.accounts.models import EmailVerificationCode
 from apps.accounts.services import register_account
@@ -82,6 +84,7 @@ def test_registration_email_failure_preserves_user_and_verification_code(monkeyp
     user, code = register_account(
         email="notify-student@example.edu",
         password="StrongPass1!",
+        name="Notify Student",
         nickname="Notify Student",
         requested_role="student",
         degree_type="masters",
@@ -97,6 +100,61 @@ def test_registration_email_failure_preserves_user_and_verification_code(monkeyp
     assert notification.status == Notification.Status.RETRY_NEEDED
     assert "super-secret" not in notification.failure_reason
     assert "[masked]" in notification.failure_reason
+
+    notification.eligible_at = timezone.now()
+    notification.save(update_fields=["eligible_at"])
+
+    assert deliver_due_notifications() == 1
+    notification.refresh_from_db()
+    assert notification.status == Notification.Status.SENT
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ["notify-student@example.edu"]
+    assert code.plain_code in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+def test_registration_smtp_message_contains_delivery_metadata(settings):
+    settings.EMAIL_SUBJECT_PREFIX = "[GradSync] "
+    user, code = register_account(
+        email="smtp-student@example.edu",
+        password="StrongPass1!",
+        name="SMTP Student",
+        nickname="SMTP Student",
+        requested_role="student",
+        degree_type="masters",
+    )
+
+    notification = Notification.objects.get(
+        recipient=user,
+        event_type=Notification.EventType.VERIFICATION_CODE,
+        target_id=str(code.id),
+    )
+    assert notification.status == Notification.Status.SENT
+    assert len(mail.outbox) == 1
+    message = mail.outbox[0]
+    assert message.to == ["smtp-student@example.edu"]
+    assert message.from_email == settings.DEFAULT_FROM_EMAIL
+    assert message.subject == "[GradSync] Verify your GradSync email"
+    assert code.plain_code in message.body
+    assert str(settings.EMAIL_VERIFICATION_CODE_TTL_MINUTES) in message.body
+
+
+@pytest.mark.django_db
+def test_registration_zero_delivery_count_is_retryable(monkeypatch):
+    monkeypatch.setattr("apps.accounts.services.send_mail", lambda *args, **kwargs: 0)
+
+    user, code = register_account(
+        email="smtp-zero@example.edu",
+        password="StrongPass1!",
+        name="SMTP Zero",
+        nickname="SMTP Zero",
+        requested_role="student",
+        degree_type="masters",
+    )
+
+    notification = Notification.objects.get(recipient=user, target_id=str(code.id))
+    assert notification.status == Notification.Status.RETRY_NEEDED
+    assert notification.retry_count == 1
 
 
 @pytest.mark.django_db

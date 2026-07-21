@@ -53,17 +53,6 @@ class LoginSerializer(serializers.Serializer):
 # ── Admin account management ──
 
 
-class AccountCreateSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    name = serializers.CharField(max_length=255)
-    global_role = serializers.ChoiceField(choices=["advisor", "student"])
-
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
-        return value
-
-
 class AccountUpdateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, required=False)
     global_role = serializers.ChoiceField(choices=["admin", "advisor", "student"], required=False)
@@ -82,8 +71,9 @@ class LocalePreferenceSerializer(serializers.Serializer):
 class RegistrationSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+    name = serializers.CharField(max_length=255)
     nickname = serializers.CharField(max_length=80)
-    requestedRole = serializers.ChoiceField(choices=["student", "teacher", "administrator"])
+    requestedRole = serializers.ChoiceField(choices=["student", "teacher"])
     degreeType = serializers.ChoiceField(
         choices=["masters", "doctoral"],
         required=False,
@@ -97,8 +87,21 @@ class EmailVerificationSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=12)
 
 
-class NicknameUpdateSerializer(serializers.Serializer):
+class VerificationResendSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ProfileUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
     nickname = serializers.CharField(max_length=80)
+    degreeType = serializers.ChoiceField(
+        choices=["masters", "doctoral"], required=False, allow_null=True
+    )
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    currentPassword = serializers.CharField(write_only=True, trim_whitespace=False)
+    newPassword = serializers.CharField(write_only=True, trim_whitespace=False)
 
 
 class RoleActivationSerializer(serializers.ModelSerializer):

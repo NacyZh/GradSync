@@ -88,6 +88,31 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
         issues.append("EMAIL_HOST must be configured")
     if not getattr(settings_obj, "DEFAULT_FROM_EMAIL", ""):
         issues.append("DEFAULT_FROM_EMAIL must be configured")
+    email_host = str(getattr(settings_obj, "EMAIL_HOST", ""))
+    default_from_email = str(getattr(settings_obj, "DEFAULT_FROM_EMAIL", ""))
+    if _has_placeholder(email_host):
+        issues.append("EMAIL_HOST must be configured with a non-placeholder production value")
+    if _has_placeholder(default_from_email):
+        issues.append(
+            "DEFAULT_FROM_EMAIL must be configured with a non-placeholder production value"
+        )
+    email_port = getattr(settings_obj, "EMAIL_PORT", 0)
+    if not isinstance(email_port, int) or not 1 <= email_port <= 65535:
+        issues.append("EMAIL_PORT must be between 1 and 65535")
+    if getattr(settings_obj, "EMAIL_USE_TLS", False) and getattr(
+        settings_obj, "EMAIL_USE_SSL", False
+    ):
+        issues.append("EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be true")
+    if getattr(settings_obj, "EMAIL_TIMEOUT", 0) <= 0:
+        issues.append("EMAIL_TIMEOUT must be positive")
+    email_user = str(getattr(settings_obj, "EMAIL_HOST_USER", ""))
+    email_password = str(getattr(settings_obj, "EMAIL_HOST_PASSWORD", ""))
+    if bool(email_user) != bool(email_password):
+        issues.append("EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be configured together")
+    if (email_user and _has_placeholder(email_user)) or (
+        email_password and _has_placeholder(email_password)
+    ):
+        issues.append("SMTP credentials must not contain placeholder values")
     if not getattr(settings_obj, "CELERY_BROKER_URL", ""):
         issues.append("CELERY_BROKER_URL must be configured")
     notification_queue = getattr(settings_obj, "CELERY_NOTIFICATION_QUEUE", "")
@@ -109,6 +134,7 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
         "EMAIL_PROVIDER",
         "EMAIL_PROVIDER_DOMAIN",
         "EMAIL_DKIM_SELECTOR",
+        "PRODUCTION_SMTP_PROBE_TO",
         "ALERT_WEBHOOK_URL",
         "ALERT_ONCALL_TARGET",
         "REGISTRY_IMAGE_PREFIX",
@@ -143,9 +169,7 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
                 "GRADSYNC_MEDIA_VOLUME_NAME",
             ):
                 if volume_name not in compose_text:
-                    issues.append(
-                        f"production compose must use a stable {volume_name} volume name"
-                    )
+                    issues.append(f"production compose must use a stable {volume_name} volume name")
         for relative_doc in REQUIRED_OPERATIONAL_DOCS:
             if not (repo_root / relative_doc).exists():
                 issues.append(f"{relative_doc} is missing")
@@ -197,8 +221,14 @@ def production_ready_settings_stub(**overrides):
         "CSRF_COOKIE_SECURE": True,
         "SECURE_HSTS_SECONDS": 31536000,
         "STATIC_ROOT": "/app/backend/staticfiles",
-        "EMAIL_HOST": "smtp.example.edu",
-        "DEFAULT_FROM_EMAIL": "no-reply@example.edu",
+        "EMAIL_HOST": "smtp.gradsync.edu",
+        "EMAIL_PORT": 587,
+        "EMAIL_HOST_USER": "smtp-user",
+        "EMAIL_HOST_PASSWORD": "smtp-password",
+        "EMAIL_USE_TLS": True,
+        "EMAIL_USE_SSL": False,
+        "EMAIL_TIMEOUT": 10,
+        "DEFAULT_FROM_EMAIL": "no-reply@gradsync.edu",
         "CELERY_BROKER_URL": "redis://redis:6379/0",
         "CELERY_NOTIFICATION_QUEUE": "notifications",
         "CELERY_TASK_ROUTES": {"apps.notifications.tasks.*": {"queue": "notifications"}},
@@ -208,6 +238,7 @@ def production_ready_settings_stub(**overrides):
         "EMAIL_PROVIDER": "smtp-provider",
         "EMAIL_PROVIDER_DOMAIN": "gradsync.edu",
         "EMAIL_DKIM_SELECTOR": "gradsync",
+        "PRODUCTION_SMTP_PROBE_TO": "ops@gradsync.edu",
         "ALERT_WEBHOOK_URL": "https://alerts.gradsync.edu/hooks/grad-sync",
         "ALERT_ONCALL_TARGET": "grad-sync-primary",
         "REGISTRY_IMAGE_PREFIX": "ghcr.io/gradsync-prod/gradsync",
