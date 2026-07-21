@@ -1,0 +1,1291 @@
+openapi: 3.0.3
+info:
+  title: GradSync Research Collaboration Platform API
+  version: 0.1.0
+  description: >
+    API contract for verified registration, elevated role activation, project
+    membership, shared research libraries, writing projects, teacher feedback,
+    laboratory resources, email notification status, downloads, and audit.
+servers:
+  - url: /api
+security:
+  - sessionAuth: []
+paths:
+  /auth/register:
+    post:
+      summary: Register a user and request email verification
+      operationId: registerAccount
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "202":
+          description: Registration accepted pending verification or role activation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /auth/verify-email:
+    post:
+      summary: Verify an email registration code
+      operationId: verifyEmail
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "200":
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAccount"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /accounts/resend-verification/:
+    post:
+      summary: Resend a registration verification code when the account is pending
+      operationId: resendVerificationCode
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationResendRequest"
+      responses:
+        "202":
+          description: A new code is queued when the account is eligible
+  /accounts/me/password/:
+    post:
+      summary: Change the authenticated user's password
+      operationId: changeCurrentUserPassword
+      tags: [Accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordChangeRequest"
+      responses:
+        "204":
+          description: Password changed and current session retained
+  /admin/role-activations:
+    get:
+      summary: List pending elevated role activation requests
+      operationId: listRoleActivations
+      tags: [Admin]
+      responses:
+        "200":
+          description: Role activation requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleActivationRequest"
+  /admin/role-activations/{activationId}:
+    patch:
+      summary: Approve, reject, revoke, or expire a role activation request
+      operationId: updateRoleActivation
+      tags: [Admin]
+      parameters:
+        - $ref: "#/components/parameters/ActivationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleActivationUpdate"
+      responses:
+        "200":
+          description: Activation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleActivationRequest"
+  /me:
+    get:
+      summary: Get current user account
+      operationId: getCurrentUser
+      tags: [Accounts]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAccount"
+    patch:
+      summary: Update current user's personal profile
+      operationId: updateCurrentUser
+      tags: [Accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAccount"
+  /students:
+    get:
+      summary: Search eligible students for teacher project membership controls
+      operationId: searchStudents
+      tags: [Accounts]
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Eligible students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudentOption"
+  /projects:
+    get:
+      summary: List visible projects
+      operationId: listProjects
+      tags: [Projects]
+      responses:
+        "200":
+          description: Visible projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      summary: Create a research project
+      operationId: createProject
+      tags: [Projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{projectId}/members:
+    get:
+      summary: List project members
+      operationId: listProjectMembers
+      tags: [Projects]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectMembership"
+    post:
+      summary: Add a student to a project by selected student account
+      operationId: addProjectMember
+      tags: [Projects]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MembershipCreate"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMembership"
+  /projects/{projectId}/members/{membershipId}:
+    delete:
+      summary: Remove a project member
+      operationId: removeProjectMember
+      tags: [Projects]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/MembershipId"
+      responses:
+        "204":
+          description: Member removed
+  /projects/{projectId}/papers:
+    get:
+      summary: Search project-visible and group-wide papers
+      operationId: listPapers
+      tags: [Papers]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Visibility"
+      responses:
+        "200":
+          description: Paper results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedPapers"
+    post:
+      summary: Upload a paper PDF with metadata
+      operationId: uploadPaper
+      tags: [Papers]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PaperUpload"
+      responses:
+        "201":
+          description: Paper uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaperRecord"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /papers/{paperId}/download:
+    get:
+      summary: Download a permitted paper file
+      operationId: downloadPaper
+      tags: [Papers, Downloads]
+      parameters:
+        - $ref: "#/components/parameters/PaperId"
+      responses:
+        "200":
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /projects/{projectId}/code-artifacts:
+    get:
+      summary: Search project-visible and group-wide code archives
+      operationId: listCodeArtifacts
+      tags: [Code]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Visibility"
+      responses:
+        "200":
+          description: Code artifact results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedCodeArtifacts"
+    post:
+      summary: Upload a compressed code archive with required description
+      operationId: uploadCodeArtifact
+      tags: [Code]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CodeArtifactUpload"
+      responses:
+        "201":
+          description: Code artifact uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeArtifact"
+  /code-artifacts/{artifactId}/download:
+    get:
+      summary: Download a permitted code archive
+      operationId: downloadCodeArtifact
+      tags: [Code, Downloads]
+      parameters:
+        - $ref: "#/components/parameters/ArtifactId"
+      responses:
+        "200":
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /document-categories:
+    get:
+      summary: List document categories
+      operationId: listDocumentCategories
+      tags: [Documents]
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentCategory"
+    post:
+      summary: Create a document category
+      operationId: createDocumentCategory
+      tags: [Documents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentCategoryCreate"
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentCategory"
+  /projects/{projectId}/documents:
+    get:
+      summary: Search project-visible and group-wide documents
+      operationId: listDocuments
+      tags: [Documents]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Visibility"
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDocuments"
+    post:
+      summary: Upload a categorized work document
+      operationId: uploadDocument
+      tags: [Documents]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/DocumentUpload"
+      responses:
+        "201":
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentRecord"
+  /documents/{documentId}/download:
+    get:
+      summary: Download a permitted document
+      operationId: downloadDocument
+      tags: [Documents, Downloads]
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /projects/{projectId}/writing-projects:
+    get:
+      summary: List writing projects visible in a project
+      operationId: listWritingProjects
+      tags: [Writing]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Writing projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WritingProject"
+    post:
+      summary: Create a writing project
+      operationId: createWritingProject
+      tags: [Writing]
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WritingProjectCreate"
+      responses:
+        "201":
+          description: Writing project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WritingProject"
+  /writing-projects/{writingProjectId}/versions:
+    post:
+      summary: Upload a new Word or LaTeX writing version
+      operationId: uploadWritingVersion
+      tags: [Writing]
+      parameters:
+        - $ref: "#/components/parameters/WritingProjectId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/WritingVersionUpload"
+      responses:
+        "201":
+          description: Writing version uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WritingVersion"
+  /writing-versions/{writingVersionId}/feedback:
+    post:
+      summary: Submit teacher feedback with an annotated document
+      operationId: submitTeacherFeedback
+      tags: [Writing]
+      parameters:
+        - $ref: "#/components/parameters/WritingVersionId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/TeacherFeedbackCreate"
+      responses:
+        "201":
+          description: Feedback submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherFeedback"
+  /teacher-feedback/{feedbackId}/download:
+    get:
+      summary: Download a permitted annotated feedback document
+      operationId: downloadTeacherFeedback
+      tags: [Writing, Downloads]
+      parameters:
+        - $ref: "#/components/parameters/FeedbackId"
+      responses:
+        "200":
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /resources:
+    get:
+      summary: List laboratory resources
+      operationId: listResources
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LaboratoryResource"
+    post:
+      summary: Create a laboratory resource
+      operationId: createResource
+      tags: [Resources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResourceCreate"
+      responses:
+        "201":
+          description: Resource created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaboratoryResource"
+  /resources/{resourceId}:
+    patch:
+      summary: Update a laboratory resource
+      operationId: updateResource
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResourceUpdate"
+      responses:
+        "200":
+          description: Resource updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaboratoryResource"
+    delete:
+      summary: Delete or retire a laboratory resource
+      operationId: deleteResource
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "204":
+          description: Resource removed
+  /resources/{resourceId}/use-submissions:
+    post:
+      summary: Submit a resource use request or use record
+      operationId: createResourceUseSubmission
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResourceUseSubmissionCreate"
+      responses:
+        "201":
+          description: Use submission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceUseSubmission"
+  /resource-use-submissions/{submissionId}:
+    patch:
+      summary: Confirm or reject a student resource use submission
+      operationId: updateResourceUseSubmission
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/SubmissionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResourceUseSubmissionUpdate"
+      responses:
+        "200":
+          description: Use submission updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceUseSubmission"
+  /notifications:
+    get:
+      summary: List visible email notification statuses
+      operationId: listNotifications
+      tags: [Notifications]
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmailNotification"
+  /audit-events:
+    get:
+      summary: List administrator-visible audit events
+      operationId: listAuditEvents
+      tags: [Audit]
+      parameters:
+        - name: targetType
+          in: query
+          schema:
+            type: string
+        - name: actorId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEvent"
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    ActivationId:
+      name: activationId
+      in: path
+      required: true
+      schema:
+        type: string
+    MembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema:
+        type: string
+    PaperId:
+      name: paperId
+      in: path
+      required: true
+      schema:
+        type: string
+    ArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      schema:
+        type: string
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+    WritingProjectId:
+      name: writingProjectId
+      in: path
+      required: true
+      schema:
+        type: string
+    WritingVersionId:
+      name: writingVersionId
+      in: path
+      required: true
+      schema:
+        type: string
+    FeedbackId:
+      name: feedbackId
+      in: path
+      required: true
+      schema:
+        type: string
+    ResourceId:
+      name: resourceId
+      in: path
+      required: true
+      schema:
+        type: string
+    SubmissionId:
+      name: submissionId
+      in: path
+      required: true
+      schema:
+        type: string
+    Search:
+      name: q
+      in: query
+      schema:
+        type: string
+    Visibility:
+      name: visibility
+      in: query
+      schema:
+        type: string
+        enum: [project_members, group_wide]
+  responses:
+    Forbidden:
+      description: Authenticated user is not permitted to perform the action
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, name, nickname, requestedRole]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+          maxLength: 255
+        requestedRole:
+          $ref: "#/components/schemas/RequestedRole"
+        degreeType:
+          type: string
+          enum: [masters, doctoral]
+        nickname:
+          type: string
+    RegisterResponse:
+      type: object
+      required: [email, status]
+      properties:
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [verification_sent, pending_role_activation]
+    VerifyEmailRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+    UserAccount:
+      type: object
+      required: [id, email, requestedRole, activeRole, status, nickname]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        requestedRole:
+          $ref: "#/components/schemas/RequestedRole"
+        activeRole:
+          type: string
+          enum: [pending, student, teacher, administrator]
+        status:
+          type: string
+          enum: [pending_email_verification, pending_role_activation, active, suspended, archived]
+        nickname:
+          type: string
+        degreeType:
+          type: string
+          enum: [masters, doctoral]
+    RequestedRole:
+      type: string
+      enum: [student, teacher]
+    UserUpdate:
+      type: object
+      required: [name, nickname]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        nickname:
+          type: string
+          maxLength: 80
+        degreeType:
+          type: string
+          enum: [masters, doctoral]
+    VerificationResendRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    PasswordChangeRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+    RoleActivationRequest:
+      type: object
+      required: [id, userId, requestedRole, status]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        requestedRole:
+          type: string
+          enum: [teacher, administrator]
+        status:
+          type: string
+          enum: [pending, approved, rejected, expired, revoked]
+        activationSource:
+          type: string
+          enum: [administrator_approval, invitation]
+    RoleInvitationCreate:
+      type: object
+      required: [email, requestedRole]
+      properties:
+        email:
+          type: string
+          format: email
+        requestedRole:
+          type: string
+          enum: [teacher, administrator]
+    RoleActivationUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, revoked]
+        decisionNote:
+          type: string
+    StudentOption:
+      type: object
+      required: [id, nickname, email, degreeType]
+      properties:
+        id:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
+          format: email
+        degreeType:
+          type: string
+          enum: [masters, doctoral]
+    Project:
+      type: object
+      required: [id, name, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, archived]
+    ProjectCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    ProjectMembership:
+      type: object
+      required: [id, projectId, userId, role, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        userId:
+          type: string
+        role:
+          type: string
+          enum: [teacher, student, administrator, observer]
+        status:
+          type: string
+          enum: [active, removed]
+    MembershipCreate:
+      type: object
+      required: [studentId]
+      properties:
+        studentId:
+          type: string
+    AssetVisibility:
+      type: string
+      enum: [project_members, group_wide]
+    PaperUpload:
+      type: object
+      required: [file, title, projectId]
+      properties:
+        file:
+          type: string
+          format: binary
+        title:
+          type: string
+        authors:
+          type: string
+        publicationYear:
+          type: integer
+        keywords:
+          type: array
+          items:
+            type: string
+        visibility:
+          $ref: "#/components/schemas/AssetVisibility"
+    PaperRecord:
+      allOf:
+        - $ref: "#/components/schemas/AssetRecordBase"
+        - type: object
+          properties:
+            title:
+              type: string
+            authors:
+              type: string
+            publicationYear:
+              type: integer
+    CodeArtifactUpload:
+      type: object
+      required: [archive, name, description]
+      properties:
+        archive:
+          type: string
+          format: binary
+        name:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        visibility:
+          $ref: "#/components/schemas/AssetVisibility"
+    CodeArtifact:
+      allOf:
+        - $ref: "#/components/schemas/AssetRecordBase"
+        - type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            tags:
+              type: array
+              items:
+                type: string
+    DocumentCategory:
+      type: object
+      required: [id, name, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, archived]
+    DocumentCategoryCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    DocumentUpload:
+      type: object
+      required: [file, title, categoryId]
+      properties:
+        file:
+          type: string
+          format: binary
+        title:
+          type: string
+        categoryId:
+          type: string
+        description:
+          type: string
+        visibility:
+          $ref: "#/components/schemas/AssetVisibility"
+    DocumentRecord:
+      allOf:
+        - $ref: "#/components/schemas/AssetRecordBase"
+        - type: object
+          properties:
+            title:
+              type: string
+            categoryId:
+              type: string
+            description:
+              type: string
+    AssetRecordBase:
+      type: object
+      required: [id, projectId, visibility, uploaderId, createdAt]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        visibility:
+          $ref: "#/components/schemas/AssetVisibility"
+        uploaderId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    PaginatedPapers:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaperRecord"
+    PaginatedCodeArtifacts:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodeArtifact"
+    PaginatedDocuments:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentRecord"
+    WritingProject:
+      type: object
+      required: [id, projectId, studentId, title, status]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        studentId:
+          type: string
+        title:
+          type: string
+        writingType:
+          type: string
+          enum: [thesis, manuscript, paper, other]
+        status:
+          type: string
+          enum: [active, closed, archived]
+    WritingProjectCreate:
+      type: object
+      required: [title, writingType]
+      properties:
+        title:
+          type: string
+        writingType:
+          type: string
+          enum: [thesis, manuscript, paper, other]
+    WritingVersionUpload:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+        summary:
+          type: string
+    WritingVersion:
+      type: object
+      required: [id, writingProjectId, versionNumber, status]
+      properties:
+        id:
+          type: string
+        writingProjectId:
+          type: string
+        versionNumber:
+          type: integer
+        status:
+          type: string
+          enum: [submitted, under_review, feedback_available, closed]
+    TeacherFeedbackCreate:
+      type: object
+      required: [annotatedFile]
+      properties:
+        annotatedFile:
+          type: string
+          format: binary
+        comments:
+          type: string
+    TeacherFeedback:
+      type: object
+      required: [id, writingVersionId, reviewerId, status]
+      properties:
+        id:
+          type: string
+        writingVersionId:
+          type: string
+        reviewerId:
+          type: string
+        comments:
+          type: string
+        status:
+          type: string
+          enum: [draft, submitted, notification_pending, notification_sent, notification_failed]
+    LaboratoryResource:
+      type: object
+      required: [id, name, resourceType, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        resourceType:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, unavailable, retired]
+        useInstructions:
+          type: string
+    ResourceCreate:
+      type: object
+      required: [name, resourceType]
+      properties:
+        name:
+          type: string
+        resourceType:
+          type: string
+        description:
+          type: string
+        useInstructions:
+          type: string
+    ResourceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        resourceType:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, unavailable, retired]
+        useInstructions:
+          type: string
+    ResourceUseSubmissionCreate:
+      type: object
+      required: [submissionType, details]
+      properties:
+        submissionType:
+          type: string
+          enum: [request, use_record]
+        details:
+          type: string
+    ResourceUseSubmissionUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [confirmed, rejected]
+        decisionNote:
+          type: string
+    ResourceUseSubmission:
+      type: object
+      required: [id, resourceId, studentId, submissionType, status]
+      properties:
+        id:
+          type: string
+        resourceId:
+          type: string
+        studentId:
+          type: string
+        submissionType:
+          type: string
+          enum: [request, use_record]
+        status:
+          type: string
+          enum: [pending, confirmed, rejected]
+        details:
+          type: string
+    EmailNotification:
+      type: object
+      required: [id, recipientEmail, eventType, status]
+      properties:
+        id:
+          type: string
+        recipientEmail:
+          type: string
+          format: email
+        eventType:
+          type: string
+        status:
+          type: string
+          enum: [pending, queued, sent, failed, retry_needed, skipped]
+        failureReason:
+          type: string
+    AuditEvent:
+      type: object
+      required: [id, actorId, eventType, targetType, targetId, createdAt]
+      properties:
+        id:
+          type: string
+        actorId:
+          type: string
+        eventType:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: string
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
