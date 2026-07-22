@@ -6,6 +6,7 @@ from django.utils import timezone
 from apps.accounts.models import EmailVerificationCode
 from apps.accounts.services import register_account
 from apps.notifications.models import Notification
+from apps.notifications.services import notifications_visible_to
 from apps.notifications.tasks import deliver_due_notifications
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.resources.models import ResourceItem, ResourceType, ResourceUseSubmission
@@ -107,6 +108,10 @@ def test_registration_email_failure_preserves_user_and_verification_code(monkeyp
     assert deliver_due_notifications() == 1
     notification.refresh_from_db()
     assert notification.status == Notification.Status.SENT
+    assert notification.delivery_policy == Notification.DeliveryPolicy.EMAIL_ONLY
+    assert not notifications_visible_to(user).filter(pk=notification.pk).exists()
+    admin = UserFactory(global_role="admin", status="active")
+    assert notifications_visible_to(admin).filter(pk=notification.pk).exists()
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == ["notify-student@example.edu"]
     assert code.plain_code in mail.outbox[0].body

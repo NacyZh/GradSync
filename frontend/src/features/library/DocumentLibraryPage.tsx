@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Textarea } from '@/shared/ui/primitives/textarea';
+import { formatUiDate } from '@/shared/i18n/translate';
 
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
@@ -345,7 +346,7 @@ function DocumentDetailPanel({
         </div>
         <div>
           <dt className="font-semibold">Uploaded</dt>
-          <dd>{document.createdAt ? new Date(document.createdAt).toLocaleDateString() : 'Unknown'}</dd>
+          <dd>{document.createdAt ? formatUiDate(document.createdAt) : 'Unknown'}</dd>
         </div>
         <div className="min-w-0">
           <dt className="font-semibold">Checksum</dt>

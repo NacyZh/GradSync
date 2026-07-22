@@ -1,0 +1,11 @@
+{
+  "name": "GradSync",
+  "short_name": "GradSync",
+  "description": "Research group collaboration workspace",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#166534",
+  "lang": "en"
+}

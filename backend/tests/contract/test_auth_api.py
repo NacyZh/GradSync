@@ -53,11 +53,11 @@ def test_logout_clears_session(api_client):
     assert logout_response.status_code == 204
 
     me_response = api_client.get("/api/accounts/me/")
-    assert me_response.status_code == 403
+    assert me_response.status_code == 401
 
 
 @pytest.mark.django_db
 def test_session_endpoint_requires_authentication(api_client):
     response = api_client.get("/api/accounts/me/")
 
-    assert response.status_code == 403
+    assert response.status_code == 401

@@ -5,6 +5,7 @@ import { FileSearch, MessageSquareText, NotebookPen } from 'lucide-react';
 
 import { Badge } from '@/shared/ui/primitives/badge';
 import { Button } from '@/shared/ui/primitives/button';
+import { formatUiDate } from '@/shared/i18n/translate';
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -109,7 +110,7 @@ function ReviewDetail({ projectId, report }: { projectId: number; report?: Weekl
           </h2>
           <p className="text-sm text-muted-foreground">
             Target progress_report #{report.id}
-            {report.submitted_at ? ` · Submitted ${new Date(report.submitted_at).toLocaleString()}` : ''}
+            {report.submitted_at ? ` · Submitted ${formatUiDate(report.submitted_at)}` : ''}
           </p>
         </div>
         <StatusBadge status={report.review_status} />

@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { currentUser, fulfillJson } from './api-mocks';
+import { currentUser, fulfillJson, mockUnavailableTokenRefresh } from './api-mocks';
 
 test.describe('authentication', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockUnavailableTokenRefresh(page);
+  });
+
   test('unauthenticated visitor is redirected to login from every protected route', async ({ page }) => {
     await page.route('**/api/accounts/me/', async (route) => {
       await fulfillJson(route, { message: 'Authentication required' }, 401);

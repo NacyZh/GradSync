@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, mockAuthenticatedApi } from './api-mocks';
+import { fulfillJson, mockAuthenticatedApi, mockUnavailableTokenRefresh } from './api-mocks';
 
 test('registration and role approval flow is reachable', async ({ page }) => {
   await page.route('**/api/accounts/register/', async (route) => {
@@ -25,6 +25,7 @@ test('registration and role approval flow is reachable', async ({ page }) => {
 
 test('administrator can review role activation requests', async ({ page }) => {
   await mockAuthenticatedApi(page);
+  await mockUnavailableTokenRefresh(page);
   await page.route('**/api/accounts/me/', async (route) => {
     await fulfillJson(route, { id: 10, email: 'admin@example.edu', name: 'Admin One', global_role: 'admin', status: 'active' });
   });

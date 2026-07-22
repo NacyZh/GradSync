@@ -67,6 +67,8 @@ def test_frontend_nginx_serves_static_assets_and_proxies_api():
     assert "client_max_body_size 30m;" in nginx_conf
     assert 'Cache-Control "public, max-age=31536000, immutable" always' in nginx_conf
     assert 'Cache-Control "no-store" always' in nginx_conf
+    assert "location = /sw.js" in nginx_conf
+    assert 'Service-Worker-Allowed "/" always' in nginx_conf
     assert "try_files $uri /index.html" in nginx_conf
 
 

@@ -14,6 +14,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('paper import, code download, and locale persistence workflow is reachable', async ({ page }) => {
+  let persistedLocale: 'en' | 'zh' = 'en';
   if (!fullStackE2E) {
     await page.route('**/api/library/papers/**', async (route) => {
       const request = route.request();
@@ -120,10 +121,12 @@ test('paper import, code download, and locale persistence workflow is reachable'
     });
     await page.route('**/api/accounts/locale/', async (route) => {
       if (route.request().method() === 'PUT') {
-        await fulfillJson(route, { locale: 'zh' });
+        const body = route.request().postDataJSON() as { locale: 'en' | 'zh' };
+        persistedLocale = body.locale;
+        await fulfillJson(route, { locale: persistedLocale });
         return;
       }
-      await fulfillJson(route, { locale: 'en' });
+      await fulfillJson(route, { locale: persistedLocale });
     });
   }
 
@@ -163,6 +166,40 @@ test('paper import, code download, and locale persistence workflow is reachable'
   await expect(page.getByRole('status')).toContainText('analysis-toolkit.zip');
 
   await page.getByRole('button', { name: /Language|语言/ }).click();
+  await expect(page.getByRole('link', { name: '项目' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '共享代码' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '下载' })).toBeVisible();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+  await expect(page.getByRole('heading', { name: '共享代码' })).toBeVisible();
+});
+
+test('Chinese locale covers dashboard and project workspaces', async ({ page }) => {
+  test.skip(fullStackE2E, 'Deterministic cross-workspace localization coverage uses mocked fixtures.');
+  let locale: 'en' | 'zh' = 'en';
+  await page.route('**/api/accounts/locale/', async (route) => {
+    if (route.request().method() === 'PUT') {
+      locale = (route.request().postDataJSON() as { locale: 'en' | 'zh' }).locale;
+    }
+    await fulfillJson(route, { locale });
+  });
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Advisor workspace' })).toBeVisible();
+  await page.getByRole('button', { name: /Language|语言/ }).click();
+  await expect(page.getByRole('heading', { name: '教师工作台' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '工作台日历' })).toBeVisible();
+
+  await page.goto('/projects');
+  await expect(page.getByRole('heading', { name: '项目' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /打开/ })).toBeVisible();
+
+  await page.goto('/projects/1');
+  await expect(page.getByRole('heading', { name: 'Graphene Lab' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '任务计划' })).toBeVisible();
+  await expect(page.locator('aside h2').filter({ hasText: /^成员与进度$/ })).toBeVisible();
+  await expect(page.getByText('未提供任务描述。')).toBeVisible();
+  await expect(page.getByText(/unread notifications|% complete|weekly reports|No task description|Add task/)).toHaveCount(0);
 });
 
 test('English paper-library upload, rename, delete, viewer, and download states stay English-only', async ({ page }) => {

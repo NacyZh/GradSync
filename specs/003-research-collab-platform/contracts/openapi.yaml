@@ -9,8 +9,60 @@ info:
 servers:
   - url: /api
 security:
+  - bearerAuth: []
   - sessionAuth: []
 paths:
+  /accounts/login/:
+    post:
+      summary: Authenticate and issue a short-lived access token
+      operationId: loginAccount
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: User, access token, and HttpOnly refresh cookie issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticatedUser"
+  /accounts/token/refresh/:
+    post:
+      summary: Rotate the HttpOnly refresh cookie and issue a new access token
+      operationId: refreshAccountToken
+      tags: [Auth]
+      security: []
+      responses:
+        "200":
+          description: Access token refreshed and refresh cookie rotated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessToken"
+        "401":
+          description: Refresh token missing, invalid, expired, or revoked
+  /accounts/token/revoke/:
+    post:
+      summary: Revoke the current refresh token and clear its cookie
+      operationId: revokeAccountToken
+      tags: [Auth]
+      security: []
+      responses:
+        "204":
+          description: Refresh token revoked
   /auth/register:
     post:
       summary: Register a user and request email verification
@@ -667,6 +719,10 @@ paths:
                   $ref: "#/components/schemas/AuditEvent"
 components:
   securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
     sessionAuth:
       type: apiKey
       in: cookie
@@ -820,6 +876,19 @@ components:
         degreeType:
           type: string
           enum: [masters, doctoral]
+    AccessToken:
+      type: object
+      required: [accessToken, accessTokenExpiresAt]
+      properties:
+        accessToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+    AuthenticatedUser:
+      allOf:
+        - $ref: "#/components/schemas/UserAccount"
+        - $ref: "#/components/schemas/AccessToken"
     RequestedRole:
       type: string
       enum: [student, teacher]

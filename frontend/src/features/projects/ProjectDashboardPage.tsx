@@ -6,6 +6,9 @@ import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, Rota
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
+import { formatUiDate } from '@/shared/i18n/translate';
+import { translateUiText } from '@/shared/i18n/translate';
+import { useI18n } from '@/shared/i18n/I18nProvider';
 
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
@@ -19,6 +22,7 @@ import { archiveProject, deleteProject, getProject, reopenProject } from './api'
 import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 
 export function ProjectDashboardPage() {
+  const { locale } = useI18n();
   const projectId = Number(useParams().projectId ?? 0);
   const navigate = useNavigate();
   const { confirm, notify } = useAppFeedback();
@@ -158,9 +162,9 @@ export function ProjectDashboardPage() {
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Project summary">
-        <MetricCard icon={ClipboardList} label="Current tasks" value={flattenedTasks.length} detail={`${progress}% complete`} />
-        <MetricCard icon={CheckCircle2} label="Blocked tasks" value={blocked} detail={blocked ? 'needs attention' : 'clear'} />
-        <MetricCard icon={BookOpenCheck} label="Pending reviews" value={pendingReviews.length} detail="weekly reports" />
+        <MetricCard icon={ClipboardList} label="Current tasks" value={flattenedTasks.length} detail={translateUiText(`${progress}% complete`, locale)} />
+        <MetricCard icon={CheckCircle2} label="Blocked tasks" value={blocked} detail={translateUiText(blocked ? 'needs attention' : 'clear', locale)} />
+        <MetricCard icon={BookOpenCheck} label="Pending reviews" value={pendingReviews.length} detail={translateUiText('weekly reports', locale)} />
         <MetricCard icon={CalendarDays} label="Upcoming bookings" value={bookings.length} detail={nextDeadline ? `Next due ${formatDate(nextDeadline.deadline_at)}` : 'reserved resources'} />
       </section>
 
@@ -202,7 +206,7 @@ export function ProjectDashboardPage() {
               <dl className="grid gap-2 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="font-bold text-muted-foreground">Priority</dt>
-                  <dd>Priority: {primaryTask.priority ?? 'normal'}</dd>
+                  <dd>{translateUiText(`Priority: ${primaryTask.priority ?? 'normal'}`, locale)}</dd>
                 </div>
                 <div>
                   <dt className="font-bold text-muted-foreground">Assignee</dt>
@@ -215,7 +219,7 @@ export function ProjectDashboardPage() {
               </dl>
               <section className="grid gap-1 text-sm" aria-label="Selected task description">
                 <h4 className="font-bold text-muted-foreground">Description</h4>
-                <p className="whitespace-pre-wrap text-muted-foreground">{primaryTask.description || 'No task description provided.'}</p>
+                <p className="whitespace-pre-wrap text-muted-foreground">{primaryTask.description || translateUiText('No task description provided.', locale)}</p>
               </section>
               {capabilities.canUpdateTasks ? (
                 <div className="rounded-lg border bg-background p-3">
@@ -258,7 +262,7 @@ export function ProjectDashboardPage() {
           {pendingReviews.length ? (
             <ul className="timeline">
               {pendingReviews.map((review, index) => (
-                <li key={index}>Review {String((review as { target_type?: string }).target_type ?? 'submission')} #{String((review as { target_id?: string }).target_id ?? index + 1)}</li>
+                <li key={index}>{translateUiText(`Review ${String((review as { target_type?: string }).target_type ?? 'submission')} #${String((review as { target_id?: string }).target_id ?? index + 1)}`, locale)}</li>
               ))}
             </ul>
           ) : (
@@ -282,7 +286,7 @@ function formatAssignees(task: TaskNode, memberNameById: Map<number, string>) {
 
 function formatDate(value?: string) {
   if (!value) return 'No date';
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+  return formatUiDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function MetricCard({ icon: Icon, label, value, detail }: { icon: typeof ClipboardList; label: string; value: number; detail: string }) {

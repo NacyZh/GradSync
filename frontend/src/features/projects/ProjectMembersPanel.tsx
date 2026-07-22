@@ -4,6 +4,8 @@ import { UserMinus, UserPlus, UsersRound } from 'lucide-react';
 import { Button } from '@/shared/ui/primitives/button';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import type { ProjectMembership } from './api';
+import { useI18n } from '@/shared/i18n/I18nProvider';
+import { translateUiText } from '@/shared/i18n/translate';
 import { addProjectMember, removeProjectMember } from './api';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { StudentSelector } from './StudentSelector';
@@ -19,6 +21,7 @@ export function ProjectMembersPanel({
   disabled?: boolean;
   canManageMembers?: boolean;
 }) {
+  const { locale } = useI18n();
   const queryClient = useQueryClient();
   const { confirm, notify } = useAppFeedback();
   const addMutation = useMutation({
@@ -66,7 +69,7 @@ export function ProjectMembersPanel({
             <span className="grid min-w-0 gap-1">
               <strong className="min-w-0 truncate">{member.nickname || member.name || `User ${member.userId ?? member.user_id}`}</strong>
               {member.email ? <span className="min-w-0 overflow-hidden text-ellipsis break-all text-muted-foreground">{member.email}</span> : null}
-              <span className="text-muted-foreground">{member.role}</span>
+              <span className="text-muted-foreground">{translateUiText(member.role, locale)}</span>
             </span>
             <span className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
               <StatusBadge status={member.status} />
@@ -77,7 +80,7 @@ export function ProjectMembersPanel({
                   size="sm"
                   onClick={() => onRemove(member)}
                   disabled={disabled || removeMutation.isPending}
-                  aria-label={`Remove ${member.nickname || member.name || `User ${member.userId ?? member.user_id}`}`}
+                  aria-label={`${translateUiText('Remove', locale)} ${member.nickname || member.name || `User ${member.userId ?? member.user_id}`}`}
                 >
                   <UserMinus className="h-4 w-4" aria-hidden="true" />
                   Remove

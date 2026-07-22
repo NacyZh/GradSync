@@ -2,8 +2,11 @@ from django.contrib.auth import login, logout, update_session_auth_hash
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.middleware.csrf import get_token
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics, status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -14,7 +17,9 @@ from apps.common.permissions import IsAdministrator
 from .locale_services import get_locale, set_locale
 from .models import RoleActivationRequest, User
 from .serializers import (
+    AccessTokenSerializer,
     AccountUpdateSerializer,
+    AuthenticatedUserSerializer,
     EmailVerificationSerializer,
     LocalePreferenceSerializer,
     LoginSerializer,
@@ -36,23 +41,35 @@ from .services import (
     update_profile,
     verify_email,
 )
+from .tokens import (
+    clear_refresh_cookie,
+    issue_token_pair,
+    refresh_cookie,
+    revoke_refresh_token,
+    rotate_refresh_token,
+    set_refresh_cookie,
+)
 
 
 class LoginView(APIView):
-    """Authenticate by email/password and establish a cookie session."""
+    """Authenticate and establish both a session and a refreshable access token."""
 
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
 
-    @extend_schema(request=LoginSerializer, responses={200: UserSerializer})
+    @extend_schema(request=LoginSerializer, responses={200: AuthenticatedUserSerializer})
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
         login(request, user)
         get_token(request)
-        return Response(UserSerializer(user).data)
+        token_payload, refresh = issue_token_pair(user)
+        response = Response({**UserSerializer(user).data, **token_payload})
+        set_refresh_cookie(response, refresh)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class LogoutView(APIView):
@@ -62,8 +79,55 @@ class LogoutView(APIView):
 
     @extend_schema(request=None, responses={204: OpenApiResponse(description="Logged out")})
     def post(self, request):
+        revoke_refresh_token(refresh_cookie(request))
         logout(request)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        clear_refresh_cookie(response)
+        response["Cache-Control"] = "no-store"
+        return response
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class TokenRefreshView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: AccessTokenSerializer,
+            401: OpenApiResponse(description="Refresh token invalid or expired"),
+        },
+    )
+    def post(self, request):
+        raw_refresh = refresh_cookie(request)
+        if not raw_refresh:
+            return Response(
+                {"message": "Refresh token is required."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        try:
+            token_payload, replacement = rotate_refresh_token(raw_refresh)
+        except AuthenticationFailed as exc:
+            return Response({"message": str(exc.detail)}, status=status.HTTP_401_UNAUTHORIZED)
+        response = Response(token_payload)
+        set_refresh_cookie(response, replacement)
+        response["Cache-Control"] = "no-store"
+        return response
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class TokenRevokeView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(request=None, responses={204: OpenApiResponse(description="Token revoked")})
+    def post(self, request):
+        revoke_refresh_token(refresh_cookie(request))
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        clear_refresh_cookie(response)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class CurrentUserView(APIView):

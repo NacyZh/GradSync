@@ -9,6 +9,8 @@ import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
+import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
+import { useI18n } from '../i18n/I18nProvider';
 import { register, resendVerification, verifyEmail, type RegisterPayload } from './api';
 
 export function RegisterPage() {
@@ -18,13 +20,14 @@ export function RegisterPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [passwordMismatch, setPasswordMismatch] = useState(false);
   const { notify } = useAppFeedback();
+  const { t } = useI18n();
 
   const registerMutation = useMutation({
     mutationFn: register,
     onSuccess: (result) => {
       setEmail(result.email);
       setStatus(result.status);
-      notify('Verification email sent', 'success');
+      notify(t('verificationEmailSent'), 'success');
     },
     onError: (error) => notify(error.message, 'error'),
   });
@@ -32,7 +35,7 @@ export function RegisterPage() {
     mutationFn: verifyEmail,
     onSuccess: (user) => {
       setStatus(user.status);
-      notify('Email verified', 'success');
+      notify(t('emailVerified'), 'success');
     },
     onError: (error) => notify(error.message, 'error'),
   });
@@ -48,7 +51,7 @@ export function RegisterPage() {
     const password = String(form.get('password'));
     if (password !== String(form.get('confirmPassword'))) {
       setPasswordMismatch(true);
-      notify('Passwords do not match', 'error');
+      notify(t('passwordsDoNotMatch'), 'error');
       return;
     }
     setPasswordMismatch(false);
@@ -70,58 +73,58 @@ export function RegisterPage() {
 
   return (
     <main className="login-screen">
-      <section className="login-container" aria-label="Register">
+      <section className="login-container" aria-label={t('register')}>
         <div className="login-card">
           <div className="login-header">
             <div>
               <h1>GradSync</h1>
-              <p className="login-subtitle">Create your research workspace account.</p>
+              <p className="login-subtitle">{t('createWorkspaceAccount')}</p>
             </div>
-            {status ? <StatusBadge status={status} /> : null}
+            <div className="flex items-center gap-2"><LanguageSwitcher />{status ? <StatusBadge status={status} /> : null}</div>
           </div>
 
-          <form aria-label="Register account" onSubmit={onRegister} className="login-form">
+          <form aria-label={t('registerAccount')} onSubmit={onRegister} className="login-form">
             <div className="login-field">
-              <Label htmlFor="register-email">Email</Label>
+              <Label htmlFor="register-email">{t('email')}</Label>
               <Input id="register-email" name="email" type="email" required disabled={registerMutation.isPending} />
             </div>
             <div className="login-field">
-              <Label htmlFor="register-name">Full name</Label>
+              <Label htmlFor="register-name">{t('fullName')}</Label>
               <Input id="register-name" name="name" autoComplete="name" required disabled={registerMutation.isPending} />
             </div>
             <div className="login-field">
-              <Label htmlFor="register-nickname">Workspace nickname</Label>
+              <Label htmlFor="register-nickname">{t('workspaceNickname')}</Label>
               <Input id="register-nickname" name="nickname" required disabled={registerMutation.isPending} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="login-field">
-                <Label htmlFor="register-password">Password</Label>
+                <Label htmlFor="register-password">{t('password')}</Label>
                 <Input id="register-password" name="password" type="password" autoComplete="new-password" minLength={8} required disabled={registerMutation.isPending} />
               </div>
               <div className="login-field">
-                <Label htmlFor="register-password-confirm">Confirm password</Label>
+                <Label htmlFor="register-password-confirm">{t('confirmPassword')}</Label>
                 <Input id="register-password-confirm" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} aria-invalid={passwordMismatch} required disabled={registerMutation.isPending} />
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1.5 text-sm font-bold">
-                Role
+                {t('role')}
                 <Select value={role} onValueChange={(value) => setRole(value as RegisterPayload['requestedRole'])}>
-                  <SelectTrigger aria-label="Requested role"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label={t('requestedRole')}><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="student">Student</SelectItem>
-                    <SelectItem value="teacher">Teacher</SelectItem>
+                    <SelectItem value="student">{t('student')}</SelectItem>
+                    <SelectItem value="teacher">{t('teacher')}</SelectItem>
                   </SelectContent>
                 </Select>
               </label>
               {role === 'student' ? (
                 <label className="grid gap-1.5 text-sm font-bold">
-                  Degree
+                  {t('degree')}
                   <Select value={degreeType} onValueChange={(value) => setDegreeType(value as 'masters' | 'doctoral')}>
-                    <SelectTrigger aria-label="Degree type"><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label={t('degreeType')}><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="masters">Masters</SelectItem>
-                      <SelectItem value="doctoral">Doctoral</SelectItem>
+                      <SelectItem value="masters">{t('masters')}</SelectItem>
+                      <SelectItem value="doctoral">{t('doctoral')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </label>
@@ -129,29 +132,29 @@ export function RegisterPage() {
             </div>
             <Button type="submit" disabled={registerMutation.isPending}>
               <UserPlus className="h-4 w-4" aria-hidden="true" />
-              {registerMutation.isPending ? 'Registering' : 'Register'}
+              {registerMutation.isPending ? t('registering') : t('register')}
             </Button>
           </form>
 
           {email ? (
-            <form aria-label="Verify email" onSubmit={onVerify} className="login-form border-t pt-4">
+            <form aria-label={t('verifyEmail')} onSubmit={onVerify} className="login-form border-t pt-4">
               <div className="login-field">
-                <Label htmlFor="verification-code">Verification code</Label>
+                <Label htmlFor="verification-code">{t('verificationCode')}</Label>
                 <Input id="verification-code" name="code" inputMode="numeric" required disabled={verifyMutation.isPending} />
               </div>
               <Button type="submit" variant="outline" disabled={verifyMutation.isPending}>
                 <MailCheck className="h-4 w-4" aria-hidden="true" />
-                Verify email
+                {t('verifyEmail')}
               </Button>
               <Button type="button" variant="ghost" disabled={resendMutation.isPending} onClick={() => resendMutation.mutate(email)}>
                 <RotateCw className="h-4 w-4" aria-hidden="true" />
-                Resend code
+                {t('resendCode')}
               </Button>
-              {status === 'active' ? <p className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4" /> Account active</p> : null}
-              {status === 'pending_role_activation' ? <p className="text-sm text-muted-foreground">Email verified. Your teacher role is awaiting administrator approval.</p> : null}
+              {status === 'active' ? <p className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4" /> {t('accountActive')}</p> : null}
+              {status === 'pending_role_activation' ? <p className="text-sm text-muted-foreground">{t('teacherApprovalPending')}</p> : null}
             </form>
           ) : null}
-          <Link className="text-sm font-semibold text-primary" to="/login">Sign in</Link>
+          <Link className="text-sm font-semibold text-primary" to="/login">{t('signIn')}</Link>
         </div>
       </section>
     </main>

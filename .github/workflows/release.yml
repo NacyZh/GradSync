@@ -162,6 +162,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=1536
         run: npm run build
+      - name: Verify Cache API offline build
+        working-directory: frontend
+        run: npm run check:pwa
       - name: Clean generated frontend build artifacts
         run: sh scripts/check-generated-artifacts.sh --clean
       - name: Check generated artifacts after frontend build

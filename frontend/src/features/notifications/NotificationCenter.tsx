@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 
 import { Button } from '@/shared/ui/primitives/button';
+import { useI18n } from '@/shared/i18n/I18nProvider';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import {
 } from './api';
 
 export function NotificationCenter() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const notificationsQuery = useQuery({
@@ -59,7 +61,7 @@ export function NotificationCenter() {
           <Bell className="h-4 w-4" aria-hidden="true" />
           {unreadNotifications.length > 0 ? <span className="unread-dot" data-testid="notification-unread-dot" aria-hidden="true" /> : null}
           <span className="sr-only" aria-live="polite">
-            {unreadNotifications.length > 0 ? `${unreadNotifications.length} unread notifications` : 'No unread notifications'}
+            {unreadNotifications.length > 0 ? t('unreadNotifications', { count: unreadNotifications.length }) : t('noUnreadNotifications')}
           </span>
         </Button>
       </DialogTrigger>

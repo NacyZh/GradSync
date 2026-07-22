@@ -13,6 +13,8 @@ from .views import (
     RoleActivationDetailView,
     RoleActivationListView,
     StudentSearchView,
+    TokenRefreshView,
+    TokenRevokeView,
     VerificationResendView,
 )
 
@@ -22,6 +24,8 @@ urlpatterns = [
     path("resend-verification/", VerificationResendView.as_view(), name="resend-verification"),
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    path("token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    path("token/revoke/", TokenRevokeView.as_view(), name="token-revoke"),
     path("me/", CurrentUserView.as_view(), name="current-user"),
     path("me/password/", PasswordChangeView.as_view(), name="password-change"),
     path("students/", StudentSearchView.as_view(), name="student-search"),

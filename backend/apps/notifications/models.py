@@ -29,6 +29,7 @@ class Notification(models.Model):
     class DeliveryPolicy(models.TextChoices):
         IN_APP = "in_app", "In app"
         IN_APP_EMAIL = "in_app_email", "In app and email"
+        EMAIL_ONLY = "email_only", "Email only"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"

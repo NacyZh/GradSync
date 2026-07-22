@@ -135,15 +135,19 @@ def notifications_visible_to(user, *, project=None):
     if project is not None:
         queryset = queryset.filter(project=project)
     if not getattr(user, "is_administrator", False):
-        queryset = queryset.filter(
-            Q(recipient=user)
-            | Q(sender=user)
-            | Q(
-                project__memberships__user=user,
-                project__memberships__status="active",
-                project__memberships__role__in=["advisor", "reviewer"],
+        queryset = (
+            queryset.exclude(delivery_policy=Notification.DeliveryPolicy.EMAIL_ONLY)
+            .filter(
+                Q(recipient=user)
+                | Q(sender=user)
+                | Q(
+                    project__memberships__user=user,
+                    project__memberships__status="active",
+                    project__memberships__role__in=["advisor", "reviewer"],
+                )
             )
-        ).distinct()
+            .distinct()
+        )
     from apps.schedules.models import ScheduleItem
 
     visible_schedules = ScheduleItem.objects.filter(owner=user) | ScheduleItem.objects.filter(

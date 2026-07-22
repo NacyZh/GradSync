@@ -4,6 +4,7 @@ import { AlertCircle, BellRing, ExternalLink, MailCheck, RotateCcw } from 'lucid
 import { Badge } from '@/shared/ui/primitives/badge';
 import { Button } from '@/shared/ui/primitives/button';
 import { cn } from '@/shared/lib/utils';
+import { formatUiDate } from '@/shared/i18n/translate';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { NotificationRecord } from './api';
@@ -122,7 +123,15 @@ function NotificationRow({ notification }: { notification: NotificationRecord })
             </Badge>
           )}
           {lastAttemptAt ? <Badge variant="muted">Last attempt {formatDateTime(lastAttemptAt)}</Badge> : null}
-          {deliveryPolicy ? <Badge variant="muted">{deliveryPolicy === 'in_app' ? 'In-app only' : 'In-app + email'}</Badge> : null}
+          {deliveryPolicy ? (
+            <Badge variant="muted">
+              {deliveryPolicy === 'in_app'
+                ? 'In-app only'
+                : deliveryPolicy === 'email_only'
+                  ? 'Email only'
+                  : 'In-app + email'}
+            </Badge>
+          ) : null}
         </div>
       </div>
     </li>
@@ -135,10 +144,10 @@ function formatToken(value: string) {
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'not scheduled';
-  return new Intl.DateTimeFormat(undefined, {
+  return formatUiDate(value, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-  }).format(new Date(value));
+  });
 }

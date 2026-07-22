@@ -1,3 +1,6 @@
+import { translateApiMessage } from '../i18n/translate';
+import { fetchWithAuth } from './fetchWithAuth';
+
 export type ApiError = {
   message: string;
   fields?: Record<string, string[]>;
@@ -72,15 +75,14 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     ...addCsrfHeader(init.headers ?? {}, method),
   };
 
-  const response = await fetch(apiUrl(path), {
-    credentials: 'include',
+  const response = await fetchWithAuth(apiUrl(path), path, {
     ...init,
     method,
     headers,
   });
 
   if (response.status === 401) {
-    // Session expired or not authenticated — signal the app to show login.
+    // Both access-token refresh and the session fallback failed.
     window.dispatchEvent(new CustomEvent('gradsync:auth-required'));
   }
 
@@ -90,7 +92,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     const fieldMessages = formatFieldMessages(fields);
     const fallbackMessage = statusMessages[response.status] ?? `Request failed with ${response.status}`;
     throw {
-      message: payload.message ?? (typeof payload.detail === 'string' ? payload.detail : fieldMessages || fallbackMessage),
+      message: translateApiMessage(payload.message ?? (typeof payload.detail === 'string' ? payload.detail : fieldMessages || fallbackMessage)),
       fields,
       code: typeof payload.code === 'string' ? payload.code : undefined,
       status: response.status,

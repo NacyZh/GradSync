@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { fulfillJson } from './api-mocks';
+import { fulfillJson, mockUnavailableTokenRefresh } from './api-mocks';
 
 const activeUser = {
   id: 10,
@@ -11,6 +11,7 @@ const activeUser = {
 };
 
 async function mockSharedWorkspaceApi(page: Page) {
+  await mockUnavailableTokenRefresh(page);
   await page.route('**/api/accounts/me/', async (route) => fulfillJson(route, activeUser));
   await page.route('**/api/accounts/logout/', async (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/projects/?**', async (route) => fulfillJson(route, { results: [] }));

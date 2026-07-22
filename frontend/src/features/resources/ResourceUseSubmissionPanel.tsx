@@ -7,6 +7,7 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
 import { Textarea } from '@/shared/ui/primitives/textarea';
+import { formatUiDate } from '@/shared/i18n/translate';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -230,7 +231,7 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
             <li key={`booking-${booking.id}`} className="min-h-24 items-start">
               <div className="min-w-0">
                 <strong>{booking.resourceName}</strong>
-                <p>{new Date(booking.startsAt).toLocaleString()} – {new Date(booking.endsAt).toLocaleString()} · Qty {booking.quantity}</p>
+                <p>{formatUiDate(booking.startsAt)} – {formatUiDate(booking.endsAt)} · Qty {booking.quantity}</p>
                 {canManage ? <p className="text-sm text-muted-foreground">{booking.requesterName ?? `Student #${booking.requestedById}`} · student request</p> : null}
                 {booking.purpose ? <p>{booking.purpose}</p> : null}
                 <div className="mt-2 flex flex-wrap gap-2">

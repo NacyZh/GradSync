@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson } from './api-mocks';
+import { fulfillJson, mockUnavailableTokenRefresh } from './api-mocks';
 
 test.describe('role workspaces', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockUnavailableTokenRefresh(page);
+  });
+
   test('admin sees account management and can navigate', async ({ page }) => {
     const adminUser = {
       id: 1,

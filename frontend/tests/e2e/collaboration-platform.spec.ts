@@ -24,6 +24,12 @@ async function mockCollaborationApi(page: Page) {
   let documentUploaded = false;
   let liveMemberAdded = false;
 
+  await page.route('**/api/accounts/token/refresh/', async (route) => {
+    await fulfillJson(route, {
+      accessToken: 'collaboration-access-token',
+      accessTokenExpiresAt: '2099-01-01T00:00:00Z',
+    });
+  });
   await page.route('**/api/accounts/me/', async (route) => fulfillJson(route, currentUser));
   await page.route('**/api/accounts/logout/', async (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/code-artifacts/upload-policy/', async (route) => {

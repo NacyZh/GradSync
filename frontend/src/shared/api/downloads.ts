@@ -1,4 +1,5 @@
 import { apiRequest, apiUrl } from './client';
+import { fetchWithAuth } from './fetchWithAuth';
 
 export type DownloadDescriptor = {
   filename: string;
@@ -34,8 +35,7 @@ async function errorMessageFromResponse(response: Response) {
 }
 
 export async function downloadFile(path: string, fallbackFilename = 'download.pdf', method = 'GET'): Promise<DownloadDescriptor> {
-  const response = await fetch(apiUrl(path), {
-    credentials: 'include',
+  const response = await fetchWithAuth(apiUrl(path), path, {
     method,
   });
 
@@ -67,8 +67,7 @@ export async function downloadFile(path: string, fallbackFilename = 'download.pd
 }
 
 export async function fetchDownloadBlobUrl(path: string): Promise<string> {
-  const response = await fetch(apiUrl(path), {
-    credentials: 'include',
+  const response = await fetchWithAuth(apiUrl(path), path, {
     method: 'GET',
   });
 

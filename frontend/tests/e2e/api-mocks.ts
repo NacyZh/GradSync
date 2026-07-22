@@ -314,12 +314,20 @@ export function buildLongDocumentRecord(overrides: Record<string, unknown> = {})
 }
 
 export async function mockUnauthenticated(page: Page) {
+  await mockUnavailableTokenRefresh(page);
   await page.route('**/api/accounts/me/', async (route) => {
     await route.fulfill({ status: 401, json: { message: 'Authentication required' } });
   });
 }
 
+export async function mockUnavailableTokenRefresh(page: Page) {
+  await page.route('**/api/accounts/token/refresh/', async (route) => {
+    await route.fulfill({ status: 401, json: { message: 'Refresh token is required.' } });
+  });
+}
+
 export async function mockLogin(page: Page, user = currentUser) {
+  await mockUnavailableTokenRefresh(page);
   await page.route('**/api/accounts/login/', async (route) => {
     if (route.request().method() === 'POST') {
       await route.fulfill({ json: user });
@@ -343,6 +351,12 @@ export async function mockAuthenticatedApi(page: Page) {
   if (fullStackE2E) {
     return;
   }
+  await page.route('**/api/accounts/token/refresh/', async (route) => {
+    await fulfillJson(route, {
+      accessToken: 'mock-access-token',
+      accessTokenExpiresAt: '2099-01-01T00:00:00Z',
+    });
+  });
   await page.route('**/api/accounts/me/', async (route) => {
     await route.fulfill({ json: currentUser });
   });

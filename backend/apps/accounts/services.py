@@ -195,6 +195,7 @@ def send_verification_email(*, email: str, code: str, user, verification: EmailV
         target_id=str(verification.id),
         subject=subject,
         action_path="/verify-email",
+        delivery_policy=Notification.DeliveryPolicy.EMAIL_ONLY,
     )
     mark_notification_status(notification, Notification.Status.QUEUED)
     try:

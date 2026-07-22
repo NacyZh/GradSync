@@ -124,7 +124,10 @@ def deliver_due_notifications(limit: int = 100) -> int:
     delivered = 0
     notifications = Notification.objects.filter(
         status__in=[Notification.Status.PENDING, Notification.Status.RETRY_NEEDED],
-        delivery_policy=Notification.DeliveryPolicy.IN_APP_EMAIL,
+        delivery_policy__in=[
+            Notification.DeliveryPolicy.IN_APP_EMAIL,
+            Notification.DeliveryPolicy.EMAIL_ONLY,
+        ],
         eligible_at__lte=now,
     ).select_related("recipient", "project", "sender")[:limit]
     for notification in notifications:

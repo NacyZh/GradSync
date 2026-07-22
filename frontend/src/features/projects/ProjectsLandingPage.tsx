@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
+import { formatUiDate } from '@/shared/i18n/translate';
 
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
@@ -82,5 +83,5 @@ function formatRange(startsOn?: string | null, endsOn?: string | null) {
 
 function formatDate(value?: string | null) {
   if (!value) return 'No date';
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+  return formatUiDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
 }

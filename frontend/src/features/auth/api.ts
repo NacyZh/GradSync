@@ -1,4 +1,5 @@
 import { apiRequest } from '../../shared/api/client';
+import { clearAccessToken, setAccessToken } from '../../shared/auth/tokenStore';
 import type { CurrentUser } from './AuthProvider';
 
 export type LoginPayload = {
@@ -6,17 +7,23 @@ export type LoginPayload = {
   password: string;
 };
 
-export function login(payload: LoginPayload): Promise<CurrentUser> {
-  return apiRequest<CurrentUser>('/api/accounts/login/', {
+type LoginResponse = CurrentUser & { accessToken?: string; accessTokenExpiresAt?: string };
+
+export async function login(payload: LoginPayload): Promise<CurrentUser> {
+  const response = await apiRequest<LoginResponse>('/api/accounts/login/', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  setAccessToken(response);
+  return response;
 }
 
-export function logout(): Promise<void> {
-  return apiRequest<void>('/api/accounts/logout/', {
-    method: 'POST',
-  });
+export async function logout(): Promise<void> {
+  try {
+    await apiRequest<void>('/api/accounts/logout/', { method: 'POST' });
+  } finally {
+    clearAccessToken();
+  }
 }
 
 export function fetchCurrentUser(): Promise<CurrentUser> {

@@ -6,6 +6,7 @@ import { Badge } from '@/shared/ui/primitives/badge';
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
+import { formatUiDate } from '@/shared/i18n/translate';
 import { DataState } from '../../shared/ui/DataState';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -166,7 +167,7 @@ export function BookingCalendar({ resource, resourceTypes = [], onWindowChange, 
         <BookingConflictAlert title="Invalid availability window" message={invalidWindowMessage} />
       ) : null}
       {availabilityQuery.isLoading ? <DataState state="loading" message="Checking resource availability." className="mt-4" /> : null}
-      {observedAt ? <p className="mt-3 text-xs text-muted-foreground" role="status">Availability observed {new Date(observedAt).toLocaleTimeString()}</p> : null}
+      {observedAt ? <p className="mt-3 text-xs text-muted-foreground" role="status">Availability observed {formatUiDate(observedAt, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p> : null}
       {availabilityQuery.isFetching && !availabilityQuery.isLoading ? <p className="mt-3 text-xs text-muted-foreground" role="status">Updating availability…</p> : null}
       {availabilityQuery.error ? <DataState state="error" title="Availability unavailable" message={`${availabilityQuery.error.message}${availability.length ? ' Showing last known availability.' : ''}`} className="mt-4" /> : null}
       {isUnavailable ? (
@@ -307,7 +308,7 @@ function canCancelFutureBooking(booking: Booking) {
 }
 
 function formatDateTime(value: string) {
-  return new Date(value).toLocaleString(undefined, {
+  return formatUiDate(value, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

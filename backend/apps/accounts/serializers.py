@@ -29,6 +29,19 @@ class UserSerializer(serializers.ModelSerializer):
         return profile.degree_type if profile else None
 
 
+class AuthenticatedUserSerializer(UserSerializer):
+    accessToken = serializers.CharField(read_only=True)
+    accessTokenExpiresAt = serializers.DateTimeField(read_only=True)
+
+    class Meta(UserSerializer.Meta):
+        fields = [*UserSerializer.Meta.fields, "accessToken", "accessTokenExpiresAt"]
+
+
+class AccessTokenSerializer(serializers.Serializer):
+    accessToken = serializers.CharField(read_only=True)
+    accessTokenExpiresAt = serializers.DateTimeField(read_only=True)
+
+
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)

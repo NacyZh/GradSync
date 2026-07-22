@@ -3,27 +3,16 @@ import { Eye, EyeOff } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 
 import { useAuth } from './AuthProvider';
-import { I18nProvider, type Locale, useI18n } from '../i18n/I18nProvider';
+import { useI18n } from '../i18n/I18nProvider';
+import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 import { AsyncState } from '../../shared/ui/AsyncState';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 
 export function LoginPage() {
-  const [locale, setLocale] = useState<Locale>('en');
-
-  return (
-    <I18nProvider locale={locale}>
-      <LoginContent locale={locale} onLocaleChange={setLocale} />
-    </I18nProvider>
-  );
+  return <LoginContent />;
 }
 
-function LoginContent({
-  locale,
-  onLocaleChange,
-}: {
-  locale: Locale;
-  onLocaleChange: (locale: Locale) => void;
-}) {
+function LoginContent() {
   const { user, isLoading, login, isLoggingIn, loginError } = useAuth();
   const { t } = useI18n();
   const { notify } = useAppFeedback();
@@ -63,14 +52,7 @@ function LoginContent({
               <h1>GradSync</h1>
               <p className="login-subtitle">{t('loginSubtitle')}</p>
             </div>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => onLocaleChange(locale === 'zh' ? 'en' : 'zh')}
-              aria-label={`${t('language')}: ${locale === 'zh' ? t('chinese') : t('english')}`}
-            >
-              {locale === 'zh' ? '中文' : 'EN'}
-            </button>
+            <LanguageSwitcher />
           </div>
 
           <form aria-label={t('signIn')} onSubmit={onSubmit} className="login-form">
@@ -127,8 +109,8 @@ function LoginContent({
             </button>
           </form>
           <p className="text-center text-sm text-muted-foreground">
-            New to GradSync?{' '}
-            <Link className="font-semibold text-primary" to="/register">Create your account</Link>
+            {t('newToGradSync')}{' '}
+            <Link className="font-semibold text-primary" to="/register">{t('createAccount')}</Link>
           </p>
         </div>
       </section>

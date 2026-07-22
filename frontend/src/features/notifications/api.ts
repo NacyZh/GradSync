@@ -34,8 +34,8 @@ export type NotificationRecord = {
   retryCount?: number;
   failure_reason?: string | null;
   failureReason?: string | null;
-  delivery_policy?: 'in_app' | 'in_app_email';
-  deliveryPolicy?: 'in_app' | 'in_app_email';
+  delivery_policy?: 'in_app' | 'in_app_email' | 'email_only';
+  deliveryPolicy?: 'in_app' | 'in_app_email' | 'email_only';
   skipped_reason?: string | null;
   skippedReason?: string | null;
   readAt?: string | null;

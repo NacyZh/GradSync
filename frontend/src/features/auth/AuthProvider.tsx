@@ -2,6 +2,7 @@ import { createContext, useContext, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { login as loginApi, logout as logoutApi, fetchCurrentUser } from './api';
+import { clearAccessToken, restoreAccessToken } from '../../shared/auth/tokenStore';
 
 export type CurrentUser = {
   id: number;
@@ -42,7 +43,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const { data, isLoading } = useQuery({
     queryKey: ['current-user'],
-    queryFn: fetchCurrentUser,
+    queryFn: async () => {
+      await restoreAccessToken();
+      return fetchCurrentUser();
+    },
     retry: false,
   });
 
@@ -75,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     function handleAuthRequired() {
+      clearAccessToken();
       queryClient.setQueryData(['current-user'], null);
     }
     window.addEventListener('gradsync:auth-required', handleAuthRequired);

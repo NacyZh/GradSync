@@ -10,7 +10,9 @@ import {
   ToastViewport,
 } from '@/shared/ui/primitives/toast';
 import { TooltipProvider } from '@/shared/ui/primitives/tooltip';
+import { translateUiText } from '@/shared/i18n/translate';
 
+import { useI18n } from '@/shared/i18n/I18nProvider';
 import { ConfirmDialog } from './ConfirmDialog';
 
 type ToastTone = 'success' | 'error' | 'info';
@@ -47,6 +49,7 @@ function getInitialTheme(): Theme {
 }
 
 export function FeedbackProvider({ children }: PropsWithChildren) {
+  const { locale } = useI18n();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
@@ -102,8 +105,8 @@ export function FeedbackProvider({ children }: PropsWithChildren) {
               }}
             >
               <div className="grid gap-1">
-                <ToastTitle>{toast.tone === 'error' ? 'Action failed' : toast.tone === 'success' ? 'Action complete' : 'GradSync'}</ToastTitle>
-                <ToastDescription>{toast.message}</ToastDescription>
+                <ToastTitle>{translateUiText(toast.tone === 'error' ? 'Action failed' : toast.tone === 'success' ? 'Action complete' : 'GradSync', locale)}</ToastTitle>
+                <ToastDescription>{translateUiText(toast.message, locale)}</ToastDescription>
               </div>
               <ToastClose aria-label="Dismiss notification" />
             </Toast>
@@ -112,9 +115,9 @@ export function FeedbackProvider({ children }: PropsWithChildren) {
           {confirmState ? (
             <ConfirmDialog
               open
-              title={confirmState.title}
-              message={confirmState.message}
-              actionLabel={confirmState.actionLabel}
+              title={translateUiText(confirmState.title, locale)}
+              message={translateUiText(confirmState.message, locale)}
+              actionLabel={translateUiText(confirmState.actionLabel, locale)}
               onConfirm={() => closeConfirm(true)}
               onCancel={() => closeConfirm(false)}
             />

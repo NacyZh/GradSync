@@ -10,9 +10,11 @@ import {
   TooltipTrigger,
 } from '@/shared/ui/primitives/tooltip';
 import { cn } from '@/shared/lib/utils';
+import { translateUiText } from '@/shared/i18n/translate';
 
 import { useAuth } from '../features/auth/AuthProvider';
 import { LanguageSwitcher } from '../features/i18n/LanguageSwitcher';
+import { useI18n } from '../features/i18n/I18nProvider';
 import { NotificationCenter } from '../features/notifications/NotificationCenter';
 import { ProjectContextBanner } from '../features/projects/ProjectContextBanner';
 import { useAppFeedback } from '../shared/ui/AppFeedback';
@@ -20,6 +22,7 @@ import { useAppFeedback } from '../shared/ui/AppFeedback';
 export function Layout({ children }: PropsWithChildren) {
   const { user, logout, isLoggingOut } = useAuth();
   const { theme, toggleTheme } = useAppFeedback();
+  const { locale, t } = useI18n();
   const navigate = useNavigate();
 
   async function onSignOut() {
@@ -29,16 +32,16 @@ export function Layout({ children }: PropsWithChildren) {
 
   const primaryLinks = user
     ? [
-        { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'advisor', 'student'] },
-        { to: '/projects', label: 'Projects', icon: BriefcaseBusiness, roles: ['admin', 'advisor', 'student'] },
-        { to: '/resources', label: 'Resources', icon: Settings, roles: ['admin', 'advisor', 'student'] },
-        { to: '/library/papers', label: 'Papers', icon: BookOpen, roles: ['admin', 'advisor', 'student'] },
-        { to: '/library/code', label: 'Code', icon: Code2, roles: ['admin', 'advisor', 'student'] },
-        { to: '/library/documents', label: 'Documents', icon: FileStack, roles: ['admin', 'advisor', 'student'] },
-        { to: '/writing', label: 'Writing', icon: FileText, roles: ['admin', 'advisor', 'student'] },
-        { to: '/admin/accounts', label: 'Team', icon: Users, roles: ['admin'] },
-        { to: '/admin/role-activations', label: 'Approvals', icon: UserCircle, roles: ['admin'] },
-        { to: '/profile', label: 'Profile', icon: UserCircle, roles: ['admin', 'advisor', 'student'] },
+        { to: '/', label: t('dashboard'), icon: LayoutDashboard, roles: ['admin', 'advisor', 'student'] },
+        { to: '/projects', label: t('projects'), icon: BriefcaseBusiness, roles: ['admin', 'advisor', 'student'] },
+        { to: '/resources', label: t('resources'), icon: Settings, roles: ['admin', 'advisor', 'student'] },
+        { to: '/library/papers', label: t('library'), icon: BookOpen, roles: ['admin', 'advisor', 'student'] },
+        { to: '/library/code', label: t('repository'), icon: Code2, roles: ['admin', 'advisor', 'student'] },
+        { to: '/library/documents', label: t('documents'), icon: FileStack, roles: ['admin', 'advisor', 'student'] },
+        { to: '/writing', label: t('writing'), icon: FileText, roles: ['admin', 'advisor', 'student'] },
+        { to: '/admin/accounts', label: t('team'), icon: Users, roles: ['admin'] },
+        { to: '/admin/role-activations', label: t('approvals'), icon: UserCircle, roles: ['admin'] },
+        { to: '/profile', label: t('profile'), icon: UserCircle, roles: ['admin', 'advisor', 'student'] },
       ].filter((link) => link.roles.includes(user.global_role))
     : [];
 
@@ -52,37 +55,37 @@ export function Layout({ children }: PropsWithChildren) {
         {user ? (
           <div className="topbar-right">
             <label className="global-search">
-              <span className="sr-only">Search</span>
+              <span className="sr-only">{t('search')}</span>
               <span className="relative block">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <Input className="pl-9" placeholder="Search projects, tasks, reviews" />
+                <Input className="pl-9" placeholder={t('globalSearchPlaceholder')} />
               </span>
             </label>
             <NotificationCenter />
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+                <Button variant="outline" size="icon" type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? t('switchToLightTheme') : t('switchToDarkTheme')}>
                   {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}</TooltipContent>
+              <TooltipContent>{theme === 'dark' ? t('switchToLightTheme') : t('switchToDarkTheme')}</TooltipContent>
             </Tooltip>
             <LanguageSwitcher />
             <div className="hidden min-w-0 text-right sm:block">
               <span className="topbar-user block truncate">{user.name}</span>
-              <span className="topbar-role mt-1">{user.global_role}</span>
+              <span className="topbar-role mt-1">{translateUiText(user.global_role, locale)}</span>
             </div>
             <Button variant="outline" onClick={onSignOut} disabled={isLoggingOut}>
               <LogOut className="h-4 w-4" aria-hidden="true" />
-              {isLoggingOut ? 'Signing out' : 'Sign out'}
+              {isLoggingOut ? t('signingOut') : t('signOut')}
             </Button>
           </div>
         ) : null}
       </header>
       <div className="workspace">
         {user ? (
-          <aside className="sidebar" aria-label="Workspace navigation">
-            <nav className="sidebar-nav" aria-label="Primary workspace">
+          <aside className="sidebar" aria-label={t('workspaceNavigation')}>
+            <nav className="sidebar-nav" aria-label={t('primaryWorkspace')}>
               {primaryLinks.map(({ icon: Icon, ...link }) => (
                 <NavLink
                   key={link.to}
@@ -95,9 +98,9 @@ export function Layout({ children }: PropsWithChildren) {
                 </NavLink>
               ))}
             </nav>
-            <section className="sidebar-section" aria-label="Role workspace">
-              <h2>{user.global_role === 'student' ? 'Student work' : user.global_role === 'advisor' ? 'Advisor review' : 'Administration'}</h2>
-              <p>{user.global_role === 'student' ? 'Submit work, track reviews, and reserve resources.' : user.global_role === 'advisor' ? 'Review submissions, manage tasks, and monitor project progress.' : 'Manage accounts, projects, and release readiness.'}</p>
+            <section className="sidebar-section" aria-label={t('roleWorkspace')}>
+              <h2>{user.global_role === 'student' ? t('studentWork') : user.global_role === 'advisor' ? t('advisorReview') : t('administration')}</h2>
+              <p>{user.global_role === 'student' ? t('studentWorkspaceDescription') : user.global_role === 'advisor' ? t('advisorWorkspaceDescription') : t('adminWorkspaceDescription')}</p>
             </section>
           </aside>
         ) : null}

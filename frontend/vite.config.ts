@@ -19,6 +19,7 @@ export default defineConfig({
     },
   },
   build: {
+    manifest: 'asset-manifest.json',
     chunkSizeWarningLimit: productionChunkSizeWarningLimit,
     rollupOptions: {
       output: {
