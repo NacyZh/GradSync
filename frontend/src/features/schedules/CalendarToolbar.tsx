@@ -1,7 +1,8 @@
-import { addDays, addMonths, addWeeks, format } from 'date-fns';
+import { addDays, addMonths, addWeeks } from 'date-fns';
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, SlidersHorizontal } from 'lucide-react';
 
 import { Button } from '../../shared/ui/primitives/button';
+import { formatUiDate } from '../../shared/i18n/translate';
 import { Popover, PopoverContent, PopoverTrigger } from '../../shared/ui/primitives/popover';
 import type { CalendarSource, CalendarView } from './api';
 
@@ -43,7 +44,9 @@ export function CalendarToolbar({ anchor, view, sources, onAnchorChange, onViewC
     <header className="calendar-toolbar">
       <div className="calendar-toolbar-heading">
         <span className="calendar-toolbar-kicker"><CalendarDays className="h-4 w-4" aria-hidden="true" /> Schedule</span>
-        <h2>{format(anchor, view === 'month' ? 'MMMM yyyy' : 'MMM d, yyyy')}</h2>
+        <h2>{formatUiDate(anchor, view === 'month'
+          ? { month: 'long', year: 'numeric' }
+          : { month: 'short', day: 'numeric', year: 'numeric' })}</h2>
       </div>
       <div className="calendar-toolbar-actions">
         {onCreate ? <Button type="button" size="sm" onClick={onCreate}><Plus className="h-4 w-4" aria-hidden="true" /> New schedule</Button> : null}
@@ -86,10 +89,10 @@ export function CalendarToolbar({ anchor, view, sources, onAnchorChange, onViewC
           <Button type="button" size="icon" variant="ghost" aria-label="Previous period" title="Previous period" onClick={() => shift(-1)}>
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => onAnchorChange(new Date())}>Today</Button>
           <Button type="button" size="icon" variant="ghost" aria-label="Next period" title="Next period" onClick={() => shift(1)}>
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => onAnchorChange(new Date())}>Today</Button>
         </div>
         <div className="calendar-view-switch" role="group" aria-label="Calendar view">
           {views.map((option) => (

@@ -7,6 +7,8 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
+import { useI18n } from '@/shared/i18n/I18nProvider';
+import { translateUiText } from '@/shared/i18n/translate';
 import { useAuth } from '../auth/AuthProvider';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
@@ -29,6 +31,7 @@ import { ResourceUseSubmissionPanel } from './ResourceUseSubmissionPanel';
 export function ResourceListPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { locale } = useI18n();
   const { notify } = useAppFeedback();
   const canManage = user?.global_role === 'advisor' || user?.global_role === 'admin';
   const [query, setQuery] = useState('');
@@ -155,7 +158,7 @@ export function ResourceListPage() {
                     </Badge>
                   </div>
                   <p>{getResourceTypeName(resource, resourceTypeById)} · {resource.location || 'No location'}</p>
-                  <p>{formatAvailabilitySummary(resource, availabilityById.get(resource.id))}</p>
+                  <p>{translateUiText(formatAvailabilitySummary(resource, availabilityById.get(resource.id)), locale)}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2 text-right">
                   <div className="flex flex-wrap items-center justify-end gap-2">

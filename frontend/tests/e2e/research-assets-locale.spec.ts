@@ -183,12 +183,80 @@ test('Chinese locale covers dashboard and project workspaces', async ({ page }) 
     }
     await fulfillJson(route, { locale });
   });
+  await page.route('**/api/projects/1/materials/**', async (route) => {
+    await fulfillJson(route, {
+      count: 1,
+      results: [{
+        id: 'material-1',
+        materialType: 'document',
+        backingRecordId: 'document-1',
+        sourceProject: { id: '1', title: 'Graphene Lab' },
+        visibility: 'project-only',
+        classificationState: 'pending_review',
+        displayName: 'Protocol.pdf',
+        actionCapabilities: { canView: true, canDownload: true, canChangeVisibility: true },
+      }],
+    });
+  });
+  await page.route('**/api/resources/**', async (route) => {
+    await fulfillJson(route, {
+      results: [{
+        id: 1,
+        name: 'Microscope',
+        resourceType: 'Equipment',
+        resourceTypeId: 1,
+        location: 'Lab A',
+        totalQuantity: 4,
+        availableQuantity: 2,
+        status: 'active',
+        effectiveConfirmationPolicy: 'immediate',
+        version: 1,
+      }],
+    });
+  });
+  await page.route('**/api/resources/availability/**', async (route) => {
+    await fulfillJson(route, {
+      observedAt: '2026-07-22T08:00:00Z',
+      results: [{
+        id: 1,
+        name: 'Microscope',
+        resourceType: 'Equipment',
+        resourceTypeId: 1,
+        location: 'Lab A',
+        totalQuantity: 4,
+        availableQuantity: 2,
+        allocatedQuantity: 2,
+        status: 'available',
+        effectiveConfirmationPolicy: 'immediate',
+        version: 1,
+      }],
+    });
+  });
+  await page.route('**/api/resource-types/**', async (route) => {
+    await fulfillJson(route, { results: [{ id: 1, name: 'Equipment', scope: 'global', fieldSchema: [], confirmationPolicy: 'immediate', status: 'active' }] });
+  });
+  await page.route('**/api/bookings/**', async (route) => {
+    await fulfillJson(route, { results: [] });
+  });
+  await page.route('**/api/library/papers/**', async (route) => {
+    if (route.request().url().endsWith('/api/library/papers/upload-policy/')) {
+      await fulfillJson(route, { category: 'paper', maxSizeBytes: 2048, displayLabel: '2 KB', allowedExtensions: ['.pdf'], contentTypes: ['application/pdf'] });
+      return;
+    }
+    await fulfillJson(route, { results: [], count: 0 });
+  });
 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Advisor workspace' })).toBeVisible();
   await page.getByRole('button', { name: /Language|语言/ }).click();
   await expect(page.getByRole('heading', { name: '教师工作台' })).toBeVisible();
-  await expect(page.getByRole('region', { name: '工作台日历' })).toBeVisible();
+  const calendar = page.getByRole('region', { name: '工作台日历' });
+  await expect(calendar).toBeVisible();
+  await expect(calendar.getByRole('button', { name: '月', exact: true })).toBeVisible();
+  await expect(calendar.getByRole('button', { name: '周', exact: true })).toBeVisible();
+  await expect(calendar.getByRole('button', { name: '日', exact: true })).toBeVisible();
+  await expect(calendar.getByRole('button', { name: '议程', exact: true })).toBeVisible();
+  await expect(calendar.locator('.calendar-period-controls button').nth(2)).toHaveText('今天');
 
   await page.goto('/projects');
   await expect(page.getByRole('heading', { name: '项目' })).toBeVisible();
@@ -200,6 +268,21 @@ test('Chinese locale covers dashboard and project workspaces', async ({ page }) 
   await expect(page.locator('aside h2').filter({ hasText: /^成员与进度$/ })).toBeVisible();
   await expect(page.getByText('未提供任务描述。')).toBeVisible();
   await expect(page.getByText(/unread notifications|% complete|weekly reports|No task description|Add task/)).toHaveCount(0);
+
+  await page.goto('/projects/1/materials');
+  await expect(page.getByRole('heading', { name: '项目材料' })).toBeVisible();
+  await expect(page.getByText('1 份文档材料')).toBeVisible();
+  await expect(page.getByRole('tab', { name: '显示文档材料' })).toBeVisible();
+  await expect(page.getByPlaceholder('搜索文档材料')).toBeVisible();
+  await expect(page.getByText('文档 · 待评审')).toBeVisible();
+
+  await page.goto('/resources');
+  await expect(page.getByText('立即确认')).toBeVisible();
+  await expect(page.getByText('记录本人当前或未来的使用，无需审批。')).toBeVisible();
+  await expect(page.getByText('最大可用数量 4（Microscope）')).toBeVisible();
+
+  await page.goto('/library/papers');
+  await expect(page.getByRole('button', { name: '选择 PDF' })).toBeVisible();
 });
 
 test('English paper-library upload, rename, delete, viewer, and download states stay English-only', async ({ page }) => {

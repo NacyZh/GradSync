@@ -5,6 +5,8 @@ import { useParams } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
+import { useI18n } from '@/shared/i18n/I18nProvider';
+import { translateUiText } from '@/shared/i18n/translate';
 
 import { getErrorMessage } from '../../shared/api/errors';
 import { DataState } from '../../shared/ui/DataState';
@@ -23,6 +25,7 @@ import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 export function ProjectMaterialsPage() {
   const projectId = Number(useParams().projectId ?? 0);
   const queryClient = useQueryClient();
+  const { locale } = useI18n();
   const { notify } = useAppFeedback();
   const liveRefresh = useProjectLiveRefresh(projectId);
   const [title, setTitle] = useState('');
@@ -76,6 +79,7 @@ export function ProjectMaterialsPage() {
     { value: 'paper', label: 'Paper', icon: Newspaper },
   ];
   const filteredMaterials = materialsQuery.data?.results ?? [];
+  const ui = (value: string) => translateUiText(value, locale);
 
   return (
     <PageShell title="Project materials" description="Project-owned papers, code, and documents with controlled project-only or group-wide visibility.">
@@ -128,7 +132,7 @@ export function ProjectMaterialsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2>Materials</h2>
-              <p className="text-sm text-muted-foreground">{materialsQuery.data?.count ?? 0} {materialFilter} materials</p>
+              <p className="text-sm text-muted-foreground">{ui(`${materialsQuery.data?.count ?? 0} ${materialFilter} materials`)}</p>
             </div>
           </div>
           <div className="mt-4 grid gap-3">
@@ -144,7 +148,7 @@ export function ProjectMaterialsPage() {
                     className="min-w-0 px-2"
                     role="tab"
                     aria-selected={active}
-                    aria-label={`Show ${category.label} materials`}
+                    aria-label={ui(`Show ${category.label} materials`)}
                     onClick={() => setMaterialFilter(category.value)}
                   >
                     <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -160,7 +164,7 @@ export function ProjectMaterialsPage() {
                 className="pl-9"
                 value={materialSearch}
                 onChange={(event) => setMaterialSearch(event.target.value)}
-                placeholder={`Search ${materialFilter} materials`}
+                placeholder={ui(`Search ${materialFilter} materials`)}
               />
             </label>
           </div>
@@ -170,27 +174,27 @@ export function ProjectMaterialsPage() {
           {materialsQuery.isLoading ? <DataState state="loading" title="Loading materials" message="Loading project materials." /> : null}
           {materialsQuery.error ? <DataState state="error" title="Materials unavailable" message={materialsQuery.error.message} /> : null}
           {!materialsQuery.isLoading && !filteredMaterials.length ? (
-            <DataState state="empty" title="No matching materials" message={`No ${materialFilter} materials match the current search.`} />
+            <DataState state="empty" title="No matching materials" message={ui(`No ${materialFilter} materials match the current search.`)} />
           ) : null}
-          <ul className="mt-4 grid min-h-0 gap-3 overflow-y-auto pr-1" aria-label={`${materialFilter} material results`}>
+          <ul className="mt-4 grid min-h-0 gap-3 overflow-y-auto pr-1" aria-label={ui(`${materialFilter} material results`)}>
             {filteredMaterials.map((material) => (
               <li key={material.id} className="rounded-md border p-3">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <strong>{material.displayName || `${material.materialType} ${material.backingRecordId}`}</strong>
+                  <strong>{material.displayName || `${ui(material.materialType)} ${material.backingRecordId}`}</strong>
                   <span className="flex flex-wrap gap-2">
                     <VisibilityStateBadge visibility={material.visibility} />
                     <SourceProjectBadge title={material.sourceProject.title} />
                   </span>
                 </div>
                 <p className="text-sm capitalize text-muted-foreground">
-                  {material.materialType} · {material.classificationState.replaceAll('_', ' ')}
+                  {ui(`${material.materialType} · ${material.classificationState.replaceAll('_', ' ')}`)}
                 </p>
                 {material.actionCapabilities.canDownload || material.actionCapabilities.canChangeVisibility ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
                       type="button"
                       variant="outline"
-                      aria-label={`Download ${material.displayName || `${material.materialType} ${material.backingRecordId}`}`}
+                      aria-label={ui(`Download ${material.displayName || `${material.materialType} ${material.backingRecordId}`}`)}
                       disabled={!material.actionCapabilities.canDownload || downloadMutation.isPending}
                       onClick={() => downloadMutation.mutate(material.id)}
                     >

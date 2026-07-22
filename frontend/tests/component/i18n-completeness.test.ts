@@ -31,6 +31,7 @@ function tsxFiles(directory: string): string[] {
 describe('i18n completeness', () => {
   it('keeps keyed English and Chinese catalogs aligned', () => {
     expect(Object.keys(messagesZh).sort()).toEqual(Object.keys(messagesEn).sort());
+    expect(messagesZh.paperLibraryChoosePdfs).toBe('选择 PDF');
   });
 
   it('registers every static JSX label in a locale catalog', () => {
@@ -86,6 +87,18 @@ describe('i18n completeness', () => {
     window.localStorage.setItem('gradsync.locale', 'zh');
     expect(translateUiText('Download started: report.pdf')).toBe('下载已开始：report.pdf');
     expect(translateUiText('3 visible workspaces')).toBe('3 个可见工作区');
+    expect(translateUiText('Immediate confirmation')).toBe('立即确认');
+    expect(translateUiText('Month')).toBe('月');
+    expect(translateUiText('Day')).toBe('日');
+    expect(translateUiText('Agenda')).toBe('议程');
+    expect(translateUiText('3 document materials')).toBe('3 份文档材料');
+    expect(translateUiText('Show Paper materials')).toBe('显示论文材料');
+    expect(translateUiText('Search code materials')).toBe('搜索代码材料');
+    expect(translateUiText('document · pending review')).toBe('文档 · 待评审');
+    expect(translateUiText('Maximum 4 for Microscope')).toBe('最大可用数量 4（Microscope）');
+    expect(translateUiText('2 of 4 available · 2 in use')).toBe('4 件中 2 件可用 · 2 件使用中');
+    expect(translateUiText('Student #12 · student request')).toBe('学生 #12 · 学生申请');
+    expect(translateUiText('+3 more')).toBe('还有 3 项');
     expect(formatUiDate('2026-07-21T12:00:00Z', { year: 'numeric', month: 'long', timeZone: 'UTC' })).toContain('2026年');
     window.localStorage.removeItem('gradsync.locale');
   });

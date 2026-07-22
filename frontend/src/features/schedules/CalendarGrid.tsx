@@ -2,6 +2,7 @@ import { eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMont
 import { useState } from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '../../shared/ui/primitives/popover';
+import { formatUiDate } from '../../shared/i18n/translate';
 import { CalendarAgenda } from './CalendarAgenda';
 import type { CalendarOccurrence, CalendarView } from './api';
 import { formatOccurrenceTime, occurrenceStart } from './api';
@@ -30,7 +31,7 @@ export function CalendarGrid({ anchor, view, occurrences, selectedId, onSelect }
       <div className="calendar-desktop-surface">
         {view !== 'day' ? (
           <div className="calendar-weekdays" role="row" aria-label="Weekdays">
-            {weekdays.map((day) => <span key={day.toISOString()} role="columnheader">{format(day, 'EEE')}</span>)}
+            {weekdays.map((day) => <span key={day.toISOString()} role="columnheader">{formatUiDate(day, { weekday: 'short' })}</span>)}
           </div>
         ) : null}
         <div className={`calendar-grid ${gridClass}`} role="grid" aria-label={`${view} calendar`}>
@@ -47,11 +48,13 @@ export function CalendarGrid({ anchor, view, occurrences, selectedId, onSelect }
                 key={day.toISOString()}
                 className="calendar-day"
                 role="gridcell"
-                aria-label={format(day, 'EEEE, MMMM d')}
+                aria-label={calendarDayLabel(day)}
                 data-today={isToday(day) || undefined}
                 data-outside={view === 'month' && !isSameMonth(day, anchor) || undefined}
               >
-                <time dateTime={dayKey}>{format(day, view === 'day' ? 'EEEE, MMMM d' : 'd')}</time>
+                <time dateTime={dayKey}>{view === 'day'
+                  ? formatUiDate(day, { weekday: 'long', month: 'long', day: 'numeric' })
+                  : formatUiDate(day, { day: 'numeric' })}</time>
                 <div className="calendar-day-items">
                   {visibleItems.map((item) => (
                     <button
@@ -103,7 +106,7 @@ function DayOverflowPopover({
   onSelect: (occurrence: CalendarOccurrence) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const dayLabel = format(day, 'EEEE, MMMM d');
+  const dayLabel = calendarDayLabel(day);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -146,4 +149,8 @@ function DayOverflowPopover({
       </PopoverContent>
     </Popover>
   );
+}
+
+function calendarDayLabel(day: Date) {
+  return formatUiDate(day, { weekday: 'long', month: 'long', day: 'numeric' });
 }

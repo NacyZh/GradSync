@@ -24,6 +24,29 @@ export function translateUiText(value: string, locale = activeUiLocale()) {
   const exact = runtimeZh[value] ?? keyedZhByEnglish[value];
   if (exact) return exact;
   return value
+    .replace(/^(\d+) (document|code|paper) materials$/, (_, count: string, type: string) => `${count} 份${materialTypeZh[type]}材料`)
+    .replace(/^Show (Document|Code|Paper) materials$/, (_, type: string) => `显示${materialTypeZh[type.toLowerCase()]}材料`)
+    .replace(/^Search (document|code|paper) materials$/, (_, type: string) => `搜索${materialTypeZh[type]}材料`)
+    .replace(/^No (document|code|paper) materials match the current search\.$/, (_, type: string) => `没有符合当前搜索条件的${materialTypeZh[type]}材料。`)
+    .replace(/^(document|code|paper) material results$/, (_, type: string) => `${materialTypeZh[type]}材料结果`)
+    .replace(/^(document|code|paper) · (active|pending review|approved|rejected|archived)$/, (_, type: string, state: string) => `${materialTypeZh[type]} · ${materialStateZh[state]}`)
+    .replace(/^Download (?!started:|ready:)(.+)$/, '下载 $1')
+    .replace(/^Maximum (\d+) for (.+)$/, '最大可用数量 $1（$2）')
+    .replace(/^(\d+) of (\d+) available · (\d+) in use$/, '$2 件中 $1 件可用 · $3 件使用中')
+    .replace(/^(\d+) available · (\d+) allocated · (\d+) total$/, '$1 件可用 · $2 件已分配 · 共 $3 件')
+    .replace(/^(\d+) available$/, '$1 件可用')
+    .replace(/^(\d+) conflicts?$/, '$1 个冲突')
+    .replace(/^(\d+) periods?$/, '$1 个时段')
+    .replace(/^Qty (\d+)$/, '数量 $1')
+    .replace(/^Student #(\d+) · student request$/, '学生 #$1 · 学生申请')
+    .replace(/^Student #(\d+)$/, '学生 #$1')
+    .replace(/^(.+) · student request$/, '$1 · 学生申请')
+    .replace(/^\+(\d+) more$/, '还有 $1 项')
+    .replace(/^(\d+) scheduled items?$/, '$1 项日程')
+    .replace(/^(\d+) items?$/, '$1 项')
+    .replace(/^View all (\d+) schedules on (.+)$/, '查看 $2 的全部 $1 项日程')
+    .replace(/^Schedules on (.+)$/, '$1 的日程')
+    .replace(/^Filter calendar sources, (\d+) selected$/, '筛选日历来源，已选择 $1 项')
     .replace(/^(\d+) visible workspaces$/, '$1 个可见工作区')
     .replace(/^(\d+) visible$/, '$1 条可见')
     .replace(/^(\d+) active$/, '$1 个活跃')
@@ -56,6 +79,20 @@ export function translateUiText(value: string, locale = activeUiLocale()) {
     .replace(/^Choose an archive no larger than (.+)\.$/, '请选择不超过 $1 的压缩包。')
     .replace(/^Quantity cannot exceed (\d+)\.$/, '数量不能超过 $1。');
 }
+
+const materialTypeZh: Record<string, string> = {
+  document: '文档',
+  code: '代码',
+  paper: '论文',
+};
+
+const materialStateZh: Record<string, string> = {
+  active: '有效',
+  'pending review': '待评审',
+  approved: '已批准',
+  rejected: '已拒绝',
+  archived: '已归档',
+};
 
 const apiMessages: Record<string, string> = {
   'Invalid email or password.': '邮箱或密码错误。',

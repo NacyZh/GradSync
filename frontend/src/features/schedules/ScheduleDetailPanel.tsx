@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import { CalendarClock, Check, ExternalLink, Pencil, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -6,6 +5,7 @@ import { Link } from 'react-router-dom';
 
 import { Button } from '../../shared/ui/primitives/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../shared/ui/primitives/dialog';
+import { formatUiDate } from '../../shared/i18n/translate';
 import { Label } from '../../shared/ui/primitives/label';
 import type { CalendarOccurrence } from './api';
 import { formatOccurrenceTime, listScheduleRevisions, occurrenceStart, retrieveScheduleDeliveryStatus } from './api';
@@ -53,7 +53,7 @@ export function ScheduleDetailPanel({ occurrence, upcoming = [], onSelect, onClo
               <li key={item.occurrenceId}>
                 <button type="button" onClick={() => onSelect?.(item)} aria-label={`${item.title}, ${formatOccurrenceTime(item)}`}>
                   <span className={`calendar-source-mark source-${item.sourceType}`} aria-hidden="true" />
-                  <span><strong>{item.title}</strong><small>{format(occurrenceStart(item), 'MMM d')} · {formatOccurrenceTime(item)}</small></span>
+                  <span><strong>{item.title}</strong><small>{formatUiDate(occurrenceStart(item), { month: 'short', day: 'numeric' })} · {formatOccurrenceTime(item)}</small></span>
                 </button>
               </li>
             ))}
@@ -78,7 +78,7 @@ export function ScheduleDetailPanel({ occurrence, upcoming = [], onSelect, onClo
       </div>
       <h2>{occurrence.title}</h2>
       <dl>
-        <div><dt>Date</dt><dd>{format(occurrenceStart(occurrence), 'EEEE, MMMM d, yyyy')}</dd></div>
+        <div><dt>Date</dt><dd>{formatUiDate(occurrenceStart(occurrence), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</dd></div>
         <div><dt>Time</dt><dd>{formatOccurrenceTime(occurrence)}</dd></div>
         <div><dt>Timezone</dt><dd>{occurrence.timezone}</dd></div>
       </dl>
@@ -111,7 +111,7 @@ export function ScheduleDetailPanel({ occurrence, upcoming = [], onSelect, onClo
           <ol>{revisions.data.results.slice(0, 5).map((revision) => (
             <li key={revision.revisionNumber}>
               <strong>{revision.changeType.replaceAll('_', ' ')}</strong>
-              <span>{revision.actor.name} · {format(new Date(revision.createdAt), 'MMM d, HH:mm')}</span>
+              <span>{revision.actor.name} · {formatUiDate(revision.createdAt, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
             </li>
           ))}</ol>
         </section>

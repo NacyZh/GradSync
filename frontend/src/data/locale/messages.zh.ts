@@ -34,7 +34,7 @@ export const messagesZh = {
   paperLibraryUploadPolicy: 'PDF 最大大小',
   paperLibraryImportPdf: '导入论文 PDF',
   paperLibraryPdfFile: 'PDF 文件',
-  paperLibraryChoosePdfs: 'Choose PDFs',
+  paperLibraryChoosePdfs: '选择 PDF',
   paperLibraryClear: '清除',
   paperLibraryClearSelectedPdfs: '清除已选 PDF',
   paperLibrarySelectedFiles: '已选 PDF 文件',

@@ -7,7 +7,8 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/primitives/select';
 import { Textarea } from '@/shared/ui/primitives/textarea';
-import { formatUiDate } from '@/shared/i18n/translate';
+import { useI18n } from '@/shared/i18n/I18nProvider';
+import { formatUiDate, translateUiText } from '@/shared/i18n/translate';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
 import { DataState } from '../../shared/ui/DataState';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -26,6 +27,7 @@ type ResourceUseSubmissionPanelProps = {
 
 export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUseSubmissionPanelProps) {
   const queryClient = useQueryClient();
+  const { locale } = useI18n();
   const { notify } = useAppFeedback();
   const [resourceId, setResourceId] = useState(resources[0]?.id ? String(resources[0].id) : '');
   const [startsAt, setStartsAt] = useState('');
@@ -200,7 +202,7 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
             onChange={(event) => setQuantity(event.target.value)}
             required
           />
-          {selectedResource ? <small className="text-muted-foreground">Maximum {selectedResource.totalQuantity} for {selectedResource.name}</small> : null}
+          {selectedResource ? <small className="text-muted-foreground">{translateUiText(`Maximum ${selectedResource.totalQuantity} for ${selectedResource.name}`, locale)}</small> : null}
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="resourceUsePurpose">Purpose</Label>
@@ -231,8 +233,8 @@ export function ResourceUseSubmissionPanel({ resources, canManage }: ResourceUse
             <li key={`booking-${booking.id}`} className="min-h-24 items-start">
               <div className="min-w-0">
                 <strong>{booking.resourceName}</strong>
-                <p>{formatUiDate(booking.startsAt)} – {formatUiDate(booking.endsAt)} · Qty {booking.quantity}</p>
-                {canManage ? <p className="text-sm text-muted-foreground">{booking.requesterName ?? `Student #${booking.requestedById}`} · student request</p> : null}
+                <p>{formatUiDate(booking.startsAt)} – {formatUiDate(booking.endsAt)} · {translateUiText(`Qty ${booking.quantity}`, locale)}</p>
+                {canManage ? <p className="text-sm text-muted-foreground">{translateUiText(`${booking.requesterName ?? `Student #${booking.requestedById}`} · student request`, locale)}</p> : null}
                 {booking.purpose ? <p>{booking.purpose}</p> : null}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <StatusBadge status={booking.status} />

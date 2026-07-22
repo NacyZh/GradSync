@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 
+import { formatUiDate } from '../../shared/i18n/translate';
 import type { CalendarOccurrence } from './api';
 import { formatOccurrenceTime, occurrenceStart } from './api';
 
@@ -25,7 +26,7 @@ export function CalendarAgenda({ occurrences, selectedId, onSelect }: Props) {
       {groups.map(([day, items]) => (
         <section className="calendar-agenda-group" key={day}>
           <header>
-            <time dateTime={day}>{format(occurrenceStart(items[0]), 'EEEE, MMMM d')}</time>
+            <time dateTime={day}>{formatUiDate(occurrenceStart(items[0]), { weekday: 'long', month: 'long', day: 'numeric' })}</time>
             <span>{items.length} {items.length === 1 ? 'item' : 'items'}</span>
           </header>
           <ol>
