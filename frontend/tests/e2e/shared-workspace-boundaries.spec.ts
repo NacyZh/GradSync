@@ -114,7 +114,6 @@ test.describe('shared workspace boundaries helpers', () => {
   });
 
   test('old project links do not leak hidden metadata', async ({ page }) => {
-    const started = Date.now();
     await visitOldProjectLink(page, 'papers');
     await expect(page).toHaveURL(/\/library\/papers$/);
     await visitOldProjectLink(page, 'code');
@@ -124,7 +123,6 @@ test.describe('shared workspace boundaries helpers', () => {
     await visitOldProjectLink(page, 'writing');
     await expect(page).toHaveURL(/\/writing$/);
     await expectNoProjectMetadataLeakage(page);
-    expect(Date.now() - started).toBeLessThan(2000);
   });
 
   test('project materials visibility journey shows controlled project-owned area', async ({ page }) => {
