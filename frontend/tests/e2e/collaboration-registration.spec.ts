@@ -1,6 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, mockAuthenticatedApi, mockUnavailableTokenRefresh } from './api-mocks';
+import {
+  fulfillJson,
+  fullStackE2E,
+  mockAuthenticatedApi,
+  mockUnavailableTokenRefresh,
+} from './api-mocks';
+
+test.beforeEach(() => {
+  test.skip(fullStackE2E, 'mock-owned registration responses are covered by the mocked Playwright stage');
+});
 
 test('registration and role approval flow is reachable', async ({ page }) => {
   await page.route('**/api/accounts/register/', async (route) => {

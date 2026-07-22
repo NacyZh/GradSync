@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { fulfillJson, mockUnavailableTokenRefresh } from './api-mocks';
+import { fulfillJson, fullStackE2E, mockUnavailableTokenRefresh } from './api-mocks';
 
 const activeUser = {
   id: 10,
@@ -99,6 +99,7 @@ async function visitOldProjectLink(page: Page, section: 'papers' | 'code' | 'doc
 
 test.describe('shared workspace boundaries helpers', () => {
   test.beforeEach(async ({ page }) => {
+    test.skip(fullStackE2E, 'mock-owned boundary fixtures are covered by the mocked Playwright stage');
     await mockSharedWorkspaceApi(page);
   });
 

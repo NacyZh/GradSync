@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { currentUser, fulfillJson, fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
@@ -9,6 +9,15 @@ const studentUser = {
   global_role: 'student',
   status: 'active',
 };
+
+async function openReportsAfterInitialLoad(page: Page) {
+  const reportsLoaded = page.waitForResponse((response) =>
+    response.request().method() === 'GET'
+      && response.url().includes('/api/projects/1/reports/'),
+  );
+  await page.goto('/projects/1/reports');
+  await reportsLoaded;
+}
 
 test.beforeEach(async ({ page }) => {
   await mockAuthenticatedApi(page);
@@ -45,7 +54,7 @@ test('student submits report revision and advisor updates review status', async 
   if (fullStackE2E) {
     await loginAs(page, 'student@example.edu');
   }
-  await page.goto('/projects/1/reports');
+  await openReportsAfterInitialLoad(page);
   await expect(page.getByRole('banner')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Weekly progress report' })).toBeVisible();
   await page.getByLabel('Week start').fill('2026-06-22');
@@ -86,7 +95,7 @@ test('student submits report revision and advisor updates review status', async 
       await fulfillJson(route, studentUser);
     });
   }
-  await page.goto('/projects/1/reports');
+  await openReportsAfterInitialLoad(page);
   await page.getByLabel('Week start').fill('2026-06-22');
   await page.getByLabel('Completed work').fill('Completed experiments revised');
   await page.getByLabel('Next steps').fill('Write results');

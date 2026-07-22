@@ -1,8 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-import { currentUser, fulfillJson, mockUnavailableTokenRefresh } from './api-mocks';
+import {
+  currentUser,
+  fulfillJson,
+  fullStackE2E,
+  loginAs,
+  mockUnavailableTokenRefresh,
+} from './api-mocks';
 
 test.describe('authentication', () => {
+  const expectedAdvisorName = fullStackE2E ? 'Advisor User' : currentUser.name;
+
   test.beforeEach(async ({ page }) => {
     await mockUnavailableTokenRefresh(page);
   });
@@ -24,33 +32,39 @@ test.describe('authentication', () => {
   });
 
   test('login page redirects to home when already authenticated', async ({ page }) => {
-    await page.route('**/api/accounts/me/', async (route) => {
-      await fulfillJson(route, currentUser);
-    });
+    if (fullStackE2E) {
+      await loginAs(page);
+    } else {
+      await page.route('**/api/accounts/me/', async (route) => {
+        await fulfillJson(route, currentUser);
+      });
+    }
 
     await page.goto('/login');
     await expect(page).toHaveURL('/');
-    await expect(page.getByText(currentUser.name)).toBeVisible();
+    await expect(page.getByText(expectedAdvisorName)).toBeVisible();
   });
 
   test('user signs in with valid credentials and reaches home page', async ({ page }) => {
     let loginAttempts = 0;
-    await page.route('**/api/accounts/me/', async (route) => {
-      if (loginAttempts > 0) {
-        await fulfillJson(route, currentUser);
-        return;
-      }
-      await fulfillJson(route, { message: 'Authentication required' }, 401);
-    });
+    if (!fullStackE2E) {
+      await page.route('**/api/accounts/me/', async (route) => {
+        if (loginAttempts > 0) {
+          await fulfillJson(route, currentUser);
+          return;
+        }
+        await fulfillJson(route, { message: 'Authentication required' }, 401);
+      });
 
-    await page.route('**/api/accounts/login/', async (route) => {
-      if (route.request().method() === 'POST') {
-        loginAttempts += 1;
-        await fulfillJson(route, currentUser);
-        return;
-      }
-      await fulfillJson(route, {}, 405);
-    });
+      await page.route('**/api/accounts/login/', async (route) => {
+        if (route.request().method() === 'POST') {
+          loginAttempts += 1;
+          await fulfillJson(route, currentUser);
+          return;
+        }
+        await fulfillJson(route, {}, 405);
+      });
+    }
 
     await page.route('**/api/projects/', async (route) => {
       await fulfillJson(route, { results: [] });
@@ -62,13 +76,13 @@ test.describe('authentication', () => {
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeDisabled();
 
     await page.getByLabel('Email').fill(currentUser.email);
-    await page.getByLabel('Password').fill('correct-password');
+    await page.getByLabel('Password').fill(fullStackE2E ? 'password123' : 'correct-password');
     await expect(page.getByRole('button', { name: 'Sign in' })).not.toBeDisabled();
 
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL('/');
     await expect(page.getByRole('heading', { name: 'Advisor workspace' })).toBeVisible();
-    await expect(page.getByText(currentUser.name)).toBeVisible();
+    await expect(page.getByText(expectedAdvisorName)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   });
 
@@ -147,24 +161,30 @@ test.describe('authentication', () => {
   });
 
   test('user can sign out and is returned to login', async ({ page }) => {
-    await page.route('**/api/accounts/me/', async (route) => {
-      await fulfillJson(route, currentUser);
-    });
-    await page.route('**/api/accounts/logout/', async (route) => {
-      await fulfillJson(route, {}, 204);
-    });
-    await page.route('**/api/projects/', async (route) => {
-      await fulfillJson(route, { results: [] });
-    });
+    if (fullStackE2E) {
+      await loginAs(page);
+    } else {
+      await page.route('**/api/accounts/me/', async (route) => {
+        await fulfillJson(route, currentUser);
+      });
+      await page.route('**/api/accounts/logout/', async (route) => {
+        await fulfillJson(route, {}, 204);
+      });
+      await page.route('**/api/projects/', async (route) => {
+        await fulfillJson(route, { results: [] });
+      });
+    }
 
     await page.goto('/');
-    await expect(page.getByText(currentUser.name)).toBeVisible();
+    await expect(page.getByText(expectedAdvisorName)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 
     // After clicking sign out, redirect /api/accounts/me/ to 401
-    await page.route('**/api/accounts/me/', async (route) => {
-      await fulfillJson(route, { message: 'Authentication required' }, 401);
-    });
+    if (!fullStackE2E) {
+      await page.route('**/api/accounts/me/', async (route) => {
+        await fulfillJson(route, { message: 'Authentication required' }, 401);
+      });
+    }
 
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL('/login');

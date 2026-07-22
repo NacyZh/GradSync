@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { fulfillJson, mockUnavailableTokenRefresh } from './api-mocks';
+import { fulfillJson, fullStackE2E, mockUnavailableTokenRefresh } from './api-mocks';
 
 test.describe('role workspaces', () => {
   test.beforeEach(async ({ page }) => {
+    test.skip(fullStackE2E, 'mock-owned role matrices are covered by the mocked Playwright stage');
     await mockUnavailableTokenRefresh(page);
   });
 

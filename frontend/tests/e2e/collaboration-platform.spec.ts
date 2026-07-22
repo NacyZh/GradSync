@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { fulfillAttachment, fulfillJson, validPdfBuffer } from './api-mocks';
+import { fulfillAttachment, fulfillJson, fullStackE2E, validPdfBuffer } from './api-mocks';
+
+test.beforeEach(() => {
+  test.skip(fullStackE2E, 'mock-owned collaboration matrix is covered by the mocked Playwright stage');
+});
 
 const advisorUser = {
   id: 10,

@@ -518,4 +518,17 @@ export async function loginAs(
     page.getByRole('button', { name: 'Sign in' }).click(),
   ]);
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+
+  if (fullStackE2E) {
+    const csrf = (await page.context().cookies()).find((cookie) => cookie.name === 'csrftoken');
+    expect(csrf, 'login should establish a CSRF cookie').toBeDefined();
+    const response = await page.request.put('/api/accounts/locale/', {
+      data: { locale: 'en' },
+      headers: { 'X-CSRFToken': csrf?.value ?? '' },
+    });
+    expect(response.ok(), 'English locale should be restored for isolated E2E assertions').toBeTruthy();
+    await page.evaluate(() => window.localStorage.setItem('gradsync.locale', 'en'));
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  }
 }
