@@ -96,6 +96,8 @@ describe('i18n completeness', () => {
     expect(translateUiText('Search code materials')).toBe('搜索代码材料');
     expect(translateUiText('document · pending review')).toBe('文档 · 待评审');
     expect(translateUiText('Add target location')).toBe('添加目标位置');
+    expect(translateUiText('Delete target location')).toBe('删除目标位置');
+    expect(translateUiText('Delete target location Protocols?')).toBe('删除目标位置 Protocols？');
     expect(translateUiText('Category Protocols')).toBe('分类 Protocols');
     expect(translateUiText('Select document Protocol')).toBe('选择文档 Protocol');
     expect(translateUiText('Maximum 4 for Microscope')).toBe('最大可用数量 4（Microscope）');

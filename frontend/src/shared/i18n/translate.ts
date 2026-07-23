@@ -31,6 +31,7 @@ export function translateUiText(value: string, locale = activeUiLocale()) {
     .replace(/^(document|code|paper) material results$/, (_, type: string) => `${materialTypeZh[type]}材料结果`)
     .replace(/^(document|code|paper) · (active|pending review|approved|rejected|archived)$/, (_, type: string, state: string) => `${materialTypeZh[type]} · ${materialStateZh[state]}`)
     .replace(/^Category (.+)$/, '分类 $1')
+    .replace(/^Delete target location (.+)\?$/, '删除目标位置 $1？')
     .replace(/^Select document (.+)$/, '选择文档 $1')
     .replace(/^Download (?!started:|ready:)(.+)$/, '下载 $1')
     .replace(/^Maximum (\d+) for (.+)$/, '最大可用数量 $1（$2）')
@@ -109,6 +110,8 @@ const apiMessages: Record<string, string> = {
   'Student registration requires a masters or doctoral degree type.': '学生注册必须选择硕士或博士。',
   'Requested role must be student or teacher.': '申请角色只能是学生或教师。',
   'If the account is awaiting verification, a new code has been sent.': '如果账号正在等待验证，新的验证码已发送。',
+  'Document target location contains active documents': '目标位置中仍有有效文档，无法删除。',
+  'Document target location is no longer active': '目标位置已不再有效。',
 };
 
 export function translateApiMessage(value: string) {

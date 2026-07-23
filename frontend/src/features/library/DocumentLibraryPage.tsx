@@ -20,6 +20,7 @@ import {
   downloadDocument,
   downloadSharedDocument,
   useCreateDocumentCategory,
+  useDeleteDocumentCategory,
   useDeleteDocument,
   useDocumentCategories,
   useDocumentUpload,
@@ -58,20 +59,25 @@ function CategorySelector({
   categories,
   selectedCategoryId,
   onSelect,
-  canCreate,
+  canManage,
   onCreate,
+  onDelete,
 }: {
   categories: DocumentCategory[];
   selectedCategoryId: string;
   onSelect: (categoryId: string) => void;
-  canCreate: boolean;
+  canManage: boolean;
   onCreate: (payload: { name: string; description?: string }) => Promise<DocumentCategory>;
+  onDelete: (category: DocumentCategory) => Promise<void>;
 }) {
   const [isCreating, setIsCreating] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { notify } = useAppFeedback();
+  const selectedCategory = categories.find((category) => category.id === selectedCategoryId);
 
   async function submitCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,49 +103,95 @@ function CategorySelector({
     }
   }
 
+  async function deleteCategory() {
+    if (!selectedCategory) {
+      notify('Select a target location to delete', 'error');
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await onDelete(selectedCategory);
+      setIsConfirmingDelete(false);
+      notify('Target location deleted', 'success');
+    } catch (err) {
+      notify(getErrorMessage(err, 'Target location could not be deleted'), 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <div className="grid min-w-0 gap-2" aria-label="Document categories">
-      <div
-        data-testid="document-category-strip"
-        className="flex h-12 min-w-0 items-start gap-2 overflow-x-auto overflow-y-hidden pb-1"
-      >
-        {categories.map((category) => (
-          <button
-            key={category.id}
-            type="button"
-            aria-label={`Category ${category.name}`}
-            aria-pressed={category.id === selectedCategoryId}
-            data-selected={category.id === selectedCategoryId ? 'true' : 'false'}
-            className={`min-h-10 max-w-48 shrink-0 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-              category.id === selectedCategoryId
-                ? 'border-primary bg-primary/10 text-foreground'
-                : 'bg-background hover:bg-muted'
-            }`}
-            onClick={() => onSelect(category.id)}
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+        <div
+          data-testid="document-category-strip"
+          className="flex h-12 min-w-0 items-start gap-2 overflow-x-auto overflow-y-hidden pb-1"
+        >
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              aria-label={`Category ${category.name}`}
+              aria-pressed={category.id === selectedCategoryId}
+              data-selected={category.id === selectedCategoryId ? 'true' : 'false'}
+              className={`min-h-10 max-w-48 shrink-0 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                category.id === selectedCategoryId
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'bg-background hover:bg-muted'
+              }`}
+              onClick={() => {
+                onSelect(category.id);
+                setIsConfirmingDelete(false);
+              }}
+            >
+              <span className="block truncate font-medium">{category.name}</span>
+            </button>
+          ))}
+        </div>
+        {canManage ? (
+          <div
+            data-testid="document-category-actions"
+            className="flex h-10 shrink-0 items-start gap-1"
           >
-            <span className="block truncate font-medium">{category.name}</span>
-          </button>
-        ))}
-        {canCreate ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="min-h-10 shrink-0"
-            aria-expanded={isCreating}
-            aria-controls="document-category-create-form"
-            onClick={() => setIsCreating((current) => !current)}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add target location
-          </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Add target location"
+              title="Add target location"
+              aria-expanded={isCreating}
+              aria-controls="document-category-create-form"
+              onClick={() => {
+                setIsCreating((current) => !current);
+                setIsConfirmingDelete(false);
+              }}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Delete target location"
+              title="Delete target location"
+              aria-expanded={isConfirmingDelete}
+              aria-controls="document-category-delete-confirmation"
+              disabled={!selectedCategory}
+              onClick={() => {
+                setIsConfirmingDelete((current) => !current);
+                setIsCreating(false);
+              }}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         ) : null}
       </div>
       {!categories.length ? (
         <DataState
           state="empty"
           title="No target locations"
-          message={canCreate ? 'Add a target location before uploading documents.' : 'No document target locations are available.'}
+          message={canManage ? 'Add a target location before uploading documents.' : 'No document target locations are available.'}
         />
       ) : null}
       {isCreating ? (
@@ -167,6 +219,26 @@ function CategorySelector({
             <Button type="button" variant="outline" size="sm" onClick={() => setIsCreating(false)}>Cancel</Button>
           </div>
         </form>
+      ) : null}
+      {isConfirmingDelete && selectedCategory ? (
+        <div
+          id="document-category-delete-confirmation"
+          className="grid min-w-0 gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+          role="alert"
+        >
+          <p className="font-semibold">{`Delete target location ${selectedCategory.name}?`}</p>
+          <p className="text-muted-foreground">
+            This target location can only be deleted when it contains no active documents.
+          </p>
+          <div className="flex min-w-0 flex-wrap gap-2">
+            <Button type="button" variant="destructive" size="sm" disabled={isDeleting} onClick={deleteCategory}>
+              Confirm delete
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsConfirmingDelete(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       ) : null}
       <p className="min-w-0 break-words text-xs text-muted-foreground">
         Selected target location filters the list and sets the upload destination.
@@ -502,6 +574,7 @@ export function DocumentLibraryPage() {
   const [deletedDocumentIds, setDeletedDocumentIds] = useState<Set<string>>(() => new Set());
   const categoriesQuery = useDocumentCategories();
   const createCategoryMutation = useCreateDocumentCategory();
+  const deleteCategoryMutation = useDeleteDocumentCategory();
   const categories = categoriesQuery.data ?? EMPTY_CATEGORIES;
   const selectedCategory = categories.find((category) => category.id === categoryId);
   const projectDocumentsQuery = useDocuments(projectId, query, categoryId, '');
@@ -565,6 +638,13 @@ export function DocumentLibraryPage() {
     const category = await createCategoryMutation.mutateAsync(payload);
     setCategoryId(category.id);
     return category;
+  }
+
+  async function deleteCategory(category: DocumentCategory) {
+    await deleteCategoryMutation.mutateAsync(category.id);
+    if (categoryId === category.id) {
+      setCategoryId(categories.find((item) => item.id !== category.id)?.id ?? '');
+    }
   }
 
   async function renameSelectedDocument(newTitle: string) {
@@ -647,8 +727,9 @@ export function DocumentLibraryPage() {
             categories={categories}
             selectedCategoryId={categoryId}
             onSelect={setCategoryId}
-            canCreate={canCreateCategory}
+            canManage={canCreateCategory}
             onCreate={createCategory}
+            onDelete={deleteCategory}
           />
           <label className="block min-w-0">
             <span className="sr-only">Search documents</span>

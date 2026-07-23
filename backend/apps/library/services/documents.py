@@ -261,6 +261,27 @@ class DocumentCategoryService:
         )
         return category
 
+    def delete_category(self, category: DocumentCategory) -> None:
+        if not _can_manage_documents(self.user):
+            raise PermissionDenied(
+                "Only teachers and administrators can delete document categories"
+            )
+        if category.status != DocumentCategory.Status.ACTIVE:
+            raise ValidationError("Document target location is no longer active")
+        if category.documents.filter(status=DocumentRecord.Status.ACTIVE).exists():
+            raise ValidationError("Document target location contains active documents")
+
+        with transaction.atomic():
+            category.status = DocumentCategory.Status.ARCHIVED
+            category.save(update_fields=["status", "updated_at"])
+            record_event(
+                None,
+                self.user,
+                "document_category.deleted",
+                f"Deleted document category {category.name}",
+                category,
+            )
+
 
 class DocumentService:
     def __init__(self, user, project):

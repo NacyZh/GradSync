@@ -138,6 +138,61 @@ def test_category_list_returns_active_categories(api_client):
 
 
 @pytest.mark.django_db
+def test_category_delete_requires_maintainer_and_rejects_active_documents(api_client):
+    teacher = UserFactory(global_role="advisor", status="active")
+    student = UserFactory(global_role="student", status="active")
+    project = ResearchProject.objects.create(title="Category deletion", advisor=teacher)
+    ProjectMembership.objects.create(project=project, user=teacher, role="advisor")
+    ProjectMembership.objects.create(project=project, user=student, role="student")
+    teacher_client = authenticate(api_client, teacher)
+    empty_category = teacher_client.post(
+        "/api/document-categories",
+        {"name": "Empty target location"},
+    ).data
+    used_category = teacher_client.post(
+        "/api/document-categories",
+        {"name": "Used target location"},
+    ).data
+    upload = teacher_client.post(
+        f"/api/projects/{project.id}/documents",
+        {
+            "file": _file("category-delete.pdf"),
+            "categoryId": used_category["id"],
+        },
+        format="multipart",
+    )
+
+    blocked = authenticate(api_client, student).delete(
+        f"/api/document-categories/{empty_category['id']}"
+    )
+    conflict = authenticate(api_client, teacher).delete(
+        f"/api/document-categories/{used_category['id']}"
+    )
+    deleted = authenticate(api_client, teacher).delete(
+        f"/api/document-categories/{empty_category['id']}"
+    )
+    category_list = authenticate(api_client, teacher).get("/api/document-categories")
+
+    assert upload.status_code == 201
+    assert blocked.status_code == 403
+    assert conflict.status_code == 409
+    assert conflict.data["message"] == "Document target location contains active documents"
+    assert deleted.status_code == 204
+    assert "Empty target location" not in {
+        category["name"] for category in category_list.data
+    }
+    assert (
+        DocumentCategory.objects.get(pk=empty_category["id"]).status
+        == DocumentCategory.Status.ARCHIVED
+    )
+    assert AuditEvent.objects.filter(
+        actor=teacher,
+        event_type="document_category.deleted",
+        target_id=str(empty_category["id"]),
+    ).exists()
+
+
+@pytest.mark.django_db
 def test_archived_stale_and_unauthorized_document_downloads_are_blocked(api_client):
     teacher = UserFactory(global_role="advisor", status="active")
     student = UserFactory(global_role="student", status="active")

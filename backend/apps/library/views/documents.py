@@ -70,6 +70,31 @@ class DocumentCategoryView(views.APIView):
         return Response(DocumentCategorySerializer(category).data, status=status.HTTP_201_CREATED)
 
 
+class DocumentCategoryDetailView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={
+            204: OpenApiResponse(description="Document category deleted"),
+            403: OpenApiResponse(description="Delete forbidden"),
+            404: OpenApiResponse(description="Document category not found"),
+            409: OpenApiResponse(description="Document category contains active documents"),
+        }
+    )
+    def delete(self, request, category_id: int):
+        category = get_object_or_404(DocumentCategory, pk=category_id)
+        try:
+            DocumentCategoryService(request.user).delete_category(category)
+        except DjangoValidationError as exc:
+            return Response(
+                {"message": _error_message(exc)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class DocumentViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,

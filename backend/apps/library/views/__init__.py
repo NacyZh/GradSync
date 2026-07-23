@@ -1,4 +1,5 @@
 from .documents import (
+    DocumentCategoryDetailView,
     DocumentCategoryView,
     DocumentDownloadView,
     DocumentViewSet,
@@ -16,6 +17,7 @@ from .papers import (
 )
 
 __all__ = [
+    "DocumentCategoryDetailView",
     "DocumentCategoryView",
     "DocumentDownloadView",
     "DocumentViewSet",

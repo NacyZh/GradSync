@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    DocumentCategoryDetailView,
     DocumentCategoryView,
     DocumentDownloadView,
     DocumentViewSet,
@@ -29,6 +30,16 @@ router.register(
 urlpatterns = [
     path("document-categories", DocumentCategoryView.as_view(), name="document-categories"),
     path("document-categories/", DocumentCategoryView.as_view(), name="document-categories-slash"),
+    path(
+        "document-categories/<int:category_id>",
+        DocumentCategoryDetailView.as_view(),
+        name="document-category-detail",
+    ),
+    path(
+        "document-categories/<int:category_id>/",
+        DocumentCategoryDetailView.as_view(),
+        name="document-category-detail-slash",
+    ),
     path(
         "documents/<int:document_id>/download",
         DocumentDownloadView.as_view(),

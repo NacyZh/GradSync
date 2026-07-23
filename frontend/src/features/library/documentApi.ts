@@ -58,6 +58,12 @@ export function createDocumentCategory(payload: { name: string; description?: st
   });
 }
 
+export function deleteDocumentCategory(categoryId: string) {
+  return apiRequest<void>(`/api/document-categories/${categoryId}`, {
+    method: 'DELETE',
+  });
+}
+
 export function listDocuments(projectId: number, query = '', categoryId = '', visibility = '') {
   const params = new URLSearchParams();
   if (query) params.set('q', query);
@@ -157,6 +163,18 @@ export function useCreateDocumentCategory() {
       queryClient.setQueryData<DocumentCategory[]>(['documentCategories'], (current = []) => (
         [...current.filter((item) => item.id !== category.id), category]
           .sort((left, right) => left.name.localeCompare(right.name))
+      ));
+    },
+  });
+}
+
+export function useDeleteDocumentCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteDocumentCategory,
+    onSuccess: (_, categoryId) => {
+      queryClient.setQueryData<DocumentCategory[]>(['documentCategories'], (current = []) => (
+        current.filter((category) => category.id !== categoryId)
       ));
     },
   });

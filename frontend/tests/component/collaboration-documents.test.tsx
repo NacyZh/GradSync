@@ -186,6 +186,9 @@ describe('collaboration document library UI', () => {
           status: 'active',
         };
       }
+      if (url.endsWith('/document-categories/11') && init?.method === 'DELETE') {
+        return { status: 204 };
+      }
       if (url.includes('/document-categories')) return manyCategories;
       return { results: [baseDocument] };
     });
@@ -193,7 +196,12 @@ describe('collaboration document library UI', () => {
     renderDocuments();
 
     const categoryStrip = await screen.findByTestId('document-category-strip');
+    const categoryActions = await screen.findByTestId('document-category-actions');
     expect(categoryStrip).toHaveClass('h-12', 'overflow-x-auto', 'overflow-y-hidden');
+    expect(within(categoryStrip).queryByRole('button', { name: 'Add target location' })).not.toBeInTheDocument();
+    expect(within(categoryStrip).queryByRole('button', { name: 'Delete target location' })).not.toBeInTheDocument();
+    expect(within(categoryActions).getByRole('button', { name: 'Add target location' })).toBeInTheDocument();
+    expect(within(categoryActions).getByRole('button', { name: 'Delete target location' })).toBeInTheDocument();
     await screen.findByRole('button', { name: 'Category Location 1' });
     await userEvent.click(screen.getByRole('button', { name: 'Add target location' }));
     await userEvent.type(screen.getByLabelText('Target location name'), 'Datasets');
@@ -212,6 +220,19 @@ describe('collaboration document library UI', () => {
       name: 'Datasets',
       description: 'Experiment datasets',
     });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete target location' }));
+    expect(screen.getByText('Delete target location Datasets?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) => request.url.endsWith('/document-categories/11') && request.init?.method === 'DELETE',
+        ),
+      ).toBe(true),
+    );
+    expect(screen.queryByRole('button', { name: 'Category Datasets' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Target location deleted')).toBeInTheDocument();
   });
 
   it('keeps long document rows bounded and shows no-selection download state', async () => {
@@ -324,6 +345,9 @@ describe('collaboration document library UI', () => {
       expect(screen.getByRole('button', { name: /Select document Microscope Protocol/ })).toBeInTheDocument(),
     );
     expect(screen.queryByLabelText('Document visibility')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('document-category-actions')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add target location' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete target location' })).not.toBeInTheDocument();
   });
 
   it('supports maintainer rename and delete while syncing selected/list/download state', async () => {
