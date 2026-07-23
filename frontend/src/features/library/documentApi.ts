@@ -115,8 +115,21 @@ export function renameDocument(projectId: number, documentId: string, payload: D
   });
 }
 
+export function renameSharedDocument(documentId: string, payload: DocumentRenamePayload) {
+  return apiRequest<DocumentRecord>(`/api/library/documents/${documentId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function deleteDocument(projectId: number, documentId: string) {
   return apiRequest<void>(`/api/projects/${projectId}/documents/${documentId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function deleteSharedDocument(documentId: string) {
+  return apiRequest<void>(`/api/library/documents/${documentId}/`, {
     method: 'DELETE',
   });
 }
@@ -133,6 +146,19 @@ export function useDocumentCategories() {
   return useQuery({
     queryKey: ['documentCategories'],
     queryFn: listDocumentCategories,
+  });
+}
+
+export function useCreateDocumentCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createDocumentCategory,
+    onSuccess: (category) => {
+      queryClient.setQueryData<DocumentCategory[]>(['documentCategories'], (current = []) => (
+        [...current.filter((item) => item.id !== category.id), category]
+          .sort((left, right) => left.name.localeCompare(right.name))
+      ));
+    },
   });
 }
 
@@ -178,22 +204,30 @@ export function useSharedDocumentUpload() {
   });
 }
 
-export function useRenameDocument(projectId: number) {
+export function useRenameDocument(projectId: number, standalone = false) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ documentId, payload }: { documentId: string; payload: DocumentRenamePayload }) =>
-      renameDocument(projectId, documentId, payload),
+      standalone
+        ? renameSharedDocument(documentId, payload)
+        : renameDocument(projectId, documentId, payload),
     onSuccess: (document) => {
       queryClient.setQueryData(['document', projectId, document.id], document);
-      queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+      queryClient.invalidateQueries({
+        queryKey: standalone ? ['shared-documents'] : ['documents', projectId],
+      });
     },
   });
 }
 
-export function useDeleteDocument(projectId: number) {
+export function useDeleteDocument(projectId: number, standalone = false) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (documentId: string) => deleteDocument(projectId, documentId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents', projectId] }),
+    mutationFn: (documentId: string) => (
+      standalone ? deleteSharedDocument(documentId) : deleteDocument(projectId, documentId)
+    ),
+    onSuccess: () => queryClient.invalidateQueries({
+      queryKey: standalone ? ['shared-documents'] : ['documents', projectId],
+    }),
   });
 }

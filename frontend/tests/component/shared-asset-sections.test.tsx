@@ -20,6 +20,63 @@ function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
 }
 
 describe('standalone shared asset sections', () => {
+  it('uses shared document capabilities for rename and download actions', async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const sharedDocument = {
+      id: 'doc-1',
+      projectId: '1',
+      categoryId: '1',
+      categoryName: 'Protocols',
+      title: 'Shared Protocol',
+      description: 'Reusable protocol',
+      visibility: 'group_wide',
+      uploaderId: '2',
+      documentFileId: '44',
+      checksumSha256: 'a'.repeat(64),
+      createdAt: '2026-07-03T08:00:00Z',
+      status: 'active',
+      actionCapabilities: {
+        canView: true,
+        canDownload: true,
+        canRename: true,
+        canDelete: true,
+        canUploadGroupWide: true,
+      },
+    };
+    mockFetch((url, init) => {
+      requests.push({ url, init });
+      if (url.includes('/document-categories')) return categories;
+      if (init?.method === 'PATCH') return { ...sharedDocument, title: 'Renamed Shared Protocol' };
+      return { count: 1, results: [sharedDocument] };
+    });
+
+    renderWithClient(
+      <MemoryRouter initialEntries={['/library/documents']}>
+        <Routes>
+          <Route path="/library/documents" element={<DocumentLibraryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Shared Protocol'));
+    expect(screen.getByRole('button', { name: 'Download Shared Protocol' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Rename document' }));
+    await userEvent.clear(screen.getByLabelText('New document title'));
+    await userEvent.type(screen.getByLabelText('New document title'), 'Renamed Shared Protocol');
+    await userEvent.click(screen.getByRole('button', { name: 'Save title' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('document-selected-detail-region')).toHaveTextContent('Renamed Shared Protocol'),
+    );
+    expect(
+      requests.some(
+        (request) =>
+          request.url.endsWith('/api/library/documents/doc-1/')
+          && request.init?.method === 'PATCH',
+      ),
+    ).toBe(true);
+  });
+
   it('hides document visibility controls and uploads through /api/library/documents/', async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     mockFetch((url, init) => {

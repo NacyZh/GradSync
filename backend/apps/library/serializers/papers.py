@@ -13,7 +13,7 @@ from ..models import (
     PaperRecord,
     PaperTitleExtractionResult,
 )
-from ..services.documents import document_action_capabilities
+from ..services.documents import can_manage_shared_document, document_action_capabilities
 
 
 class PaperAttachmentSerializer(serializers.ModelSerializer):
@@ -431,7 +431,14 @@ class DocumentRecordSerializer(serializers.ModelSerializer):
     )
     def get_actionCapabilities(self, obj):
         request = self.context.get("request")
-        return document_action_capabilities(getattr(request, "user", None), obj)
+        user = getattr(request, "user", None)
+        capabilities = document_action_capabilities(user, obj)
+        if self.context.get("shared_section"):
+            can_manage = can_manage_shared_document(user, obj)
+            capabilities["canRename"] = can_manage
+            capabilities["canDelete"] = can_manage
+            capabilities["canUploadGroupWide"] = can_manage
+        return capabilities
 
     def get_boundaryType(self, obj) -> str:
         classification = classify_workspace_record(obj)

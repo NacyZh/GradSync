@@ -30,6 +30,8 @@ export function translateUiText(value: string, locale = activeUiLocale()) {
     .replace(/^No (document|code|paper) materials match the current search\.$/, (_, type: string) => `没有符合当前搜索条件的${materialTypeZh[type]}材料。`)
     .replace(/^(document|code|paper) material results$/, (_, type: string) => `${materialTypeZh[type]}材料结果`)
     .replace(/^(document|code|paper) · (active|pending review|approved|rejected|archived)$/, (_, type: string, state: string) => `${materialTypeZh[type]} · ${materialStateZh[state]}`)
+    .replace(/^Category (.+)$/, '分类 $1')
+    .replace(/^Select document (.+)$/, '选择文档 $1')
     .replace(/^Download (?!started:|ready:)(.+)$/, '下载 $1')
     .replace(/^Maximum (\d+) for (.+)$/, '最大可用数量 $1（$2）')
     .replace(/^(\d+) of (\d+) available · (\d+) in use$/, '$2 件中 $1 件可用 · $3 件使用中')

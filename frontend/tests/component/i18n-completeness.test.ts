@@ -95,6 +95,9 @@ describe('i18n completeness', () => {
     expect(translateUiText('Show Paper materials')).toBe('显示论文材料');
     expect(translateUiText('Search code materials')).toBe('搜索代码材料');
     expect(translateUiText('document · pending review')).toBe('文档 · 待评审');
+    expect(translateUiText('Add target location')).toBe('添加目标位置');
+    expect(translateUiText('Category Protocols')).toBe('分类 Protocols');
+    expect(translateUiText('Select document Protocol')).toBe('选择文档 Protocol');
     expect(translateUiText('Maximum 4 for Microscope')).toBe('最大可用数量 4（Microscope）');
     expect(translateUiText('2 of 4 available · 2 in use')).toBe('4 件中 2 件可用 · 2 件使用中');
     expect(translateUiText('Student #12 · student request')).toBe('学生 #12 · 学生申请');

@@ -167,6 +167,54 @@ def test_standalone_asset_detail_and_download_contracts(api_client):
 
 
 @pytest.mark.django_db
+def test_standalone_shared_document_maintainer_can_rename_and_delete(api_client):
+    maintainer = active_teacher()
+    student = active_student()
+    project = project_with_members(advisor=maintainer, students=[student])
+    document = standalone_shared_document(
+        project=project,
+        title="Shared Document Before",
+    )
+    standalone_shared_document(
+        project=project,
+        category=document.category,
+        title="Existing Shared Document",
+    )
+
+    student_response = authenticate(api_client, student).patch(
+        f"/api/library/documents/{document.id}/",
+        {"newTitle": "Student Rename"},
+        format="json",
+    )
+    duplicate_response = authenticate(api_client, maintainer).patch(
+        f"/api/library/documents/{document.id}/",
+        {"newTitle": "Existing Shared Document"},
+        format="json",
+    )
+    rename_response = authenticate(api_client, maintainer).patch(
+        f"/api/library/documents/{document.id}/",
+        {"newTitle": "Shared Document After"},
+        format="json",
+    )
+    delete_response = authenticate(api_client, maintainer).delete(
+        f"/api/library/documents/{document.id}/"
+    )
+    list_response = authenticate(api_client, maintainer).get(
+        "/api/library/documents/?q=Shared Document After"
+    )
+
+    assert student_response.status_code == 403
+    assert duplicate_response.status_code == 409
+    assert rename_response.status_code == 200
+    assert rename_response.data["title"] == "Shared Document After"
+    assert rename_response.data["actionCapabilities"]["canRename"] is True
+    assert rename_response.data["actionCapabilities"]["canDownload"] is True
+    assert delete_response.status_code == 204
+    assert list_response.status_code == 200
+    assert list_response.data["results"] == []
+
+
+@pytest.mark.django_db
 def test_standalone_shared_code_maintainer_can_rename_and_delete(api_client):
     maintainer = active_teacher()
     student = active_student()

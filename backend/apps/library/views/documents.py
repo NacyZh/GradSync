@@ -25,7 +25,9 @@ from ..services import (
     DocumentService,
     DownloadUnavailable,
     active_document_queryset,
+    delete_shared_document,
     describe_document_download,
+    rename_shared_document,
     shared_document_queryset_for,
 )
 from .papers import _error_message
@@ -263,10 +265,16 @@ class SharedDocumentListCreateView(generics.GenericAPIView):
             queryset = queryset.filter(category_id=category_id)
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = DocumentRecordSerializer(page, many=True, context={"request": request})
+            serializer = DocumentRecordSerializer(
+                page,
+                many=True,
+                context={"request": request, "shared_section": True},
+            )
             return self.get_paginated_response(serializer.data)
         serializer = DocumentRecordSerializer(
-            queryset, many=True, context={"request": request}
+            queryset,
+            many=True,
+            context={"request": request, "shared_section": True},
         )
         return Response(serializer.data)
 
@@ -288,7 +296,10 @@ class SharedDocumentListCreateView(generics.GenericAPIView):
         except DjangoPermissionDenied as exc:
             raise PermissionDenied(str(exc)) from exc
         return Response(
-            DocumentRecordSerializer(document, context={"request": request}).data,
+            DocumentRecordSerializer(
+                document,
+                context={"request": request, "shared_section": True},
+            ).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -299,7 +310,79 @@ class SharedDocumentDetailView(views.APIView):
     @extend_schema(responses={200: DocumentRecordSerializer})
     def get(self, request, document_id):
         document = get_object_or_404(shared_document_queryset_for(request.user), pk=document_id)
-        return Response(DocumentRecordSerializer(document, context={"request": request}).data)
+        return Response(
+            DocumentRecordSerializer(
+                document,
+                context={"request": request, "shared_section": True},
+            ).data
+        )
+
+    @extend_schema(
+        request=DocumentRenameRequestSerializer,
+        responses={
+            200: DocumentRecordSerializer,
+            400: OpenApiResponse(description="Rename validation failed"),
+            403: OpenApiResponse(description="Rename forbidden"),
+            404: OpenApiResponse(description="Document not found"),
+            409: OpenApiResponse(description="Duplicate or unavailable document"),
+        },
+    )
+    def patch(self, request, document_id):
+        document = get_object_or_404(
+            shared_document_queryset_for(request.user), pk=document_id
+        )
+        serializer = DocumentRenameRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            renamed = rename_shared_document(
+                actor=request.user,
+                document=document,
+                **serializer.validated_data,
+            )
+        except DjangoValidationError as exc:
+            message = _error_message(exc)
+            status_code = (
+                status.HTTP_409_CONFLICT
+                if _is_document_conflict_message(message)
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"message": message}, status=status_code)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(
+            DocumentRecordSerializer(
+                renamed,
+                context={"request": request, "shared_section": True},
+            ).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        request=DocumentDeleteRequestSerializer,
+        responses={
+            204: OpenApiResponse(description="Document archived"),
+            403: OpenApiResponse(description="Delete forbidden"),
+            404: OpenApiResponse(description="Document not found"),
+            409: OpenApiResponse(description="Unavailable document"),
+        },
+    )
+    def delete(self, request, document_id):
+        document = get_object_or_404(
+            shared_document_queryset_for(request.user), pk=document_id
+        )
+        serializer = DocumentDeleteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            delete_shared_document(
+                actor=request.user,
+                document=document,
+                reason=serializer.validated_data.get("reason", ""),
+            )
+        except DjangoValidationError as exc:
+            return Response({"message": _error_message(exc)}, status=status.HTTP_409_CONFLICT)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SharedDocumentDownloadView(views.APIView):

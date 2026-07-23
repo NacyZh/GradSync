@@ -108,6 +108,15 @@ def document_action_capabilities(user, document: DocumentRecord) -> dict:
     }
 
 
+def can_manage_shared_document(user, document: DocumentRecord) -> bool:
+    return bool(
+        document.status == DocumentRecord.Status.ACTIVE
+        and document.boundary_classification
+        == DocumentRecord.BoundaryClassification.STANDALONE_SHARED
+        and _can_manage_documents(user)
+    )
+
+
 def record_rejected_document_management_attempt(project, actor, document, action: str):
     return record_event(
         project,
@@ -116,6 +125,65 @@ def record_rejected_document_management_attempt(project, actor, document, action
         f"Rejected document {action} for {getattr(document, 'id', '')}",
         document,
     )
+
+
+def rename_shared_document(
+    *,
+    actor,
+    document: DocumentRecord,
+    newTitle: str,
+    reason: str = "",
+) -> DocumentRecord:
+    if not can_manage_shared_document(actor, document):
+        record_rejected_document_management_attempt(
+            document.project, actor, document, "rename"
+        )
+        raise PermissionDenied("You cannot rename this shared document")
+
+    cleaned_title = newTitle.strip()
+    if not cleaned_title:
+        raise ValidationError("Document title is required")
+    normalized_title = _normalized_document_title(cleaned_title)
+    duplicate_exists = any(
+        _normalized_document_title(candidate.title) == normalized_title
+        for candidate in DocumentRecord.objects.filter(
+            category=document.category,
+            status=DocumentRecord.Status.ACTIVE,
+            boundary_classification=DocumentRecord.BoundaryClassification.STANDALONE_SHARED,
+        ).exclude(pk=document.pk)
+    )
+    if duplicate_exists:
+        raise ValidationError("Active shared document title already exists in this category")
+
+    with transaction.atomic():
+        document.title = cleaned_title
+        document.save(update_fields=["title", "updated_at"])
+        summary = f"Renamed shared document {document.id}"
+        if reason:
+            summary = f"{summary}: {reason}"
+        record_event(document.project, actor, "document.renamed", summary, document)
+    return document
+
+
+def delete_shared_document(
+    *,
+    actor,
+    document: DocumentRecord,
+    reason: str = "",
+) -> None:
+    if not can_manage_shared_document(actor, document):
+        record_rejected_document_management_attempt(
+            document.project, actor, document, "delete"
+        )
+        raise PermissionDenied("You cannot delete this shared document")
+
+    with transaction.atomic():
+        document.status = DocumentRecord.Status.ARCHIVED
+        document.save(update_fields=["status", "updated_at"])
+        summary = f"Deleted shared document {document.id}"
+        if reason:
+            summary = f"{summary}: {reason}"
+        record_event(document.project, actor, "document.deleted", summary, document)
 
 
 def is_seeded_document_example(document: DocumentRecord) -> bool:

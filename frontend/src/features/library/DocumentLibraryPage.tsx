@@ -1,4 +1,4 @@
-import { Download, FolderOpen, Pencil, Search, Trash2, X } from 'lucide-react';
+import { Download, FolderOpen, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import { useParams } from 'react-router-dom';
@@ -19,6 +19,7 @@ import { useAuth } from '../auth/AuthProvider';
 import {
   downloadDocument,
   downloadSharedDocument,
+  useCreateDocumentCategory,
   useDeleteDocument,
   useDocumentCategories,
   useDocumentUpload,
@@ -57,18 +58,51 @@ function CategorySelector({
   categories,
   selectedCategoryId,
   onSelect,
+  canCreate,
+  onCreate,
 }: {
   categories: DocumentCategory[];
   selectedCategoryId: string;
   onSelect: (categoryId: string) => void;
+  canCreate: boolean;
+  onCreate: (payload: { name: string; description?: string }) => Promise<DocumentCategory>;
 }) {
-  if (!categories.length) {
-    return <DataState state="empty" title="No categories" message="Create document categories before uploading documents." />;
+  const [isCreating, setIsCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const { notify } = useAppFeedback();
+
+  async function submitCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const cleanedName = name.trim();
+    if (!cleanedName) {
+      notify('Target location name is required', 'error');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onCreate({
+        name: cleanedName,
+        description: description.trim(),
+      });
+      setName('');
+      setDescription('');
+      setIsCreating(false);
+      notify('Target location added', 'success');
+    } catch (err) {
+      notify(getErrorMessage(err, 'Target location could not be added'), 'error');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
     <div className="grid min-w-0 gap-2" aria-label="Document categories">
-      <div className="flex min-w-0 flex-wrap gap-2">
+      <div
+        data-testid="document-category-strip"
+        className="flex h-12 min-w-0 items-start gap-2 overflow-x-auto overflow-y-hidden pb-1"
+      >
         {categories.map((category) => (
           <button
             key={category.id}
@@ -76,7 +110,7 @@ function CategorySelector({
             aria-label={`Category ${category.name}`}
             aria-pressed={category.id === selectedCategoryId}
             data-selected={category.id === selectedCategoryId ? 'true' : 'false'}
-            className={`min-h-10 max-w-full min-w-0 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+            className={`min-h-10 max-w-48 shrink-0 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               category.id === selectedCategoryId
                 ? 'border-primary bg-primary/10 text-foreground'
                 : 'bg-background hover:bg-muted'
@@ -86,9 +120,56 @@ function CategorySelector({
             <span className="block truncate font-medium">{category.name}</span>
           </button>
         ))}
+        {canCreate ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-10 shrink-0"
+            aria-expanded={isCreating}
+            aria-controls="document-category-create-form"
+            onClick={() => setIsCreating((current) => !current)}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add target location
+          </Button>
+        ) : null}
       </div>
+      {!categories.length ? (
+        <DataState
+          state="empty"
+          title="No target locations"
+          message={canCreate ? 'Add a target location before uploading documents.' : 'No document target locations are available.'}
+        />
+      ) : null}
+      {isCreating ? (
+        <form
+          id="document-category-create-form"
+          className="grid min-w-0 gap-2 rounded-md border bg-muted/20 p-3"
+          onSubmit={submitCategory}
+        >
+          <Input
+            aria-label="Target location name"
+            value={name}
+            maxLength={120}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Target location name"
+            autoFocus
+          />
+          <Input
+            aria-label="Target location description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Optional description"
+          />
+          <div className="flex min-w-0 flex-wrap gap-2">
+            <Button type="submit" size="sm" disabled={isSaving}>Add location</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreating(false)}>Cancel</Button>
+          </div>
+        </form>
+      ) : null}
       <p className="min-w-0 break-words text-xs text-muted-foreground">
-        Selected category filters the list and sets the upload destination.
+        Selected target location filters the list and sets the upload destination.
       </p>
     </div>
   );
@@ -420,13 +501,14 @@ export function DocumentLibraryPage() {
   const [renamedDocuments, setRenamedDocuments] = useState<Record<string, DocumentRecord>>({});
   const [deletedDocumentIds, setDeletedDocumentIds] = useState<Set<string>>(() => new Set());
   const categoriesQuery = useDocumentCategories();
+  const createCategoryMutation = useCreateDocumentCategory();
   const categories = categoriesQuery.data ?? EMPTY_CATEGORIES;
   const selectedCategory = categories.find((category) => category.id === categoryId);
   const projectDocumentsQuery = useDocuments(projectId, query, categoryId, '');
   const sharedDocumentsQuery = useSharedDocuments(query, categoryId, standalone);
   const documentsQuery = standalone ? sharedDocumentsQuery : projectDocumentsQuery;
-  const renameMutation = useRenameDocument(projectId);
-  const deleteMutation = useDeleteDocument(projectId);
+  const renameMutation = useRenameDocument(projectId, standalone);
+  const deleteMutation = useDeleteDocument(projectId, standalone);
   const documents = useMemo(() => {
     const byId = new Map<string, DocumentRecord>();
     for (const document of documentsQuery.data?.results ?? []) {
@@ -451,18 +533,8 @@ export function DocumentLibraryPage() {
   );
   const selectedDocument = documents.find((document) => document.id === selectedId);
   const displayDocument = selectedDocument ?? (!selectedId ? documents[0] : undefined);
-  const selectedDocumentForDisplay = standalone && displayDocument
-    ? {
-        ...displayDocument,
-        actionCapabilities: {
-          canView: displayDocument.actionCapabilities?.canView ?? displayDocument.status === 'active',
-          canDownload: displayDocument.actionCapabilities?.canDownload ?? Boolean(displayDocument.documentFileId),
-          canRename: false,
-          canDelete: false,
-          canUploadGroupWide: false,
-        },
-      }
-    : displayDocument;
+  const selectedDocumentForDisplay = displayDocument;
+  const canCreateCategory = canUploadGroupWide;
   const emptyTitle = standalone
     ? query
       ? 'No document search results'
@@ -487,6 +559,12 @@ export function DocumentLibraryPage() {
   function handleUploadedDocument(document: DocumentRecord) {
     setUploadedDocuments((current) => ({ ...current, [document.id]: document }));
     setSelectedId(document.id);
+  }
+
+  async function createCategory(payload: { name: string; description?: string }) {
+    const category = await createCategoryMutation.mutateAsync(payload);
+    setCategoryId(category.id);
+    return category;
   }
 
   async function renameSelectedDocument(newTitle: string) {
@@ -565,7 +643,13 @@ export function DocumentLibraryPage() {
           <SelectedDownloadPanel document={selectedDocumentForDisplay} standalone={standalone} />
         </section>
         <section className="panel relative z-10 grid min-w-0 content-start gap-4" aria-label="Document library search and display region">
-          <CategorySelector categories={categories} selectedCategoryId={categoryId} onSelect={setCategoryId} />
+          <CategorySelector
+            categories={categories}
+            selectedCategoryId={categoryId}
+            onSelect={setCategoryId}
+            canCreate={canCreateCategory}
+            onCreate={createCategory}
+          />
           <label className="block min-w-0">
             <span className="sr-only">Search documents</span>
             <span className="relative block min-w-0">

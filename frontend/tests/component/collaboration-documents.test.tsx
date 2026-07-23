@@ -168,6 +168,52 @@ describe('collaboration document library UI', () => {
     expect(await screen.findByText('Upload complete')).toBeInTheDocument();
   });
 
+  it('adds a target location and keeps many category tabs in a fixed horizontal strip', async () => {
+    const manyCategories = Array.from({ length: 10 }, (_, index) => ({
+      id: String(index + 1),
+      name: `Location ${index + 1}`,
+      description: '',
+      status: 'active',
+    }));
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    mockFetch((url, init) => {
+      requests.push({ url, init });
+      if (url.includes('/document-categories') && init?.method === 'POST') {
+        return {
+          id: '11',
+          name: 'Datasets',
+          description: 'Experiment datasets',
+          status: 'active',
+        };
+      }
+      if (url.includes('/document-categories')) return manyCategories;
+      return { results: [baseDocument] };
+    });
+
+    renderDocuments();
+
+    const categoryStrip = await screen.findByTestId('document-category-strip');
+    expect(categoryStrip).toHaveClass('h-12', 'overflow-x-auto', 'overflow-y-hidden');
+    await screen.findByRole('button', { name: 'Category Location 1' });
+    await userEvent.click(screen.getByRole('button', { name: 'Add target location' }));
+    await userEvent.type(screen.getByLabelText('Target location name'), 'Datasets');
+    await userEvent.type(screen.getByLabelText('Target location description'), 'Experiment datasets');
+    await userEvent.click(screen.getByRole('button', { name: 'Add location' }));
+
+    expect(await screen.findByRole('button', { name: 'Category Datasets' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByText('Destination: Datasets')).toBeInTheDocument();
+    const createRequest = requests.find(
+      (request) => request.url.includes('/document-categories') && request.init?.method === 'POST',
+    );
+    expect(JSON.parse(String(createRequest?.init?.body))).toEqual({
+      name: 'Datasets',
+      description: 'Experiment datasets',
+    });
+  });
+
   it('keeps long document rows bounded and shows no-selection download state', async () => {
     const longTitle = 'Document title with exceptionally long protocol naming for responsive layout validation';
     mockFetch((url) => {
@@ -207,7 +253,7 @@ describe('collaboration document library UI', () => {
 
     renderDocuments();
 
-    expect(await screen.findByText('No categories')).toBeInTheDocument();
+    expect(await screen.findByText('No target locations')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Selected document download' })).toHaveTextContent('No document selected');
     expect(screen.getByRole('button', { name: 'Choose file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload document' })).toBeDisabled();

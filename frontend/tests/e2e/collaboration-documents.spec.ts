@@ -210,7 +210,7 @@ test('project material document download stays inside project materials workspac
   await expect(page.getByRole('status').filter({ hasText: 'Project material is no longer available' }).first()).toBeVisible();
 });
 
-test('standalone shared documents hide project-level rename and delete actions', async ({ page }) => {
+test('standalone shared documents expose capability-gated rename and delete actions', async ({ page }) => {
   test.skip(fullStackE2E, 'Mock-mode standalone boundary coverage; API tests cover mutations.');
 
   await mockAuthenticatedApi(page);
@@ -245,8 +245,8 @@ test('standalone shared documents hide project-level rename and delete actions',
 
   await page.goto('/library/documents');
   await expect(page.getByTestId('document-selected-detail-region')).toContainText('Microscope Protocol');
-  await expect(page.getByRole('button', { name: 'Rename document' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Delete document' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Rename document' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete document' })).toBeVisible();
 });
 
 test('document selected download shows errors and no-selection state clearly', async ({ page }) => {
