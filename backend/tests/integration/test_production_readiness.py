@@ -75,11 +75,14 @@ def test_frontend_nginx_serves_static_assets_and_proxies_api():
     assert 'Service-Worker-Allowed "/" always' in nginx_conf
     assert "try_files $uri /index.html" in nginx_conf
     production_env = (REPO_ROOT / ".env.production.example").read_text()
+    production_docs = (REPO_ROOT / "docs/production.md").read_text()
     base_settings = (REPO_ROOT / "backend/gradsync/settings/base.py").read_text()
     assert "GRADSYNC_UPLOAD_MAX_BYTES=" in production_env
     assert 'os.getenv("GRADSYNC_UPLOAD_MAX_BYTES"' in base_settings
     assert "UPLOAD_LIMIT_PAPER_BYTES" not in base_settings
     assert "UPLOAD_LIMIT_CODE_BYTES" not in base_settings
+    assert "client_max_body_size 0;" in production_docs
+    assert "client_max_body_size 30m;" not in production_docs
 
 
 def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
@@ -209,6 +212,9 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     assert "$PUBLIC_URL/healthz/" in script
     assert "$PUBLIC_URL/readyz/" in script
     assert "$PUBLIC_URL/api/schema/" in script
+    assert "upload_probe_size" in script
+    assert 'upload_probe_status" = "413"' in script
+    assert "client_max_body_size 0" in script
 
 
 def test_env_template_names_operational_launch_inputs():

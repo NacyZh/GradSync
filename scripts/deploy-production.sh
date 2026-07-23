@@ -121,6 +121,27 @@ if command -v curl >/dev/null 2>&1; then
   curl -fsS "$PUBLIC_URL/healthz/" >/dev/null
   curl -fsS "$PUBLIC_URL/readyz/" >/dev/null
   curl -fsS "$PUBLIC_URL/api/schema/" >/dev/null
+
+  upload_limit="$(
+    compose exec -T backend python -c \
+      'from django.conf import settings; print(settings.GRADSYNC_UPLOAD_MAX_BYTES)'
+  )"
+  upload_probe_size=$((3 * 1024 * 1024))
+  if [ "$upload_limit" -gt "$upload_probe_size" ]; then
+    upload_probe_status="$(
+      head -c "$upload_probe_size" /dev/zero |
+        curl -sS -o /dev/null -w '%{http_code}' \
+          -X POST \
+          -H 'Content-Type: application/octet-stream' \
+          --data-binary @- \
+          "$PUBLIC_URL/api/library/papers/"
+    )"
+    if [ "$upload_probe_status" = "413" ]; then
+      echo "The public proxy rejected a 3 MiB request before Django." >&2
+      echo "Set client_max_body_size 0 in the host TLS proxy and reload it." >&2
+      exit 1
+    fi
+  fi
 fi
 
 compose ps

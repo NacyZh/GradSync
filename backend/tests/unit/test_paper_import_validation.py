@@ -93,6 +93,16 @@ def test_pdf_validation_allows_exact_upload_size_boundary():
     assert validated.size_bytes == len(content)
 
 
+def test_pdf_validation_allows_three_megabyte_pdf_under_production_limit():
+    content = _pdf("Three Megabyte Paper")
+    content += b"\0" * ((3 * 1024 * 1024) - len(content))
+
+    with override_settings(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES=100 * 1024 * 1024):
+        validated = validate_pdf_upload(_upload(content))
+
+    assert validated.size_bytes == 3 * 1024 * 1024
+
+
 def test_pdf_validation_oversized_message_repeats_policy_display_label():
     content = _pdf("Oversized Boundary Paper")
     limit = len(content) - 1
