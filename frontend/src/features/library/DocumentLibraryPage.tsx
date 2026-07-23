@@ -7,6 +7,7 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Textarea } from '@/shared/ui/primitives/textarea';
 import { formatUiDate } from '@/shared/i18n/translate';
+import { uploadSizeError, useUploadPolicy } from '@/shared/api/uploadPolicy';
 
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
@@ -114,6 +115,7 @@ function DocumentUploadForm({
   const { notify } = useAppFeedback();
   const uploadMutation = useDocumentUpload(projectId);
   const sharedUploadMutation = useSharedDocumentUpload();
+  const uploadPolicyQuery = useUploadPolicy('document');
   const activeUploadMutation = standalone ? sharedUploadMutation : uploadMutation;
 
   function clearFile() {
@@ -126,6 +128,11 @@ function DocumentUploadForm({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!file || !selectedCategory) return;
+    const sizeError = uploadSizeError(file, uploadPolicyQuery.data);
+    if (sizeError) {
+      notify(sizeError, 'error');
+      return;
+    }
     try {
       const uploaded = await activeUploadMutation.mutateAsync({
         file,
@@ -153,8 +160,8 @@ function DocumentUploadForm({
     <form className="grid min-w-0 gap-3 overflow-hidden rounded-md border p-3" onSubmit={onSubmit} noValidate>
       <UploadRequirements
         title="Categorized document upload"
-        extensions={['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md']}
-        maxSizeLabel="50 MB"
+        extensions={uploadPolicyQuery.data?.allowedExtensions ?? ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md']}
+        maxSizeLabel={uploadPolicyQuery.data?.displayLabel ?? 'Loading limit'}
       />
       <input
         ref={fileInputRef}

@@ -6,6 +6,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Textarea } from '@/shared/ui/primitives/textarea';
+import { uploadSizeError, useUploadPolicy } from '@/shared/api/uploadPolicy';
 
 import { getErrorMessage } from '../../shared/api/errors';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
@@ -76,6 +77,7 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
   const { notify } = useAppFeedback();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useUploadWritingVersion(projectId, writingProject?.id ?? '');
+  const uploadPolicyQuery = useUploadPolicy('writing');
 
   function clearFile() {
     setFile(undefined);
@@ -85,6 +87,11 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!writingProject || !file) return;
+    const sizeError = uploadSizeError(file, uploadPolicyQuery.data);
+    if (sizeError) {
+      notify(sizeError, 'error');
+      return;
+    }
     try {
       await uploadMutation.mutateAsync({ file, summary });
       clearFile();
@@ -98,7 +105,11 @@ function WritingVersionUploadForm({ projectId, writingProject }: { projectId?: n
 
   return (
     <form className="grid gap-3 rounded-md border p-3" onSubmit={onSubmit} noValidate>
-      <UploadRequirements title="Word or LaTeX version upload" extensions={['.doc', '.docx', '.tex', '.zip', '.tar', '.gz', '.tgz']} maxSizeLabel="50 MB" />
+      <UploadRequirements
+        title="Word or LaTeX version upload"
+        extensions={uploadPolicyQuery.data?.allowedExtensions ?? ['.doc', '.docx', '.tex', '.zip', '.tar', '.gz', '.tgz']}
+        maxSizeLabel={uploadPolicyQuery.data?.displayLabel ?? 'Loading limit'}
+      />
       <input
         ref={fileInputRef}
         className="hidden"

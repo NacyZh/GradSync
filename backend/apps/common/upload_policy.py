@@ -51,6 +51,25 @@ def upload_policy_metadata(
     }
 
 
+def configured_upload_limit_bytes(category: UploadCategory | str) -> int:
+    resolved = UploadCategory(str(category))
+    return int(
+        getattr(settings, "COLLABORATION_UPLOAD_LIMITS", {}).get(resolved.value, 0)
+        or getattr(settings, "GRADSYNC_UPLOAD_MAX_BYTES", 0)
+        or 0
+    )
+
+
+def configured_upload_policy(category: UploadCategory | str) -> dict:
+    resolved = UploadCategory(str(category))
+    return upload_policy_metadata(
+        category=resolved.value,
+        max_size_bytes=configured_upload_limit_bytes(resolved),
+        allowed_extensions=sorted(ALLOWED_EXTENSIONS[resolved]),
+        content_types=[],
+    )
+
+
 ALLOWED_EXTENSIONS = {
     UploadCategory.PAPER: {".pdf"},
     UploadCategory.CODE: {".zip", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".7z"},
@@ -82,9 +101,10 @@ def validate_upload(upload, category: UploadCategory | str) -> UploadPolicyResul
             raise ValidationError("Code uploads must be a compressed archive.")
         raise ValidationError(f"{resolved.value} uploads only allow: {', '.join(sorted(allowed))}.")
     size = int(getattr(upload, "size", 0) or 0)
-    limit = int(getattr(settings, "COLLABORATION_UPLOAD_LIMITS", {}).get(resolved.value, 0) or 0)
+    limit = configured_upload_limit_bytes(resolved)
     if limit and size > limit:
-        raise ValidationError(f"Upload exceeds the {resolved.value} size limit.")
+        label = format_upload_size_label(limit)
+        raise ValidationError(f"Upload exceeds the {label} size limit.")
     return UploadPolicyResult(
         category=resolved.value,
         filename=filename,

@@ -1,9 +1,8 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
-from apps.common.upload_policy import upload_policy_metadata
+from apps.common.upload_policy import configured_upload_limit_bytes, upload_policy_metadata
 
-PAPER_MAX_BYTES = 50 * 1024 * 1024
 ALLOWED_PAPER_EXTENSIONS = {".pdf", ".bib", ".bibtex", ".txt"}
 ALLOWED_PAPER_CONTENT_TYPES = {
     "application/pdf",
@@ -17,7 +16,10 @@ SHARED_PAPER_CONTENT_TYPES = ["application/pdf"]
 
 
 def shared_paper_upload_limit_bytes() -> int:
-    return int(getattr(settings, "PAPER_LIBRARY_UPLOAD_LIMIT_BYTES", 0) or 0)
+    return int(
+        getattr(settings, "PAPER_LIBRARY_UPLOAD_LIMIT_BYTES", 0)
+        or configured_upload_limit_bytes("paper")
+    )
 
 
 def shared_paper_upload_policy() -> dict:
@@ -44,8 +46,11 @@ def _extension(filename: str) -> str:
 
 
 def validate_paper_import(*, filename: str, content_type: str = "", size_bytes: int = 0) -> None:
-    if size_bytes > PAPER_MAX_BYTES:
-        raise ValidationError("Paper attachments must be 50 MB or smaller")
+    limit = shared_paper_upload_limit_bytes()
+    if limit and size_bytes > limit:
+        raise ValidationError(
+            f"Paper attachment exceeds the {shared_paper_upload_policy()['displayLabel']} size limit"
+        )
     if _extension(filename) not in ALLOWED_PAPER_EXTENSIONS:
         raise ValidationError("Paper attachments must be PDF, BibTeX, or text metadata files")
     if content_type and content_type not in ALLOWED_PAPER_CONTENT_TYPES:

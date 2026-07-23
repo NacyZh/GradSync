@@ -7,12 +7,14 @@ import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { useI18n } from '@/shared/i18n/I18nProvider';
 import { translateUiText } from '@/shared/i18n/translate';
+import { uploadSizeError, useUploadPolicy } from '@/shared/api/uploadPolicy';
 
 import { getErrorMessage } from '../../shared/api/errors';
 import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
 import { SourceProjectBadge, VisibilityStateBadge } from '../../shared/ui/BoundaryBadges';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
+import { UploadRequirements } from '../../shared/ui/UploadRequirements';
 import {
   createProjectMaterial,
   downloadProjectMaterial,
@@ -35,6 +37,7 @@ export function ProjectMaterialsPage() {
   const [visibility, setVisibility] = useState<ProjectMaterial['visibility']>('project-only');
   const [file, setFile] = useState<File | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadPolicyQuery = useUploadPolicy(materialType);
 
   function clearFile() {
     setFile(undefined);
@@ -70,6 +73,11 @@ export function ProjectMaterialsPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!file) return;
+    const sizeError = uploadSizeError(file, uploadPolicyQuery.data);
+    if (sizeError) {
+      notify(sizeError, 'error');
+      return;
+    }
     createMutation.mutate({ materialType, file, title, visibility });
   }
 
@@ -87,6 +95,11 @@ export function ProjectMaterialsPage() {
         <section className="panel" aria-label="Create project material">
           <h2>Create material</h2>
           <form className="mt-4 grid gap-3" noValidate onSubmit={onSubmit}>
+            <UploadRequirements
+              title="Material file"
+              extensions={uploadPolicyQuery.data?.allowedExtensions ?? []}
+              maxSizeLabel={uploadPolicyQuery.data?.displayLabel ?? 'Loading limit'}
+            />
             <Input aria-label="Material title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material title" />
             <select
               aria-label="Material type"

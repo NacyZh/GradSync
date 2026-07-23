@@ -8,6 +8,9 @@ type UploadRequirementsProps = {
 };
 
 export function UploadRequirements({ title, extensions, maxSizeLabel, description }: UploadRequirementsProps) {
+  const requirements = description
+    ?? `${extensions.length ? `${extensions.join(', ')} ` : ''}up to ${maxSizeLabel}`;
+
   return (
     <div className="min-w-0 rounded-md border bg-muted/30 p-3 text-sm">
       <div className="mb-1 flex min-w-0 items-center gap-2 font-semibold">
@@ -15,7 +18,7 @@ export function UploadRequirements({ title, extensions, maxSizeLabel, descriptio
         <span className="min-w-0 break-words">{title}</span>
       </div>
       <p className="min-w-0 break-words text-muted-foreground">
-        {description ?? `${extensions.join(', ')} up to ${maxSizeLabel}`}
+        {requirements}
       </p>
     </div>
   );

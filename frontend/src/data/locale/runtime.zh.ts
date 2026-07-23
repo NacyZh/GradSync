@@ -52,7 +52,7 @@ export const runtimeZh: Record<string, string> = {
   'Invalid availability window': '可用时间段无效', 'Lab resources': '实验室资源', 'Last attempt': '上次尝试',
   'Live updates paused.': '实时更新已暂停。', 'Loading code': '正在加载代码', 'Loading dashboard': '正在加载工作台',
   'Loading documents': '正在加载文档', 'Loading materials': '正在加载材料', 'Loading options': '正在加载选项',
-  'Loading projects': '正在加载项目', 'Loading workspace': '正在加载工作区', 'Loading writing projects': '正在加载写作项目',
+  'Loading limit': '正在加载限制', 'Loading projects': '正在加载项目', 'Loading workspace': '正在加载工作区', 'Loading writing projects': '正在加载写作项目',
   'Location (optional)': '位置（可选）', 'Low': '低', 'Manuscript': '手稿', 'Material category': '材料分类',
   'Material file': '材料文件', 'Material title': '材料标题', 'Material type': '材料类型', 'Material visibility': '材料可见范围',
   'Materials': '材料', 'Materials may be stale': '材料数据可能已过期', 'Materials unavailable': '材料不可用',

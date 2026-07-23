@@ -1,4 +1,5 @@
 import pytest
+from django.test import override_settings
 
 from apps.library.models import PaperAttachment, PaperRecord
 from apps.projects.models import ProjectMembership, ResearchProject
@@ -83,6 +84,7 @@ def test_paper_create_import_duplicate_and_authorized_download(api_client):
 
 
 @pytest.mark.django_db
+@override_settings(PAPER_LIBRARY_UPLOAD_LIMIT_BYTES=1024)
 def test_paper_import_rejection_is_enforced_by_policy():
     from django.core.exceptions import ValidationError
 
@@ -92,7 +94,7 @@ def test_paper_import_rejection_is_enforced_by_policy():
         validate_paper_import(
             filename="too-large.pdf",
             content_type="application/pdf",
-            size_bytes=51 * 1024 * 1024,
+            size_bytes=1025,
         )
 
     with pytest.raises(ValidationError):

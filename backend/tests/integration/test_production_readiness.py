@@ -64,12 +64,22 @@ def test_frontend_nginx_serves_static_assets_and_proxies_api():
     assert "location = /metrics/" in nginx_conf
     assert "proxy_set_header Host $host;" in nginx_conf
     assert "proxy_set_header X-Forwarded-Proto https;" in nginx_conf
-    assert "client_max_body_size 30m;" in nginx_conf
+    assert "client_max_body_size ${GRADSYNC_HTTP_UPLOAD_MAX_BYTES};" in nginx_conf
+    frontend_dockerfile = (REPO_ROOT / "docker/frontend.Dockerfile").read_text()
+    assert "GRADSYNC_UPLOAD_MAX_BYTES" in frontend_dockerfile
+    assert "GRADSYNC_HTTP_UPLOAD_MAX_BYTES" in frontend_dockerfile
+    assert "envsubst" in frontend_dockerfile
     assert 'Cache-Control "public, max-age=31536000, immutable" always' in nginx_conf
     assert 'Cache-Control "no-store" always' in nginx_conf
     assert "location = /sw.js" in nginx_conf
     assert 'Service-Worker-Allowed "/" always' in nginx_conf
     assert "try_files $uri /index.html" in nginx_conf
+    production_env = (REPO_ROOT / ".env.production.example").read_text()
+    base_settings = (REPO_ROOT / "backend/gradsync/settings/base.py").read_text()
+    assert "GRADSYNC_UPLOAD_MAX_BYTES=" in production_env
+    assert 'os.getenv("GRADSYNC_UPLOAD_MAX_BYTES"' in base_settings
+    assert "UPLOAD_LIMIT_PAPER_BYTES" not in base_settings
+    assert "UPLOAD_LIMIT_CODE_BYTES" not in base_settings
 
 
 def test_production_compose_has_healthchecks_and_no_source_bind_mounts():
@@ -325,9 +335,13 @@ def test_schedule_reminder_uses_existing_queue_and_readiness_registration(db):
 def test_paper_library_operational_signals_are_configured(settings):
     from apps.library.models import DuplicateDetectionResult, PaperImportJob, PaperLibraryActivity
 
-    assert settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES >= 25 * 1024 * 1024
-    assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE >= settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES
-    assert settings.FILE_UPLOAD_MAX_MEMORY_SIZE >= settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES
+    assert settings.GRADSYNC_UPLOAD_MAX_BYTES > 0
+    assert set(settings.COLLABORATION_UPLOAD_LIMITS.values()) == {
+        settings.GRADSYNC_UPLOAD_MAX_BYTES
+    }
+    assert settings.PAPER_LIBRARY_UPLOAD_LIMIT_BYTES == settings.GRADSYNC_UPLOAD_MAX_BYTES
+    assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE > settings.GRADSYNC_UPLOAD_MAX_BYTES
+    assert settings.FILE_UPLOAD_MAX_MEMORY_SIZE < settings.GRADSYNC_UPLOAD_MAX_BYTES
     assert settings.PAPER_LIBRARY_EXTRACTION_TIMEOUT_SECONDS > 0
     assert 0 < settings.PAPER_LIBRARY_DUPLICATE_FUZZY_MATCH_THRESHOLD < 1
     assert 0 < settings.PAPER_LIBRARY_DUPLICATE_STRONG_MATCH_THRESHOLD <= 1

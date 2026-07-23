@@ -373,6 +373,23 @@ export async function mockAuthenticatedApi(page: Page) {
   await page.route('**/api/code-artifacts/upload-policy/', async (route) => {
     await fulfillJson(route, codeUploadPolicy);
   });
+  await page.route('**/api/upload-policies/**', async (route) => {
+    const category = new URL(route.request().url()).pathname.split('/').filter(Boolean).at(-1) ?? 'document';
+    const extensions: Record<string, string[]> = {
+      paper: ['.pdf'],
+      code: ['.zip', '.tar', '.gz', '.tgz', '.bz2', '.xz', '.7z'],
+      document: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md'],
+      writing: ['.doc', '.docx', '.tex', '.zip', '.tar', '.gz', '.tgz'],
+      feedback: ['.pdf', '.doc', '.docx', '.txt', '.md'],
+    };
+    await fulfillJson(route, {
+      category,
+      maxSizeBytes: 100 * 1024 * 1024,
+      displayLabel: '100 MB',
+      allowedExtensions: extensions[category] ?? [],
+      contentTypes: [],
+    });
+  });
   await page.route('**/api/calendar/occurrences/**', async (route) => {
     await fulfillJson(route, buildCalendarResponse());
   });

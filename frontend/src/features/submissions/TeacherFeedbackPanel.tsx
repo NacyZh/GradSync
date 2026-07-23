@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { Button } from '@/shared/ui/primitives/button';
 import { Input } from '@/shared/ui/primitives/input';
 import { Textarea } from '@/shared/ui/primitives/textarea';
+import { uploadSizeError, useUploadPolicy } from '@/shared/api/uploadPolicy';
 
 import { getErrorMessage } from '../../shared/api/errors';
 import { useAppFeedback } from '../../shared/ui/AppFeedback';
@@ -25,6 +26,7 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
   const { notify } = useAppFeedback();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const feedbackMutation = useSubmitTeacherFeedback(projectId, version?.id ?? '');
+  const uploadPolicyQuery = useUploadPolicy('feedback');
   const canSubmitFeedback = participantRole === 'bound_advisor'
     || participantRole === 'assigned_reviewer'
     || participantRole === 'administrator';
@@ -32,6 +34,11 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!version || !annotatedFile || !canSubmitFeedback) return;
+    const sizeError = uploadSizeError(annotatedFile, uploadPolicyQuery.data);
+    if (sizeError) {
+      notify(sizeError, 'error');
+      return;
+    }
     try {
       await feedbackMutation.mutateAsync({ annotatedFile, comments });
       setComments('');
@@ -70,7 +77,11 @@ export function TeacherFeedbackPanel({ participantRole, projectId, version }: Te
       ) : null}
       {canSubmitFeedback ? (
       <form className="grid gap-3 rounded-md border p-3" onSubmit={onSubmit} noValidate>
-        <UploadRequirements title="Annotated feedback upload" extensions={['.pdf', '.doc', '.docx', '.txt', '.md']} maxSizeLabel="25 MB" />
+        <UploadRequirements
+          title="Annotated feedback upload"
+          extensions={uploadPolicyQuery.data?.allowedExtensions ?? ['.pdf', '.doc', '.docx', '.txt', '.md']}
+          maxSizeLabel={uploadPolicyQuery.data?.displayLabel ?? 'Loading limit'}
+        />
         <Input
           ref={fileInputRef}
           className="sr-only"

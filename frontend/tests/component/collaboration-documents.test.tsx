@@ -68,6 +68,27 @@ function renderDocuments() {
 }
 
 describe('collaboration document library UI', () => {
+  it('shows the upload limit returned by the active environment policy', async () => {
+    mockFetch((url) => {
+      if (url.includes('/api/upload-policies/document/')) {
+        return {
+          category: 'document',
+          maxSizeBytes: 7 * 1024 * 1024,
+          displayLabel: '7 MB',
+          allowedExtensions: ['.pdf', '.docx'],
+          contentTypes: [],
+        };
+      }
+      if (url.includes('/document-categories')) return categories;
+      return { results: [baseDocument] };
+    });
+
+    renderDocuments();
+
+    expect(await screen.findByText('.pdf, .docx up to 7 MB')).toBeInTheDocument();
+    expect(screen.queryByText(/up to 50 MB/)).not.toBeInTheDocument();
+  });
+
   it('uses papers-style upload/download and search/display regions', async () => {
     const createObjectURL = vi.fn(() => 'blob:document-download');
     const revokeObjectURL = vi.fn();

@@ -1,9 +1,14 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
-from apps.common.upload_policy import ALLOWED_EXTENSIONS, UploadCategory, upload_policy_metadata
+from apps.common.upload_policy import (
+    ALLOWED_EXTENSIONS,
+    UploadCategory,
+    configured_upload_limit_bytes,
+    format_upload_size_label,
+    upload_policy_metadata,
+)
 
-CODE_MAX_BYTES = 200 * 1024 * 1024
 ALLOWED_CODE_EXTENSIONS = {".zip", ".tar.gz"}
 ALLOWED_CODE_CONTENT_TYPES = {
     "application/zip",
@@ -43,8 +48,11 @@ def _extension(filename: str) -> str:
 
 
 def validate_code_import(*, filename: str, content_type: str = "", size_bytes: int = 0) -> None:
-    if size_bytes > CODE_MAX_BYTES:
-        raise ValidationError("Code artifacts must be 200 MB or smaller")
+    limit = configured_upload_limit_bytes(UploadCategory.CODE)
+    if limit and size_bytes > limit:
+        raise ValidationError(
+            f"Code artifact exceeds the {format_upload_size_label(limit)} size limit"
+        )
     if _extension(filename) not in ALLOWED_CODE_EXTENSIONS:
         raise ValidationError("Code artifacts must be zip or tar.gz archives")
     if content_type and content_type not in ALLOWED_CODE_CONTENT_TYPES:

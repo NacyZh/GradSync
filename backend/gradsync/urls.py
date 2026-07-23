@@ -11,7 +11,7 @@ from apps.accounts.views import (
     RoleActivationListView,
     StudentSearchView,
 )
-from apps.common.views import healthz, metrics, readyz
+from apps.common.views import UploadPolicyView, healthz, metrics, readyz
 
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
@@ -34,6 +34,11 @@ urlpatterns = [
     path("api/students", StudentSearchView.as_view(), name="contract-student-search"),
     path("api/accounts/", include("apps.accounts.urls")),
     path("api/account/locale/", LocalePreferenceView.as_view(), name="contract-locale-preference"),
+    path(
+        "api/upload-policies/<str:category>/",
+        UploadPolicyView.as_view(),
+        name="upload-policy",
+    ),
     path("api/", include("apps.projects.urls")),
     path("api/", include("apps.tasks.urls")),
     path("api/", include("apps.submissions.urls")),

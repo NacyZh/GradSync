@@ -76,6 +76,10 @@ services:
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
+    env_file:
+      - path: .env.production.example
+      - path: .env.production
+        required: false
     ports:
       - "8080:8080"
     mem_limit: ${GRADSYNC_FRONTEND_MEM_LIMIT:-96m}

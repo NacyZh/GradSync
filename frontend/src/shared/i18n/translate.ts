@@ -77,6 +77,7 @@ export function translateUiText(value: string, locale = activeUiLocale()) {
     .replace(/^Weekly report deadline saved for (.+)$/, '周期汇报截止时间已保存：$1')
     .replace(/^Choose a supported archive file: (.+)\.$/, '请选择支持的压缩包格式：$1。')
     .replace(/^Choose an archive no larger than (.+)\.$/, '请选择不超过 $1 的压缩包。')
+    .replace(/^(.+) exceeds the (.+) upload size limit\.$/, '$1 超过了 $2 的上传大小限制。')
     .replace(/^Quantity cannot exceed (\d+)\.$/, '数量不能超过 $1。');
 }
 

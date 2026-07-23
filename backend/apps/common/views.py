@@ -4,6 +4,22 @@ from django.db import connection
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from redis import Redis
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .upload_policy import UploadCategory, configured_upload_policy
+
+
+class UploadPolicyResponseSerializer(serializers.Serializer):
+    category = serializers.ChoiceField(choices=[item.value for item in UploadCategory])
+    maxSizeBytes = serializers.IntegerField(min_value=1)
+    displayLabel = serializers.CharField()
+    allowedExtensions = serializers.ListField(child=serializers.CharField())
+    contentTypes = serializers.ListField(child=serializers.CharField())
 
 
 def healthz(_request):
@@ -72,3 +88,18 @@ def metrics(_request):
                 f'{{channel="{channel}",status="{dispatch_status}"}} {count}'
             )
     return HttpResponse("\n".join(lines) + "\n", content_type="text/plain; version=0.0.4")
+
+
+class UploadPolicyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=UploadPolicyResponseSerializer)
+    def get(self, _request, category: str):
+        try:
+            policy = configured_upload_policy(UploadCategory(category))
+        except ValueError:
+            return Response(
+                {"message": "Unknown upload category."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(policy)
