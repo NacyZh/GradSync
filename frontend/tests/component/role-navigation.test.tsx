@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Layout } from '../../src/app/Layout';
@@ -27,6 +27,10 @@ function renderLayout() {
   );
 }
 
+function LocationProbe() {
+  return <output data-testid="current-location">{useLocation().pathname}</output>;
+}
+
 describe('role-aware navigation', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -48,6 +52,9 @@ describe('role-aware navigation', () => {
     expect(screen.getByRole('button', { name: 'Open notifications' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    const account = screen.getByRole('link', { name: 'Profile: Admin' });
+    expect(account).toHaveAttribute('href', '/profile');
+    expect(account.querySelector('.topbar-account-copy')).toHaveTextContent('Adminadmin');
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveTextContent('content');
     expect(screen.getByLabelText('Workspace navigation')).toBeInTheDocument();
@@ -114,6 +121,41 @@ describe('role-aware navigation', () => {
     await screen.findByText('advisor');
     await user.click(screen.getByRole('button', { name: 'Switch to dark theme' }));
     expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('searches visible projects and navigates to the selected workspace', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (String(url).includes('/api/accounts/me/')) {
+        return Promise.resolve(new Response(JSON.stringify({
+          id: 2,
+          email: 'advisor@test.local',
+          name: 'Advisor',
+          global_role: 'advisor',
+          status: 'active',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      if (String(url).includes('/api/projects/')) {
+        return Promise.resolve(new Response(JSON.stringify({
+          results: [{ id: 41, title: 'Graphene Research', description: 'Materials project', status: 'active' }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }));
+
+    renderWithClient(
+      <MemoryRouter>
+        <AuthProvider>
+          <Layout>content</Layout>
+          <LocationProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('advisor');
+    await user.type(screen.getByRole('combobox', { name: 'Search' }), 'Graphene');
+    await user.click(await screen.findByRole('option', { name: /Graphene Research/ }));
+    expect(screen.getByTestId('current-location')).toHaveTextContent('/projects/41');
   });
 
   it('renders protected route content for authenticated users', async () => {

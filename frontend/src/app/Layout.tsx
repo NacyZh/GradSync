@@ -1,9 +1,8 @@
 import type { PropsWithChildren } from 'react';
-import { BookOpen, BriefcaseBusiness, Code2, FileStack, FileText, LayoutDashboard, LogOut, Moon, Search, Settings, Sun, UserCircle, Users } from 'lucide-react';
+import { BookOpen, BriefcaseBusiness, Code2, FileStack, FileText, LayoutDashboard, LogOut, Moon, Settings, Sun, UserCircle, Users } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
-import { Input } from '@/shared/ui/primitives/input';
 import {
   Tooltip,
   TooltipContent,
@@ -17,6 +16,7 @@ import { LanguageSwitcher } from '../features/i18n/LanguageSwitcher';
 import { useI18n } from '../features/i18n/I18nProvider';
 import { NotificationCenter } from '../features/notifications/NotificationCenter';
 import { ProjectContextBanner } from '../features/projects/ProjectContextBanner';
+import { GlobalWorkspaceSearch } from '../features/search/GlobalWorkspaceSearch';
 import { useAppFeedback } from '../shared/ui/AppFeedback';
 
 export function Layout({ children }: PropsWithChildren) {
@@ -54,13 +54,7 @@ export function Layout({ children }: PropsWithChildren) {
         </Link>
         {user ? (
           <div className="topbar-right">
-            <label className="global-search">
-              <span className="sr-only">{t('search')}</span>
-              <span className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <Input className="pl-9" placeholder={t('globalSearchPlaceholder')} />
-              </span>
-            </label>
+            <GlobalWorkspaceSearch links={primaryLinks} role={user.global_role} />
             <NotificationCenter />
             <Tooltip>
               <TooltipTrigger asChild>
@@ -71,10 +65,13 @@ export function Layout({ children }: PropsWithChildren) {
               <TooltipContent>{theme === 'dark' ? t('switchToLightTheme') : t('switchToDarkTheme')}</TooltipContent>
             </Tooltip>
             <LanguageSwitcher />
-            <div className="hidden min-w-0 text-right sm:block">
-              <span className="topbar-user block truncate">{user.name}</span>
-              <span className="topbar-role mt-1">{translateUiText(user.global_role, locale)}</span>
-            </div>
+            <Link to="/profile" className="topbar-account" aria-label={`${t('profile')}: ${user.name}`}>
+              <UserCircle className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="topbar-account-copy">
+                <span className="topbar-user truncate">{user.name}</span>
+                <span className="topbar-role">{translateUiText(user.global_role, locale)}</span>
+              </span>
+            </Link>
             <Button variant="outline" onClick={onSignOut} disabled={isLoggingOut}>
               <LogOut className="h-4 w-4" aria-hidden="true" />
               {isLoggingOut ? t('signingOut') : t('signOut')}

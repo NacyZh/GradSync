@@ -88,15 +88,64 @@
   }
 
   .global-search {
-    @apply grid gap-1 text-xs font-bold text-muted-foreground md:flex md:items-center md:gap-2;
+    @apply relative min-w-48 text-xs font-bold text-muted-foreground md:w-64;
+  }
+
+  .global-search-control {
+    @apply relative;
+  }
+
+  .global-search-icon {
+    @apply pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground;
   }
 
   .global-search input {
-    @apply min-h-10 min-w-40 rounded-md border bg-background px-3 text-sm md:min-w-64;
+    @apply min-h-10 w-full min-w-0 rounded-md border bg-background pl-10 pr-10 text-sm;
+  }
+
+  .global-search-clear {
+    @apply absolute right-0.5 top-1/2 min-h-8 h-8 w-8 -translate-y-1/2 border-0 bg-transparent p-0;
+  }
+
+  .global-search-popover {
+    @apply absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-md border bg-popover p-1.5 text-popover-foreground shadow-lg;
+  }
+
+  .global-search-popover ul {
+    @apply grid max-h-80 gap-1 overflow-y-auto;
+  }
+
+  .global-search-popover li button {
+    @apply grid w-full grid-cols-[1rem_minmax(0,1fr)] items-center justify-start gap-3 border-0 bg-transparent px-3 py-2 text-left font-normal;
+  }
+
+  .global-search-popover li button[aria-selected='true'] {
+    @apply bg-muted;
+  }
+
+  .global-search-popover li button span {
+    @apply grid min-w-0 gap-0.5;
+  }
+
+  .global-search-popover li strong,
+  .global-search-popover li small {
+    @apply truncate;
+  }
+
+  .global-search-state {
+    @apply flex items-center gap-2 px-3 py-2 text-sm font-medium;
+  }
+
+  .topbar-account {
+    @apply hidden min-w-0 max-w-44 grid-cols-[2rem_minmax(0,1fr)] items-center gap-2 rounded-md px-1.5 py-1 text-foreground hover:bg-muted hover:no-underline sm:grid;
+  }
+
+  .topbar-account-copy {
+    @apply grid min-w-0 justify-items-start gap-0.5;
   }
 
   .topbar-user {
-    @apply text-sm font-bold;
+    @apply block max-w-full text-left text-sm font-bold;
   }
 
   .topbar-role,
