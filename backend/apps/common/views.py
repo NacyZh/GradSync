@@ -3,10 +3,9 @@ from django.conf import settings
 from django.db import connection
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
-from redis import Redis
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers
-from rest_framework import status
+from redis import Redis
+from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView

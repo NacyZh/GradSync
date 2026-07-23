@@ -48,8 +48,9 @@ def _extension(filename: str) -> str:
 def validate_paper_import(*, filename: str, content_type: str = "", size_bytes: int = 0) -> None:
     limit = shared_paper_upload_limit_bytes()
     if limit and size_bytes > limit:
+        display_label = shared_paper_upload_policy()["displayLabel"]
         raise ValidationError(
-            f"Paper attachment exceeds the {shared_paper_upload_policy()['displayLabel']} size limit"
+            f"Paper attachment exceeds the {display_label} size limit"
         )
     if _extension(filename) not in ALLOWED_PAPER_EXTENSIONS:
         raise ValidationError("Paper attachments must be PDF, BibTeX, or text metadata files")
