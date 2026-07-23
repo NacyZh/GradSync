@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, RotateCcw, Search, ShieldCheck, UserX } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { Badge } from '@/shared/ui/primitives/badge';
 import { Button } from '@/shared/ui/primitives/button';
@@ -12,7 +13,8 @@ import { DataState } from '../../shared/ui/DataState';
 import { PageShell } from '../../shared/ui/PageShell';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { CurrentUser } from '../auth/AuthProvider';
-import { accountAction, listAccounts } from './api';
+import { accountAction, listAccounts, listRoleActivations } from './api';
+import { RoleActivationPanel } from './RoleActivationPanel';
 
 export function AccountAdminPage() {
   const queryClient = useQueryClient();
@@ -21,10 +23,17 @@ export function AccountAdminPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedView = searchParams.get('view');
+  const view = requestedView === 'requests' || requestedView === 'history' ? requestedView : 'accounts';
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['accounts', pageUrl],
     queryFn: () => listAccounts(pageUrl),
+  });
+  const pendingActivationsQuery = useQuery({
+    queryKey: ['role-activations', 'pending', '', undefined],
+    queryFn: () => listRoleActivations({ status: 'pending' }),
   });
 
   const actionMutation = useMutation({
@@ -69,7 +78,7 @@ export function AccountAdminPage() {
   return (
     <PageShell
       title="Account administration"
-      description="Review self-registered users, approve roles, and manage account state with audit-friendly controls."
+      description="Manage account lifecycle and review verified teacher access requests."
       actions={
         <>
           <Badge variant="secondary">{activeCount} active</Badge>
@@ -78,7 +87,22 @@ export function AccountAdminPage() {
         </>
       }
     >
-      <section className="panel">
+      <nav className="flex min-w-0 gap-1 overflow-x-auto border-b pb-2" aria-label="Account administration views">
+        <Button variant={view === 'accounts' ? 'secondary' : 'ghost'} onClick={() => setSearchParams({ view: 'accounts' })}>
+          Accounts
+        </Button>
+        <Button variant={view === 'requests' ? 'secondary' : 'ghost'} onClick={() => setSearchParams({ view: 'requests' })}>
+          Teacher access requests
+          <Badge variant={pendingActivationsQuery.data?.count ? 'warning' : 'muted'}>
+            {pendingActivationsQuery.data?.count ?? 0}
+          </Badge>
+        </Button>
+        <Button variant={view === 'history' ? 'secondary' : 'ghost'} onClick={() => setSearchParams({ view: 'history' })}>
+          Decision history
+        </Button>
+      </nav>
+
+      {view === 'accounts' ? <section className="panel">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2">
@@ -228,7 +252,9 @@ export function AccountAdminPage() {
             </Button>
           </nav>
         ) : null}
-      </section>
+      </section> : null}
+      {view === 'requests' ? <RoleActivationPanel mode="pending" /> : null}
+      {view === 'history' ? <RoleActivationPanel mode="processed" /> : null}
     </PageShell>
   );
 }

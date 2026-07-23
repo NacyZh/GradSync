@@ -40,7 +40,6 @@ export function Layout({ children }: PropsWithChildren) {
         { to: '/library/documents', label: t('documents'), icon: FileStack, roles: ['admin', 'advisor', 'student'] },
         { to: '/writing', label: t('writing'), icon: FileText, roles: ['admin', 'advisor', 'student'] },
         { to: '/admin/accounts', label: t('team'), icon: Users, roles: ['admin'] },
-        { to: '/admin/role-activations', label: t('approvals'), icon: UserCircle, roles: ['admin'] },
         { to: '/profile', label: t('profile'), icon: UserCircle, roles: ['admin', 'advisor', 'student'] },
       ].filter((link) => link.roles.includes(user.global_role))
     : [];

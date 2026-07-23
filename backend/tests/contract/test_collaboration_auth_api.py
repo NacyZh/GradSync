@@ -1,4 +1,5 @@
 import pytest
+from django.utils import timezone
 
 from apps.accounts.models import EmailVerificationCode, RoleActivationRequest
 from tests.factories.accounts import UserFactory
@@ -59,6 +60,7 @@ def test_role_activation_admin_contract(api_client):
         status="invited",
         requested_role="teacher",
         active_role="pending",
+        email_verified_at=timezone.now(),
     )
     activation = RoleActivationRequest.objects.create(user=teacher, requested_role="teacher")
 
@@ -70,6 +72,7 @@ def test_role_activation_admin_contract(api_client):
     )
 
     assert list_response.status_code == 200
+    assert list_response.json()["results"][0]["id"] == activation.id
     assert patch_response.status_code == 200
     assert patch_response.json()["status"] == "approved"
 

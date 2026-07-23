@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
-import { RoleActivationPage } from '../../src/features/admin/RoleActivationPage';
+import { AccountAdminPage } from '../../src/features/admin/AccountAdminPage';
 import { ProfilePage } from '../../src/features/auth/ProfilePage';
 import { RegisterPage } from '../../src/features/auth/RegisterPage';
 import { AuthProvider } from '../../src/features/auth/AuthProvider';
@@ -64,14 +64,67 @@ describe('collaboration registration UI', () => {
   it('shows pending role activations and approves one', async () => {
     mockFetch((url, init) => {
       if (init?.method === 'PATCH') return { id: 1, status: 'approved', requestedRole: 'teacher', user: { id: 2, email: 't@example.com', name: 'Teacher', global_role: 'advisor', status: 'active' } };
-      if (url.includes('/role-activations/')) return [{ id: 1, status: 'pending', requestedRole: 'teacher', activationSource: 'administrator_approval', createdAt: '2026-07-03T00:00:00Z', user: { id: 2, email: 't@example.com', name: 'Teacher', global_role: 'advisor', status: 'pending_role_activation' } }];
-      return {};
+      if (url.includes('/role-activations/')) return {
+        count: 1,
+        next: null,
+        previous: null,
+        results: [{ id: 1, status: 'pending', requestedRole: 'teacher', activationSource: 'administrator_approval', createdAt: '2026-07-03T00:00:00Z', user: { id: 2, email: 't@example.com', name: 'Teacher', global_role: 'advisor', status: 'pending_role_activation' } }],
+      };
+      return { count: 0, next: null, previous: null, results: [] };
     });
 
-    renderWithClient(<RoleActivationPage />);
+    renderWithClient(
+      <MemoryRouter initialEntries={['/admin/accounts?view=requests']}>
+        <AccountAdminPage />
+      </MemoryRouter>,
+    );
     expect(await screen.findByText('t@example.com')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
-    expect(await screen.findByText('Activation updated')).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve request' }));
+    expect(await screen.findByText('Teacher access request updated')).toBeInTheDocument();
+  });
+
+  it('revokes approved teacher access from decision history with a reason', async () => {
+    let decisionPayload: Record<string, string> | undefined;
+    mockFetch((url, init) => {
+      if (init?.method === 'PATCH') {
+        decisionPayload = JSON.parse(String(init.body));
+        return { id: 1, status: 'revoked' };
+      }
+      if (url.includes('/role-activations/') && url.includes('status=processed')) {
+        return {
+          count: 1,
+          next: null,
+          previous: null,
+          results: [{
+            id: 1,
+            status: 'approved',
+            requestedRole: 'teacher',
+            activationSource: 'administrator_approval',
+            createdAt: '2026-07-03T00:00:00Z',
+            reviewedAt: '2026-07-04T00:00:00Z',
+            user: { id: 2, email: 't@example.com', name: 'Teacher', global_role: 'advisor', status: 'active' },
+            reviewer: { id: 3, email: 'admin@example.com', name: 'Admin', global_role: 'admin', status: 'active' },
+          }],
+        };
+      }
+      return { count: 0, next: null, previous: null, results: [] };
+    });
+
+    renderWithClient(
+      <MemoryRouter initialEntries={['/admin/accounts?view=history']}>
+        <AccountAdminPage />
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Revoke access' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Decision reason'), 'Employment ended.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Revoke access' }));
+
+    await waitFor(() => expect(decisionPayload).toEqual({
+      action: 'revoke',
+      reason: 'Employment ended.',
+    }));
   });
 
   it('disambiguates student selector options by email and degree', async () => {

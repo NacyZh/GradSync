@@ -38,15 +38,17 @@ test('administrator can review role activation requests', async ({ page }) => {
   await page.route('**/api/accounts/me/', async (route) => {
     await fulfillJson(route, { id: 10, email: 'admin@example.edu', name: 'Admin One', global_role: 'admin', status: 'active' });
   });
-  await page.route('**/api/accounts/admin/role-activations/', async (route) => {
-    await fulfillJson(route, [{ id: 1, status: 'pending', requestedRole: 'teacher', activationSource: 'administrator_approval', createdAt: '2026-07-03T00:00:00Z', user: { id: 2, email: 'teacher@example.edu', name: 'Teacher One', global_role: 'advisor', status: 'pending_role_activation' } }]);
+  await page.route(/\/api\/accounts\/admin\/role-activations\/(?:\?.*)?$/, async (route) => {
+    await fulfillJson(route, { count: 1, next: null, previous: null, results: [{ id: 1, status: 'pending', requestedRole: 'teacher', activationSource: 'administrator_approval', createdAt: '2026-07-03T00:00:00Z', user: { id: 2, email: 'teacher@example.edu', name: 'Teacher One', global_role: 'advisor', status: 'pending_role_activation' } }] });
   });
   await page.route('**/api/accounts/admin/role-activations/1/', async (route) => {
     await fulfillJson(route, { id: 1, status: 'approved', requestedRole: 'teacher', user: { id: 2, email: 'teacher@example.edu', name: 'Teacher One', global_role: 'advisor', status: 'active' } });
   });
 
   await page.goto('/admin/role-activations');
+  await expect(page).toHaveURL(/\/admin\/accounts\?view=requests/);
   await expect(page.getByText('teacher@example.edu')).toBeVisible();
   await page.getByRole('button', { name: 'Approve' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Activation updated' }).first()).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Approve request' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Teacher access request updated' }).first()).toBeVisible();
 });

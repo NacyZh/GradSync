@@ -57,7 +57,7 @@ describe('project work UI', () => {
     expect(await screen.findByRole('heading', { name: 'Operations workspace' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Operations queue' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Account operations' })).toHaveAttribute('href', '/admin/accounts');
-    expect(screen.getByRole('link', { name: 'Role approvals' })).toHaveAttribute('href', '/admin/role-activations');
+    expect(screen.getByRole('link', { name: 'Teacher access requests' })).toHaveAttribute('href', '/admin/accounts?view=requests');
     expect(await screen.findByRole('link', { name: 'Report oversight' })).toHaveAttribute('href', '/projects/7/reports');
     expect(screen.queryByRole('heading', { name: 'Advisor work queue' })).not.toBeInTheDocument();
     vi.unstubAllGlobals();

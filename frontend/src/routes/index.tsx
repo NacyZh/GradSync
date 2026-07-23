@@ -10,7 +10,6 @@ import { ProtectedRoute, RoleRoute } from './ProtectedRoute';
 
 export const routeWorkspaceBundles = {
   accountAdmin: () => import('../features/admin/AccountAdminPage'),
-  roleActivation: () => import('../features/admin/RoleActivationPage'),
   profile: () => import('../features/auth/ProfilePage'),
   projectsLanding: () => import('../features/projects/ProjectsLandingPage'),
   projectCreate: () => import('../features/projects/ProjectCreatePage'),
@@ -26,7 +25,6 @@ export const routeWorkspaceBundles = {
 } as const;
 
 const AccountAdminPage = lazy(async () => ({ default: (await routeWorkspaceBundles.accountAdmin()).AccountAdminPage }));
-const RoleActivationPage = lazy(async () => ({ default: (await routeWorkspaceBundles.roleActivation()).RoleActivationPage }));
 const ProfilePage = lazy(async () => ({ default: (await routeWorkspaceBundles.profile()).ProfilePage }));
 const ProjectsLandingPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectsLanding()).ProjectsLandingPage }));
 const ProjectCreatePage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectCreate()).ProjectCreatePage }));
@@ -91,7 +89,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/admin/role-activations',
-    element: rolePage(<RoleActivationPage />, 'admin'),
+    element: rolePage(<Navigate to="/admin/accounts?view=requests" replace />, 'admin'),
   },
   // Advisor + Admin: create and manage projects.
   {

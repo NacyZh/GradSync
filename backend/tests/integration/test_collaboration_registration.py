@@ -1,6 +1,12 @@
 import pytest
 
-from apps.accounts.models import EmailVerificationCode, RoleActivationRequest, StudentProfile
+from apps.accounts.models import (
+    EmailVerificationCode,
+    RoleActivationRequest,
+    StudentProfile,
+    TeacherProfile,
+)
+from apps.audit.models import AuditEvent
 from tests.factories.accounts import UserFactory
 
 
@@ -106,6 +112,166 @@ def test_admin_approval_activates_teacher(api_client):
     assert response.status_code == 200
     assert response.json()["status"] == "approved"
     assert response.json()["user"]["status"] == "active"
+
+
+@pytest.mark.django_db
+def test_teacher_rejection_requires_reason_and_allows_secure_resubmission(api_client):
+    admin = UserFactory(global_role="admin", status="active")
+    register(
+        api_client,
+        email="teacher-resubmit@example.com",
+        requestedRole="teacher",
+        degreeType=None,
+    )
+    code = EmailVerificationCode.objects.get(
+        email="teacher-resubmit@example.com"
+    ).plain_code
+    api_client.post(
+        "/api/accounts/verify-email/",
+        {"email": "teacher-resubmit@example.com", "code": code},
+        format="json",
+    )
+    activation = RoleActivationRequest.objects.get(
+        user__email="teacher-resubmit@example.com"
+    )
+    api_client.force_authenticate(admin)
+
+    missing_reason = api_client.patch(
+        f"/api/accounts/admin/role-activations/{activation.id}/",
+        {"action": "reject"},
+        format="json",
+    )
+    rejected = api_client.patch(
+        f"/api/accounts/admin/role-activations/{activation.id}/",
+        {"action": "reject", "reason": "Use your institutional display name."},
+        format="json",
+    )
+    repeated = api_client.patch(
+        f"/api/accounts/admin/role-activations/{activation.id}/",
+        {"action": "approve"},
+        format="json",
+    )
+    api_client.force_authenticate(user=None)
+    resubmitted = register(
+        api_client,
+        email="teacher-resubmit@example.com",
+        password="StrongPass1!",
+        name="Corrected Teacher",
+        nickname="Corrected",
+        requestedRole="teacher",
+        degreeType=None,
+    )
+
+    assert missing_reason.status_code == 400
+    assert rejected.status_code == 200
+    assert rejected.json()["reviewReason"] == "Use your institutional display name."
+    assert rejected.json()["reviewer"]["id"] == admin.id
+    assert repeated.status_code == 409
+    assert resubmitted.status_code == 202
+    assert resubmitted.json()["status"] == "pending_role_activation"
+    requests = RoleActivationRequest.objects.filter(
+        user__email="teacher-resubmit@example.com"
+    ).order_by("created_at")
+    assert [request.status for request in requests] == ["rejected", "pending"]
+    assert requests.last().user.name == "Corrected Teacher"
+
+
+@pytest.mark.django_db
+def test_rejected_teacher_cannot_resubmit_with_the_wrong_password(api_client):
+    admin = UserFactory(global_role="admin", status="active")
+    register(
+        api_client,
+        email="teacher-secure-resubmit@example.com",
+        requestedRole="teacher",
+        degreeType=None,
+    )
+    code = EmailVerificationCode.objects.get(
+        email="teacher-secure-resubmit@example.com"
+    ).plain_code
+    api_client.post(
+        "/api/accounts/verify-email/",
+        {"email": "teacher-secure-resubmit@example.com", "code": code},
+        format="json",
+    )
+    activation = RoleActivationRequest.objects.get(
+        user__email="teacher-secure-resubmit@example.com"
+    )
+    api_client.force_authenticate(admin)
+    api_client.patch(
+        f"/api/accounts/admin/role-activations/{activation.id}/",
+        {"action": "reject", "reason": "Correct the submitted profile."},
+        format="json",
+    )
+    api_client.force_authenticate(user=None)
+
+    response = register(
+        api_client,
+        email="teacher-secure-resubmit@example.com",
+        password="WrongPass1!",
+        requestedRole="teacher",
+        degreeType=None,
+    )
+
+    assert response.status_code == 400
+    assert RoleActivationRequest.objects.filter(
+        user__email="teacher-secure-resubmit@example.com"
+    ).count() == 1
+
+
+@pytest.mark.django_db
+def test_revoking_teacher_access_removes_profile_and_records_reason(api_client):
+    admin = UserFactory(global_role="admin", status="active")
+    register(
+        api_client,
+        email="teacher-revoke@example.com",
+        requestedRole="teacher",
+        degreeType=None,
+    )
+    code = EmailVerificationCode.objects.get(
+        email="teacher-revoke@example.com"
+    ).plain_code
+    api_client.post(
+        "/api/accounts/verify-email/",
+        {"email": "teacher-revoke@example.com", "code": code},
+        format="json",
+    )
+    activation = RoleActivationRequest.objects.get(
+        user__email="teacher-revoke@example.com"
+    )
+    api_client.force_authenticate(admin)
+    api_client.patch(
+        f"/api/accounts/admin/role-activations/{activation.id}/",
+        {"action": "approve"},
+        format="json",
+    )
+
+    response = api_client.patch(
+        f"/api/accounts/admin/role-activations/{activation.id}/",
+        {"action": "revoke", "reason": "Employment ended."},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    activation.refresh_from_db()
+    activation.user.refresh_from_db()
+    assert activation.status == RoleActivationRequest.Status.REVOKED
+    assert activation.review_reason == "Employment ended."
+    assert activation.user.status == "pending_role_activation"
+    assert activation.user.active_role == "pending"
+    assert not TeacherProfile.objects.filter(user=activation.user).exists()
+    audit = AuditEvent.objects.get(
+        event_type="role_activation.revoke", target_id=str(activation.id)
+    )
+    assert audit.target_snapshot["reason"] == "Employment ended."
+
+    bypass_response = api_client.post(
+        f"/api/accounts/admin/{activation.user_id}/",
+        {"action": "reactivate"},
+        format="json",
+    )
+    assert bypass_response.status_code == 400
+    activation.user.refresh_from_db()
+    assert activation.user.status == "pending_role_activation"
 
 
 @pytest.mark.django_db

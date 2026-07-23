@@ -188,6 +188,7 @@ export const messagesZh = {
   resendCode: '重新发送验证码',
   accountActive: '账号已激活',
   teacherApprovalPending: '邮箱已验证，教师角色正在等待管理员审批。',
+  accessRequestSubmitted: '教师权限申请已提交',
   profileSettings: '个人资料设置',
   profileSettingsDescription: '管理个人身份、科研角色和账号安全。',
   accountIdentity: '账号身份',

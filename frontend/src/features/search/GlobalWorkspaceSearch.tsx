@@ -35,7 +35,7 @@ const routeKeywords: Record<string, string> = {
   '/library/documents': 'documents files 文档 文件',
   '/writing': 'writing versions feedback 写作 版本 反馈',
   '/admin/accounts': 'accounts users team 账号 用户 成员',
-  '/admin/role-activations': 'approvals roles activation 审批 角色 激活',
+  '/admin/accounts?view=requests': 'teacher access requests approvals 教师 权限 申请 审批',
   '/profile': 'profile account settings 个人资料 账号 设置',
 };
 
@@ -59,7 +59,10 @@ export function GlobalWorkspaceSearch({ links, role }: Props) {
 
   const results = useMemo<SearchResult[]>(() => {
     if (!searchTerm) return [];
-    const workspaceResults = links
+    const searchableLinks = role === 'admin'
+      ? [...links, { to: '/admin/accounts?view=requests', label: 'Teacher access requests' }]
+      : links;
+    const workspaceResults = searchableLinks
       .filter((link) => normalized(`${link.label} ${routeKeywords[link.to] ?? ''}`).includes(searchTerm))
       .map((link) => ({
         id: `workspace:${link.to}`,

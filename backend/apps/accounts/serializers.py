@@ -119,8 +119,10 @@ class PasswordChangeSerializer(serializers.Serializer):
 
 class RoleActivationSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    reviewer = UserSerializer(read_only=True)
     requestedRole = serializers.CharField(source="requested_role", read_only=True)
     activationSource = serializers.CharField(source="activation_source", read_only=True)
+    reviewReason = serializers.CharField(source="review_reason", read_only=True)
     reviewedAt = serializers.DateTimeField(source="reviewed_at", read_only=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
 
@@ -132,6 +134,8 @@ class RoleActivationSerializer(serializers.ModelSerializer):
             "requestedRole",
             "activationSource",
             "status",
+            "reviewer",
+            "reviewReason",
             "reviewedAt",
             "createdAt",
         ]
@@ -139,6 +143,15 @@ class RoleActivationSerializer(serializers.ModelSerializer):
 
 class RoleActivationUpdateSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=["approve", "reject", "revoke", "expire"])
+    reason = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        attrs["reason"] = attrs.get("reason", "").strip()
+        if attrs["action"] in {"reject", "revoke"} and not attrs["reason"]:
+            raise serializers.ValidationError(
+                {"reason": "A reason is required for rejection or revocation."}
+            )
+        return attrs
 
 
 class StudentOptionSerializer(serializers.ModelSerializer):

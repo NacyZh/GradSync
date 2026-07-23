@@ -48,6 +48,8 @@ class AccountsService:
 
     @staticmethod
     def reactivate_account(*, user: User) -> User:
+        if user.status != User.Status.SUSPENDED:
+            raise ValidationError("Only suspended accounts can be reactivated.")
         user.status = User.Status.ACTIVE
         user.is_active = True
         user.save(update_fields=["status", "is_active"])
@@ -126,8 +128,6 @@ def register_account(
     requested_role: str,
     degree_type: str | None,
 ):
-    if User.objects.filter(email=email).exists():
-        raise ValidationError("An account with this email already exists.")
     if requested_role not in {"student", "teacher"}:
         raise ValidationError("Requested role must be student or teacher.")
     if requested_role == "student" and degree_type not in {"masters", "doctoral"}:
@@ -139,6 +139,39 @@ def register_account(
         raise ValidationError("Name is required.")
     if not nickname:
         raise ValidationError("Nickname is required.")
+
+    existing_user = User.objects.select_for_update().filter(email=email).first()
+    if existing_user is not None:
+        latest_activation = existing_user.role_activation_requests.order_by(
+            "-created_at"
+        ).first()
+        can_resubmit = (
+            requested_role == "teacher"
+            and existing_user.requested_role == User.RequestedRole.TEACHER
+            and existing_user.email_verified_at is not None
+            and latest_activation is not None
+            and latest_activation.status == RoleActivationRequest.Status.REJECTED
+            and existing_user.check_password(password)
+        )
+        if not can_resubmit:
+            raise ValidationError("An account with this email already exists.")
+        existing_user.name = name
+        existing_user.nickname = nickname
+        existing_user.active_role = User.RequestedRole.PENDING
+        existing_user.status = User.Status.PENDING_ROLE_ACTIVATION
+        existing_user.is_active = True
+        existing_user.save(
+            update_fields=["name", "nickname", "active_role", "status", "is_active"]
+        )
+        activation = RoleActivationRequest.objects.create(
+            user=existing_user,
+            requested_role=User.RequestedRole.TEACHER,
+            activation_source=RoleActivationRequest.ActivationSource.ADMIN_APPROVAL,
+            expires_at=timezone.now()
+            + timezone.timedelta(days=settings.ROLE_ACTIVATION_TTL_DAYS),
+        )
+        record_role_activation(existing_user, activation, "resubmitted")
+        return existing_user, None
 
     user = User.objects.create(
         email=email,
@@ -257,11 +290,35 @@ def verify_email(*, email: str, code: str):
 
 
 @transaction.atomic
-def decide_role_activation(*, activation: RoleActivationRequest, reviewer, action: str):
+def decide_role_activation(
+    *, activation: RoleActivationRequest, reviewer, action: str, reason: str = ""
+):
     if action not in {"approve", "reject", "revoke", "expire"}:
         raise ValidationError("Invalid role activation action.")
+    activation = (
+        RoleActivationRequest.objects.select_for_update()
+        .select_related("user")
+        .get(pk=activation.pk)
+    )
+    allowed_status = {
+        "approve": RoleActivationRequest.Status.PENDING,
+        "reject": RoleActivationRequest.Status.PENDING,
+        "expire": RoleActivationRequest.Status.PENDING,
+        "revoke": RoleActivationRequest.Status.APPROVED,
+    }[action]
+    if activation.status != allowed_status:
+        raise ValidationError(
+            f"Only {allowed_status} role activation requests can be {action}d."
+        )
+    if activation.user_id == reviewer.id:
+        raise ValidationError("Administrators cannot review their own role request.")
+    reason = reason.strip()
+    if action in {"reject", "revoke"} and not reason:
+        raise ValidationError("A reason is required for rejection or revocation.")
+
     activation.reviewer = reviewer
     activation.reviewed_at = timezone.now()
+    activation.review_reason = reason
     if action == "approve":
         activation.status = RoleActivationRequest.Status.APPROVED
         user = activation.user
@@ -278,17 +335,24 @@ def decide_role_activation(*, activation: RoleActivationRequest, reviewer, actio
         activation.status = RoleActivationRequest.Status.REJECTED
     elif action == "revoke":
         activation.status = RoleActivationRequest.Status.REVOKED
+        user = activation.user
+        user.active_role = User.RequestedRole.PENDING
+        user.status = User.Status.PENDING_ROLE_ACTIVATION
+        user.save(update_fields=["active_role", "status"])
+        TeacherProfile.objects.filter(user=user).delete()
     else:
         activation.status = RoleActivationRequest.Status.EXPIRED
-    activation.save(update_fields=["status", "reviewer", "reviewed_at"])
-    record_role_activation(reviewer, activation, action)
+    activation.save(
+        update_fields=["status", "reviewer", "reviewed_at", "review_reason"]
+    )
+    record_role_activation(reviewer, activation, action, reason)
     enqueue_notification(
         recipient=activation.user,
         sender=reviewer,
         event_type=Notification.EventType.ROLE_ACTIVATION,
         target_type="RoleActivationRequest",
         target_id=str(activation.id),
-        subject=f"Role activation {activation.status}",
+        subject=f"Teacher access request {activation.status}",
         action_path="/profile",
     )
     return activation

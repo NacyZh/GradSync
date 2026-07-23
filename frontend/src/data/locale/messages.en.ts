@@ -188,6 +188,7 @@ export const messagesEn = {
   resendCode: 'Resend code',
   accountActive: 'Account active',
   teacherApprovalPending: 'Email verified. Your teacher role is awaiting administrator approval.',
+  accessRequestSubmitted: 'Teacher access request submitted',
   profileSettings: 'Profile settings',
   profileSettingsDescription: 'Manage your identity, research role, and account security.',
   accountIdentity: 'Account identity',

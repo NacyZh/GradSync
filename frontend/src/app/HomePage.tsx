@@ -292,7 +292,7 @@ export function HomePage() {
               <div className="workflow-list">
                 <Link to="/projects/new">New project</Link>
                 <Link to="/admin/accounts">Account operations</Link>
-                <Link to="/admin/role-activations">Role approvals</Link>
+                <Link to="/admin/accounts?view=requests">Teacher access requests</Link>
                 <Link to="/resources">Resource operations</Link>
                 {latestProject ? <Link to={`/projects/${latestProject.id}`}>Project health dashboard</Link> : null}
                 {latestProject ? <Link to={`/projects/${latestProject.id}/reviews`}>Review queue</Link> : null}

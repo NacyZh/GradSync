@@ -17,9 +17,18 @@ def record_event(
     )
 
 
-def record_role_activation(actor, target, action: str) -> AuditEvent:
+def record_role_activation(actor, target, action: str, reason: str = "") -> AuditEvent:
     return record_event(
-        None, actor, f"role_activation.{action}", f"Role activation {action}", target
+        None,
+        actor,
+        f"role_activation.{action}",
+        f"Role activation {action}",
+        target,
+        target_snapshot={
+            "requestedRole": target.requested_role,
+            "status": target.status,
+            "reason": reason,
+        },
     )
 
 

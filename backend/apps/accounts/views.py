@@ -249,7 +249,22 @@ class RoleActivationListView(generics.ListAPIView):
     serializer_class = RoleActivationSerializer
 
     def get_queryset(self):
-        return RoleActivationRequest.objects.select_related("user").order_by("-created_at")
+        queryset = RoleActivationRequest.objects.select_related(
+            "user", "reviewer"
+        ).order_by("-created_at")
+        request_status = self.request.query_params.get("status")
+        if request_status == "processed":
+            queryset = queryset.exclude(status=RoleActivationRequest.Status.PENDING)
+        elif request_status in RoleActivationRequest.Status.values:
+            queryset = queryset.filter(status=request_status)
+        query = self.request.query_params.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(
+                Q(user__name__icontains=query)
+                | Q(user__nickname__icontains=query)
+                | Q(user__email__icontains=query)
+            )
+        return queryset
 
 
 class RoleActivationDetailView(generics.UpdateAPIView):
@@ -266,9 +281,16 @@ class RoleActivationDetailView(generics.UpdateAPIView):
                 activation=self.get_object(),
                 reviewer=request.user,
                 action=serializer.validated_data["action"],
+                reason=serializer.validated_data.get("reason", ""),
             )
         except ValidationError as exc:
-            return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            message = "; ".join(exc.messages)
+            response_status = (
+                status.HTTP_409_CONFLICT
+                if message.startswith("Only ")
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"message": message}, status=response_status)
         return Response(RoleActivationSerializer(activation).data)
 
 

@@ -147,6 +147,7 @@ class RoleActivationRequest(models.Model):
     invitation_token_hash = models.CharField(max_length=128, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

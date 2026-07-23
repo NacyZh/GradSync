@@ -27,7 +27,12 @@ export function RegisterPage() {
     onSuccess: (result) => {
       setEmail(result.email);
       setStatus(result.status);
-      notify(t('verificationEmailSent'), 'success');
+      notify(
+        result.status === 'pending_role_activation'
+          ? t('accessRequestSubmitted')
+          : t('verificationEmailSent'),
+        'success',
+      );
     },
     onError: (error) => notify(error.message, 'error'),
   });
@@ -136,7 +141,7 @@ export function RegisterPage() {
             </Button>
           </form>
 
-          {email ? (
+          {email && status === 'pending_email_verification' ? (
             <form aria-label={t('verifyEmail')} onSubmit={onVerify} className="login-form border-t pt-4">
               <div className="login-field">
                 <Label htmlFor="verification-code">{t('verificationCode')}</Label>
@@ -150,10 +155,10 @@ export function RegisterPage() {
                 <RotateCw className="h-4 w-4" aria-hidden="true" />
                 {t('resendCode')}
               </Button>
-              {status === 'active' ? <p className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4" /> {t('accountActive')}</p> : null}
-              {status === 'pending_role_activation' ? <p className="text-sm text-muted-foreground">{t('teacherApprovalPending')}</p> : null}
             </form>
           ) : null}
+          {status === 'active' ? <p className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4" /> {t('accountActive')}</p> : null}
+          {status === 'pending_role_activation' ? <p className="text-sm text-muted-foreground">{t('teacherApprovalPending')}</p> : null}
           <Link className="text-sm font-semibold text-primary" to="/login">{t('signIn')}</Link>
         </div>
       </section>

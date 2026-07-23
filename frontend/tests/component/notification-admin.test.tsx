@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 import { AccountAdminPage } from '../../src/features/admin/AccountAdminPage';
 import { NotificationList } from '../../src/features/notifications/NotificationList';
@@ -64,7 +65,7 @@ describe('notification and account administration UI', () => {
       )),
     );
 
-    renderWithClient(<AccountAdminPage />);
+    renderWithClient(<MemoryRouter><AccountAdminPage /></MemoryRouter>);
 
     expect(await screen.findByRole('heading', { name: 'Account administration' })).toBeInTheDocument();
     expect(await screen.findByText('admin@test.local')).toBeInTheDocument();
@@ -101,7 +102,7 @@ describe('notification and account administration UI', () => {
       }),
     );
 
-    renderWithClient(<AccountAdminPage />);
+    renderWithClient(<MemoryRouter><AccountAdminPage /></MemoryRouter>);
 
     await screen.findByText('admin@test.local');
     expect(screen.queryByRole('button', { name: 'Create account' })).not.toBeInTheDocument();
