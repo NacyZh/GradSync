@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, RotateCcw, Trash2 } from 'lucide-react';
 
@@ -18,13 +18,14 @@ import { TaskForm } from '../tasks/TaskForm';
 import { TaskStatusControl } from '../tasks/TaskStatusControl';
 import { TaskTree, type TaskNode } from '../tasks/TaskTree';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
-import { archiveProject, deleteProject, getProject, reopenProject } from './api';
+import { archiveProject, deleteProject, getProject, reopenProject, type Project } from './api';
 import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 
 export function ProjectDashboardPage() {
   const { locale } = useI18n();
   const projectId = Number(useParams().projectId ?? 0);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { confirm, notify } = useAppFeedback();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const projectQuery = useQuery({ queryKey: ['project', projectId], queryFn: () => getProject(projectId), enabled: Boolean(projectId) });
@@ -69,6 +70,19 @@ export function ProjectDashboardPage() {
       actionLabel: 'Delete project',
     });
     if (ok) deleteMutation.mutate();
+  }
+
+  function onTaskUpdated(updatedTask: TaskNode) {
+    queryClient.setQueryData<Project>(['project', projectId], (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        current_tasks: updateTaskTree(
+          (current.current_tasks ?? []) as TaskNode[],
+          updatedTask,
+        ),
+      };
+    });
   }
 
   if (projectQuery.isLoading) return <DataState state="loading" title="Loading dashboard" message="Loading project dashboard..." />;
@@ -222,8 +236,15 @@ export function ProjectDashboardPage() {
                 <p className="whitespace-pre-wrap text-muted-foreground">{primaryTask.description || translateUiText('No task description provided.', locale)}</p>
               </section>
               {capabilities.canUpdateTasks ? (
-                <div className="rounded-lg border bg-background p-3">
-                  <TaskStatusControl projectId={projectId} taskId={primaryTask.id} status={primaryTask.status ?? 'not_started'} disabled={archived} />
+                <div className="border-t pt-3">
+                  <TaskStatusControl
+                    key={primaryTask.id}
+                    projectId={projectId}
+                    taskId={primaryTask.id}
+                    status={primaryTask.status ?? 'not_started'}
+                    disabled={archived}
+                    onUpdated={onTaskUpdated}
+                  />
                 </div>
               ) : null}
             </article>
@@ -276,6 +297,24 @@ export function ProjectDashboardPage() {
 
 function flattenTasks(tasks: TaskNode[]): TaskNode[] {
   return tasks.flatMap((task) => [task, ...flattenTasks(task.children ?? [])]);
+}
+
+function updateTaskTree(tasks: TaskNode[], updatedTask: TaskNode): TaskNode[] {
+  return tasks.map((task) => {
+    if (task.id === updatedTask.id) {
+      const { children, ...updatedFields } = updatedTask;
+      return {
+        ...task,
+        ...updatedFields,
+        children: children ?? task.children,
+      };
+    }
+    if (!task.children?.length) return task;
+    return {
+      ...task,
+      children: updateTaskTree(task.children, updatedTask),
+    };
+  });
 }
 
 function formatAssignees(task: TaskNode, memberNameById: Map<number, string>) {

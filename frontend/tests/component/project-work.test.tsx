@@ -160,6 +160,20 @@ describe('project work UI', () => {
         if (String(url).includes('/api/projects/1/tasks/11/') && init?.method === 'DELETE') {
           return new Response(null, { status: 204 });
         }
+        if (String(url).includes('/api/projects/1/tasks/11/') && init?.method === 'PATCH') {
+          return new Response(JSON.stringify({
+            id: 11,
+            title: 'Analyze sample',
+            status: 'completed',
+            priority: 'high',
+            description: 'Run analysis and summarize evidence.',
+            assignee_id: 7,
+            assignee_ids: [7, 8],
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
         if (String(url).includes('/api/projects/1/tasks/') && init?.method === 'POST') {
           return new Response(JSON.stringify({ id: 21, title: 'Prepare slides', status: 'not_started', assignee_ids: [7, 8] }), {
             status: 201,
@@ -225,6 +239,19 @@ describe('project work UI', () => {
     expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Priority: high');
     expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Student One, Student Two');
     expect(screen.getByRole('region', { name: 'Task details' })).toHaveTextContent('Run analysis and summarize evidence.');
+    const statusControl = within(screen.getByRole('region', { name: 'Task details' })).getByRole(
+      'radiogroup',
+      { name: 'Task status' },
+    );
+    expect(within(statusControl).getByRole('radio', { name: 'In progress' })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(within(statusControl).getByRole('radio', { name: 'Completed' }));
+    await waitFor(() =>
+      expect(within(statusControl).getByRole('radio', { name: 'Completed' })).toHaveAttribute('aria-checked', 'true'),
+    );
+    expect(screen.getByRole('region', { name: 'Current tasks' })).toHaveTextContent('completed');
+    expect(JSON.parse(String(requests.find((request) => request.method === 'PATCH')?.body))).toEqual({
+      status: 'completed',
+    });
     expect(screen.getByRole('complementary', { name: 'Members and progress' })).toHaveTextContent('Student One');
     expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Task title'), 'Prepare slides');

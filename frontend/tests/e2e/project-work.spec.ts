@@ -82,8 +82,9 @@ test('advisor can create a project and dashboard shows isolated project work', a
   await expect(page.getByRole('region', { name: 'Pending reviews' })).toContainText(/Review progress_report #\d+/);
   await expect(page.getByRole('region', { name: 'Activity' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Notifications', exact: true })).toHaveCount(0);
-  await page.getByLabel('Task status').selectOption('completed');
+  await page.getByRole('radiogroup', { name: 'Task status' }).getByRole('radio', { name: 'Completed' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Task status updated' }).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Current tasks' })).toContainText('completed');
 
   if (fullStackE2E) {
     await page.getByRole('button', { name: 'Sign out' }).click();
