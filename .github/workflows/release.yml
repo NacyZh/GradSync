@@ -273,6 +273,7 @@ jobs:
       DEPLOY_PATH: ${{ vars.GRADSYNC_DEPLOY_PATH || '/home/GradSync/GradSync' }}
       DEPLOY_BRANCH: master
       PUBLIC_URL: ${{ vars.GRADSYNC_PUBLIC_URL || 'https://120021123.xyz' }}
+      STRICT_UPLOAD_PROXY_CHECK: ${{ vars.GRADSYNC_STRICT_UPLOAD_PROXY_CHECK || 'false' }}
       PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
     steps:
       - uses: actions/checkout@v5
@@ -336,5 +337,5 @@ jobs:
             -i ~/.ssh/gradsync_github_deploy \
             -p "${DEPLOY_PORT}" \
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' sh -s" \
+            "GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' GRADSYNC_STRICT_UPLOAD_PROXY_CHECK='${STRICT_UPLOAD_PROXY_CHECK}' sh -s" \
             < scripts/deploy-production.sh

@@ -135,9 +135,11 @@ sudo systemctl reload nginx
 ```
 
 The deployment script sends an unauthenticated 3 MiB request whenever the
-configured application limit is larger than 3 MiB. A `413` response fails the
-deployment because it proves that an outer proxy still has a smaller,
-independent body-size limit.
+configured application limit is larger than 3 MiB. A `413` response emits a
+deployment warning because it proves that an outer proxy still has a smaller,
+independent body-size limit. Set the protected GitHub environment variable
+`GRADSYNC_STRICT_UPLOAD_PROXY_CHECK=true` when this operational check should
+block releases.
 
 Validate the deployed routing with trailing slashes on backend health endpoints:
 

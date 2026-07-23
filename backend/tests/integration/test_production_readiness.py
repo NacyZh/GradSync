@@ -215,6 +215,8 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     assert "upload_probe_size" in script
     assert 'upload_probe_status" = "413"' in script
     assert "client_max_body_size 0" in script
+    assert 'STRICT_UPLOAD_PROXY_CHECK="${GRADSYNC_STRICT_UPLOAD_PROXY_CHECK:-false}"' in script
+    assert 'if [ "$STRICT_UPLOAD_PROXY_CHECK" = "true" ]' in script
 
 
 def test_env_template_names_operational_launch_inputs():

@@ -19,6 +19,7 @@ environment.
 | `GRADSYNC_PRODUCTION_SSH_PORT` | SSH port, defaults to `22` |
 | `GRADSYNC_DEPLOY_PATH` | Repository path on the production host |
 | `GRADSYNC_PUBLIC_URL` | Public URL used by post-deploy smoke checks |
+| `GRADSYNC_STRICT_UPLOAD_PROXY_CHECK` | Optional `true` to fail deployment when the public proxy rejects the 3 MiB upload probe |
 
 ## Gate Rules
 

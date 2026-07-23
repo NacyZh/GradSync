@@ -9,6 +9,7 @@ COMPOSE_ENV_FILE="${GRADSYNC_COMPOSE_ENV_FILE:-.env.production}"
 PUBLIC_URL="${GRADSYNC_PUBLIC_URL:-https://120021123.xyz}"
 PRUNE_BUILDER_CACHE="${GRADSYNC_PRUNE_BUILDER_CACHE:-true}"
 PRUNE_DANGLING_IMAGES="${GRADSYNC_PRUNE_DANGLING_IMAGES:-true}"
+STRICT_UPLOAD_PROXY_CHECK="${GRADSYNC_STRICT_UPLOAD_PROXY_CHECK:-false}"
 
 COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
 DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-1}"
@@ -137,9 +138,11 @@ if command -v curl >/dev/null 2>&1; then
           "$PUBLIC_URL/api/library/papers/"
     )"
     if [ "$upload_probe_status" = "413" ]; then
-      echo "The public proxy rejected a 3 MiB request before Django." >&2
+      echo "WARNING: The public proxy rejected a 3 MiB request before Django." >&2
       echo "Set client_max_body_size 0 in the host TLS proxy and reload it." >&2
-      exit 1
+      if [ "$STRICT_UPLOAD_PROXY_CHECK" = "true" ]; then
+        exit 1
+      fi
     fi
   fi
 fi
