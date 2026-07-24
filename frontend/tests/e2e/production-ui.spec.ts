@@ -53,6 +53,8 @@ const routeCases = [
   { path: '/projects/1/code', label: 'code repository' },
   { path: '/', label: 'home dashboard' },
   { path: '/admin/accounts', label: 'account administration' },
+  { path: '/admin/audit', label: 'audit console' },
+  { path: '/profile', label: 'account security' },
 ];
 
 const viewportSizes = [

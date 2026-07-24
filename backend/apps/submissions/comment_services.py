@@ -1,4 +1,4 @@
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 
 from apps.audit.services import record_event
@@ -6,6 +6,7 @@ from apps.common.project_scope import ProjectScopedService
 from apps.projects.archive_services import ensure_project_writable
 
 from .models import InlineComment, WeeklyProgressReport
+from .review_assignment_services import reviewer_can_access_target
 
 
 class InlineCommentService(ProjectScopedService):
@@ -16,13 +17,14 @@ class InlineCommentService(ProjectScopedService):
     def create_comment(
         self, *, target_type: str, target_id: int, anchor: str, body: str
     ) -> InlineComment:
-        self.require_project_reviewer(self.project)
         ensure_project_writable(self.project)
         if target_type != InlineComment.TargetType.PROGRESS_REPORT:
             raise ValidationError("Inline comments are only supported for weekly reports")
         target = WeeklyProgressReport.objects.get(pk=target_id)
         if target.project_id != self.project.id:
             raise ValidationError("Comment target must belong to the same project")
+        if not reviewer_can_access_target(user=self.user, target=target):
+            raise PermissionDenied("You are not assigned to review this report")
         comment = InlineComment.objects.create(
             project=self.project,
             target_type=target_type,
@@ -41,8 +43,12 @@ class InlineCommentService(ProjectScopedService):
         return comment
 
     def set_status(self, comment: InlineComment, status: str) -> InlineComment:
-        self.require_project_reviewer(self.project)
         ensure_project_writable(self.project)
+        if comment.target_type != InlineComment.TargetType.PROGRESS_REPORT:
+            raise PermissionDenied("You cannot update this comment")
+        target = WeeklyProgressReport.objects.get(pk=comment.target_id)
+        if not reviewer_can_access_target(user=self.user, target=target):
+            raise PermissionDenied("You are not assigned to review this report")
         comment.status = status
         comment.resolved_at = timezone.now() if status == InlineComment.Status.RESOLVED else None
         comment.save(update_fields=["status", "resolved_at", "updated_at"])

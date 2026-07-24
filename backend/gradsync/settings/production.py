@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 from apps.common.error_reporting import configure_error_reporting
 
@@ -34,6 +35,24 @@ if "*" in ALLOWED_HOSTS:
 
 CSRF_TRUSTED_ORIGINS = _csv_env("DJANGO_CSRF_TRUSTED_ORIGINS", required=True)
 FRONTEND_ORIGIN = _required_env("FRONTEND_ORIGIN")
+APPROVED_FRONTEND_ORIGIN = _required_env("GRADSYNC_APPROVED_FRONTEND_ORIGIN").rstrip("/")
+approved_origin = urlparse(APPROVED_FRONTEND_ORIGIN)
+if (
+    approved_origin.scheme != "https"
+    or not approved_origin.netloc
+    or approved_origin.path
+    not in {
+        "",
+        "/",
+    }
+):
+    raise RuntimeError("GRADSYNC_APPROVED_FRONTEND_ORIGIN must be an HTTPS origin without a path")
+if ACCOUNT_RECOVERY_TOKEN_TTL_SECONDS > 1800:  # noqa: F405
+    raise RuntimeError("GRADSYNC_RECOVERY_TOKEN_TTL_SECONDS cannot exceed 1800")
+if EMAIL_CHANGE_TOKEN_TTL_SECONDS > 1800:  # noqa: F405
+    raise RuntimeError("GRADSYNC_EMAIL_CHANGE_TOKEN_TTL_SECONDS cannot exceed 1800")
+if AUDIT_EXPORT_MAX_ROWS > 10000:  # noqa: F405
+    raise RuntimeError("GRADSYNC_AUDIT_EXPORT_MAX_ROWS cannot exceed 10000")
 
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True

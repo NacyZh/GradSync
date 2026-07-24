@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "feature": "016-access-governance",
+  "specificationPath": "specs/016-access-governance/spec.md",
+  "normativeRevision": "not-a-revision",
+  "decisions": {
+    "product": {
+      "assignedReviewer": "product@example.edu",
+      "decision": "approved",
+      "decidedRevision": null,
+      "decidedAt": null,
+      "rationale": ""
+    }
+  },
+  "exceptions": []
+}

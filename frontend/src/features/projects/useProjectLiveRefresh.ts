@@ -12,6 +12,10 @@ export function useProjectLiveRefresh(projectId: number | null | undefined, late
     queryClient.invalidateQueries({ queryKey: ['project', projectId] });
     queryClient.invalidateQueries({ queryKey: ['projectMaterials', projectId] });
     queryClient.invalidateQueries({ queryKey: ['projects'] });
+    queryClient.invalidateQueries({ queryKey: ['project-context', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['review-reports', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['review-assignments', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['eligible-project-teachers', projectId] });
   }, [projectId, queryClient]);
 
   useEffect(() => {

@@ -97,7 +97,9 @@ describe('frontend import boundaries', () => {
       const owningFeature = relativeFile.split('/')[0];
       const source = readFileSync(filePath, 'utf8');
 
-      return [...source.matchAll(/from ['"](?:\.\.\/)([^/'"]+)\/api(?:['"]|\/)/g)]
+      const relativeImports = [...source.matchAll(/from ['"](?:\.\.\/)([^/'"]+)\/api(?:['"]|\/)/g)];
+      const aliasImports = [...source.matchAll(/from ['"]@\/features\/([^/'"]+)\/api(?:['"]|\/)/g)];
+      return [...relativeImports, ...aliasImports]
         .filter((match) => match[1] !== owningFeature)
         .map((match) => `${projectPath(filePath)} imports private ${match[1]}/api`);
     });

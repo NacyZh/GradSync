@@ -4,6 +4,18 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
+
+def _positive_int_env(name: str, default: int, *, minimum: int = 1) -> int:
+    raw_value = os.getenv(name, str(default))
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an integer") from exc
+    if value < minimum:
+        raise RuntimeError(f"{name} must be at least {minimum}")
+    return value
+
+
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(",")]
@@ -112,7 +124,7 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.common.exceptions.api_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "apps.accounts.authentication.ActiveAccountJWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        "apps.accounts.authentication.ActiveAccountSessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -124,6 +136,9 @@ REST_FRAMEWORK = {
         "login": os.getenv("THROTTLE_LOGIN_RATE", "10/min"),
         "invite": os.getenv("THROTTLE_INVITE_RATE", "10/min"),
         "registration": os.getenv("THROTTLE_REGISTRATION_RATE", "5/min"),
+        "password_recovery": os.getenv("GRADSYNC_RECOVERY_THROTTLE_RATE", "5/hour"),
+        "email_security": os.getenv("GRADSYNC_EMAIL_SECURITY_THROTTLE_RATE", "10/hour"),
+        "session_revocation": os.getenv("GRADSYNC_SESSION_REVOCATION_THROTTLE_RATE", "30/hour"),
         "paper_library": os.getenv("THROTTLE_PAPER_LIBRARY_RATE", "120/min"),
         "paper_import": os.getenv("THROTTLE_PAPER_IMPORT_RATE", "30/hour"),
         "calendar": os.getenv("THROTTLE_CALENDAR_RATE", "120/min"),
@@ -131,9 +146,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(
-        seconds=int(os.getenv("JWT_ACCESS_TOKEN_SECONDS", "300"))
-    ),
+    "ACCESS_TOKEN_LIFETIME": timedelta(seconds=int(os.getenv("JWT_ACCESS_TOKEN_SECONDS", "300"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(
         seconds=int(os.getenv("JWT_REFRESH_TOKEN_SECONDS", "604800"))
     ),
@@ -195,9 +208,7 @@ EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@gradsync.local")
 EMAIL_SUBJECT_PREFIX = os.getenv("EMAIL_SUBJECT_PREFIX", "[GradSync] ")
 
-GRADSYNC_UPLOAD_MAX_BYTES = int(
-    os.getenv("GRADSYNC_UPLOAD_MAX_BYTES", str(100 * 1024 * 1024))
-)
+GRADSYNC_UPLOAD_MAX_BYTES = int(os.getenv("GRADSYNC_UPLOAD_MAX_BYTES", str(100 * 1024 * 1024)))
 COLLABORATION_UPLOAD_LIMITS = {
     category: GRADSYNC_UPLOAD_MAX_BYTES
     for category in ("paper", "code", "document", "writing", "feedback")
@@ -206,9 +217,7 @@ PAPER_LIBRARY_UPLOAD_LIMIT_BYTES = GRADSYNC_UPLOAD_MAX_BYTES
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(
     os.getenv("DATA_UPLOAD_MAX_MEMORY_SIZE", str(GRADSYNC_UPLOAD_MAX_BYTES + 1024 * 1024))
 )
-FILE_UPLOAD_MAX_MEMORY_SIZE = int(
-    os.getenv("FILE_UPLOAD_MAX_MEMORY_SIZE", str(2_621_440))
-)
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MEMORY_SIZE", str(2_621_440)))
 PAPER_LIBRARY_EXTRACTION_TIMEOUT_SECONDS = int(
     os.getenv("PAPER_LIBRARY_EXTRACTION_TIMEOUT_SECONDS", "30")
 )
@@ -223,6 +232,22 @@ PAPER_LIBRARY_MAINTAINER_REVIEW_VISIBLE = (
 )
 EMAIL_VERIFICATION_CODE_TTL_MINUTES = int(os.getenv("EMAIL_VERIFICATION_CODE_TTL_MINUTES", "30"))
 ROLE_ACTIVATION_TTL_DAYS = int(os.getenv("ROLE_ACTIVATION_TTL_DAYS", "14"))
+ACCOUNT_RECOVERY_TOKEN_TTL_SECONDS = _positive_int_env("GRADSYNC_RECOVERY_TOKEN_TTL_SECONDS", 1800)
+EMAIL_CHANGE_TOKEN_TTL_SECONDS = _positive_int_env("GRADSYNC_EMAIL_CHANGE_TOKEN_TTL_SECONDS", 1800)
+APPROVED_FRONTEND_ORIGIN = (
+    os.getenv(
+        "GRADSYNC_APPROVED_FRONTEND_ORIGIN",
+        os.getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
+    )
+    .strip()
+    .rstrip("/")
+)
+ACCOUNT_SESSION_ACTIVITY_UPDATE_SECONDS = _positive_int_env(
+    "GRADSYNC_SESSION_ACTIVITY_UPDATE_SECONDS", 300
+)
+AUDIT_RETENTION_DAYS = _positive_int_env("GRADSYNC_AUDIT_RETENTION_DAYS", 365, minimum=365)
+AUDIT_EXPORT_MAX_ROWS = _positive_int_env("GRADSYNC_AUDIT_EXPORT_MAX_ROWS", 10000)
+AUDIT_EXPORT_TTL_SECONDS = _positive_int_env("GRADSYNC_AUDIT_EXPORT_TTL_SECONDS", 86400)
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOGGING = {

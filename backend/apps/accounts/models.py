@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -153,3 +155,170 @@ class RoleActivationRequest(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class AccountRecoveryRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        CONSUMED = "consumed", "Consumed"
+        SUPERSEDED = "superseded", "Superseded"
+        EXPIRED = "expired", "Expired"
+        REVOKED = "revoked", "Revoked"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="recovery_requests",
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    requested_email_snapshot = models.EmailField()
+    requested_ip_hash = models.CharField(max_length=64, blank=True)
+    requested_user_agent = models.CharField(max_length=255, blank=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    superseded_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    delivery_notification = models.ForeignKey(
+        "notifications.Notification",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recovery_requests",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user", "status", "-created_at"], name="account_recovery_user_idx"
+            ),
+            models.Index(fields=["status", "expires_at"], name="account_recovery_expiry_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(status="pending"),
+                name="unique_pending_account_recovery",
+            )
+        ]
+
+    def is_usable(self) -> bool:
+        return self.status == self.Status.PENDING and self.expires_at >= timezone.now()
+
+
+class EmailChangeRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        VERIFIED = "verified", "Verified"
+        CANCELLED = "cancelled", "Cancelled"
+        SUPERSEDED = "superseded", "Superseded"
+        EXPIRED = "expired", "Expired"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="email_change_requests",
+    )
+    previous_email = models.EmailField()
+    new_email = models.EmailField()
+    verification_hash = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    expires_at = models.DateTimeField()
+    verified_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    delivery_notification = models.ForeignKey(
+        "notifications.Notification",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="email_change_deliveries",
+    )
+    security_notification = models.ForeignKey(
+        "notifications.Notification",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="email_change_security_notices",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "status", "-created_at"], name="email_change_user_idx"),
+            models.Index(fields=["new_email", "status"], name="email_change_address_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(status="pending"),
+                name="unique_pending_email_change_user",
+            ),
+            models.UniqueConstraint(
+                fields=["new_email"],
+                condition=models.Q(status="pending"),
+                name="unique_pending_email_change_address",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(previous_email=models.F("new_email")),
+                name="email_change_addresses_differ",
+            ),
+        ]
+
+    def is_usable(self) -> bool:
+        return self.status == self.Status.PENDING and self.expires_at >= timezone.now()
+
+
+class AccountSession(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REVOKED = "revoked", "Revoked"
+        EXPIRED = "expired", "Expired"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="account_sessions",
+    )
+    django_session_key_hash = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    device_label = models.CharField(max_length=120, default="Unknown device")
+    user_agent = models.CharField(max_length=255, blank=True)
+    initial_ip_hash = models.CharField(max_length=64, blank=True)
+    last_ip_hash = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="revoked_account_sessions",
+    )
+    revoke_reason = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user", "status", "-last_seen_at"], name="account_session_user_idx"
+            ),
+            models.Index(fields=["status", "expires_at"], name="account_session_expiry_idx"),
+        ]
+
+    @staticmethod
+    def default_expiry():
+        from datetime import timedelta
+
+        return timezone.now() + timedelta(
+            seconds=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+        )
+
+    def is_active_session(self) -> bool:
+        return self.status == self.Status.ACTIVE and self.expires_at > timezone.now()

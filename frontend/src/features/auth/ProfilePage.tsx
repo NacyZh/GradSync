@@ -12,6 +12,7 @@ import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { useI18n } from '../i18n/I18nProvider';
 import { useAuth } from './AuthProvider';
 import { changePassword, updateProfile } from './api';
+import { SecuritySettingsPanel } from './SecuritySettingsPanel';
 
 export function ProfilePage() {
   const { user } = useAuth();
@@ -152,6 +153,8 @@ export function ProfilePage() {
           </Button>
         </form>
       </section>
+
+      <SecuritySettingsPanel />
     </PageShell>
   );
 }

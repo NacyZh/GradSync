@@ -215,6 +215,7 @@ describe('role-aware navigation', () => {
   it('keeps large workspaces behind explicit route-level bundles', () => {
     expect(Object.keys(routeWorkspaceBundles)).toEqual([
       'accountAdmin',
+      'auditConsole',
       'profile',
       'projectsLanding',
       'projectCreate',

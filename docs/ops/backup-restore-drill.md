@@ -66,3 +66,23 @@ role activation records, and audit events are part of the restore acceptance
 set. If email delivery is unavailable during restore validation, the business
 records still pass only when notification status records show retry-needed or
 failed states with masked failure details.
+
+## Access Governance Restore Addendum
+
+For feature 016, record a migration dry run and pre/post counts for account
+sessions, recovery and email-change requests, project memberships, held
+projects, ownership transfers, reviewer assignments, audit events, and audit
+exports. Restore at least one held project and verify its reason remains
+visible to an administrator without exposing member-private payloads.
+
+Exercise one revoked legacy session after restore; it must remain rejected and
+the user must sign in again. Restore audit export metadata and any unexpired
+CSV object as a matched unit, then verify expired files can be removed without
+deleting immutable audit events. Preserve `.specify/acceptance-policy.json`,
+each tracked `acceptance.json`, and CI acceptance reports separately from the
+database backup.
+
+An application rollback keeps additive governance schema and evidence in
+place. It must not reactivate sessions or collaborators, clear governance
+holds, broaden reviewer assignments, discard audit history, or change Pending,
+Rejected, or stale acceptance decisions.

@@ -5,11 +5,14 @@ import { HomePage } from '../app/HomePage';
 import { Layout } from '../app/Layout';
 import { LoginPage } from '../features/auth/LoginPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
+import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
 import { DataState } from '../shared/ui/DataState';
 import { ProtectedRoute, RoleRoute } from './ProtectedRoute';
 
 export const routeWorkspaceBundles = {
   accountAdmin: () => import('../features/admin/AccountAdminPage'),
+  auditConsole: () => import('../features/admin/AuditConsolePage'),
   profile: () => import('../features/auth/ProfilePage'),
   projectsLanding: () => import('../features/projects/ProjectsLandingPage'),
   projectCreate: () => import('../features/projects/ProjectCreatePage'),
@@ -25,6 +28,7 @@ export const routeWorkspaceBundles = {
 } as const;
 
 const AccountAdminPage = lazy(async () => ({ default: (await routeWorkspaceBundles.accountAdmin()).AccountAdminPage }));
+const AuditConsolePage = lazy(async () => ({ default: (await routeWorkspaceBundles.auditConsole()).AuditConsolePage }));
 const ProfilePage = lazy(async () => ({ default: (await routeWorkspaceBundles.profile()).ProfilePage }));
 const ProjectsLandingPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectsLanding()).ProjectsLandingPage }));
 const ProjectCreatePage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectCreate()).ProjectCreatePage }));
@@ -79,6 +83,14 @@ export const router = createBrowserRouter([
     element: <RegisterPage />,
   },
   {
+    path: '/forgot-password',
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
+  },
+  {
     path: '/profile',
     element: protectedPage(<ProfilePage />),
   },
@@ -86,6 +98,10 @@ export const router = createBrowserRouter([
   {
     path: '/admin/accounts',
     element: rolePage(<AccountAdminPage />, 'admin'),
+  },
+  {
+    path: '/admin/audit',
+    element: rolePage(<AuditConsolePage />, 'admin'),
   },
   {
     path: '/admin/role-activations',

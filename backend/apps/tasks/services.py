@@ -21,7 +21,7 @@ class TaskService(ProjectScopedService):
     ) -> Task:
         self.require_project_member(self.project)
         if not self.project.memberships.filter(
-            user=self.user, status="active", role__in=["advisor", "reviewer"]
+            user=self.user, status="active", role__in=["advisor", "co_advisor"]
         ).exists():
             raise PermissionDenied("Only advisors can create project tasks")
         ensure_project_writable(self.project)
@@ -47,7 +47,7 @@ class TaskService(ProjectScopedService):
         self.require_project_member(self.project)
         ensure_project_writable(self.project)
         is_advisor = self.project.memberships.filter(
-            user=self.user, status="active", role__in=["advisor", "reviewer"]
+            user=self.user, status="active", role__in=["advisor", "co_advisor"]
         ).exists()
         is_assignee = (
             task.assignee_id == self.user.id
@@ -98,7 +98,7 @@ class TaskService(ProjectScopedService):
         self.require_project_member(self.project)
         ensure_project_writable(self.project)
         if not self.project.memberships.filter(
-            user=self.user, status="active", role__in=["advisor", "reviewer"]
+            user=self.user, status="active", role__in=["advisor", "co_advisor"]
         ).exists():
             raise PermissionDenied("Only advisors can delete project tasks")
         title = task.title

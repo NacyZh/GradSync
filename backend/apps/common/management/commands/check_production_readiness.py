@@ -1,10 +1,13 @@
+from datetime import timedelta
 from pathlib import Path
 
+from django.apps import apps
 from django.conf import settings
 from django.core.mail import send_mail
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connections
+from django.db import connections, models
 from django.db.migrations.executor import MigrationExecutor
+from django.utils import timezone
 
 from apps.common.production_checks import collect_production_readiness_issues
 
@@ -26,10 +29,45 @@ class Command(BaseCommand):
         repo_root = None if options["skip_repo_files"] else Path(options["repo_root"])
         issues = collect_production_readiness_issues(settings, repo_root)
         if not options["skip_database"]:
+            ResearchProject = apps.get_model("projects", "ResearchProject")
+            ProjectMembership = apps.get_model("projects", "ProjectMembership")
+            AuditExport = apps.get_model("audit", "AuditExport")
             executor = MigrationExecutor(connections["default"])
             unapplied = executor.migration_plan(executor.loader.graph.leaf_nodes())
             if unapplied:
                 issues.append(f"{len(unapplied)} database migrations are not applied")
+            held_projects = list(
+                ResearchProject.objects.filter(governance_state="hold").values_list(
+                    "id", "governance_hold_reason"
+                )[:25]
+            )
+            if held_projects:
+                summary = ", ".join(
+                    f"{project_id}:{reason}" for project_id, reason in held_projects
+                )
+                issues.append(f"project governance holds require resolution: {summary}")
+            conflicting_projects = (
+                ProjectMembership.objects.filter(status="active", role="advisor")
+                .values("project_id")
+                .annotate(total=models.Count("id"))
+                .filter(total__gt=1)
+                .values_list("project_id", flat=True)[:25]
+            )
+            conflicts = list(conflicting_projects)
+            if conflicts:
+                issues.append(
+                    "projects have conflicting active primary advisors: "
+                    + ", ".join(str(project_id) for project_id in conflicts)
+                )
+            stale_export_cutoff = timezone.now() - timedelta(minutes=5)
+            stale_export_count = AuditExport.objects.filter(
+                status__in=["queued", "processing"],
+                created_at__lt=stale_export_cutoff,
+            ).count()
+            if stale_export_count:
+                issues.append(
+                    f"{stale_export_count} audit exports have remained pending for over 5 minutes"
+                )
 
         static_root = Path(settings.STATIC_ROOT)
         if not static_root.exists():

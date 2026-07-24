@@ -1,0 +1,1233 @@
+openapi: 3.0.3
+info:
+  title: GradSync Access and Release Governance
+  version: 1.0.0
+  description: Runtime contracts for account recovery/security, project collaborator governance, reviewer assignment, and administrator audit investigation.
+servers:
+  - url: /api
+security:
+  - sessionAuth: []
+  - bearerAuth: []
+tags:
+  - name: Account Security
+  - name: Project Collaborators
+  - name: Review Assignments
+  - name: Audit
+paths:
+  /accounts/password-recovery/:
+    post:
+      tags: [Account Security]
+      operationId: requestPasswordRecovery
+      security: []
+      description: Always returns the same accepted acknowledgement for validly shaped email input, regardless of account existence or eligibility.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordRecoveryRequest'
+      responses:
+        '202':
+          description: Recovery request accepted without account disclosure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRecoveryAcknowledgement'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /accounts/password-recovery/confirm/:
+    post:
+      tags: [Account Security]
+      operationId: confirmPasswordRecovery
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordRecoveryConfirm'
+      responses:
+        '204':
+          description: Password changed and every prior account session revoked.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Recovery instruction is expired, consumed, superseded, or concurrently changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /accounts/me/email-change/:
+    get:
+      tags: [Account Security]
+      operationId: retrievePendingEmailChange
+      responses:
+        '200':
+          description: Current pending email change or null result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailChangeState'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Account Security]
+      operationId: requestEmailChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailChangeRequest'
+      responses:
+        '202':
+          description: Pending new-address verification.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailChangeState'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    delete:
+      tags: [Account Security]
+      operationId: cancelEmailChange
+      responses:
+        '204':
+          description: Pending email change cancelled; current email unchanged.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /accounts/me/email-change/verify/:
+    post:
+      tags: [Account Security]
+      operationId: verifyEmailChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailChangeVerify'
+      responses:
+        '200':
+          description: Email changed and replacement credentials/session returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticatedAccount'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /accounts/me/email-change/resend/:
+    post:
+      tags: [Account Security]
+      operationId: resendEmailChangeVerification
+      responses:
+        '202':
+          description: Verification delivery queued without changing the current email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailChangeState'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /accounts/me/sessions/:
+    get:
+      tags: [Account Security]
+      operationId: listAccountSessions
+      responses:
+        '200':
+          description: Current and recent account sessions, current first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccountSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /accounts/me/sessions/revoke-others/:
+    post:
+      tags: [Account Security]
+      operationId: revokeOtherAccountSessions
+      responses:
+        '200':
+          description: Every active session except the current session revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revokedCount]
+                properties:
+                  revokedCount:
+                    type: integer
+                    minimum: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /accounts/me/sessions/{session_id}/:
+    delete:
+      tags: [Account Security]
+      operationId: revokeAccountSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '204':
+          description: Non-current session revoked; repeated revocation is idempotent.
+        '400':
+          description: Current session must be ended through logout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /accounts/teachers/:
+    get:
+      tags: [Project Collaborators]
+      operationId: searchEligibleProjectTeachers
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: projectId
+          in: query
+          schema:
+            type: integer
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/CollaboratorRole'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 25
+            default: 25
+      responses:
+        '200':
+          description: Active, verified, approved teacher options only.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 25
+                items:
+                  $ref: '#/components/schemas/TeacherOption'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /projects/{project_id}/members/:
+    get:
+      tags: [Project Collaborators]
+      operationId: listProjectMembers
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Role-safe project membership list and current capabilities.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results, capabilities]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectMember'
+                  capabilities:
+                    $ref: '#/components/schemas/ProjectGovernanceCapabilities'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Project Collaborators]
+      operationId: addProjectMember
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectMemberCreate'
+      responses:
+        '201':
+          description: Member assigned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMember'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /projects/{project_id}/members/{membership_id}/:
+    patch:
+      tags: [Project Collaborators]
+      operationId: changeProjectMemberRole
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MembershipId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectMemberUpdate'
+      responses:
+        '200':
+          description: Role changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMember'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+    delete:
+      tags: [Project Collaborators]
+      operationId: removeProjectMember
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MembershipId'
+        - name: expectedVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: reason
+          in: query
+          schema:
+            type: string
+            maxLength: 1000
+      responses:
+        '204':
+          description: Membership removed.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /projects/{project_id}/ownership-transfer/:
+    post:
+      tags: [Project Collaborators]
+      operationId: transferProjectOwnership
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnershipTransferRequest'
+      responses:
+        '200':
+          description: Ownership transferred and project returned to normal governance when applicable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnershipTransferResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /projects/{project_id}/governance-hold/resolve/:
+    post:
+      tags: [Project Collaborators]
+      operationId: resolveProjectGovernanceHold
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GovernanceHoldResolution'
+      responses:
+        '200':
+          description: Administrator assigned eligible successor and resolved hold.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnershipTransferResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /projects/{project_id}/review-assignments/:
+    get:
+      tags: [Review Assignments]
+      operationId: listProjectReviewAssignments
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: reviewerId
+          in: query
+          schema:
+            type: integer
+        - name: targetType
+          in: query
+          schema:
+            $ref: '#/components/schemas/ReviewTargetType'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, removed]
+      responses:
+        '200':
+          description: Authorized assignment list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReviewAssignment'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Review Assignments]
+      operationId: createProjectReviewAssignment
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewAssignmentCreate'
+      responses:
+        '201':
+          description: Reviewer assigned to one target.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewAssignment'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /projects/{project_id}/review-assignments/{assignment_id}/:
+    delete:
+      tags: [Review Assignments]
+      operationId: removeProjectReviewAssignment
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/AssignmentId'
+        - name: expectedVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '204':
+          description: Assignment removed.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /audit-events:
+    get:
+      tags: [Audit]
+      operationId: listAuditEvents
+      parameters:
+        - name: startsAt
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endsAt
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: actorId
+          in: query
+          schema:
+            type: integer
+        - name: projectId
+          in: query
+          schema:
+            type: integer
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: outcome
+          in: query
+          schema:
+            type: string
+            enum: [succeeded, denied, failed, queued]
+        - name: targetType
+          in: query
+          schema:
+            type: string
+        - name: targetId
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Newest-first cursor page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /audit-events/{event_id}:
+    get:
+      tags: [Audit]
+      operationId: retrieveAuditEvent
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Redacted event detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /audit-exports:
+    post:
+      tags: [Audit]
+      operationId: createAuditExport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditExportCreate'
+      responses:
+        '202':
+          description: Bounded export queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditExport'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /audit-exports/{export_id}:
+    get:
+      tags: [Audit]
+      operationId: retrieveAuditExport
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: Export status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditExport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /audit-exports/{export_id}/download:
+    get:
+      tags: [Audit]
+      operationId: downloadAuditExport
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: Ready, authorized, non-expired CSV export.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    MembershipId:
+      name: membership_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    AssignmentId:
+      name: assignment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EventId:
+      name: event_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    ExportId:
+      name: export_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Unauthorized:
+      description: Authentication required or session revoked.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Authenticated account lacks current permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource unavailable without hidden metadata disclosure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+    Conflict:
+      description: Current state conflicts with requested transition.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    VersionConflict:
+      description: Expected version is stale.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionConflict'
+    RateLimited:
+      description: Request rate exceeded without account disclosure.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+    ValidationError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+    VersionConflict:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [currentVersion]
+          properties:
+            currentVersion:
+              type: integer
+              minimum: 1
+    PasswordRecoveryRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        returnTo:
+          type: string
+          description: Optional approved GradSync path, never an arbitrary origin.
+          maxLength: 255
+    GenericRecoveryAcknowledgement:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: If the account is eligible, recovery instructions will be sent.
+    PasswordRecoveryConfirm:
+      type: object
+      required: [requestId, token, newPassword]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        token:
+          type: string
+          minLength: 32
+          maxLength: 512
+        newPassword:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 256
+    EmailChangeRequest:
+      type: object
+      required: [newEmail, currentPassword]
+      properties:
+        newEmail:
+          type: string
+          format: email
+          maxLength: 254
+        currentPassword:
+          type: string
+          format: password
+          maxLength: 256
+    EmailChangeVerify:
+      type: object
+      required: [requestId, code]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        code:
+          type: string
+          minLength: 6
+          maxLength: 64
+    EmailChangeState:
+      type: object
+      required: [pending]
+      properties:
+        pending:
+          type: boolean
+        requestId:
+          type: string
+          format: uuid
+          nullable: true
+        maskedNewEmail:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+          enum: [pending, verified, cancelled, superseded, expired]
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        deliveryStatus:
+          type: string
+          nullable: true
+    AuthenticatedAccount:
+      type: object
+      required: [id, email, name, global_role, status, accessToken, accessTokenExpiresAt]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        global_role:
+          type: string
+          enum: [admin, advisor, student]
+        status:
+          type: string
+        accessToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+    AccountSession:
+      type: object
+      required: [id, status, current, deviceLabel, createdAt, lastSeenAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, revoked, expired]
+        current:
+          type: boolean
+        deviceLabel:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+    CollaboratorRole:
+      type: string
+      enum: [co_advisor, reviewer, observer]
+    TeacherOption:
+      type: object
+      required: [id, label, name, email, eligibility]
+      properties:
+        id:
+          type: integer
+        label:
+          type: string
+        name:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
+          format: email
+        eligibility:
+          type: object
+          required: [selectable, reason]
+          properties:
+            selectable:
+              type: boolean
+            reason:
+              type: string
+    ProjectRole:
+      type: string
+      enum: [primary_advisor, co_advisor, reviewer, observer, student]
+    ProjectMember:
+      type: object
+      required: [id, user, role, status, version, capabilities]
+      properties:
+        id:
+          type: integer
+        user:
+          $ref: '#/components/schemas/MemberAccount'
+        role:
+          $ref: '#/components/schemas/ProjectRole'
+        status:
+          type: string
+          enum: [active, removed]
+        version:
+          type: integer
+          minimum: 1
+        assignedAt:
+          type: string
+          format: date-time
+        removedAt:
+          type: string
+          format: date-time
+          nullable: true
+        capabilities:
+          type: object
+          required: [canChangeRole, canRemove]
+          properties:
+            canChangeRole:
+              type: boolean
+            canRemove:
+              type: boolean
+            disabledReason:
+              type: string
+    MemberAccount:
+      type: object
+      required: [id, name, nickname, email]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
+          format: email
+    ProjectMemberCreate:
+      type: object
+      required: [accountId, role]
+      properties:
+        accountId:
+          type: integer
+        role:
+          $ref: '#/components/schemas/ProjectRole'
+        reason:
+          type: string
+          maxLength: 1000
+    ProjectMemberUpdate:
+      type: object
+      required: [role, expectedVersion]
+      properties:
+        role:
+          $ref: '#/components/schemas/CollaboratorRole'
+        expectedVersion:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          maxLength: 1000
+    ProjectGovernanceCapabilities:
+      type: object
+      required: [governanceState, canManageMembers, canTransferOwnership, canResolveHold]
+      properties:
+        governanceState:
+          type: string
+          enum: [normal, hold]
+        holdReason:
+          type: string
+        canManageMembers:
+          type: boolean
+        canTransferOwnership:
+          type: boolean
+        canResolveHold:
+          type: boolean
+        disabledReason:
+          type: string
+    OwnershipTransferRequest:
+      type: object
+      required: [newAdvisorId, previousAdvisorResult, expectedProjectVersion]
+      properties:
+        newAdvisorId:
+          type: integer
+        previousAdvisorResult:
+          type: string
+          enum: [co_advisor, reviewer, observer, removed]
+        reason:
+          type: string
+          maxLength: 1000
+        expectedProjectVersion:
+          type: integer
+          minimum: 1
+        idempotencyKey:
+          type: string
+          format: uuid
+    GovernanceHoldResolution:
+      type: object
+      required: [newAdvisorId, reason, expectedProjectVersion]
+      properties:
+        newAdvisorId:
+          type: integer
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        expectedProjectVersion:
+          type: integer
+          minimum: 1
+        idempotencyKey:
+          type: string
+          format: uuid
+    OwnershipTransferResult:
+      type: object
+      required: [transferId, projectId, previousAdvisorId, newAdvisorId, governanceState, projectVersion]
+      properties:
+        transferId:
+          type: string
+          format: uuid
+        projectId:
+          type: integer
+        previousAdvisorId:
+          type: integer
+        newAdvisorId:
+          type: integer
+        governanceState:
+          type: string
+          enum: [normal]
+        projectVersion:
+          type: integer
+          minimum: 1
+    ReviewTargetType:
+      type: string
+      enum: [weekly_report, writing_version, draft_version]
+    ReviewAssignmentCreate:
+      type: object
+      required: [reviewerMembershipId, targetType, targetId]
+      properties:
+        reviewerMembershipId:
+          type: integer
+        targetType:
+          $ref: '#/components/schemas/ReviewTargetType'
+        targetId:
+          type: integer
+    ReviewAssignment:
+      type: object
+      required: [id, projectId, reviewer, targetType, targetId, status, version, assignedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: integer
+        reviewer:
+          $ref: '#/components/schemas/MemberAccount'
+        targetType:
+          $ref: '#/components/schemas/ReviewTargetType'
+        targetId:
+          type: integer
+        targetLabel:
+          type: string
+        status:
+          type: string
+          enum: [active, removed]
+        version:
+          type: integer
+          minimum: 1
+        assignedAt:
+          type: string
+          format: date-time
+        removedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AuditEventSummary:
+      type: object
+      required: [id, category, eventType, outcome, summary, createdAt]
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+        eventType:
+          type: string
+        outcome:
+          type: string
+          enum: [succeeded, denied, failed, queued]
+        summary:
+          type: string
+        actor:
+          $ref: '#/components/schemas/AuditActor'
+        project:
+          $ref: '#/components/schemas/AuditProject'
+        targetType:
+          type: string
+        targetId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    AuditEventDetail:
+      allOf:
+        - $ref: '#/components/schemas/AuditEventSummary'
+        - type: object
+          required: [snapshot, redactionVersion]
+          properties:
+            reason:
+              type: string
+            correlationId:
+              type: string
+            snapshot:
+              type: object
+              additionalProperties: true
+            redactionVersion:
+              type: integer
+    AuditActor:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+    AuditProject:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+    AuditEventPage:
+      type: object
+      required: [results, nextCursor, count, appliedFilters]
+      properties:
+        results:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AuditEventSummary'
+        nextCursor:
+          type: string
+          nullable: true
+        count:
+          type: integer
+          minimum: 0
+        appliedFilters:
+          type: object
+          additionalProperties: true
+    AuditExportCreate:
+      type: object
+      required: [filters]
+      properties:
+        filters:
+          type: object
+          properties:
+            startsAt:
+              type: string
+              format: date-time
+            endsAt:
+              type: string
+              format: date-time
+            actorId:
+              type: integer
+            projectId:
+              type: integer
+            category:
+              type: string
+            outcome:
+              type: string
+            targetType:
+              type: string
+            targetId:
+              type: string
+            q:
+              type: string
+              maxLength: 100
+    AuditExport:
+      type: object
+      required: [id, status, requestedCount, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing, ready, failed, expired]
+        requestedCount:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        exportedCount:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+        failureReason:
+          type: string
+          nullable: true
+        capabilities:
+          type: object
+          required: [canDownload, canRetry]
+          properties:
+            canDownload:
+              type: boolean
+            canRetry:
+              type: boolean

@@ -16,7 +16,7 @@ from tests.factories.shared_workspace import (
 
 
 @pytest.mark.django_db
-def test_project_owner_advisor_and_admin_can_change_project_material_visibility():
+def test_only_project_advisors_can_change_project_material_visibility():
     owner = active_teacher()
     advisor_member = active_teacher()
     student = active_student()
@@ -24,8 +24,8 @@ def test_project_owner_advisor_and_admin_can_change_project_material_visibility(
     project = project_with_members(advisor=owner, students=[student], reviewers=[advisor_member])
 
     assert can_change_project_material_visibility(owner, project)
-    assert can_change_project_material_visibility(advisor_member, project)
-    assert can_change_project_material_visibility(admin, project)
+    assert not can_change_project_material_visibility(advisor_member, project)
+    assert not can_change_project_material_visibility(admin, project)
     assert not can_change_project_material_visibility(student, project)
 
 

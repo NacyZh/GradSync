@@ -1,5 +1,6 @@
 from apps.accounts.models import User
 
+from .access_services import project_capabilities
 from .models import ProjectMembership, ResearchProject
 
 
@@ -12,15 +13,7 @@ def is_active_user(user) -> bool:
 
 
 def is_project_owner_or_advisor(user, project: ResearchProject) -> bool:
-    if not is_active_user(user):
-        return False
-    if project.advisor_id == getattr(user, "id", None):
-        return True
-    return project.memberships.filter(
-        user=user,
-        status=ProjectMembership.Status.ACTIVE,
-        role__in=[ProjectMembership.Role.ADVISOR, ProjectMembership.Role.REVIEWER],
-    ).exists()
+    return bool(project_capabilities(user, project)["canMutateProjectWork"])
 
 
 def is_admin_user(user) -> bool:
@@ -31,7 +24,7 @@ def is_admin_user(user) -> bool:
 
 
 def can_change_project_material_visibility(user, project: ResearchProject) -> bool:
-    return is_admin_user(user) or is_project_owner_or_advisor(user, project)
+    return is_project_owner_or_advisor(user, project)
 
 
 def can_access_project_only_material(user, project: ResearchProject) -> bool:

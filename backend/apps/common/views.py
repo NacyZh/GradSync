@@ -48,9 +48,24 @@ def readyz(_request):
 
 
 def metrics(_request):
+    AccountRecoveryRequest = apps.get_model("accounts", "AccountRecoveryRequest")
+    AccountSession = apps.get_model("accounts", "AccountSession")
+    AuditExport = apps.get_model("audit", "AuditExport")
     Notification = apps.get_model("notifications", "Notification")
     ResearchProject = apps.get_model("projects", "ResearchProject")
     ScheduleNotificationDispatch = apps.get_model("schedules", "ScheduleNotificationDispatch")
+    pending_recoveries = AccountRecoveryRequest.objects.filter(status="pending").count()
+    revoked_sessions = AccountSession.objects.filter(status="revoked").count()
+    oldest_export = (
+        AuditExport.objects.filter(status__in=["queued", "processing"])
+        .order_by("created_at")
+        .first()
+    )
+    export_queue_age = (
+        max(0, int((timezone.now() - oldest_export.created_at).total_seconds()))
+        if oldest_export
+        else 0
+    )
 
     lines = [
         "# HELP gradsync_projects_total Total GradSync projects.",
@@ -59,6 +74,24 @@ def metrics(_request):
         "# HELP gradsync_notifications_pending Pending notification records.",
         "# TYPE gradsync_notifications_pending gauge",
         f"gradsync_notifications_pending {Notification.objects.filter(status='pending').count()}",
+        "# HELP gradsync_account_recovery_pending Pending account recovery requests.",
+        "# TYPE gradsync_account_recovery_pending gauge",
+        f"gradsync_account_recovery_pending {pending_recoveries}",
+        "# HELP gradsync_account_sessions_revoked Revoked authoritative account sessions.",
+        "# TYPE gradsync_account_sessions_revoked gauge",
+        f"gradsync_account_sessions_revoked {revoked_sessions}",
+        "# HELP gradsync_audit_exports_pending Queued or processing audit exports.",
+        "# TYPE gradsync_audit_exports_pending gauge",
+        (
+            "gradsync_audit_exports_pending "
+            f"{AuditExport.objects.filter(status__in=['queued', 'processing']).count()}"
+        ),
+        "# HELP gradsync_audit_export_queue_age_seconds Age of oldest pending audit export.",
+        "# TYPE gradsync_audit_export_queue_age_seconds gauge",
+        f"gradsync_audit_export_queue_age_seconds {export_queue_age}",
+        "# HELP gradsync_audit_exports_failed Failed audit exports.",
+        "# TYPE gradsync_audit_exports_failed gauge",
+        f"gradsync_audit_exports_failed {AuditExport.objects.filter(status='failed').count()}",
         "# HELP gradsync_schedule_dispatch_total Schedule dispatches by channel and status.",
         "# TYPE gradsync_schedule_dispatch_total gauge",
     ]

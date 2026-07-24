@@ -5,6 +5,8 @@ from django.db import models
 class Notification(models.Model):
     class EventType(models.TextChoices):
         VERIFICATION_CODE = "verification_code", "Verification code"
+        PASSWORD_RECOVERY = "password_recovery", "Password recovery"
+        EMAIL_CHANGE_SECURITY = "email_change_security", "Email change security"
         ROLE_ACTIVATION = "role_activation", "Role activation"
         NEW_SUBMISSION = "new_submission", "New submission"
         PENDING_REVIEW = "pending_review", "Pending review"

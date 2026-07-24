@@ -80,6 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     function handleAuthRequired() {
       clearAccessToken();
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== 'current-user',
+      });
       queryClient.setQueryData(['current-user'], null);
     }
     window.addEventListener('gradsync:auth-required', handleAuthRequired);

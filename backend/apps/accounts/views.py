@@ -1,3 +1,6 @@
+import hashlib
+
+from django.conf import settings
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.core.exceptions import ValidationError
 from django.db.models import Q
@@ -12,18 +15,38 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.audit.models import AuditEvent
+from apps.audit.services import record_event
 from apps.common.permissions import IsAdministrator
 
 from .locale_services import get_locale, set_locale
-from .models import RoleActivationRequest, User
+from .models import AccountSession, RoleActivationRequest, User
+from .security_services import (
+    GENERIC_RECOVERY_MESSAGE,
+    cancel_email_change,
+    consume_password_recovery,
+    deliver_email_change,
+    deliver_password_recovery,
+    issue_email_change,
+    issue_password_recovery,
+    pending_email_change,
+    resend_email_change,
+    verify_email_change,
+)
 from .serializers import (
     AccessTokenSerializer,
+    AccountSessionSerializer,
     AccountUpdateSerializer,
     AuthenticatedUserSerializer,
+    EmailChangeRequestSerializer,
+    EmailChangeStateSerializer,
+    EmailChangeVerifySerializer,
     EmailVerificationSerializer,
     LocalePreferenceSerializer,
     LoginSerializer,
     PasswordChangeSerializer,
+    PasswordRecoveryConfirmSerializer,
+    PasswordRecoveryRequestSerializer,
     ProfileUpdateSerializer,
     RegistrationSerializer,
     RoleActivationSerializer,
@@ -40,6 +63,13 @@ from .services import (
     resend_verification_code,
     update_profile,
     verify_email,
+)
+from .session_services import (
+    create_account_session,
+    current_session_id,
+    purge_django_session,
+    revoke_session,
+    revoke_user_sessions,
 )
 from .tokens import (
     clear_refresh_cookie,
@@ -65,7 +95,8 @@ class LoginView(APIView):
         user = serializer.validated_data["user"]
         login(request, user)
         get_token(request)
-        token_payload, refresh = issue_token_pair(user)
+        account_session = create_account_session(user=user, request=request)
+        token_payload, refresh = issue_token_pair(user, account_session)
         response = Response({**UserSerializer(user).data, **token_payload})
         set_refresh_cookie(response, refresh)
         response["Cache-Control"] = "no-store"
@@ -79,12 +110,335 @@ class LogoutView(APIView):
 
     @extend_schema(request=None, responses={204: OpenApiResponse(description="Logged out")})
     def post(self, request):
+        sid = current_session_id(request)
+        if sid:
+            session = AccountSession.objects.filter(pk=sid, user=request.user).first()
+            if session:
+                revoke_session(session=session, actor=request.user, reason="logout")
         revoke_refresh_token(refresh_cookie(request))
         logout(request)
         response = Response(status=status.HTTP_204_NO_CONTENT)
         clear_refresh_cookie(response)
         response["Cache-Control"] = "no-store"
         return response
+
+
+class PasswordRecoveryRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_recovery"
+
+    @extend_schema(
+        request=PasswordRecoveryRequestSerializer,
+        responses={
+            202: OpenApiResponse(description="Generic recovery acknowledgement"),
+            400: OpenApiResponse(description="Validation failed"),
+            429: OpenApiResponse(description="Rate limited"),
+        },
+    )
+    def post(self, request):
+        serializer = PasswordRecoveryRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        normalized_email = User.objects.normalize_email(serializer.validated_data["email"])
+        user = User.objects.filter(
+            email__iexact=normalized_email,
+            status=User.Status.ACTIVE,
+            email_verified_at__isnull=False,
+        ).first()
+        if user is not None:
+            ip = request.META.get("REMOTE_ADDR", "")
+            ip_hash = (
+                hashlib.sha256(f"{settings.SECRET_KEY}:{ip}".encode()).hexdigest() if ip else ""
+            )
+            try:
+                recovery, raw_token = issue_password_recovery(
+                    user=user,
+                    requested_ip_hash=ip_hash,
+                    requested_user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                )
+                deliver_password_recovery(
+                    recovery=recovery,
+                    raw_token=raw_token,
+                    return_to=serializer.validated_data["returnTo"],
+                )
+            except Exception:
+                # The public response remains non-enumerating when delivery or
+                # governance persistence is unavailable.
+                pass
+        return Response(
+            {"message": GENERIC_RECOVERY_MESSAGE},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class PasswordRecoveryConfirmView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_recovery"
+
+    @extend_schema(
+        request=PasswordRecoveryConfirmSerializer,
+        responses={
+            204: OpenApiResponse(description="Password reset completed"),
+            400: OpenApiResponse(description="Validation failed"),
+            409: OpenApiResponse(description="Recovery request conflict"),
+            429: OpenApiResponse(description="Rate limited"),
+        },
+    )
+    def post(self, request):
+        serializer = PasswordRecoveryConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            consume_password_recovery(
+                request_id=serializer.validated_data["requestId"],
+                raw_token=serializer.validated_data["token"],
+                new_password=serializer.validated_data["newPassword"],
+            )
+        except ValidationError as exc:
+            return Response(
+                {"message": "; ".join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValueError as exc:
+            return Response(
+                {"message": str(exc), "code": "recovery_invalid"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EmailChangeView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "email_security"
+
+    @extend_schema(
+        responses={
+            200: EmailChangeStateSerializer,
+            401: OpenApiResponse(description="Authentication required"),
+        }
+    )
+    def get(self, request):
+        change = pending_email_change(request.user)
+        if change is None:
+            return Response({"pending": False})
+        return Response(EmailChangeStateSerializer(change).data)
+
+    @extend_schema(
+        request=EmailChangeRequestSerializer,
+        responses={
+            202: EmailChangeStateSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            401: OpenApiResponse(description="Authentication required"),
+            409: OpenApiResponse(description="Email change conflict"),
+            429: OpenApiResponse(description="Rate limited"),
+        },
+    )
+    def post(self, request):
+        serializer = EmailChangeRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            change, code = issue_email_change(
+                user=request.user,
+                new_email=serializer.validated_data["newEmail"],
+                current_password=serializer.validated_data["currentPassword"],
+            )
+        except ValidationError as exc:
+            return Response(
+                {"message": "; ".join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        deliver_email_change(change, code)
+        change.refresh_from_db()
+        return Response(
+            EmailChangeStateSerializer(change).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @extend_schema(
+        request=None,
+        responses={
+            204: OpenApiResponse(description="Cancelled"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+    )
+    def delete(self, request):
+        cancel_email_change(user=request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EmailChangeVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "email_security"
+
+    @extend_schema(
+        request=EmailChangeVerifySerializer,
+        responses={
+            200: AuthenticatedUserSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            409: OpenApiResponse(description="Email change conflict"),
+            429: OpenApiResponse(description="Rate limited"),
+        },
+    )
+    def post(self, request):
+        serializer = EmailChangeVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            user = verify_email_change(
+                user=request.user,
+                request_id=serializer.validated_data["requestId"],
+                code=serializer.validated_data["code"],
+            )
+        except ValidationError as exc:
+            return Response(
+                {"message": "; ".join(exc.messages)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except ValueError as exc:
+            return Response(
+                {"message": str(exc), "code": "email_change_invalid"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        account_session = create_account_session(user=user, request=request)
+        token_payload, refresh = issue_token_pair(user, account_session)
+        response = Response({**UserSerializer(user).data, **token_payload})
+        set_refresh_cookie(response, refresh)
+        response["Cache-Control"] = "no-store"
+        return response
+
+
+class EmailChangeResendView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "email_security"
+
+    @extend_schema(
+        request=None,
+        responses={
+            202: EmailChangeStateSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            429: OpenApiResponse(description="Rate limited"),
+        },
+    )
+    def post(self, request):
+        try:
+            change, code = resend_email_change(user=request.user)
+        except ValidationError as exc:
+            return Response(
+                {"message": "; ".join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        deliver_email_change(change, code)
+        change.refresh_from_db()
+        return Response(
+            EmailChangeStateSerializer(change).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class AccountSessionListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={
+            200: AccountSessionSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        }
+    )
+    def get(self, request):
+        current = current_session_id(request)
+        sessions = list(
+            AccountSession.objects.filter(user=request.user).order_by("-last_seen_at")[:50]
+        )
+        sessions.sort(key=lambda item: str(item.id) != str(current))
+        serializer = AccountSessionSerializer(
+            sessions,
+            many=True,
+            context={"current_session_id": current},
+        )
+        return Response({"results": serializer.data})
+
+
+class AccountSessionRevokeOthersView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "session_revocation"
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: OpenApiResponse(description="Revoked"),
+            401: OpenApiResponse(description="Authentication required"),
+            409: OpenApiResponse(description="Session conflict"),
+        },
+    )
+    def post(self, request):
+        count = revoke_user_sessions(
+            user=request.user,
+            actor=request.user,
+            exclude_session_id=current_session_id(request),
+            reason="user_revoke_others",
+        )
+        record_event(
+            None,
+            request.user,
+            "account_security.sessions_revoked",
+            "Other account sessions revoked",
+            category=AuditEvent.Category.ACCOUNT_SECURITY,
+            target_snapshot={"revokedCount": count},
+            allowed_snapshot_keys={"revokedCount"},
+        )
+        return Response({"revokedCount": count})
+
+
+class AccountSessionDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "session_revocation"
+
+    @extend_schema(
+        request=None,
+        responses={
+            204: OpenApiResponse(description="Revoked"),
+            400: OpenApiResponse(description="Validation failed"),
+            401: OpenApiResponse(description="Authentication required"),
+            404: OpenApiResponse(description="Session not found"),
+        },
+    )
+    def delete(self, request, session_id):
+        if str(session_id) == str(current_session_id(request)):
+            return Response(
+                {"message": "End the current session through sign out."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        session = AccountSession.objects.filter(
+            pk=session_id,
+            user=request.user,
+        ).first()
+        if session is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        changed = revoke_session(
+            session=session,
+            actor=request.user,
+            reason="user_revoked_session",
+        )
+        if changed:
+            purge_django_session(session)
+            record_event(
+                None,
+                request.user,
+                "account_security.session_revoked",
+                "Account session revoked",
+                session,
+                category=AuditEvent.Category.ACCOUNT_SECURITY,
+                target_snapshot={"status": AccountSession.Status.REVOKED},
+                allowed_snapshot_keys={"status"},
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator(csrf_protect, name="dispatch")
@@ -241,6 +595,12 @@ class PasswordChangeView(APIView):
         except ValidationError as exc:
             return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         update_session_auth_hash(request, user)
+        revoke_user_sessions(
+            user=user,
+            actor=user,
+            exclude_session_id=current_session_id(request),
+            reason="password_changed",
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -249,9 +609,9 @@ class RoleActivationListView(generics.ListAPIView):
     serializer_class = RoleActivationSerializer
 
     def get_queryset(self):
-        queryset = RoleActivationRequest.objects.select_related(
-            "user", "reviewer"
-        ).order_by("-created_at")
+        queryset = RoleActivationRequest.objects.select_related("user", "reviewer").order_by(
+            "-created_at"
+        )
         request_status = self.request.query_params.get("status")
         if request_status == "processed":
             queryset = queryset.exclude(status=RoleActivationRequest.Status.PENDING)

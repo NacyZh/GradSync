@@ -18,11 +18,12 @@ import { TaskForm } from '../tasks/TaskForm';
 import { TaskStatusControl } from '../tasks/TaskStatusControl';
 import { TaskTree, type TaskNode } from '../tasks/TaskTree';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
+import { ProjectCollaboratorsPanel } from './ProjectCollaboratorsPanel';
 import { archiveProject, deleteProject, getProject, reopenProject, type Project } from './api';
 import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 
 export function ProjectDashboardPage() {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const projectId = Number(useParams().projectId ?? 0);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -174,6 +175,13 @@ export function ProjectDashboardPage() {
           message="Tasks, memberships, submissions, comments, bookings, and reminders are read-only until this project is reopened."
         />
       ) : null}
+      {project.governanceState === 'hold' ? (
+        <DataState
+          state="warning"
+          title={t('projectGovernanceOnHold')}
+          message={`${t('projectGovernanceHoldPrefix')} ${project.governanceHoldReason || t('administratorReviewRequired')}.`}
+        />
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Project summary">
         <MetricCard icon={ClipboardList} label="Current tasks" value={flattenedTasks.length} detail={translateUiText(`${progress}% complete`, locale)} />
@@ -266,6 +274,13 @@ export function ProjectDashboardPage() {
           <ProjectMembersPanel projectId={projectId} members={project.memberships} disabled={archived} canManageMembers={capabilities.canManageMembers} />
         </aside>
       </div>
+
+      <ProjectCollaboratorsPanel
+        projectId={projectId}
+        members={project.memberships ?? []}
+        canManage={Boolean(capabilities.canManageCollaborators)}
+        disabled={archived || project.governanceState === 'hold'}
+      />
 
       {capabilities.canCreateTasks ? (
         <section className="panel" aria-label="Create task">

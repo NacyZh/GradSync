@@ -64,6 +64,13 @@ jobs:
           cache: pip
       - name: Check generated artifacts before backend install
         run: sh scripts/check-generated-artifacts.sh
+      - name: Report specification acceptance blockers
+        run: python scripts/check-spec-acceptance.py --mode report --json-output backend-acceptance-report.json
+      - name: Upload backend acceptance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-acceptance-report
+          path: backend-acceptance-report.json
       - name: Install backend
         working-directory: backend
         run: |
@@ -151,6 +158,13 @@ jobs:
         run: npm ci
       - name: Check generated artifacts before frontend gates
         run: sh scripts/check-generated-artifacts.sh
+      - name: Report specification acceptance blockers
+        run: python3 scripts/check-spec-acceptance.py --mode report --json-output frontend-acceptance-report.json
+      - name: Upload frontend acceptance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-acceptance-report
+          path: frontend-acceptance-report.json
       - name: Lint frontend
         working-directory: frontend
         run: npm run lint
@@ -240,10 +254,28 @@ jobs:
       - name: Check generated artifacts after full-stack e2e
         run: sh scripts/check-generated-artifacts.sh
 
+  acceptance-enforce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [backend, frontend, frontend-e2e]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Enforce production specification acceptance
+        run: python3 scripts/check-spec-acceptance.py --mode enforce --scope production --json-output acceptance-enforcement.json
+      - name: Upload acceptance enforcement evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-enforcement
+          path: acceptance-enforcement.json
+          if-no-files-found: error
+
   production-image:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [backend, frontend, frontend-e2e]
+    needs: [backend, frontend, frontend-e2e, acceptance-enforce]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -258,7 +290,7 @@ jobs:
   deploy-production:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [backend, frontend, frontend-e2e, production-image]
+    needs: [backend, frontend, frontend-e2e, acceptance-enforce, production-image]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     concurrency:
       group: production

@@ -9,6 +9,7 @@ class UploadedFile(models.Model):
         DOCUMENT = "document", "Document"
         WRITING = "writing", "Writing"
         FEEDBACK = "feedback", "Feedback"
+        AUDIT_EXPORT = "audit_export", "Audit export"
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="uploaded_files"

@@ -36,6 +36,9 @@ git fetch origin "$BRANCH"
 git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH"
 
+echo "Enforcing production specification acceptance"
+python3 scripts/check-spec-acceptance.py --mode enforce --scope production
+
 echo "Stopping application services before image build to reduce memory pressure"
 compose stop backend frontend worker scheduler || true
 compose rm -f backend frontend worker scheduler || true

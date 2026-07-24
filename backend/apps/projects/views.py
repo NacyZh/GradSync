@@ -1,5 +1,6 @@
 import re
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
@@ -17,7 +18,25 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.downloads import DownloadUnavailable
+from apps.submissions.models import (
+    DraftVersion,
+    SubmissionReviewAssignment,
+    WeeklyProgressReport,
+    WritingVersion,
+)
+from apps.submissions.review_assignment_services import (
+    assign_reviewer,
+    remove_review_assignment,
+)
+from apps.submissions.serializers import SubmissionReviewAssignmentSerializer
 
+from .collaboration_services import (
+    assign_collaborator,
+    change_collaborator_role,
+    remove_collaborator,
+    search_eligible_teachers,
+    transfer_ownership,
+)
 from .legacy_link_services import resolve_legacy_project_link
 from .material_services import (
     change_project_material_visibility,
@@ -27,7 +46,11 @@ from .material_services import (
 )
 from .models import ProjectMaterial, ProjectMembership, ResearchProject
 from .serializers import (
+    CollaboratorCreateSerializer,
+    CollaboratorUpdateSerializer,
     MembershipCreateSerializer,
+    OwnershipTransferResultSerializer,
+    OwnershipTransferSerializer,
     ProjectCreateSerializer,
     ProjectDashboardSerializer,
     ProjectMaterialCreateSerializer,
@@ -67,7 +90,7 @@ from .services import ProjectService, can_create_projects, project_event_feed, p
             401: OpenApiResponse(description="Authentication required"),
             403: OpenApiResponse(description="Project access forbidden"),
             404: OpenApiResponse(description="Project not found"),
-        }
+        },
     ),
 )
 class ProjectViewSet(
@@ -149,7 +172,13 @@ class ProjectViewSet(
             409: OpenApiResponse(description="Duplicate or stale membership"),
         },
     )
-    @extend_schema(methods=["GET"], responses={200: ProjectMembershipSerializer(many=True)})
+    @extend_schema(
+        methods=["GET"],
+        responses={
+            200: ProjectMembershipSerializer(many=True),
+            403: OpenApiResponse(description="Membership access forbidden"),
+        },
+    )
     @action(detail=True, methods=["get", "post"], url_path="members")
     def members(self, request, pk=None):
         if request.method == "GET":
@@ -179,6 +208,235 @@ class ProjectViewSet(
             ProjectMembershipSerializer(membership).data, status=status.HTTP_201_CREATED
         )
 
+    @action(detail=True, methods=["get", "post"], url_path="collaborators")
+    def collaborators(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "GET":
+            memberships = project.memberships.select_related("user").filter(
+                role__in=[
+                    ProjectMembership.Role.ADVISOR,
+                    ProjectMembership.Role.CO_ADVISOR,
+                    ProjectMembership.Role.REVIEWER,
+                    ProjectMembership.Role.OBSERVER,
+                ]
+            )
+            return Response({"results": ProjectMembershipSerializer(memberships, many=True).data})
+        serializer = CollaboratorCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = get_object_or_404(get_user_model(), pk=serializer.validated_data["userId"])
+        try:
+            membership = assign_collaborator(
+                actor=request.user,
+                project=project,
+                user=user,
+                role=serializer.validated_data["role"],
+                reason=serializer.validated_data.get("reason", ""),
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
+        return Response(
+            ProjectMembershipSerializer(membership).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        detail=True,
+        methods=["patch", "delete"],
+        url_path="collaborators/(?P<membership_id>[^/.]+)",
+    )
+    def collaborator_detail(self, request, pk=None, membership_id=None):
+        project = self.get_object()
+        membership = get_object_or_404(ProjectMembership, project=project, pk=membership_id)
+        try:
+            if request.method == "PATCH":
+                serializer = CollaboratorUpdateSerializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                membership = change_collaborator_role(
+                    actor=request.user,
+                    membership=membership,
+                    role=serializer.validated_data["role"],
+                    expected_version=serializer.validated_data["expectedVersion"],
+                    reason=serializer.validated_data.get("reason", ""),
+                )
+                return Response(ProjectMembershipSerializer(membership).data)
+            expected_version = request.query_params.get("expectedVersion")
+            if membership.role == ProjectMembership.Role.STUDENT and not expected_version:
+                ProjectService(request.user).remove_member(membership)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            if not expected_version:
+                raise ValidationError({"expectedVersion": "This parameter is required."})
+            remove_collaborator(
+                actor=request.user,
+                membership=membership,
+                expected_version=int(expected_version),
+                reason=request.query_params.get("reason", ""),
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(
+        methods=["POST"],
+        request=OwnershipTransferSerializer,
+        responses={
+            200: OwnershipTransferResultSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Transfer forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="ownership-transfer")
+    def ownership_transfer(self, request, pk=None):
+        project = self.get_object()
+        serializer = OwnershipTransferSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        new_advisor = get_object_or_404(
+            get_user_model(), pk=serializer.validated_data["newAdvisorId"]
+        )
+        try:
+            transfer = transfer_ownership(
+                actor=request.user,
+                project=project,
+                new_advisor=new_advisor,
+                expected_version=serializer.validated_data["expectedVersion"],
+                previous_advisor_result=serializer.validated_data["previousAdvisorResult"],
+                reason=serializer.validated_data.get("reason", ""),
+                idempotency_key=serializer.validated_data.get("idempotencyKey", ""),
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
+        return Response(OwnershipTransferResultSerializer(transfer).data)
+
+    @extend_schema(
+        methods=["POST"],
+        request=OwnershipTransferSerializer,
+        responses={
+            200: OwnershipTransferResultSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Resolution forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="governance-hold/resolve")
+    def resolve_governance_hold(self, request, pk=None):
+        return self.ownership_transfer(request, pk=pk)
+
+    @extend_schema(
+        methods=["GET"],
+        parameters=[
+            OpenApiParameter("reviewerId", int, OpenApiParameter.QUERY),
+            OpenApiParameter("targetType", str, OpenApiParameter.QUERY),
+            OpenApiParameter("status", str, OpenApiParameter.QUERY),
+        ],
+        responses={
+            200: SubmissionReviewAssignmentSerializer(many=True),
+            403: OpenApiResponse(description="Assignment access forbidden"),
+        },
+    )
+    @extend_schema(
+        methods=["POST"],
+        request=SubmissionReviewAssignmentSerializer,
+        responses={
+            201: SubmissionReviewAssignmentSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Assignment forbidden"),
+            409: OpenApiResponse(description="Assignment conflict"),
+        },
+    )
+    @action(detail=True, methods=["get", "post"], url_path="review-assignments")
+    def review_assignments(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "GET":
+            assignments = project.review_assignments.select_related("reviewer_membership__user")
+            return Response(
+                {"results": SubmissionReviewAssignmentSerializer(assignments, many=True).data}
+            )
+        serializer = SubmissionReviewAssignmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = get_object_or_404(
+            ProjectMembership,
+            project=project,
+            pk=serializer.validated_data["reviewer_membership_id"],
+        )
+        targets = [
+            (
+                serializer.validated_data.get("weekly_report_id"),
+                WeeklyProgressReport,
+            ),
+            (
+                serializer.validated_data.get("writing_version_id"),
+                WritingVersion,
+            ),
+            (
+                serializer.validated_data.get("draft_version_id"),
+                DraftVersion,
+            ),
+        ]
+        selected = [(target_id, model) for target_id, model in targets if target_id]
+        if len(selected) != 1:
+            raise ValidationError({"message": "Select exactly one review target."})
+        target_id, model = selected[0]
+        target = get_object_or_404(model, pk=target_id)
+        try:
+            assignment = assign_reviewer(
+                actor=request.user,
+                project=project,
+                reviewer_membership=membership,
+                target=target,
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
+        return Response(
+            SubmissionReviewAssignmentSerializer(assignment).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @extend_schema(
+        methods=["DELETE"],
+        parameters=[
+            OpenApiParameter(
+                "expectedVersion",
+                int,
+                OpenApiParameter.QUERY,
+                required=True,
+            )
+        ],
+        responses={
+            204: OpenApiResponse(description="Assignment removed"),
+            403: OpenApiResponse(description="Assignment removal forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path="review-assignments/(?P<assignment_id>[^/.]+)",
+    )
+    def review_assignment_detail(self, request, pk=None, assignment_id=None):
+        project = self.get_object()
+        assignment = get_object_or_404(
+            SubmissionReviewAssignment, project=project, pk=assignment_id
+        )
+        try:
+            remove_review_assignment(
+                actor=request.user,
+                assignment=assignment,
+                expected_version=int(request.query_params.get("expectedVersion", 0)),
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError({"message": exc.messages[0]}) from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=["post"], url_path="members/(?P<membership_id>[^/.]+)/remove")
     def remove_member(self, request, pk=None, membership_id=None):
         project = self.get_object()
@@ -192,19 +450,65 @@ class ProjectViewSet(
         return Response(ProjectMembershipSerializer(membership).data)
 
     @extend_schema(
-        methods=["DELETE"],
+        methods=["PATCH"],
+        request=CollaboratorUpdateSerializer,
         responses={
-            204: OpenApiResponse(description="Membership removed"),
-            403: OpenApiResponse(description="Membership removal forbidden"),
-            404: OpenApiResponse(description="Membership not found"),
+            200: ProjectMembershipSerializer,
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Membership change forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
         },
     )
-    @action(detail=True, methods=["delete"], url_path="members/(?P<membership_id>[^/.]+)")
+    @extend_schema(
+        methods=["DELETE"],
+        parameters=[
+            OpenApiParameter(
+                "expectedVersion",
+                int,
+                OpenApiParameter.QUERY,
+                required=True,
+            ),
+            OpenApiParameter("reason", str, OpenApiParameter.QUERY),
+        ],
+        responses={
+            204: OpenApiResponse(description="Membership removed"),
+            400: OpenApiResponse(description="Validation failed"),
+            403: OpenApiResponse(description="Membership removal forbidden"),
+            409: OpenApiResponse(description="Version conflict"),
+        },
+    )
+    @action(
+        detail=True,
+        methods=["patch", "delete"],
+        url_path="members/(?P<membership_id>[^/.]+)",
+    )
     def delete_member(self, request, pk=None, membership_id=None):
         project = self.get_object()
         membership = get_object_or_404(ProjectMembership, project=project, pk=membership_id)
         try:
-            ProjectService(request.user).remove_member(membership)
+            if request.method == "PATCH":
+                serializer = CollaboratorUpdateSerializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                membership = change_collaborator_role(
+                    actor=request.user,
+                    membership=membership,
+                    role=serializer.validated_data["role"],
+                    expected_version=serializer.validated_data["expectedVersion"],
+                    reason=serializer.validated_data.get("reason", ""),
+                )
+                return Response(ProjectMembershipSerializer(membership).data)
+            expected_version = request.query_params.get("expectedVersion")
+            if membership.role == ProjectMembership.Role.STUDENT and not expected_version:
+                ProjectService(request.user).remove_member(membership)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            if not expected_version:
+                raise ValidationError({"expectedVersion": "This parameter is required."})
+            remove_collaborator(
+                actor=request.user,
+                membership=membership,
+                expected_version=int(expected_version),
+                reason=request.query_params.get("reason", ""),
+            )
         except DjangoPermissionDenied as exc:
             raise PermissionDenied(str(exc)) from exc
         except DjangoValidationError as exc:
@@ -284,9 +588,9 @@ class ProjectViewSet(
                     material.id
                     for material in queryset
                     if query.casefold()
-                    in ProjectMaterialSerializer(
-                        material, context={"request": request}
-                    ).data.get("displayName", "").casefold()
+                    in ProjectMaterialSerializer(material, context={"request": request})
+                    .data.get("displayName", "")
+                    .casefold()
                 ]
                 queryset = queryset.filter(id__in=matching_ids)
             return Response(
@@ -410,4 +714,49 @@ class LegacyBoundaryLinkView(views.APIView):
                 "message": resolution.message,
             },
             status=resolution.status_code,
+        )
+
+
+class EligibleTeacherSearchView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("q", str, OpenApiParameter.QUERY),
+            OpenApiParameter("projectId", int, OpenApiParameter.QUERY),
+            OpenApiParameter("role", str, OpenApiParameter.QUERY),
+            OpenApiParameter("limit", int, OpenApiParameter.QUERY),
+        ],
+        responses={
+            200: OpenApiResponse(description="Eligible teacher options"),
+            401: OpenApiResponse(description="Authentication required"),
+            403: OpenApiResponse(description="Teacher search forbidden"),
+        },
+    )
+    def get(self, request):
+        project = None
+        if request.query_params.get("projectId"):
+            project = get_object_or_404(
+                projects_visible_to(request.user),
+                pk=request.query_params["projectId"],
+            )
+        teachers = search_eligible_teachers(
+            actor=request.user,
+            query=request.query_params.get("q", ""),
+            project=project,
+            limit=int(request.query_params.get("limit", 25)),
+        )
+        return Response(
+            {
+                "results": [
+                    {
+                        "id": teacher.id,
+                        "name": teacher.name,
+                        "nickname": teacher.nickname,
+                        "email": teacher.email,
+                        "label": teacher.nickname or teacher.name or teacher.email,
+                    }
+                    for teacher in teachers
+                ]
+            }
         )

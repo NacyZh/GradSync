@@ -56,4 +56,4 @@ def test_student_cannot_write_and_archived_project_cannot_be_configured(api_clie
     admin = UserFactory(global_role="admin")
     project.status = ResearchProject.Status.ARCHIVED
     project.save(update_fields=["status"])
-    assert authenticate(api_client, admin).put(path, payload, format="json").status_code == 400
+    assert authenticate(api_client, admin).put(path, payload, format="json").status_code == 403

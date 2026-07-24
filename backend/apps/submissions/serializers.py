@@ -3,11 +3,53 @@ from rest_framework import serializers
 from .models import (
     InlineComment,
     ProjectReportSchedule,
+    SubmissionReviewAssignment,
     TeacherFeedback,
     WeeklyProgressReport,
     WritingProject,
     WritingVersion,
 )
+
+
+class SubmissionReviewAssignmentSerializer(serializers.ModelSerializer):
+    reviewerMembershipId = serializers.IntegerField(
+        source="reviewer_membership_id", required=False
+    )
+    weeklyReportId = serializers.IntegerField(
+        source="weekly_report_id", required=False, allow_null=True
+    )
+    writingVersionId = serializers.IntegerField(
+        source="writing_version_id", required=False, allow_null=True
+    )
+    draftVersionId = serializers.IntegerField(
+        source="draft_version_id", required=False, allow_null=True
+    )
+    reviewerName = serializers.CharField(
+        source="reviewer_membership.user.name", read_only=True
+    )
+
+    class Meta:
+        model = SubmissionReviewAssignment
+        fields = [
+            "id",
+            "reviewerMembershipId",
+            "reviewerName",
+            "weeklyReportId",
+            "writingVersionId",
+            "draftVersionId",
+            "status",
+            "version",
+            "assigned_at",
+            "removed_at",
+        ]
+        read_only_fields = [
+            "id",
+            "reviewerName",
+            "status",
+            "version",
+            "assigned_at",
+            "removed_at",
+        ]
 
 
 class ProjectReportScheduleWriteSerializer(serializers.Serializer):

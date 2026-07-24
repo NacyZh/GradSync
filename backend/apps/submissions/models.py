@@ -1,3 +1,4 @@
+import uuid
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
@@ -301,4 +302,107 @@ class TeacherFeedback(models.Model):
                 fields=["writing_version", "submitted_at"], name="sub_feedback_version_idx"
             ),
             models.Index(fields=["reviewer", "submitted_at"], name="sub_feedback_reviewer_idx"),
+        ]
+
+
+class SubmissionReviewAssignment(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REMOVED = "removed", "Removed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.CASCADE,
+        related_name="review_assignments",
+    )
+    reviewer_membership = models.ForeignKey(
+        "projects.ProjectMembership",
+        on_delete=models.PROTECT,
+        related_name="review_assignments",
+    )
+    weekly_report = models.ForeignKey(
+        WeeklyProgressReport,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="review_assignments",
+    )
+    writing_version = models.ForeignKey(
+        WritingVersion,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="review_assignments",
+    )
+    draft_version = models.ForeignKey(
+        DraftVersion,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="review_assignments",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_review_assignments",
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    removed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="removed_review_assignments",
+    )
+    removed_at = models.DateTimeField(null=True, blank=True)
+    version = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (
+                        models.Q(weekly_report__isnull=False)
+                        & models.Q(writing_version__isnull=True)
+                        & models.Q(draft_version__isnull=True)
+                    )
+                    | (
+                        models.Q(weekly_report__isnull=True)
+                        & models.Q(writing_version__isnull=False)
+                        & models.Q(draft_version__isnull=True)
+                    )
+                    | (
+                        models.Q(weekly_report__isnull=True)
+                        & models.Q(writing_version__isnull=True)
+                        & models.Q(draft_version__isnull=False)
+                    )
+                ),
+                name="review_assignment_exactly_one_target",
+            ),
+            models.UniqueConstraint(
+                fields=["reviewer_membership", "weekly_report"],
+                condition=models.Q(status="active", weekly_report__isnull=False),
+                name="unique_active_weekly_review_assignment",
+            ),
+            models.UniqueConstraint(
+                fields=["reviewer_membership", "writing_version"],
+                condition=models.Q(status="active", writing_version__isnull=False),
+                name="unique_active_writing_review_assignment",
+            ),
+            models.UniqueConstraint(
+                fields=["reviewer_membership", "draft_version"],
+                condition=models.Q(status="active", draft_version__isnull=False),
+                name="unique_active_draft_review_assignment",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["reviewer_membership", "status", "-assigned_at"],
+                name="sub_review_member_idx",
+            ),
+            models.Index(fields=["weekly_report", "status"], name="sub_review_weekly_idx"),
+            models.Index(fields=["writing_version", "status"], name="sub_review_writing_idx"),
+            models.Index(fields=["draft_version", "status"], name="sub_review_draft_idx"),
         ]

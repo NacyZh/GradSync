@@ -68,7 +68,7 @@ def test_project_dashboard_capabilities_are_role_specific(api_client):
 
 
 @pytest.mark.django_db
-def test_admin_can_view_and_manage_all_projects(api_client):
+def test_admin_can_view_all_projects_without_ordinary_management(api_client):
     admin = UserFactory(global_role="admin")
     advisor = UserFactory(global_role="advisor")
     project = ResearchProject.objects.create(title="Admin Visible", advisor=advisor)
@@ -79,7 +79,8 @@ def test_admin_can_view_and_manage_all_projects(api_client):
 
     assert list_response.status_code == 200
     assert [item["title"] for item in list_response.json()["results"]] == ["Admin Visible"]
-    assert detail_response.json()["capabilities"]["canManageProject"] is True
+    assert detail_response.json()["capabilities"]["canManageProject"] is False
+    assert detail_response.json()["capabilities"]["canSuperviseGovernance"] is True
 
 
 @pytest.mark.django_db

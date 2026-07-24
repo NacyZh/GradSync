@@ -320,6 +320,77 @@ export async function mockUnauthenticated(page: Page) {
   });
 }
 
+export async function mockAccountSecurity(page: Page) {
+  if (fullStackE2E) return;
+  await page.route('**/api/accounts/password-recovery/', async (route) => {
+    await fulfillJson(route, {
+      message: 'If the account is eligible, recovery instructions will be sent.',
+    }, 202);
+  });
+  await page.route('**/api/accounts/password-recovery/confirm/', async (route) => {
+    await route.fulfill({ status: 204 });
+  });
+  await page.route('**/api/accounts/me/email-change/', async (route) => {
+    if (route.request().method() === 'GET') {
+      await fulfillJson(route, { pending: false });
+      return;
+    }
+    await fulfillJson(route, {
+      pending: true,
+      requestId: '11111111-1111-4111-8111-111111111111',
+      maskedNewEmail: 'n**@example.edu',
+      status: 'pending',
+      expiresAt: '2099-01-01T00:00:00Z',
+      deliveryStatus: 'sent',
+    }, 202);
+  });
+  await page.route('**/api/accounts/me/sessions/', async (route) => {
+    await fulfillJson(route, {
+      results: [{
+        id: '22222222-2222-4222-8222-222222222222',
+        status: 'active',
+        current: true,
+        deviceLabel: 'Chrome on Linux',
+        createdAt: '2026-07-24T00:00:00Z',
+        lastSeenAt: '2026-07-24T00:00:00Z',
+        expiresAt: '2099-01-01T00:00:00Z',
+        revokedAt: null,
+      }],
+    });
+  });
+}
+
+export async function mockAuditConsole(page: Page) {
+  if (fullStackE2E) return;
+  await page.route('**/api/audit-events?*', async (route) => {
+    await fulfillJson(route, {
+      results: [{
+        id: 91,
+        eventType: 'project_governance.ownership_transferred',
+        category: 'project_governance',
+        outcome: 'succeeded',
+        summary: 'Ownership transferred',
+        createdAt: '2026-07-24T00:00:00Z',
+      }],
+      nextCursor: null,
+      capabilities: { canExport: true },
+    });
+  });
+  await page.route('**/api/audit-events/91', async (route) => {
+    await fulfillJson(route, {
+      id: 91,
+      eventType: 'project_governance.ownership_transferred',
+      category: 'project_governance',
+      outcome: 'succeeded',
+      summary: 'Ownership transferred',
+      actorSnapshot: { name: 'Administrator' },
+      targetSnapshot: { status: 'normal' },
+      capabilities: { canExport: true },
+      createdAt: '2026-07-24T00:00:00Z',
+    });
+  });
+}
+
 export async function mockUnavailableTokenRefresh(page: Page) {
   await page.route('**/api/accounts/token/refresh/', async (route) => {
     await route.fulfill({ status: 401, json: { message: 'Refresh token is required.' } });

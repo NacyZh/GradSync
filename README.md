@@ -102,6 +102,23 @@ sh scripts/check-openapi-contract.sh specs/003-research-collab-platform/contract
 See `specs/001-research-group-ops/quickstart.md` and
 `specs/003-research-collab-platform/quickstart.md` for scenario validation.
 
+For account security and access governance Phase 1/2/US1 validation:
+
+```bash
+cd backend
+../.venv/bin/python manage.py makemigrations --check --dry-run
+../.venv/bin/pytest tests/unit/test_audit_redaction.py tests/unit/test_account_security_lifecycle.py tests/contract/test_account_security_api.py tests/contract/test_account_sessions_api.py
+cd ../frontend
+npm run lint
+npm run test -- --run tests/component/account-security.test.tsx tests/component/login.test.tsx
+npm run build
+```
+
+Configure recovery/email TTLs, scoped throttles, the exact approved frontend
+origin, session activity interval, and audit retention/export bounds using the
+`GRADSYNC_*` values documented in `.env.example`. Raw recovery and verification
+secrets are email-only and must never be persisted in notifications or logs.
+
 For the paper library workflow feature, run the focused validation set in
 `specs/004-paper-library-workflow/quickstart.md`:
 

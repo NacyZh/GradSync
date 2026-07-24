@@ -20,4 +20,7 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
     "login": None,
     "invite": None,
     "registration": None,
+    "password_recovery": None,
+    "email_security": None,
+    "session_revocation": None,
 }

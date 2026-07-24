@@ -1,10 +1,12 @@
 import contextvars
 import logging
+import re
 import uuid
 
 from apps.common.error_reporting import capture_exception
 
 request_id_var = contextvars.ContextVar("request_id", default="-")
+_SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,63}$")
 
 
 class RequestIDMiddleware:
@@ -15,7 +17,8 @@ class RequestIDMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        request_id = request.META.get(self.header_name) or uuid.uuid4().hex
+        supplied = str(request.META.get(self.header_name, "")).strip()
+        request_id = supplied if _SAFE_REQUEST_ID.fullmatch(supplied) else uuid.uuid4().hex
         token = request_id_var.set(request_id)
         request.request_id = request_id
         try:

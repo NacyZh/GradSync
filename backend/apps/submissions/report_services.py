@@ -7,6 +7,7 @@ from apps.notifications.models import Notification
 from apps.projects.archive_services import ensure_project_writable
 
 from .models import WeeklyProgressReport
+from .review_assignment_services import reviewer_can_access_target
 
 
 class WeeklyReportService(ProjectScopedService):
@@ -39,7 +40,7 @@ class WeeklyReportService(ProjectScopedService):
             **data,
         )
         for membership in self.project.memberships.filter(
-            role__in=["advisor", "reviewer"], status="active"
+            role__in=["advisor", "co_advisor"], status="active"
         ):
             Notification.objects.create(
                 project=self.project,
@@ -64,7 +65,8 @@ class WeeklyReportService(ProjectScopedService):
     def update_review_status(
         self, report: WeeklyProgressReport, review_status: str
     ) -> WeeklyProgressReport:
-        self.require_project_reviewer(self.project)
+        if not reviewer_can_access_target(user=self.user, target=report):
+            raise PermissionDenied("You are not assigned to review this report")
         ensure_project_writable(self.project)
         report.review_status = review_status
         report.reviewed_at = timezone.now()

@@ -77,3 +77,90 @@ export function changePassword(payload: { currentPassword: string; newPassword: 
     body: JSON.stringify(payload),
   });
 }
+
+export function requestPasswordRecovery(payload: {
+  email: string;
+  returnTo?: string;
+}): Promise<{ message: string }> {
+  return apiRequest('/api/accounts/password-recovery/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function confirmPasswordRecovery(payload: {
+  requestId: string;
+  token: string;
+  newPassword: string;
+}): Promise<void> {
+  return apiRequest('/api/accounts/password-recovery/confirm/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type EmailChangeState = {
+  pending: boolean;
+  requestId?: string | null;
+  maskedNewEmail?: string | null;
+  status?: 'pending' | 'verified' | 'cancelled' | 'superseded' | 'expired' | null;
+  expiresAt?: string | null;
+  deliveryStatus?: string | null;
+};
+
+export function fetchEmailChange(): Promise<EmailChangeState> {
+  return apiRequest('/api/accounts/me/email-change/');
+}
+
+export function requestEmailChange(payload: {
+  newEmail: string;
+  currentPassword: string;
+}): Promise<EmailChangeState> {
+  return apiRequest('/api/accounts/me/email-change/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelEmailChange(): Promise<void> {
+  return apiRequest('/api/accounts/me/email-change/', { method: 'DELETE' });
+}
+
+export function resendEmailChange(): Promise<EmailChangeState> {
+  return apiRequest('/api/accounts/me/email-change/resend/', { method: 'POST' });
+}
+
+export async function verifyEmailChange(payload: {
+  requestId: string;
+  code: string;
+}): Promise<CurrentUser> {
+  const response = await apiRequest<LoginResponse>('/api/accounts/me/email-change/verify/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  setAccessToken(response);
+  return response;
+}
+
+export type AccountSession = {
+  id: string;
+  status: 'active' | 'revoked' | 'expired';
+  current: boolean;
+  deviceLabel: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  revokedAt?: string | null;
+};
+
+export function fetchAccountSessions(): Promise<{ results: AccountSession[] }> {
+  return apiRequest('/api/accounts/me/sessions/');
+}
+
+export function revokeAccountSession(sessionId: string): Promise<void> {
+  return apiRequest(`/api/accounts/me/sessions/${sessionId}/`, { method: 'DELETE' });
+}
+
+export function revokeOtherAccountSessions(): Promise<{ revokedCount: number }> {
+  return apiRequest('/api/accounts/me/sessions/revoke-others/', { method: 'POST' });
+}

@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import RoleActivationRequest, User
+from .models import AccountSession, EmailChangeRequest, RoleActivationRequest, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -40,6 +40,96 @@ class AuthenticatedUserSerializer(UserSerializer):
 class AccessTokenSerializer(serializers.Serializer):
     accessToken = serializers.CharField(read_only=True)
     accessTokenExpiresAt = serializers.DateTimeField(read_only=True)
+
+
+class PasswordRecoveryRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+    returnTo = serializers.CharField(max_length=255, required=False, default="/reset-password")
+
+    def validate_returnTo(self, value):
+        if not value.startswith("/") or value.startswith("//"):
+            raise serializers.ValidationError("Return path is not allowed.")
+        return value
+
+
+class PasswordRecoveryConfirmSerializer(serializers.Serializer):
+    requestId = serializers.UUIDField()
+    token = serializers.CharField(min_length=32, max_length=512, trim_whitespace=False)
+    newPassword = serializers.CharField(
+        min_length=10, max_length=256, trim_whitespace=False, write_only=True
+    )
+
+
+class EmailChangeRequestSerializer(serializers.Serializer):
+    newEmail = serializers.EmailField(max_length=254)
+    currentPassword = serializers.CharField(max_length=256, trim_whitespace=False, write_only=True)
+
+
+class EmailChangeVerifySerializer(serializers.Serializer):
+    requestId = serializers.UUIDField()
+    code = serializers.CharField(min_length=6, max_length=64, trim_whitespace=True)
+
+
+def mask_email(value: str) -> str:
+    local, separator, domain = value.partition("@")
+    if not separator:
+        return "***"
+    visible = local[:1]
+    return f"{visible}{'*' * max(2, len(local) - 1)}@{domain}"
+
+
+class EmailChangeStateSerializer(serializers.ModelSerializer):
+    pending = serializers.SerializerMethodField()
+    requestId = serializers.UUIDField(source="id", read_only=True)
+    maskedNewEmail = serializers.SerializerMethodField()
+    expiresAt = serializers.DateTimeField(source="expires_at", read_only=True)
+    deliveryStatus = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmailChangeRequest
+        fields = [
+            "pending",
+            "requestId",
+            "maskedNewEmail",
+            "status",
+            "expiresAt",
+            "deliveryStatus",
+        ]
+
+    def get_pending(self, obj):
+        return obj.status == EmailChangeRequest.Status.PENDING
+
+    def get_maskedNewEmail(self, obj):
+        return mask_email(obj.new_email)
+
+    def get_deliveryStatus(self, obj):
+        notification = obj.delivery_notification
+        return notification.status if notification else None
+
+
+class AccountSessionSerializer(serializers.ModelSerializer):
+    current = serializers.SerializerMethodField()
+    deviceLabel = serializers.CharField(source="device_label", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+    lastSeenAt = serializers.DateTimeField(source="last_seen_at", read_only=True)
+    expiresAt = serializers.DateTimeField(source="expires_at", read_only=True)
+    revokedAt = serializers.DateTimeField(source="revoked_at", read_only=True)
+
+    class Meta:
+        model = AccountSession
+        fields = [
+            "id",
+            "status",
+            "current",
+            "deviceLabel",
+            "createdAt",
+            "lastSeenAt",
+            "expiresAt",
+            "revokedAt",
+        ]
+
+    def get_current(self, obj):
+        return str(obj.id) == str(self.context.get("current_session_id") or "")
 
 
 class LoginSerializer(serializers.Serializer):

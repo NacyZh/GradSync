@@ -1,9 +1,19 @@
 import { expect, test } from '@playwright/test';
 
-import { fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
+import {
+  currentUser,
+  fulfillJson,
+  fullStackE2E,
+  loginAs,
+  mockAccountSecurity,
+  mockAuditConsole,
+  mockAuthenticatedApi,
+} from './api-mocks';
 
 test('main application landmarks are present', async ({ page }) => {
   await mockAuthenticatedApi(page);
+  await mockAccountSecurity(page);
+  await mockAuditConsole(page);
   if (fullStackE2E) {
     await loginAs(page);
   }
@@ -63,4 +73,31 @@ test('dashboard calendar supports keyboard views, filters, and schedule dialog',
   await expect(dialog.locator(':focus-visible')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
+});
+
+test('access governance workspaces expose keyboard-operable controls', async ({ page }) => {
+  await mockAuthenticatedApi(page);
+  await mockAccountSecurity(page);
+  await mockAuditConsole(page);
+  if (!fullStackE2E) {
+    await page.route('**/api/accounts/me/', async (route) => {
+      await fulfillJson(route, { ...currentUser, global_role: 'admin' });
+    });
+  } else {
+    await loginAs(page, 'admin@gradsync.local');
+  }
+
+  await page.goto('/profile');
+  await expect(page.getByRole('heading', { name: 'Security', exact: true })).toBeVisible();
+  await page.getByLabel('New email').focus();
+  await expect(page.getByLabel('New email')).toBeFocused();
+
+  await page.goto('/admin/audit');
+  const auditFilters = page.getByRole('region', { name: 'Audit filters' });
+  await expect(auditFilters).toBeVisible();
+  await auditFilters.getByLabel('Search').focus();
+  await page.keyboard.type('project');
+  await expect(page).toHaveURL(/q=project/);
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus-visible').first()).toBeVisible();
 });

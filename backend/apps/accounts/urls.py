@@ -3,12 +3,20 @@ from django.urls import path
 from .views import (
     AccountDetailView,
     AccountListView,
+    AccountSessionDetailView,
+    AccountSessionListView,
+    AccountSessionRevokeOthersView,
     CurrentUserView,
+    EmailChangeResendView,
+    EmailChangeVerifyView,
+    EmailChangeView,
     EmailVerificationView,
     LocalePreferenceView,
     LoginView,
     LogoutView,
     PasswordChangeView,
+    PasswordRecoveryConfirmView,
+    PasswordRecoveryRequestView,
     RegistrationView,
     RoleActivationDetailView,
     RoleActivationListView,
@@ -19,6 +27,16 @@ from .views import (
 )
 
 urlpatterns = [
+    path(
+        "password-recovery/",
+        PasswordRecoveryRequestView.as_view(),
+        name="password-recovery",
+    ),
+    path(
+        "password-recovery/confirm/",
+        PasswordRecoveryConfirmView.as_view(),
+        name="password-recovery-confirm",
+    ),
     path("register/", RegistrationView.as_view(), name="register"),
     path("verify-email/", EmailVerificationView.as_view(), name="verify-email"),
     path("resend-verification/", VerificationResendView.as_view(), name="resend-verification"),
@@ -28,6 +46,28 @@ urlpatterns = [
     path("token/revoke/", TokenRevokeView.as_view(), name="token-revoke"),
     path("me/", CurrentUserView.as_view(), name="current-user"),
     path("me/password/", PasswordChangeView.as_view(), name="password-change"),
+    path("me/email-change/", EmailChangeView.as_view(), name="email-change"),
+    path(
+        "me/email-change/verify/",
+        EmailChangeVerifyView.as_view(),
+        name="email-change-verify",
+    ),
+    path(
+        "me/email-change/resend/",
+        EmailChangeResendView.as_view(),
+        name="email-change-resend",
+    ),
+    path("me/sessions/", AccountSessionListView.as_view(), name="account-sessions"),
+    path(
+        "me/sessions/revoke-others/",
+        AccountSessionRevokeOthersView.as_view(),
+        name="account-sessions-revoke-others",
+    ),
+    path(
+        "me/sessions/<uuid:session_id>/",
+        AccountSessionDetailView.as_view(),
+        name="account-session-detail",
+    ),
     path("students/", StudentSearchView.as_view(), name="student-search"),
     path("locale/", LocalePreferenceView.as_view(), name="locale-preference"),
     path(

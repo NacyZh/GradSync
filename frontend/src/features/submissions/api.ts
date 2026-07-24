@@ -36,6 +36,44 @@ export type InlineComment = {
   status: string;
 };
 
+export type ReviewAssignment = {
+  id: string;
+  reviewerMembershipId: number;
+  reviewerName?: string;
+  weeklyReportId?: number | null;
+  writingVersionId?: number | null;
+  draftVersionId?: number | null;
+  status: 'active' | 'removed';
+  version: number;
+};
+
+export function listReviewAssignments(projectId: number) {
+  return apiRequest<{ results: ReviewAssignment[] }>(
+    `/api/projects/${projectId}/review-assignments/`,
+  );
+}
+
+export function assignReportReviewer(
+  projectId: number,
+  payload: { reviewerMembershipId: number; weeklyReportId: number },
+) {
+  return apiRequest<ReviewAssignment>(
+    `/api/projects/${projectId}/review-assignments/`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  );
+}
+
+export function removeReviewAssignment(
+  projectId: number,
+  assignmentId: string,
+  expectedVersion: number,
+) {
+  return apiRequest<void>(
+    `/api/projects/${projectId}/review-assignments/${assignmentId}/?expectedVersion=${expectedVersion}`,
+    { method: 'DELETE' },
+  );
+}
+
 export type TeacherFeedback = {
   id: string;
   writingVersionId: string;

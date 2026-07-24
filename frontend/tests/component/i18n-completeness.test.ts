@@ -34,6 +34,24 @@ describe('i18n completeness', () => {
     expect(messagesZh.paperLibraryChoosePdfs).toBe('选择 PDF');
   });
 
+  it('keeps access-governance states translated in both catalogs', () => {
+    const requiredKeys = [
+      'securitySettings',
+      'forgotPassword',
+      'projectGovernance',
+      'projectGovernanceOnHold',
+      'auditConsole',
+      'auditExportQueued',
+      'noAuditEvents',
+      'reviewerAssignment',
+    ] as const;
+    for (const key of requiredKeys) {
+      expect(messagesEn[key]).toBeTruthy();
+      expect(messagesZh[key]).toBeTruthy();
+      expect(messagesZh[key]).not.toBe(messagesEn[key]);
+    }
+  });
+
   it('registers every static JSX label in a locale catalog', () => {
     const keyedEnglish = new Set<string>(Object.values(messagesEn));
     const keyedMessageKeys = new Set<string>(Object.keys(messagesEn));

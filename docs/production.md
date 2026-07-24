@@ -289,6 +289,64 @@ must validate both sides before deploy:
 - After rotation, run `check_production_readiness --skip-repo-files` inside the
   backend container, sign in, and send a test notification.
 
+## Account Security Rollout
+
+Before deploying access-governance Phase 1/2/US1, back up PostgreSQL and run
+`python manage.py migrate --plan`. Apply the additive account-session,
+recovery/email-change, notification event type, and audit evidence migrations
+before application containers accept traffic.
+
+Set `GRADSYNC_APPROVED_FRONTEND_ORIGIN` to the exact HTTPS browser origin. Keep
+recovery and email-change TTLs at or below 1800 seconds, audit retention at or
+above 365 days, and audit export limits at or below 10000 rows. The readiness
+command rejects unsafe values.
+
+Tokens issued before this rollout do not contain an authoritative `sid`.
+Existing short-lived access tokens expire normally, but old refresh tokens must
+not rotate; affected users sign in again. Announce this expected one-time
+reauthentication before rollout.
+
+Application rollback keeps the additive tables and migrations applied. Disable
+new routes/UI while retaining revoked sessions, consumed recovery records,
+email-change evidence, and audit snapshots. Never restore an old database solely
+to reactivate credentials.
+
+## Access Governance Release
+
+Specification acceptance is repository evidence, not mutable production data.
+Product, Testing, and Development reviewers update their own entry in
+`specs/<feature>/acceptance.json` with the exact normative revision printed by
+`python3 scripts/check-spec-acceptance.py --mode report`. One account may cover
+more than one discipline, but each decision remains explicit and independently
+attributable. A normative edit requires every discipline to review the new
+fingerprint; do not copy an old `decidedRevision`.
+
+Exceptions require a separate owner and approver, the exact production scope
+and normative revision, named covered disciplines, a reason, and an expiry no
+later than 14 days after approval. Revocation takes effect on the next
+evaluation. Pull requests upload diagnostic reports. The
+`acceptance-enforce` job blocks production image construction and deployment.
+Operators must remediate the reported Pending, Rejected, stale, malformed, or
+expired evidence; deployment scripts never modify acceptance files.
+
+Before access-governance migrations:
+
+1. Take matched PostgreSQL and media backups and record their checksums.
+2. Run `python manage.py migrate --plan`.
+3. Run `python manage.py check_production_readiness --repo-root ..` and retain
+   the held-project IDs and non-sensitive reasons.
+4. Confirm users with legacy sessions have received the one-time re-login
+   notice.
+5. Confirm audit export storage retention is at least the configured export
+   TTL and that expired artifacts can be removed independently of audit rows.
+
+Rollback uses the previous application images while retaining additive account
+session, project role/hold, review assignment, audit export, and audit evidence
+tables. Never reactivate revoked sessions or removed roles, clear a governance
+hold without transfer evidence, delete immutable audit events, or rewrite
+acceptance decisions. Preserve acceptance reports and export metadata with the
+release evidence even after downloadable CSV artifacts expire.
+
 ## Incident Response
 
 - Check `/readyz` to separate application, database, and Redis failures.

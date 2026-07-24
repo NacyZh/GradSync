@@ -6,7 +6,8 @@ from django.utils import timezone
 from apps.audit.services import record_event, record_membership_change
 from apps.notifications.models import Notification
 
-from .archive_services import ensure_project_advisor, ensure_project_writable
+from .access_services import project_capabilities as evaluate_project_capabilities
+from .archive_services import ensure_project_writable
 from .models import ProjectMembership, ResearchProject
 
 
@@ -24,7 +25,7 @@ class ProjectService:
         ends_on=None,
         student_ids: list[int] | None = None,
     ) -> ResearchProject:
-        if not getattr(self.actor, "is_advisor", False):
+        if not can_create_projects(self.actor):
             raise PermissionDenied("Only advisors can create projects")
 
         project = ResearchProject.objects.create(
@@ -52,7 +53,8 @@ class ProjectService:
         return project
 
     def update_project(self, project: ResearchProject, **data) -> ResearchProject:
-        ensure_project_advisor(self.actor, project)
+        if not evaluate_project_capabilities(self.actor, project)["canEditProject"]:
+            raise PermissionDenied("Project editing is forbidden")
         for field in ["title", "description", "starts_on", "ends_on"]:
             if field in data:
                 setattr(project, field, data[field])
@@ -63,7 +65,8 @@ class ProjectService:
         return project
 
     def archive_project(self, project: ResearchProject) -> ResearchProject:
-        ensure_project_advisor(self.actor, project)
+        if not evaluate_project_capabilities(self.actor, project)["canArchiveProject"]:
+            raise PermissionDenied("Project archiving is forbidden")
         project.status = ResearchProject.Status.ARCHIVED
         project.archived_at = timezone.now()
         project.save(update_fields=["status", "archived_at", "updated_at"])
@@ -73,11 +76,13 @@ class ProjectService:
         return project
 
     def delete_project(self, project: ResearchProject) -> None:
-        ensure_project_advisor(self.actor, project)
+        if not evaluate_project_capabilities(self.actor, project)["canDeleteProject"]:
+            raise PermissionDenied("Project deletion is forbidden")
         project.delete()
 
     def reopen_project(self, project: ResearchProject) -> ResearchProject:
-        ensure_project_advisor(self.actor, project)
+        if not evaluate_project_capabilities(self.actor, project)["canReopenProject"]:
+            raise PermissionDenied("Project reopening is forbidden")
         project.status = ResearchProject.Status.ACTIVE
         project.archived_at = None
         project.save(update_fields=["status", "archived_at", "updated_at"])
@@ -87,7 +92,8 @@ class ProjectService:
         return project
 
     def add_member(self, project: ResearchProject, *, user_id: int, role: str) -> ProjectMembership:
-        ensure_project_advisor(self.actor, project)
+        if not evaluate_project_capabilities(self.actor, project)["canManageMembers"]:
+            raise PermissionDenied("Project membership management is forbidden")
         ensure_project_writable(project)
         membership, _ = ProjectMembership.objects.update_or_create(
             project=project,
@@ -100,7 +106,8 @@ class ProjectService:
 
     @transaction.atomic
     def add_student_member(self, project: ResearchProject, *, student_id: int) -> ProjectMembership:
-        ensure_project_advisor(self.actor, project)
+        if not evaluate_project_capabilities(self.actor, project)["canManageMembers"]:
+            raise PermissionDenied("Project membership management is forbidden")
         ensure_project_writable(project)
         user_model = get_user_model()
         try:
@@ -133,7 +140,8 @@ class ProjectService:
         return membership
 
     def remove_member(self, membership: ProjectMembership) -> ProjectMembership:
-        ensure_project_advisor(self.actor, membership.project)
+        if not evaluate_project_capabilities(self.actor, membership.project)["canManageMembers"]:
+            raise PermissionDenied("Project membership management is forbidden")
         ensure_project_writable(membership.project)
         if (
             membership.role == ProjectMembership.Role.ADVISOR
@@ -172,35 +180,21 @@ def projects_visible_to(user):
 
 
 def can_create_projects(user) -> bool:
-    return bool(getattr(user, "is_authenticated", False) and getattr(user, "is_advisor", False))
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and getattr(user, "global_role", None) == user.GlobalRole.ADVISOR
+        and getattr(user, "status", None) == user.Status.ACTIVE
+        and getattr(user, "active_role", None) == user.RequestedRole.TEACHER
+        and getattr(user, "email_verified_at", None) is not None
+    )
 
 
 def can_manage_project(user, project: ResearchProject) -> bool:
-    if not getattr(user, "is_authenticated", False):
-        return False
-    if getattr(user, "is_administrator", False):
-        return True
-    return project.memberships.filter(
-        user=user,
-        status=ProjectMembership.Status.ACTIVE,
-        role=ProjectMembership.Role.ADVISOR,
-    ).exists()
+    return bool(evaluate_project_capabilities(user, project)["canManageProject"])
 
 
 def project_capabilities(user, project: ResearchProject) -> dict:
-    can_manage = can_manage_project(user, project)
-    writable = project.status == ResearchProject.Status.ACTIVE
-    return {
-        "canManageProject": can_manage,
-        "canEditProject": can_manage,
-        "canArchiveProject": can_manage and writable,
-        "canReopenProject": can_manage and project.status == ResearchProject.Status.ARCHIVED,
-        "canDeleteProject": can_manage,
-        "canManageMembers": can_manage and writable,
-        "canCreateTasks": can_manage and writable,
-        "canUpdateTasks": can_manage and writable,
-        "deleteDisabledReason": "",
-    }
+    return evaluate_project_capabilities(user, project)
 
 
 def _eligible_project_students(student_ids: list[int]):

@@ -36,6 +36,9 @@ export type Project = {
   upcoming_bookings?: unknown[];
   activity?: ProjectEvent[];
   capabilities?: ProjectCapabilities;
+  governanceState?: 'normal' | 'hold';
+  governanceHoldReason?: string;
+  governanceVersion?: number;
 };
 
 export type ProjectCapabilities = {
@@ -47,6 +50,14 @@ export type ProjectCapabilities = {
   canManageMembers: boolean;
   canCreateTasks: boolean;
   canUpdateTasks: boolean;
+  canSuperviseGovernance?: boolean;
+  canResolveGovernanceHold?: boolean;
+  canManageCollaborators?: boolean;
+  canTransferOwnership?: boolean;
+  canAssignReviews?: boolean;
+  canReviewAssignedTargets?: boolean;
+  canViewProject?: boolean;
+  isReadOnly?: boolean;
   deleteDisabledReason?: string;
 };
 
@@ -85,8 +96,9 @@ export type ProjectMembership = {
   nickname?: string;
   name?: string;
   email?: string;
-  role: 'advisor' | 'student' | 'reviewer' | 'observer';
+  role: 'advisor' | 'co_advisor' | 'student' | 'reviewer' | 'observer';
   status: 'active' | 'removed';
+  version?: number;
   joinedAt?: string;
   removedAt?: string | null;
 };
@@ -140,6 +152,82 @@ export function addProjectMember(projectId: number, payload: { studentId: number
 export function removeProjectMember(projectId: number, membershipId: number) {
   return apiRequest<void>(`/api/projects/${projectId}/members/${membershipId}/`, {
     method: 'DELETE',
+  });
+}
+
+export type TeacherOption = {
+  id: number;
+  name: string;
+  nickname?: string;
+  email: string;
+  label: string;
+};
+
+export type CollaboratorRole = 'co_advisor' | 'reviewer' | 'observer';
+
+export function searchEligibleTeachers(query: string, projectId?: number) {
+  const params = new URLSearchParams({ q: query, limit: '25' });
+  if (projectId) params.set('projectId', String(projectId));
+  return apiRequest<{ results: TeacherOption[] }>(
+    `/api/accounts/teachers/?${params.toString()}`,
+  );
+}
+
+export function listProjectCollaborators(projectId: number) {
+  return apiRequest<{ results: ProjectMembership[] }>(
+    `/api/projects/${projectId}/collaborators/`,
+  );
+}
+
+export function addProjectCollaborator(
+  projectId: number,
+  payload: { userId: number; role: CollaboratorRole; reason?: string },
+) {
+  return apiRequest<ProjectMembership>(`/api/projects/${projectId}/collaborators/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateProjectCollaborator(
+  projectId: number,
+  membershipId: number,
+  payload: { role: CollaboratorRole; expectedVersion: number; reason?: string },
+) {
+  return apiRequest<ProjectMembership>(
+    `/api/projects/${projectId}/collaborators/${membershipId}/`,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+  );
+}
+
+export function removeProjectCollaborator(
+  projectId: number,
+  membershipId: number,
+  expectedVersion: number,
+  reason = '',
+) {
+  const params = new URLSearchParams({
+    expectedVersion: String(expectedVersion),
+    ...(reason ? { reason } : {}),
+  });
+  return apiRequest<void>(
+    `/api/projects/${projectId}/collaborators/${membershipId}/?${params}`,
+    { method: 'DELETE' },
+  );
+}
+
+export function transferProjectOwnership(
+  projectId: number,
+  payload: {
+    newAdvisorId: number;
+    expectedVersion: number;
+    previousAdvisorResult?: CollaboratorRole | 'removed';
+    reason?: string;
+  },
+) {
+  return apiRequest(`/api/projects/${projectId}/ownership-transfer/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

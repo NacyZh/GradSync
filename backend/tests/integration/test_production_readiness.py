@@ -156,7 +156,10 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "docker build -f docker/backend.Dockerfile" in workflow
     assert "docker build -f docker/frontend.Dockerfile" in workflow
     assert "needs: [backend, frontend, frontend-e2e]" in workflow
-    assert "needs: [backend, frontend, frontend-e2e, production-image]" in workflow
+    assert (
+        "needs: [backend, frontend, frontend-e2e, acceptance-enforce, "
+        "production-image]" in workflow
+    )
     assert "Check generated artifacts before backend install" in workflow
     assert "Clean generated backend install artifacts" in workflow
     assert "Check generated artifacts after backend install" in workflow
@@ -377,6 +380,7 @@ def test_production_readiness_smtp_probe_uses_delivery_path(settings, tmp_path):
     settings.SECRET_KEY = "x" * 64
     settings.ALLOWED_HOSTS = ["gradsync.example.edu"]
     settings.CSRF_TRUSTED_ORIGINS = ["https://gradsync.example.edu"]
+    settings.APPROVED_FRONTEND_ORIGIN = "https://gradsync.example.edu"
     settings.SESSION_COOKIE_SECURE = True
     settings.CSRF_COOKIE_SECURE = True
     settings.SECURE_HSTS_SECONDS = 31536000

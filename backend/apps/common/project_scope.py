@@ -66,7 +66,9 @@ class ProjectScopedService:
             raise PermissionDenied("You are not a member of this project")
 
     def require_project_reviewer(self, project):
+        if getattr(self.user, "is_administrator", False):
+            return
         if not project.memberships.filter(
-            user=self.user, status="active", role__in=["advisor", "reviewer"]
+            user=self.user, status="active", role__in=["advisor", "co_advisor", "reviewer"]
         ).exists():
             raise PermissionDenied("You cannot review records in this project")

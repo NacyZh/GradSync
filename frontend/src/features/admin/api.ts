@@ -1,4 +1,5 @@
 import { apiRequest } from '../../shared/api/client';
+import { downloadFile } from '../../shared/api/downloads';
 import type { CurrentUser } from '../auth/AuthProvider';
 
 export type PaginatedAccounts = {
@@ -78,4 +79,72 @@ export function decideRoleActivation(
     method: 'PATCH',
     body: JSON.stringify({ action, reason }),
   });
+}
+
+export type AuditEvent = {
+  id: number;
+  eventType: string;
+  category: string;
+  outcome: string;
+  summary: string;
+  reason?: string;
+  correlationId?: string;
+  actorSnapshot?: Record<string, unknown>;
+  targetType?: string;
+  targetId?: string;
+  targetSnapshot?: Record<string, unknown>;
+  createdAt?: string;
+  capabilities?: { canExport: boolean };
+};
+
+export type AuditFilters = {
+  q?: string;
+  category?: string;
+  outcome?: string;
+  actorId?: string;
+  projectId?: string;
+  targetType?: string;
+  targetId?: string;
+};
+
+export type AuditExport = {
+  id: string;
+  status: 'queued' | 'processing' | 'ready' | 'failed' | 'expired';
+  requestedCount: number;
+  exportedCount: number;
+  failureReason?: string;
+  expiresAt: string;
+  capabilities: { canDownload: boolean; canRetry: boolean };
+};
+
+export function listAuditEvents(filters: AuditFilters = {}, cursor?: string | null) {
+  const params = new URLSearchParams({ limit: '100' });
+  for (const [key, value] of Object.entries(filters)) {
+    if (value?.trim()) params.set(key, value.trim());
+  }
+  if (cursor) params.set('cursor', cursor);
+  return apiRequest<{
+    results: AuditEvent[];
+    nextCursor: string | null;
+    capabilities: { canExport: boolean };
+  }>(`/api/audit-events?${params}`);
+}
+
+export function getAuditEvent(eventId: number) {
+  return apiRequest<AuditEvent>(`/api/audit-events/${eventId}`);
+}
+
+export function createAuditExport(filters: AuditFilters) {
+  return apiRequest<AuditExport>('/api/audit-exports', {
+    method: 'POST',
+    body: JSON.stringify({ filters }),
+  });
+}
+
+export function getAuditExport(exportId: string) {
+  return apiRequest<AuditExport>(`/api/audit-exports/${exportId}`);
+}
+
+export function downloadAuditExport(exportId: string) {
+  return downloadFile(`/api/audit-exports/${exportId}/download`, 'audit-export.csv');
 }

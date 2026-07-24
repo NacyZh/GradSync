@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlparse
 
 REQUIRED_OPERATIONAL_DOCS = (
     "docs/ops/credential-inventory.md",
@@ -115,6 +116,27 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
         issues.append("SMTP credentials must not contain placeholder values")
     if not getattr(settings_obj, "CELERY_BROKER_URL", ""):
         issues.append("CELERY_BROKER_URL must be configured")
+    approved_origin = str(getattr(settings_obj, "APPROVED_FRONTEND_ORIGIN", "https://localhost"))
+    parsed_origin = urlparse(approved_origin)
+    if (
+        parsed_origin.scheme != "https"
+        or not parsed_origin.netloc
+        or parsed_origin.path
+        not in {
+            "",
+            "/",
+        }
+    ):
+        issues.append("APPROVED_FRONTEND_ORIGIN must be an HTTPS origin without a path")
+    if getattr(settings_obj, "ACCOUNT_RECOVERY_TOKEN_TTL_SECONDS", 1800) > 1800:
+        issues.append("ACCOUNT_RECOVERY_TOKEN_TTL_SECONDS cannot exceed 1800")
+    if getattr(settings_obj, "EMAIL_CHANGE_TOKEN_TTL_SECONDS", 1800) > 1800:
+        issues.append("EMAIL_CHANGE_TOKEN_TTL_SECONDS cannot exceed 1800")
+    if getattr(settings_obj, "AUDIT_RETENTION_DAYS", 365) < 365:
+        issues.append("AUDIT_RETENTION_DAYS cannot be below 365")
+    audit_export_limit = getattr(settings_obj, "AUDIT_EXPORT_MAX_ROWS", 10000)
+    if not 1 <= audit_export_limit <= 10000:
+        issues.append("AUDIT_EXPORT_MAX_ROWS must be between 1 and 10000")
     notification_queue = getattr(settings_obj, "CELERY_NOTIFICATION_QUEUE", "")
     if _has_placeholder(str(notification_queue)):
         issues.append("CELERY_NOTIFICATION_QUEUE must be configured")

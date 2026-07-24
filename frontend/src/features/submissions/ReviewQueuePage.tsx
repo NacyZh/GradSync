@@ -12,6 +12,7 @@ import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { listReports, type WeeklyReport } from './api';
 import { InlineCommentPanel } from './InlineCommentPanel';
 import { ReviewStatusControl } from './ReviewStatusControl';
+import { ReviewerAssignmentControl } from './ReviewerAssignmentControl';
 
 export function ReviewQueuePage() {
   const projectId = Number(useParams().projectId ?? 0);
@@ -129,6 +130,7 @@ function ReviewDetail({ projectId, report }: { projectId: number; report?: Weekl
         </h3>
         <ReviewStatusControl projectId={projectId} reportId={report.id} status={report.review_status} />
       </div>
+      <ReviewerAssignmentControl projectId={projectId} reportId={report.id} />
     </div>
   );
 }

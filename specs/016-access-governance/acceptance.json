@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "feature": "016-access-governance",
+  "specificationPath": "specs/016-access-governance/spec.md",
+  "normativeRevision": "53c2f28292e19538bfd4cd2b37b4fe4755e723fb1bea767e54edcd32de5d9033",
+  "decisions": {
+    "product": {
+      "assignedReviewer": "product-reviewer",
+      "decision": "pending",
+      "decidedRevision": null,
+      "decidedAt": null,
+      "rationale": ""
+    },
+    "testing": {
+      "assignedReviewer": "testing-reviewer",
+      "decision": "pending",
+      "decidedRevision": null,
+      "decidedAt": null,
+      "rationale": ""
+    },
+    "development": {
+      "assignedReviewer": "development-reviewer",
+      "decision": "pending",
+      "decidedRevision": null,
+      "decidedAt": null,
+      "rationale": ""
+    }
+  },
+  "exceptions": []
+}

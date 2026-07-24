@@ -100,6 +100,11 @@ function LoginContent() {
                 </button>
               </span>
             </div>
+            <div className="flex justify-end">
+              <Link className="text-sm font-semibold text-primary" to="/forgot-password">
+                {t('forgotPassword')}
+              </Link>
+            </div>
             <button
               className="button primary login-button"
               type="submit"

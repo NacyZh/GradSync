@@ -2,12 +2,13 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from .access_services import project_capabilities
 from .material_services import (
     project_material_capabilities,
     project_material_display_name,
 )
-from .models import ProjectMaterial, ProjectMembership, ResearchProject
-from .services import ProjectService, project_capabilities, project_event_feed
+from .models import ProjectMaterial, ProjectMembership, ProjectOwnershipTransfer, ResearchProject
+from .services import ProjectService, project_event_feed
 
 
 class ProjectMembershipSerializer(serializers.ModelSerializer):
@@ -18,6 +19,8 @@ class ProjectMembershipSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     joinedAt = serializers.DateTimeField(source="joined_at", read_only=True)
     removedAt = serializers.DateTimeField(source="removed_at", read_only=True)
+    assignedBy = serializers.IntegerField(source="assigned_by_id", read_only=True)
+    roleChangedAt = serializers.DateTimeField(source="role_changed_at", read_only=True)
 
     class Meta:
         model = ProjectMembership
@@ -36,11 +39,71 @@ class ProjectMembershipSerializer(serializers.ModelSerializer):
             "removed_at",
             "joinedAt",
             "removedAt",
+            "version",
+            "assignedBy",
+            "assignment_reason",
+            "roleChangedAt",
         ]
 
 
 class MembershipCreateSerializer(serializers.Serializer):
     studentId = serializers.IntegerField()
+
+
+class CollaboratorCreateSerializer(serializers.Serializer):
+    userId = serializers.IntegerField()
+    role = serializers.ChoiceField(
+        choices=[
+            ProjectMembership.Role.CO_ADVISOR,
+            ProjectMembership.Role.REVIEWER,
+            ProjectMembership.Role.OBSERVER,
+        ]
+    )
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+
+
+class CollaboratorUpdateSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(
+        choices=[
+            ProjectMembership.Role.CO_ADVISOR,
+            ProjectMembership.Role.REVIEWER,
+            ProjectMembership.Role.OBSERVER,
+        ]
+    )
+    expectedVersion = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+
+
+class OwnershipTransferSerializer(serializers.Serializer):
+    newAdvisorId = serializers.IntegerField()
+    expectedVersion = serializers.IntegerField(min_value=1)
+    previousAdvisorResult = serializers.ChoiceField(
+        choices=ProjectOwnershipTransfer.PreviousAdvisorResult.values,
+        default=ProjectOwnershipTransfer.PreviousAdvisorResult.CO_ADVISOR,
+    )
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+    idempotencyKey = serializers.CharField(required=False, allow_blank=True, max_length=100)
+
+
+class OwnershipTransferResultSerializer(serializers.ModelSerializer):
+    projectId = serializers.IntegerField(source="project_id", read_only=True)
+    previousAdvisorId = serializers.IntegerField(source="previous_advisor_id", read_only=True)
+    newAdvisorId = serializers.IntegerField(source="new_advisor_id", read_only=True)
+    governanceVersion = serializers.IntegerField(
+        source="project.governance_version", read_only=True
+    )
+
+    class Meta:
+        model = ProjectOwnershipTransfer
+        fields = [
+            "id",
+            "projectId",
+            "previousAdvisorId",
+            "newAdvisorId",
+            "previous_advisor_result",
+            "governanceVersion",
+            "completed_at",
+        ]
 
 
 class ProjectCreateSerializer(serializers.Serializer):
@@ -91,6 +154,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     startsOn = serializers.DateField(source="starts_on", read_only=True)
     endsOn = serializers.DateField(source="ends_on", read_only=True)
     archivedAt = serializers.DateTimeField(source="archived_at", read_only=True)
+    governanceState = serializers.CharField(source="governance_state", read_only=True)
+    governanceHoldReason = serializers.CharField(source="governance_hold_reason", read_only=True)
+    governanceVersion = serializers.IntegerField(source="governance_version", read_only=True)
     capabilities = serializers.SerializerMethodField()
 
     class Meta:
@@ -108,6 +174,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             "startsOn",
             "endsOn",
             "archivedAt",
+            "governanceState",
+            "governanceHoldReason",
+            "governanceVersion",
             "memberships",
             "capabilities",
         ]
@@ -218,9 +287,11 @@ class ProjectDashboardSerializer(ProjectSerializer):
     def get_current_tasks(self, obj):
         from apps.tasks.serializers import TaskSerializer
 
-        tasks = obj.tasks.exclude(status__in=["completed", "cancelled"]).prefetch_related(
-            "assignees", "children"
-        ).order_by("parent_task_id", "id")[:20]
+        tasks = (
+            obj.tasks.exclude(status__in=["completed", "cancelled"])
+            .prefetch_related("assignees", "children")
+            .order_by("parent_task_id", "id")[:20]
+        )
         return TaskSerializer(
             tasks,
             many=True,

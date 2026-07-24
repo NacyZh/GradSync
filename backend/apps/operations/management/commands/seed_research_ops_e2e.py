@@ -42,18 +42,24 @@ class Command(BaseCommand):
             password="password123",
             name="Admin User",
             global_role="admin",
+            active_role="admin",
+            email_verified_at=timezone.now(),
         )
         advisor = user_model.objects.create_user(
             email="advisor@example.edu",
             password="password123",
             name="Advisor User",
             global_role="advisor",
+            active_role="teacher",
+            email_verified_at=timezone.now(),
         )
         student = user_model.objects.create_user(
             email="student@example.edu",
             password="password123",
             name="Student User",
             global_role="student",
+            active_role="student",
+            email_verified_at=timezone.now(),
         )
 
         today = timezone.localdate()
