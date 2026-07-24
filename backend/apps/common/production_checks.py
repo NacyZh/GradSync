@@ -207,6 +207,7 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
                 "PRODUCTION_ENV_FILE",
                 "GRADSYNC_PRODUCTION_HOST",
                 "GRADSYNC_DEPLOY_PATH",
+                "DEPLOY_REVISION: ${{ github.sha }}",
                 "environment:",
                 "deploy-production",
                 "scripts/deploy-production.sh",
@@ -221,7 +222,9 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
         else:
             deploy_text = deploy_script.read_text()
             for required in (
-                "git pull --ff-only",
+                'REVISION="${GRADSYNC_DEPLOY_REVISION:-}"',
+                'git checkout --detach "$REVISION"',
+                'test "$(git rev-parse HEAD)" = "$REVISION"',
                 "docker compose",
                 "python manage.py check --deploy",
                 "/healthz/",

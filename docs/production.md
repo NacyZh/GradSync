@@ -61,23 +61,24 @@ GitHub production environment configuration:
 
 The deploy script performs:
 
-1. `git fetch` and `git pull --ff-only` on the server.
-2. Stop and remove backend, frontend, worker, and scheduler containers before
-   image builds to reduce memory pressure on small hosts.
+1. Fetch the branch and check out the exact `github.sha` revision validated by
+   the current workflow.
+2. Enforce specification acceptance before changing runtime services.
 3. Run Compose with `COMPOSE_PARALLEL_LIMIT=1` and `--env-file .env.production`.
-4. Prune Docker builder cache when `GRADSYNC_PRUNE_BUILDER_CACHE=true`.
-5. Build the backend and frontend images serially, pruning builder cache after
+4. Keep the existing application services running while new images build.
+5. Prune Docker builder cache when `GRADSYNC_PRUNE_BUILDER_CACHE=true`.
+6. Build the backend and frontend images serially, pruning builder cache after
    each image build to release build state on 1 GB hosts.
-6. Prune dangling images when `GRADSYNC_PRUNE_DANGLING_IMAGES=true`.
-7. Start PostgreSQL and Redis one at a time and wait for health checks.
-8. Run migrations.
-9. Start the backend, wait for health, and run `python manage.py check --deploy`
+7. Prune dangling images when `GRADSYNC_PRUNE_DANGLING_IMAGES=true`.
+8. Start PostgreSQL and Redis one at a time and wait for health checks.
+9. Run migrations.
+10. Recreate the backend, wait for health, and run `python manage.py check --deploy`
    plus `python manage.py reclassify_workspace_boundaries --dry-run` and
    `check_production_readiness --skip-repo-files` inside the running backend
    container.
-10. Start frontend, worker, and scheduler one at a time.
-11. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
-12. Watch backend logs, worker logs, queue depth, notification failures, and
+11. Recreate frontend, worker, and scheduler one at a time.
+12. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
+13. Watch backend logs, worker logs, queue depth, notification failures, and
    request latency for at least one reminder cycle.
 
 The deployment script intentionally does not flush Linux page cache. Avoid

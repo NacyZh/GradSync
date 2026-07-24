@@ -150,6 +150,7 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "specs/001-research-group-ops/contracts/openapi.yaml" in workflow
     assert "specs/007-code-repository-layout/contracts/openapi.yaml" in workflow
     assert "specs/003-research-collab-platform/contracts/openapi.yaml" in workflow
+    assert "specs/016-access-governance/contracts/openapi.yaml" in workflow
     assert "production-image:" in workflow
     assert "frontend-e2e:" in workflow
     assert "docker compose -f docker-compose.prod.yml config --quiet" in workflow
@@ -174,6 +175,8 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "deploy-production" in workflow
     assert "environment:" in workflow
     assert "PRODUCTION_DEPLOY_SSH_KEY" in workflow
+    assert "DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" in workflow
+    assert "DEPLOY_REVISION: ${{ github.sha }}" in workflow
     assert "PRODUCTION_ENV_FILE" in workflow
     assert "GRADSYNC_PRODUCTION_HOST" in workflow
     assert "GRADSYNC_DEPLOY_PATH" in workflow
@@ -192,11 +195,13 @@ def test_full_stack_e2e_config_uses_current_seed_command_names():
 def test_deploy_script_fetches_code_and_restarts_stack():
     script = (REPO_ROOT / "scripts/deploy-production.sh").read_text()
 
-    assert "git pull --ff-only" in script
+    assert 'REVISION="${GRADSYNC_DEPLOY_REVISION:-}"' in script
+    assert 'git checkout --detach "$REVISION"' in script
+    assert 'test "$(git rev-parse HEAD)" = "$REVISION"' in script
     assert 'docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE"' in script
     assert 'COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"' in script
-    assert "compose stop backend frontend worker scheduler" in script
-    assert "compose rm -f backend frontend worker scheduler" in script
+    assert "compose stop backend frontend worker scheduler" not in script
+    assert "compose rm -f backend frontend worker scheduler" not in script
     assert "docker builder prune -af" in script
     assert "docker image prune -f" in script
     assert "compose build --pull backend" in script

@@ -4,6 +4,7 @@ set -eu
 : "${GRADSYNC_DEPLOY_PATH:?GRADSYNC_DEPLOY_PATH is required}"
 
 BRANCH="${GRADSYNC_DEPLOY_BRANCH:-master}"
+REVISION="${GRADSYNC_DEPLOY_REVISION:-}"
 COMPOSE_FILE="${GRADSYNC_COMPOSE_FILE:-docker-compose.prod.yml}"
 COMPOSE_ENV_FILE="${GRADSYNC_COMPOSE_ENV_FILE:-.env.production}"
 PUBLIC_URL="${GRADSYNC_PUBLIC_URL:-https://120021123.xyz}"
@@ -33,15 +34,21 @@ compose() {
 
 echo "Fetching ${BRANCH}"
 git fetch origin "$BRANCH"
-git checkout "$BRANCH"
-git pull --ff-only origin "$BRANCH"
+if [ -n "$REVISION" ]; then
+  if ! git cat-file -e "${REVISION}^{commit}" 2>/dev/null; then
+    git fetch origin "$REVISION"
+  fi
+  git checkout --detach "$REVISION"
+  test "$(git rev-parse HEAD)" = "$REVISION"
+  echo "Deploying validated revision ${REVISION}"
+else
+  git checkout "$BRANCH"
+  git merge --ff-only "origin/$BRANCH"
+  echo "WARNING: GRADSYNC_DEPLOY_REVISION is unset; deploying the branch head." >&2
+fi
 
 echo "Enforcing production specification acceptance"
 python3 scripts/check-spec-acceptance.py --mode enforce --scope production
-
-echo "Stopping application services before image build to reduce memory pressure"
-compose stop backend frontend worker scheduler || true
-compose rm -f backend frontend worker scheduler || true
 
 wait_for_service() {
   service="$1"

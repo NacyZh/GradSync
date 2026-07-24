@@ -83,6 +83,8 @@ jobs:
       - name: Lint backend
         working-directory: backend
         run: python -m ruff check .
+      - name: Test specification acceptance gates
+        run: python -m pytest scripts/tests
       - name: Check migrations
         working-directory: backend
         run: python manage.py makemigrations --check --dry-run
@@ -131,6 +133,11 @@ jobs:
           PYTHON: python
           OPENAPI_STRICT_SHAPES: "1"
         run: bash scripts/check-openapi-contract.sh specs/015-dashboard-calendar/contracts/openapi.yaml
+      - name: Check access governance OpenAPI contract drift
+        env:
+          PYTHON: python
+          OPENAPI_STRICT_SHAPES: "1"
+        run: bash scripts/check-openapi-contract.sh specs/016-access-governance/contracts/openapi.yaml
       - name: Run backend tests
         working-directory: backend
         run: python -m pytest
@@ -258,6 +265,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [backend, frontend, frontend-e2e]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v5
         with:
@@ -276,6 +284,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [backend, frontend, frontend-e2e, acceptance-enforce]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v5
         with:
@@ -304,8 +313,10 @@ jobs:
       DEPLOY_PORT: ${{ vars.GRADSYNC_PRODUCTION_SSH_PORT || '22' }}
       DEPLOY_PATH: ${{ vars.GRADSYNC_DEPLOY_PATH || '/home/GradSync/GradSync' }}
       DEPLOY_BRANCH: master
+      DEPLOY_REVISION: ${{ github.sha }}
       PUBLIC_URL: ${{ vars.GRADSYNC_PUBLIC_URL || 'https://120021123.xyz' }}
       STRICT_UPLOAD_PROXY_CHECK: ${{ vars.GRADSYNC_STRICT_UPLOAD_PROXY_CHECK || 'false' }}
+      DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
       PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
     steps:
       - uses: actions/checkout@v5
@@ -314,11 +325,12 @@ jobs:
       - name: Validate deployment inputs
         run: |
           test -n "${DEPLOY_HOST}" || { echo "GRADSYNC_PRODUCTION_HOST variable is required"; exit 1; }
-          test -n "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" || { echo "PRODUCTION_DEPLOY_SSH_KEY secret is required"; exit 1; }
+          test -n "${DEPLOY_REVISION}" || { echo "github.sha deployment revision is required"; exit 1; }
+          test -n "${DEPLOY_SSH_KEY}" || { echo "PRODUCTION_DEPLOY_SSH_KEY secret is required"; exit 1; }
       - name: Configure SSH
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/gradsync_github_deploy
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/gradsync_github_deploy
           chmod 600 ~/.ssh/gradsync_github_deploy
           echo "Scanning SSH host key for ${DEPLOY_HOST}:${DEPLOY_PORT}"
           if ! timeout 20 bash -c "cat < /dev/null > /dev/tcp/${DEPLOY_HOST}/${DEPLOY_PORT}"; then
@@ -369,5 +381,5 @@ jobs:
             -i ~/.ssh/gradsync_github_deploy \
             -p "${DEPLOY_PORT}" \
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' GRADSYNC_STRICT_UPLOAD_PROXY_CHECK='${STRICT_UPLOAD_PROXY_CHECK}' sh -s" \
+            "GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_DEPLOY_REVISION='${DEPLOY_REVISION}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' GRADSYNC_STRICT_UPLOAD_PROXY_CHECK='${STRICT_UPLOAD_PROXY_CHECK}' sh -s" \
             < scripts/deploy-production.sh
