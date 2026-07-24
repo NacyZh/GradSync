@@ -763,9 +763,9 @@ exceptions, and verify the automated release decision for every state.
 
 **Required Reviewers**:
 
-- Product: Pending
-- Testing: Pending
-- Development: Pending
+- Product: Accepted by `NacyeZ <s240101199@stu.cqupt.edu.cn>` on 2026-07-24
+- Testing: Accepted by `NacyeZ <s240101199@stu.cqupt.edu.cn>` on 2026-07-24
+- Development: Accepted by `NacyeZ <s240101199@stu.cqupt.edu.cn>` on 2026-07-24
 
 Structured decisions are maintained in `acceptance.json` and bind each
 discipline independently to the SHA-256 fingerprint of the normative sections

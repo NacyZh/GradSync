@@ -210,6 +210,7 @@ Validated on 2026-07-24:
   passed from a clean build-output state.
 - Full-stack Playwright passed 70 scenarios with 39 mock-only scenarios
   skipped; the mock suite passed all 109 scenarios.
-- Production readiness and acceptance enforcement correctly stopped before
-  runtime mutation because Product, Testing, and Development decisions for the
-  current normative revision remain Pending.
+- Production readiness and acceptance enforcement initially stopped before
+  runtime mutation while decisions were Pending. The solo maintainer accepted
+  all three disciplines for the recorded current revision on 2026-07-24, and
+  production enforcement now reports the feature as eligible.

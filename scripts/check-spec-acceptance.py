@@ -308,6 +308,15 @@ def evaluate_repository(*, root=ROOT, scope="production", feature=None, now=None
     feature_dirs = discover_features(root)
     if feature:
         feature_dirs = [path for path in feature_dirs if path.name == feature]
+    elif enforcement_start := policy.get("enforcementStartFeature"):
+        if not FEATURE_RE.fullmatch(str(enforcement_start)):
+            raise ValueError("enforcementStartFeature must be a feature directory name")
+        start_number = int(enforcement_start.split("-", 1)[0])
+        feature_dirs = [
+            path
+            for path in feature_dirs
+            if int(path.name.split("-", 1)[0]) >= start_number
+        ]
     results = [
         evaluate_feature(path, policy, scope=scope, now=now, root=root)
         for path in feature_dirs

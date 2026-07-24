@@ -11,5 +11,6 @@
   ],
   "maximumExceptionDays": 14,
   "releaseScopes": ["production"],
-  "acceptanceFilename": "acceptance.json"
+  "acceptanceFilename": "acceptance.json",
+  "enforcementStartFeature": "016-access-governance"
 }

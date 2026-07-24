@@ -121,6 +121,31 @@ def test_repository_discovery_defaults_legacy_spec_to_pending(tmp_path):
     assert report["features"][0]["blockers"] == ["missing acceptance evidence"]
 
 
+def test_repository_enforcement_can_start_at_a_governance_baseline(tmp_path):
+    configured_policy = policy() | {
+        "enforcementStartFeature": "016-access-governance",
+    }
+    (tmp_path / ".specify").mkdir()
+    for feature in ("015-legacy", "016-access-governance", "017-next"):
+        feature_dir = tmp_path / "specs" / feature
+        feature_dir.mkdir(parents=True)
+        (feature_dir / "spec.md").write_text(
+            f"# {feature}\n## Requirements\n- R1: Existing behavior\n"
+        )
+    (tmp_path / ".specify" / "acceptance-policy.json").write_text(
+        json.dumps(configured_policy)
+    )
+
+    report = module.evaluate_repository(root=tmp_path)
+
+    assert [item["feature"] for item in report["features"]] == [
+        "016-access-governance",
+        "017-next",
+    ]
+    legacy_report = module.evaluate_repository(root=tmp_path, feature="015-legacy")
+    assert [item["feature"] for item in legacy_report["features"]] == ["015-legacy"]
+
+
 def test_explanatory_edits_outside_normative_sections_keep_revision(tmp_path):
     spec = tmp_path / "spec.md"
     spec.write_text(

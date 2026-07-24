@@ -322,6 +322,12 @@ more than one discipline, but each decision remains explicit and independently
 attributable. A normative edit requires every discipline to review the new
 fingerprint; do not copy an old `decidedRevision`.
 
+This repository currently has one maintainer, so the same identified maintainer
+may self-attest all three disciplines with separate rationales. Production
+enforcement starts at `016-access-governance`; features 001-015 are retained as
+the pre-governance historical baseline and remain available for explicit
+feature-level reports without retroactively blocking releases.
+
 Exceptions require a separate owner and approver, the exact production scope
 and normative revision, named covered disciplines, a reason, and an expiry no
 later than 14 days after approval. Revocation takes effect on the next
