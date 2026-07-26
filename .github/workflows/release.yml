@@ -298,7 +298,7 @@ jobs:
 
   deploy-production:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     needs: [backend, frontend, frontend-e2e, acceptance-enforce, production-image]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     concurrency:
@@ -370,7 +370,7 @@ jobs:
             echo "PRODUCTION_ENV_FILE is empty; keeping existing server .env.production"
           fi
       - name: Deploy on production host
-        timeout-minutes: 25
+        timeout-minutes: 55
         run: |
           ssh \
             -o BatchMode=yes \

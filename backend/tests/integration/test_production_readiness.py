@@ -54,6 +54,22 @@ def test_production_readiness_rejects_invalid_smtp_settings():
     assert "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be configured together" in issues
 
 
+def test_production_readiness_rejects_unbounded_research_execution_settings():
+    settings = production_ready_settings_stub(
+        GRADSYNC_NOTIFICATION_THRESHOLD_MIN_MINUTES=120,
+        GRADSYNC_NOTIFICATION_THRESHOLD_MAX_MINUTES=60,
+        GRADSYNC_NOTIFICATION_REMINDER_LEAD_MINUTES=1,
+        GRADSYNC_REPORT_ANALYTICS_MAX_PERIODS=105,
+        GRADSYNC_EXECUTION_JOB_BATCH_SIZE=1001,
+    )
+
+    issues = collect_production_readiness_issues(settings)
+
+    assert "Notification threshold minimum must be positive and below maximum" in issues
+    assert "GRADSYNC_REPORT_ANALYTICS_MAX_PERIODS must be between 1 and 104" in issues
+    assert "GRADSYNC_EXECUTION_JOB_BATCH_SIZE must be between 1 and 1000" in issues
+
+
 def test_frontend_nginx_serves_static_assets_and_proxies_api():
     nginx_conf = (REPO_ROOT / "docker/nginx.conf").read_text()
 
@@ -137,6 +153,8 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
 
     assert "concurrency:" in workflow
     assert "timeout-minutes:" in workflow
+    assert "timeout-minutes: 60" in workflow
+    assert "timeout-minutes: 55" in workflow
     assert "persist-credentials: false" in workflow
     assert "actions/checkout@v5" in workflow
     assert "actions/setup-node@v5" in workflow
@@ -200,9 +218,11 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     assert 'test "$(git rev-parse HEAD)" = "$REVISION"' in script
     assert 'docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE"' in script
     assert 'COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"' in script
+    assert 'BUILDER_CACHE_MAX_AGE="${GRADSYNC_BUILDER_CACHE_MAX_AGE:-168h}"' in script
     assert "compose stop backend frontend worker scheduler" not in script
     assert "compose rm -f backend frontend worker scheduler" not in script
     assert "docker builder prune -af" in script
+    assert '--filter "until=$BUILDER_CACHE_MAX_AGE"' in script
     assert "docker image prune -f" in script
     assert "compose build --pull backend" in script
     assert "compose build --pull frontend" in script

@@ -13,6 +13,7 @@ import { useI18n } from '../i18n/I18nProvider';
 import { useAuth } from './AuthProvider';
 import { changePassword, updateProfile } from './api';
 import { SecuritySettingsPanel } from './SecuritySettingsPanel';
+import { NotificationPreferences } from '../notifications/NotificationPreferences';
 
 export function ProfilePage() {
   const { user } = useAuth();
@@ -154,6 +155,7 @@ export function ProfilePage() {
         </form>
       </section>
 
+      <NotificationPreferences />
       <SecuritySettingsPanel />
     </PageShell>
   );

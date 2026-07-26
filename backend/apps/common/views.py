@@ -52,6 +52,9 @@ def metrics(_request):
     AccountSession = apps.get_model("accounts", "AccountSession")
     AuditExport = apps.get_model("audit", "AuditExport")
     Notification = apps.get_model("notifications", "Notification")
+    NotificationDeliveryAttempt = apps.get_model(
+        "notifications", "NotificationDeliveryAttempt"
+    )
     ResearchProject = apps.get_model("projects", "ResearchProject")
     ScheduleNotificationDispatch = apps.get_model("schedules", "ScheduleNotificationDispatch")
     pending_recoveries = AccountRecoveryRequest.objects.filter(status="pending").count()
@@ -74,6 +77,13 @@ def metrics(_request):
         "# HELP gradsync_notifications_pending Pending notification records.",
         "# TYPE gradsync_notifications_pending gauge",
         f"gradsync_notifications_pending {Notification.objects.filter(status='pending').count()}",
+        "# HELP gradsync_notification_followups_total Actionable notifications by outcome.",
+        "# TYPE gradsync_notification_followups_total gauge",
+        (
+            "# HELP gradsync_notification_delivery_attempts_total "
+            "Delivery attempts by channel and state."
+        ),
+        "# TYPE gradsync_notification_delivery_attempts_total gauge",
         "# HELP gradsync_account_recovery_pending Pending account recovery requests.",
         "# TYPE gradsync_account_recovery_pending gauge",
         f"gradsync_account_recovery_pending {pending_recoveries}",
@@ -95,6 +105,39 @@ def metrics(_request):
         "# HELP gradsync_schedule_dispatch_total Schedule dispatches by channel and status.",
         "# TYPE gradsync_schedule_dispatch_total gauge",
     ]
+    for outcome in ("pending", "acknowledged", "completed", "expired", "unavailable"):
+        lines.append(
+            "gradsync_notification_followups_total"
+            f'{{outcome="{outcome}"}} '
+            f"{Notification.objects.filter(outcome_state=outcome).count()}"
+        )
+    for channel in ("in_app", "email"):
+        for attempt_state in ("pending", "queued", "sent", "failed", "skipped"):
+            attempt_count = NotificationDeliveryAttempt.objects.filter(
+                channel=channel, state=attempt_state
+            ).count()
+            lines.append(
+                "gradsync_notification_delivery_attempts_total"
+                f'{{channel="{channel}",state="{attempt_state}"}} '
+                f"{attempt_count}"
+            )
+    oldest_attempt = (
+        NotificationDeliveryAttempt.objects.filter(state__in=["pending", "queued"])
+        .order_by("eligible_at")
+        .first()
+    )
+    notification_lag = (
+        max(0, int((timezone.now() - oldest_attempt.eligible_at).total_seconds()))
+        if oldest_attempt and oldest_attempt.eligible_at <= timezone.now()
+        else 0
+    )
+    lines.extend(
+        [
+            "# HELP gradsync_notification_delivery_lag_seconds Age of oldest due attempt.",
+            "# TYPE gradsync_notification_delivery_lag_seconds gauge",
+            f"gradsync_notification_delivery_lag_seconds {notification_lag}",
+        ]
+    )
     oldest_claim = (
         ScheduleNotificationDispatch.objects.filter(status="claimed").order_by("created_at").first()
     )

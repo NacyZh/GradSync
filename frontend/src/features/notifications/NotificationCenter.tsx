@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 
@@ -27,12 +27,19 @@ export function NotificationCenter() {
   const queryClient = useQueryClient();
   const notificationsQuery = useQuery({
     queryKey: notificationQueryKey,
-    queryFn: listNotifications,
+    queryFn: () => listNotifications(),
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
   const notifications = notificationResults(notificationsQuery.data);
   const unreadNotifications = notifications.filter((notification) => !notification.readAt);
+  const unreadCount = Array.isArray(notificationsQuery.data)
+    ? unreadNotifications.length
+    : notificationsQuery.data?.unreadCount ?? unreadNotifications.length;
+  const pendingActionCount = Array.isArray(notificationsQuery.data)
+    ? notifications.filter((notification) => notification.activeFollowUp).length
+    : notificationsQuery.data?.pendingActionCount ?? 0;
+  const markedIds = useRef(new Set<number>());
   const markReadMutation = useMutation({
     mutationFn: markNotificationsRead,
     onError: () => queryClient.invalidateQueries({ queryKey: notificationQueryKey }),
@@ -40,37 +47,41 @@ export function NotificationCenter() {
 
   useEffect(() => {
     if (!open || unreadNotifications.length === 0 || markReadMutation.isPending) return;
-    const throughId = Math.max(...unreadNotifications.map((notification) => notification.id));
+    const loadedIds = unreadNotifications
+      .map((notification) => notification.id)
+      .filter((id) => !markedIds.current.has(id));
+    if (!loadedIds.length) return;
+    loadedIds.forEach((id) => markedIds.current.add(id));
     const readAt = new Date().toISOString();
     queryClient.setQueryData<NotificationResponse>(notificationQueryKey, (current) => {
       if (!current) return current;
       const markRead = (notification: (typeof notifications)[number]) => (
-        notification.id <= throughId ? { ...notification, readAt } : notification
+        loadedIds.includes(notification.id) ? { ...notification, readAt } : notification
       );
       return Array.isArray(current)
         ? current.map(markRead)
         : { ...current, results: current.results.map(markRead) };
     });
-    markReadMutation.mutate(throughId);
+    markReadMutation.mutate(loadedIds);
   }, [markReadMutation, notifications, open, queryClient, unreadNotifications]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" className="notification-button" type="button" aria-label="Open notifications">
+        <Button variant="outline" size="icon" className="notification-button" type="button" aria-label={t('openNotifications')}>
           <Bell className="h-4 w-4" aria-hidden="true" />
-          {unreadNotifications.length > 0 ? <span className="unread-dot" data-testid="notification-unread-dot" aria-hidden="true" /> : null}
+          {unreadCount > 0 ? <span className="unread-dot" data-testid="notification-unread-dot" aria-hidden="true" /> : null}
           <span className="sr-only" aria-live="polite">
-            {unreadNotifications.length > 0 ? t('unreadNotifications', { count: unreadNotifications.length }) : t('noUnreadNotifications')}
+            {unreadCount > 0 ? t('unreadNotifications', { count: unreadCount }) : t('noUnreadNotifications')}
           </span>
         </Button>
       </DialogTrigger>
       <DialogContent className="notification-drawer">
-        <DialogTitle className="sr-only">Notifications</DialogTitle>
+        <DialogTitle className="sr-only">{t('notifications')}</DialogTitle>
         <DialogDescription className="sr-only">
-          Recent workspace notifications and delivery status.
+          {t('notificationDescription')}
         </DialogDescription>
-        <NotificationList compact />
+        <NotificationList compact pendingActionCount={pendingActionCount} />
       </DialogContent>
     </Dialog>
   );

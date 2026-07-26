@@ -115,7 +115,7 @@ test('notification drawer clears viewed state and restores the red dot for new r
     request.url().endsWith('/api/notifications/read') && request.method() === 'POST'
   ));
   await page.getByRole('button', { name: 'Open notifications' }).click();
-  expect((await readRequest).postDataJSON()).toEqual({ throughId: 51 });
+  expect((await readRequest).postDataJSON()).toEqual({ notificationIds: [51] });
   await expect(page.getByTestId('notification-unread-dot')).toHaveCount(0);
 
   const drawer = page.getByRole('dialog', { name: 'Notifications' });

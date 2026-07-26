@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { listProjectEvents } from './api';
+import { projectExecutionQueryKeys } from './index';
 
 export function useProjectLiveRefresh(projectId: number | null | undefined, latestEventId?: string | null) {
   const queryClient = useQueryClient();
@@ -16,6 +17,9 @@ export function useProjectLiveRefresh(projectId: number | null | undefined, late
     queryClient.invalidateQueries({ queryKey: ['review-reports', projectId] });
     queryClient.invalidateQueries({ queryKey: ['review-assignments', projectId] });
     queryClient.invalidateQueries({ queryKey: ['eligible-project-teachers', projectId] });
+    for (const queryKey of projectExecutionQueryKeys(projectId)) {
+      queryClient.invalidateQueries({ queryKey });
+    }
   }, [projectId, queryClient]);
 
   useEffect(() => {

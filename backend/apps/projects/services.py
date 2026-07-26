@@ -227,6 +227,7 @@ def project_event_feed(project: ResearchProject, *, after: str | None = None, li
         if raw_id.isdigit():
             after_id = int(raw_id)
 
+    limit = max(1, min(limit, 100))
     events = []
     audit_events = project.audit_events.select_related("actor").order_by("-created_at")[:limit]
     for event in audit_events:

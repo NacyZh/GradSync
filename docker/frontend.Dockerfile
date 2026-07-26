@@ -3,7 +3,8 @@ FROM node:22-slim AS build
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --no-fund
 
 COPY frontend/ ./
 ARG VITE_API_BASE_URL=""

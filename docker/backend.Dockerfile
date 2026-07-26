@@ -7,10 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app/backend
 
 COPY backend/ ./
-RUN addgroup --system gradsync \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    addgroup --system gradsync \
     && adduser --system --ingroup gradsync gradsync \
-    && pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+    && pip install --upgrade pip \
+    && pip install .
 
 COPY docker/backend-entrypoint.sh /entrypoint.sh
 

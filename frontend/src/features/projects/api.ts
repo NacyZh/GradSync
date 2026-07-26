@@ -57,6 +57,7 @@ export type ProjectCapabilities = {
   canAssignReviews?: boolean;
   canReviewAssignedTargets?: boolean;
   canViewProject?: boolean;
+  canManageProjectNotificationPolicy?: boolean;
   isReadOnly?: boolean;
   deleteDisabledReason?: string;
 };

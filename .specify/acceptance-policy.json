@@ -4,6 +4,7 @@
   "normativeHeadings": [
     "2. Complete Positive Business Flows",
     "3. Boundary and Negative Scenarios",
+    "3. Exception, Boundary, and Degradation Scenarios",
     "4. Quantifiable Acceptance Criteria",
     "Included Scope",
     "Unsupported / Out of Scope",

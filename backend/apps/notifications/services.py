@@ -3,7 +3,7 @@ import re
 from django.db.models import DateTimeField, OuterRef, Q, Subquery
 from django.utils import timezone
 
-from .models import Notification, NotificationReadReceipt
+from .models import Notification, NotificationDeliveryAttempt, NotificationReadReceipt
 
 RETRY_NEEDED_STATUSES = {Notification.Status.FAILED, Notification.Status.RETRY_NEEDED}
 
@@ -35,6 +35,21 @@ def mark_notification_status(notification: Notification, status: str, failure_re
     if failure_reason:
         notification.failure_reason = mask_notification_failure_reason(failure_reason)
     notification.save(update_fields=["status", "queued_at", "sent_at", "failure_reason"])
+    attempt = notification.delivery_attempts.filter(
+        channel=NotificationDeliveryAttempt.Channel.EMAIL,
+        attempt_number=max(notification.retry_count + 1, 1),
+    ).first()
+    if attempt:
+        attempt.state = {
+            Notification.Status.QUEUED: NotificationDeliveryAttempt.State.QUEUED,
+            Notification.Status.SENT: NotificationDeliveryAttempt.State.SENT,
+            Notification.Status.SKIPPED: NotificationDeliveryAttempt.State.SKIPPED,
+        }.get(status, attempt.state)
+        if status in {Notification.Status.SENT, Notification.Status.SKIPPED}:
+            attempt.completed_at = now
+        attempt.attempted_at = attempt.attempted_at or now
+        attempt.failure_reason_masked = mask_notification_failure_reason(failure_reason)
+        attempt.save()
     return notification
 
 
@@ -60,6 +75,23 @@ def mark_notification_attempt_failed(
             "eligible_at",
         ]
     )
+    attempt, _ = NotificationDeliveryAttempt.objects.get_or_create(
+        notification=notification,
+        channel=NotificationDeliveryAttempt.Channel.EMAIL,
+        attempt_number=notification.retry_count,
+        defaults={
+            "eligible_at": notification.last_attempt_at,
+            "idempotency_key": (
+                f"notification:{notification.pk}:email:{notification.retry_count}"
+            ),
+        },
+    )
+    attempt.state = NotificationDeliveryAttempt.State.FAILED
+    attempt.attempted_at = notification.last_attempt_at
+    attempt.completed_at = notification.last_attempt_at
+    attempt.failure_code = exc.__class__.__name__ if isinstance(exc, Exception) else "delivery"
+    attempt.failure_reason_masked = notification.failure_reason
+    attempt.save()
     return notification
 
 
@@ -77,10 +109,44 @@ def enqueue_notification(
     status: str = Notification.Status.PENDING,
     failure_reason: str = "",
     delivery_policy: str = Notification.DeliveryPolicy.IN_APP_EMAIL,
+    category: str | None = None,
+    requirement_type: str = Notification.RequirementType.INFORMATIONAL,
+    outcome_state: str | None = None,
+    due_at=None,
+    expires_at=None,
+    dedupe_key: str = "",
+    active_follow_up: bool = False,
 ) -> Notification:
     if delivery_policy == Notification.DeliveryPolicy.IN_APP:
         status = Notification.Status.IN_APP_ONLY
-    return Notification.objects.create(
+    if category is None:
+        if event_type in {
+            Notification.EventType.VERIFICATION_CODE,
+            Notification.EventType.PASSWORD_RECOVERY,
+            Notification.EventType.EMAIL_CHANGE_SECURITY,
+        }:
+            category = Notification.Category.SECURITY
+        elif (
+            event_type.startswith("schedule_")
+            or event_type == Notification.EventType.BOOKING_CHANGED
+        ):
+            category = Notification.Category.SCHEDULE
+        elif event_type in {
+            Notification.EventType.NEW_SUBMISSION,
+            Notification.EventType.PENDING_REVIEW,
+            Notification.EventType.TEACHER_FEEDBACK,
+            Notification.EventType.TEACHER_FEEDBACK_AVAILABLE,
+        }:
+            category = Notification.Category.REPORT
+        else:
+            category = Notification.Category.PROJECT
+    if outcome_state is None:
+        outcome_state = (
+            Notification.OutcomeState.NOT_REQUIRED
+            if requirement_type == Notification.RequirementType.INFORMATIONAL
+            else Notification.OutcomeState.PENDING
+        )
+    notification = Notification.objects.create(
         project=project,
         recipient=recipient,
         recipient_email=getattr(recipient, "email", ""),
@@ -94,7 +160,55 @@ def enqueue_notification(
         delivery_policy=delivery_policy,
         eligible_at=eligible_at or timezone.now(),
         failure_reason=mask_notification_failure_reason(failure_reason),
+        category=category,
+        requirement_type=requirement_type,
+        outcome_state=outcome_state,
+        due_at=due_at,
+        expires_at=expires_at,
+        dedupe_key=dedupe_key,
+        active_follow_up=active_follow_up,
     )
+    if delivery_policy != Notification.DeliveryPolicy.EMAIL_ONLY:
+        NotificationDeliveryAttempt.objects.create(
+            notification=notification,
+            channel=NotificationDeliveryAttempt.Channel.IN_APP,
+            attempt_number=1,
+            state=NotificationDeliveryAttempt.State.SENT,
+            eligible_at=notification.eligible_at,
+            attempted_at=notification.created_at,
+            completed_at=notification.created_at,
+            idempotency_key=f"notification:{notification.pk}:in_app:1",
+        )
+    if delivery_policy != Notification.DeliveryPolicy.IN_APP:
+        from .policy_services import email_enabled_for, quiet_hours_eligible_at
+
+        eligible = (
+            notification.eligible_at
+            if category == Notification.Category.SECURITY
+            else quiet_hours_eligible_at(recipient, notification.eligible_at)
+        )
+        email_enabled = email_enabled_for(recipient, category)
+        NotificationDeliveryAttempt.objects.create(
+            notification=notification,
+            channel=NotificationDeliveryAttempt.Channel.EMAIL,
+            attempt_number=1,
+            state=(
+                NotificationDeliveryAttempt.State.PENDING
+                if email_enabled
+                else NotificationDeliveryAttempt.State.SKIPPED
+            ),
+            eligible_at=eligible,
+            completed_at=None if email_enabled else timezone.now(),
+            failure_code="" if email_enabled else "preference_disabled",
+            idempotency_key=f"notification:{notification.pk}:email:1",
+        )
+        if email_enabled and eligible > notification.eligible_at:
+            notification.eligible_at = eligible
+            notification.save(update_fields=["eligible_at"])
+        elif not email_enabled:
+            notification.status = Notification.Status.IN_APP_ONLY
+            notification.save(update_fields=["status"])
+    return notification
 
 
 def notification_is_deliverable(notification: Notification) -> bool:

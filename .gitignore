@@ -63,4 +63,6 @@ specs/003-research-collab-platform/contracts/*
 !specs/015-dashboard-calendar/**
 !specs/016-access-governance/
 !specs/016-access-governance/**
+!specs/017-research-execution-loop/
+!specs/017-research-execution-loop/**
 TODO.txt

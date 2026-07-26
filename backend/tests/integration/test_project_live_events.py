@@ -1,7 +1,7 @@
 import pytest
 from django.utils import timezone
 
-from apps.audit.services import record_event
+from apps.audit.services import record_event, record_execution_event
 from apps.notifications.models import Notification
 from apps.projects.models import ProjectMembership, ResearchProject
 from apps.submissions.models import InlineComment
@@ -58,3 +58,28 @@ def test_project_event_feed_authorization_does_not_leak_events(api_client):
     response = authenticate(api_client, outsider).get(f"/api/projects/{project.id}/events/")
 
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_execution_event_uses_typed_target_and_stable_cursor(api_client):
+    advisor = UserFactory(global_role="advisor", status="active")
+    project = ResearchProject.objects.create(title="Execution Events", advisor=advisor)
+    ProjectMembership.objects.create(project=project, user=advisor, role="advisor")
+    event = record_execution_event(
+        project=project,
+        actor=advisor,
+        action="notification_policy.updated",
+        target=project,
+        state={"version": 2},
+        privileged=True,
+    )
+
+    response = authenticate(api_client, advisor).get(
+        f"/api/projects/{project.id}/events/", {"limit": 500}
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["results"]
+    assert payload[0]["id"] == f"audit:{event.id}"
+    assert payload[0]["targetType"] == "ResearchProject"
+    assert len(payload) <= 100

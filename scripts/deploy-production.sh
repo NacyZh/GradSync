@@ -9,6 +9,7 @@ COMPOSE_FILE="${GRADSYNC_COMPOSE_FILE:-docker-compose.prod.yml}"
 COMPOSE_ENV_FILE="${GRADSYNC_COMPOSE_ENV_FILE:-.env.production}"
 PUBLIC_URL="${GRADSYNC_PUBLIC_URL:-https://120021123.xyz}"
 PRUNE_BUILDER_CACHE="${GRADSYNC_PRUNE_BUILDER_CACHE:-true}"
+BUILDER_CACHE_MAX_AGE="${GRADSYNC_BUILDER_CACHE_MAX_AGE:-168h}"
 PRUNE_DANGLING_IMAGES="${GRADSYNC_PRUNE_DANGLING_IMAGES:-true}"
 STRICT_UPLOAD_PROXY_CHECK="${GRADSYNC_STRICT_UPLOAD_PROXY_CHECK:-false}"
 
@@ -76,8 +77,8 @@ wait_for_service() {
 prune_builder_cache() {
   label="$1"
   if [ "$PRUNE_BUILDER_CACHE" = "true" ]; then
-    echo "Pruning Docker builder cache ${label}"
-    docker builder prune -af || true
+    echo "Pruning Docker builder cache older than ${BUILDER_CACHE_MAX_AGE} ${label}"
+    docker builder prune -af --filter "until=$BUILDER_CACHE_MAX_AGE" || true
   fi
 }
 

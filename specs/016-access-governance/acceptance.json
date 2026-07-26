@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "feature": "016-access-governance",
   "specificationPath": "specs/016-access-governance/spec.md",
-  "normativeRevision": "53c2f28292e19538bfd4cd2b37b4fe4755e723fb1bea767e54edcd32de5d9033",
+  "normativeRevision": "051cec519aa599edd3e2d3732dee87ab0e3a816ef368e0d974c0dcefbb30cce5",
   "decisions": {
     "product": {
       "assignedReviewer": "NacyeZ <s240101199@stu.cqupt.edu.cn>",
       "decision": "accepted",
-      "decidedRevision": "53c2f28292e19538bfd4cd2b37b4fe4755e723fb1bea767e54edcd32de5d9033",
+      "decidedRevision": "051cec519aa599edd3e2d3732dee87ab0e3a816ef368e0d974c0dcefbb30cce5",
       "decidedAt": "2026-07-24T06:48:45Z",
       "rationale": "Solo maintainer confirms the current revision matches the intended product scope."
     },
     "testing": {
       "assignedReviewer": "NacyeZ <s240101199@stu.cqupt.edu.cn>",
       "decision": "accepted",
-      "decidedRevision": "53c2f28292e19538bfd4cd2b37b4fe4755e723fb1bea767e54edcd32de5d9033",
+      "decidedRevision": "051cec519aa599edd3e2d3732dee87ab0e3a816ef368e0d974c0dcefbb30cce5",
       "decidedAt": "2026-07-24T06:48:45Z",
       "rationale": "Solo maintainer confirms the documented automated and manual validation evidence is sufficient."
     },
     "development": {
       "assignedReviewer": "NacyeZ <s240101199@stu.cqupt.edu.cn>",
       "decision": "accepted",
-      "decidedRevision": "53c2f28292e19538bfd4cd2b37b4fe4755e723fb1bea767e54edcd32de5d9033",
+      "decidedRevision": "051cec519aa599edd3e2d3732dee87ab0e3a816ef368e0d974c0dcefbb30cce5",
       "decidedAt": "2026-07-24T06:48:45Z",
       "rationale": "Solo maintainer accepts the implementation, architecture, migration, and operational constraints."
     }

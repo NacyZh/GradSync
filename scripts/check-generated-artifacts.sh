@@ -118,6 +118,29 @@ check_access_governance_artifacts() {
   python3 scripts/check-spec-acceptance.py --mode validate --feature 016-access-governance
 }
 
+check_research_execution_artifacts() {
+  spec_dir="specs/017-research-execution-loop"
+  [ -d "$spec_dir" ] || return 0
+  for path in \
+    "$spec_dir/spec.md" \
+    "$spec_dir/plan.md" \
+    "$spec_dir/research.md" \
+    "$spec_dir/data-model.md" \
+    "$spec_dir/quickstart.md" \
+    "$spec_dir/tasks.md" \
+    "$spec_dir/contracts/openapi.yaml" \
+    "$spec_dir/contracts/frontend-ui.md" \
+    "$spec_dir/acceptance.json"
+  do
+    if [ ! -f "$path" ]; then
+      echo "Research execution artifact is missing: $path" >&2
+      exit 1
+    fi
+  done
+
+  python3 scripts/check-spec-acceptance.py --mode validate --feature 017-research-execution-loop
+}
+
 if [ "${1:-}" = "--clean" ]; then
   find_generated_artifacts delete
 elif [ "${1:-}" != "" ]; then
@@ -136,3 +159,4 @@ fi
 check_paper_library_spec_review_artifacts
 check_shared_resource_source_artifacts
 check_access_governance_artifacts
+check_research_execution_artifacts

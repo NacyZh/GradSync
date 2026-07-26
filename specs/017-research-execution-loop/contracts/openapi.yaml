@@ -1,0 +1,1832 @@
+openapi: 3.0.3
+info:
+  title: GradSync Research Execution Loop
+  version: 1.0.0
+  description: >
+    Additive contracts for actionable notifications, project milestones and
+    deliverables, structured periodic reports and analytics, decisions, and
+    risks. Existing authentication and project capability rules apply.
+servers:
+  - url: /api
+security:
+  - sessionAuth: []
+  - bearerAuth: []
+tags:
+  - name: Notifications
+  - name: Project Execution
+  - name: Deliverables
+  - name: Reports
+  - name: Decisions
+  - name: Risks
+  - name: Administration
+
+paths:
+  /notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: unread
+          in: query
+          schema: { type: boolean }
+        - name: outcome
+          in: query
+          schema: { $ref: '#/components/schemas/NotificationOutcomeState' }
+        - name: category
+          in: query
+          schema: { $ref: '#/components/schemas/NotificationCategory' }
+        - name: projectId
+          in: query
+          schema: { type: integer }
+        - name: createdAfter
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Current account notifications only, newest first.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /notifications/read:
+    post:
+      tags: [Notifications]
+      operationId: markVisibleNotificationsRead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [notificationIds]
+                  properties:
+                    notificationIds:
+                      type: array
+                      minItems: 1
+                      maxItems: 100
+                      uniqueItems: true
+                      items: { type: integer }
+                - type: object
+                  required: [throughId]
+                  properties:
+                    throughId: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Only currently visible selected notifications were marked read.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [readAt, updatedIds]
+                properties:
+                  readAt: { type: string, format: date-time }
+                  updatedIds:
+                    type: array
+                    items: { type: integer }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /notifications/{notification_id}/acknowledge:
+    post:
+      tags: [Notifications]
+      operationId: acknowledgeNotification
+      parameters:
+        - $ref: '#/components/parameters/NotificationId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IdempotentAction' }
+      responses:
+        '200':
+          description: Acknowledgement-required notification acknowledged idempotently.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /notification-preferences:
+    get:
+      tags: [Notifications]
+      operationId: retrieveNotificationPreferences
+      responses:
+        '200':
+          description: Current account quiet hours and category channel choices.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPreferences' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Notifications]
+      operationId: updateNotificationPreferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationPreferencesWrite' }
+      responses:
+        '200':
+          description: Updated preferences; mandatory security policy remains enforced.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPreferences' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/notification-policy:
+    get:
+      tags: [Notifications]
+      operationId: retrieveProjectNotificationPolicy
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Effective defaults or project override with permitted bounds.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectNotificationPolicy' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Notifications]
+      operationId: updateProjectNotificationPolicy
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectNotificationPolicyWrite' }
+      responses:
+        '200':
+          description: Primary-advisor project policy updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectNotificationPolicy' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/notifications/summary:
+    get:
+      tags: [Administration]
+      operationId: retrieveNotificationOperationsSummary
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Privacy-safe delivery and follow-up counts for administrators.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationOperationsSummary' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /projects/{project_id}/execution-summary:
+    get:
+      tags: [Project Execution]
+      operationId: retrieveProjectExecutionSummary
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Role-safe project execution health and capabilities.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExecutionSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /projects/{project_id}/milestones:
+    get:
+      tags: [Project Execution]
+      operationId: listMilestones
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/MilestoneStatus' }
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Ordered role-safe milestone summaries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MilestonePage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Project Execution]
+      operationId: createMilestone
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MilestoneWrite' }
+      responses:
+        '201':
+          description: Milestone created by an authorized advisor.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Milestone' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /projects/{project_id}/milestones/{milestone_id}:
+    get:
+      tags: [Project Execution]
+      operationId: retrieveMilestone
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MilestoneId'
+      responses:
+        '200':
+          description: Milestone detail with permitted deliverable summaries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Milestone' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Project Execution]
+      operationId: updateMilestone
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MilestoneId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MilestoneUpdate' }
+      responses:
+        '200':
+          description: Milestone planning fields updated and status reconciled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Milestone' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/milestones/{milestone_id}/archive:
+    post:
+      tags: [Project Execution]
+      operationId: archiveMilestone
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MilestoneId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VersionedReason' }
+      responses:
+        '200':
+          description: Milestone archived with history retained.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Milestone' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /projects/{project_id}/deliverables:
+    get:
+      tags: [Deliverables]
+      operationId: listDeliverables
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: milestoneId
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/DeliverableStatus' }
+        - name: assigneeId
+          in: query
+          schema: { type: integer }
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Filtered deliverables authorized for the current role.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliverablePage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Deliverables]
+      operationId: createDeliverable
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliverableWrite' }
+      responses:
+        '201':
+          description: Deliverable created with validated assignments and task links.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deliverable' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /projects/{project_id}/deliverables/{deliverable_id}:
+    get:
+      tags: [Deliverables]
+      operationId: retrieveDeliverable
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/DeliverableId'
+      responses:
+        '200':
+          description: Role-safe deliverable detail and revision history.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deliverable' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Deliverables]
+      operationId: updateDeliverable
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/DeliverableId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliverableUpdate' }
+      responses:
+        '200':
+          description: Permitted planning/progress fields updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deliverable' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/deliverables/{deliverable_id}/submit:
+    post:
+      tags: [Deliverables]
+      operationId: submitDeliverableRevision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/DeliverableId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliverableSubmission' }
+      responses:
+        '201':
+          description: Immutable revision submitted and reviewers notified.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliverableRevision' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/deliverables/{deliverable_id}/recommendations:
+    post:
+      tags: [Deliverables]
+      operationId: createDeliverableRecommendation
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/DeliverableId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliverableRecommendationWrite' }
+      responses:
+        '201':
+          description: Assigned reviewer recommendation recorded without final acceptance.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliverableRecommendation' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/deliverables/{deliverable_id}/decisions:
+    post:
+      tags: [Deliverables]
+      operationId: createDeliverableFinalDecision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/DeliverableId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliverableDecisionWrite' }
+      responses:
+        '201':
+          description: Advisor final decision recorded and milestone reconciled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliverableFinalDecision' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/deliverables/{deliverable_id}/archive:
+    post:
+      tags: [Deliverables]
+      operationId: archiveDeliverable
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/DeliverableId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VersionedReason' }
+      responses:
+        '200':
+          description: Deliverable archived and milestone reconciled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deliverable' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /projects/{project_id}/report-templates:
+    get:
+      tags: [Reports]
+      operationId: listReportTemplateVersions
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Active, draft, and historical template versions permitted to the role.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results, capabilities]
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReportTemplateVersion' }
+                  capabilities: { $ref: '#/components/schemas/ReportCapabilities' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Reports]
+      operationId: createReportTemplateDraft
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+      responses:
+        '201':
+          description: New draft copied from active version or default fields.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportTemplateVersion' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/report-templates/{template_version_id}:
+    get:
+      tags: [Reports]
+      operationId: retrieveReportTemplateVersion
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/TemplateVersionId'
+      responses:
+        '200':
+          description: Immutable or editable template version detail.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportTemplateVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Reports]
+      operationId: updateReportTemplateDraft
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/TemplateVersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportTemplateDraftWrite' }
+      responses:
+        '200':
+          description: Draft fields updated; published versions reject mutation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportTemplateVersion' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/report-templates/{template_version_id}/publish:
+    post:
+      tags: [Reports]
+      operationId: publishReportTemplateVersion
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/TemplateVersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VersionedReason' }
+      responses:
+        '200':
+          description: Version published for reporting periods opened later.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportTemplateVersion' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/reporting-periods:
+    get:
+      tags: [Reports]
+      operationId: listReportingPeriods
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: state
+          in: query
+          schema: { type: string, enum: [open, closed] }
+      responses:
+        '200':
+          description: Reporting periods and current user's report state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPeriodPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /projects/{project_id}/reports:
+    get:
+      tags: [Reports]
+      operationId: listProjectReports
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: periodId
+          in: query
+          schema: { type: integer }
+        - name: studentId
+          in: query
+          schema: { type: integer }
+        - name: reviewStatus
+          in: query
+          schema: { type: string, enum: [pending_review, reviewed, needs_revision, closed] }
+      responses:
+        '200':
+          description: Role-filtered report revisions.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Reports]
+      operationId: submitProjectReport
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportSubmission' }
+      responses:
+        '201':
+          description: New report revision submitted against the period-locked template.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Report' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/report-analytics:
+    get:
+      tags: [Reports]
+      operationId: retrieveReportAnalytics
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RangeFrom'
+        - $ref: '#/components/parameters/RangeTo'
+        - name: studentId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Explainable bounded aggregate without ranking.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportAnalytics' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /projects/{project_id}/report-analytics/export:
+    get:
+      tags: [Reports]
+      operationId: exportReportAnalytics
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RangeFrom'
+        - $ref: '#/components/parameters/RangeTo'
+        - name: studentId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Bounded CSV containing the same authorized scope and source references.
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{project_id}/decisions:
+    get:
+      tags: [Decisions]
+      operationId: listProjectDecisions
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema: { type: string, enum: [current, superseded] }
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+      responses:
+        '200':
+          description: Searchable role-safe decision register.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DecisionPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Decisions]
+      operationId: publishProjectDecision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisionWrite' }
+      responses:
+        '201':
+          description: Immutable current decision published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Decision' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /projects/{project_id}/decisions/{decision_id}:
+    get:
+      tags: [Decisions]
+      operationId: retrieveProjectDecision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/DecisionId'
+      responses:
+        '200':
+          description: Decision context, rationale, links, and supersession chain.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Decision' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /projects/{project_id}/decisions/{decision_id}/supersede:
+    post:
+      tags: [Decisions]
+      operationId: supersedeProjectDecision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/DecisionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisionWrite' }
+      responses:
+        '201':
+          description: Successor published and predecessor marked superseded atomically.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Decision' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /projects/{project_id}/risks:
+    get:
+      tags: [Risks]
+      operationId: listProjectRisks
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: state
+          in: query
+          schema: { $ref: '#/components/schemas/RiskState' }
+        - name: severity
+          in: query
+          schema: { $ref: '#/components/schemas/RiskLevel' }
+        - name: ownerId
+          in: query
+          schema: { type: integer }
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+      responses:
+        '200':
+          description: Filtered role-safe risk register.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiskPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Risks]
+      operationId: raiseProjectRisk
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RiskRaise' }
+      responses:
+        '201':
+          description: Risk raised by an active project member.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Risk' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/risks/{risk_id}:
+    get:
+      tags: [Risks]
+      operationId: retrieveProjectRisk
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RiskId'
+      responses:
+        '200':
+          description: Risk detail with fixed-matrix explanation and revision history.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Risk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Risks]
+      operationId: triageProjectRisk
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RiskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RiskTriage' }
+      responses:
+        '200':
+          description: Advisor triage updated and severity derived.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Risk' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{project_id}/risks/{risk_id}/transitions:
+    post:
+      tags: [Risks]
+      operationId: transitionProjectRisk
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RiskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RiskTransitionWrite' }
+      responses:
+        '200':
+          description: Risk accepted, resolved, moved to mitigation, or reopened.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Risk' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema: { type: integer }
+    NotificationId:
+      name: notification_id
+      in: path
+      required: true
+      schema: { type: integer }
+    MilestoneId:
+      name: milestone_id
+      in: path
+      required: true
+      schema: { type: integer }
+    DeliverableId:
+      name: deliverable_id
+      in: path
+      required: true
+      schema: { type: integer }
+    TemplateVersionId:
+      name: template_version_id
+      in: path
+      required: true
+      schema: { type: integer }
+    DecisionId:
+      name: decision_id
+      in: path
+      required: true
+      schema: { type: integer }
+    RiskId:
+      name: risk_id
+      in: path
+      required: true
+      schema: { type: integer }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string, maxLength: 256 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    RangeFrom:
+      name: from
+      in: query
+      required: true
+      schema: { type: string, format: date }
+    RangeTo:
+      name: to
+      in: query
+      required: true
+      schema: { type: string, format: date }
+
+  responses:
+    Unauthorized:
+      description: Authentication required.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Current account lacks the required current capability.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Record is absent or hidden by current authorization.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Request failed field or business validation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    Conflict:
+      description: Stale version, duplicate idempotency key, or invalid current state.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Conflict' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        correlationId: { type: string }
+    ValidationError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+    Conflict:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            currentVersion: { type: integer }
+            current:
+              type: object
+              additionalProperties: true
+    IdempotentAction:
+      type: object
+      properties:
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    VersionedReason:
+      type: object
+      required: [expectedVersion, reason]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 8000 }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    PageMeta:
+      type: object
+      required: [nextCursor]
+      properties:
+        nextCursor: { type: string, nullable: true }
+
+    NotificationCategory:
+      type: string
+      enum: [security, project, deliverable, report, decision, risk, schedule, administration]
+    NotificationRequirementType:
+      type: string
+      enum: [informational, acknowledgement, action]
+    NotificationOutcomeState:
+      type: string
+      enum: [not_required, pending, acknowledged, completed, expired, unavailable]
+    Notification:
+      type: object
+      required:
+        - id
+        - eventType
+        - subject
+        - category
+        - requirementType
+        - outcomeState
+        - deliveryStatus
+        - createdAt
+      properties:
+        id: { type: integer }
+        projectId: { type: integer, nullable: true }
+        eventType: { type: string }
+        subject: { type: string }
+        actionPath: { type: string }
+        category: { $ref: '#/components/schemas/NotificationCategory' }
+        requirementType: { $ref: '#/components/schemas/NotificationRequirementType' }
+        outcomeState: { $ref: '#/components/schemas/NotificationOutcomeState' }
+        deliveryStatus:
+          type: string
+          enum: [pending, queued, sent, failed, retry_needed, skipped, in_app_only]
+        readAt: { type: string, format: date-time, nullable: true }
+        dueAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        acknowledgedAt: { type: string, format: date-time, nullable: true }
+        actionCompletedAt: { type: string, format: date-time, nullable: true }
+        unavailableAt: { type: string, format: date-time, nullable: true }
+        reminderCount: { type: integer, minimum: 0 }
+        escalationLevel: { type: integer, minimum: 0 }
+        capabilities:
+          type: object
+          required: [canAcknowledge, canOpenTarget]
+          properties:
+            canAcknowledge: { type: boolean }
+            canOpenTarget: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    NotificationPage:
+      type: object
+      required: [results, page, unreadCount, pendingActionCount]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+        unreadCount: { type: integer, minimum: 0 }
+        pendingActionCount: { type: integer, minimum: 0 }
+    NotificationPreferences:
+      type: object
+      required: [version, quietHours, categories, mandatorySecurityEmail]
+      properties:
+        version: { type: integer, minimum: 1 }
+        quietHours:
+          type: object
+          required: [enabled, timezone]
+          properties:
+            enabled: { type: boolean }
+            startsAt: { type: string, format: time, nullable: true }
+            endsAt: { type: string, format: time, nullable: true }
+            timezone: { type: string, maxLength: 64 }
+        categories:
+          type: array
+          items:
+            type: object
+            required: [category, emailEnabled]
+            properties:
+              category: { $ref: '#/components/schemas/NotificationCategory' }
+              emailEnabled: { type: boolean }
+        mandatorySecurityEmail: { type: boolean, enum: [true] }
+    NotificationPreferencesWrite:
+      type: object
+      required: [expectedVersion, quietHours, categories]
+      properties:
+        expectedVersion: { type: integer, minimum: 0 }
+        quietHours:
+          type: object
+          required: [enabled, timezone]
+          properties:
+            enabled: { type: boolean }
+            startsAt: { type: string, format: time, nullable: true }
+            endsAt: { type: string, format: time, nullable: true }
+            timezone: { type: string, maxLength: 64 }
+        categories:
+          type: array
+          items:
+            type: object
+            required: [category, emailEnabled]
+            properties:
+              category: { $ref: '#/components/schemas/NotificationCategory' }
+              emailEnabled: { type: boolean }
+    ProjectNotificationPolicy:
+      type: object
+      required: [version, source, values, bounds, capabilities]
+      properties:
+        version: { type: integer, minimum: 0 }
+        source: { type: string, enum: [system_default, project_override] }
+        values: { $ref: '#/components/schemas/NotificationThresholds' }
+        bounds:
+          type: object
+          required: [minimum, maximum]
+          properties:
+            minimum: { $ref: '#/components/schemas/NotificationThresholds' }
+            maximum: { $ref: '#/components/schemas/NotificationThresholds' }
+        capabilities:
+          type: object
+          required: [canManage]
+          properties:
+            canManage: { type: boolean }
+    ProjectNotificationPolicyWrite:
+      allOf:
+        - $ref: '#/components/schemas/NotificationThresholds'
+        - type: object
+          required: [expectedVersion]
+          properties:
+            expectedVersion: { type: integer, minimum: 0 }
+    NotificationThresholds:
+      type: object
+      required: [reminderLeadMinutes, escalationDelayMinutes, repeatIntervalMinutes, maxReminders]
+      properties:
+        reminderLeadMinutes: { type: integer, minimum: 0 }
+        escalationDelayMinutes: { type: integer, minimum: 0 }
+        repeatIntervalMinutes: { type: integer, minimum: 60 }
+        maxReminders: { type: integer, minimum: 0, maximum: 10 }
+    NotificationOperationsSummary:
+      type: object
+      required: [from, to, delivery, outcomes, schedulerLagSeconds]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        delivery:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        outcomes:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        schedulerLagSeconds: { type: integer, minimum: 0 }
+
+    ExecutionCapabilities:
+      type: object
+      required:
+        - canManageMilestones
+        - canManageDeliverables
+        - canSubmitAssignedDeliverables
+        - canRecommendDeliverables
+        - canDecideDeliverables
+        - canPublishDecisions
+        - canRaiseRisks
+        - canTriageRisks
+      properties:
+        canManageMilestones: { type: boolean }
+        canManageDeliverables: { type: boolean }
+        canSubmitAssignedDeliverables: { type: boolean }
+        canRecommendDeliverables: { type: boolean }
+        canDecideDeliverables: { type: boolean }
+        canPublishDecisions: { type: boolean }
+        canRaiseRisks: { type: boolean }
+        canTriageRisks: { type: boolean }
+    ExecutionSummary:
+      type: object
+      required: [projectId, milestoneCounts, deliverableCounts, riskCounts, pendingReviews, missingReports, unresolvedActions, capabilities]
+      properties:
+        projectId: { type: integer }
+        milestoneCounts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        deliverableCounts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        riskCounts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        pendingReviews: { type: integer, minimum: 0 }
+        missingReports: { type: integer, minimum: 0 }
+        unresolvedActions: { type: integer, minimum: 0 }
+        upcoming:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            required: [type, id, title, dueDate]
+            properties:
+              type: { type: string, enum: [milestone, deliverable, risk, report] }
+              id: { type: integer }
+              title: { type: string }
+              dueDate: { type: string, format: date }
+        capabilities: { $ref: '#/components/schemas/ExecutionCapabilities' }
+    MilestoneStatus:
+      type: string
+      enum: [planned, in_progress, at_risk, blocked, overdue, completed, archived]
+    MilestoneWrite:
+      type: object
+      required: [title, targetDate, ownerIds]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string, maxLength: 8000 }
+        targetDate: { type: string, format: date }
+        ownerIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items: { type: integer }
+        order: { type: integer, minimum: 0 }
+    MilestoneUpdate:
+      allOf:
+        - $ref: '#/components/schemas/MilestoneWrite'
+        - type: object
+          required: [expectedVersion]
+          properties:
+            expectedVersion: { type: integer, minimum: 1 }
+    Milestone:
+      allOf:
+        - $ref: '#/components/schemas/MilestoneWrite'
+        - type: object
+          required: [id, projectId, status, version, requiredDeliverables, acceptedDeliverables, createdAt, updatedAt]
+          properties:
+            id: { type: integer }
+            projectId: { type: integer }
+            status: { $ref: '#/components/schemas/MilestoneStatus' }
+            version: { type: integer, minimum: 1 }
+            requiredDeliverables: { type: integer, minimum: 0 }
+            acceptedDeliverables: { type: integer, minimum: 0 }
+            completedAt: { type: string, format: date-time, nullable: true }
+            archivedAt: { type: string, format: date-time, nullable: true }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    MilestonePage:
+      type: object
+      required: [results, page, capabilities]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/Milestone' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+        capabilities: { $ref: '#/components/schemas/ExecutionCapabilities' }
+
+    DeliverableStatus:
+      type: string
+      enum: [planned, in_progress, blocked, submitted, under_review, changes_requested, accepted, archived]
+    DeliverableWrite:
+      type: object
+      required: [milestoneId, title, acceptanceCriteria, dueDate, required, assigneeIds]
+      properties:
+        milestoneId: { type: integer }
+        title: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string, maxLength: 8000 }
+        acceptanceCriteria: { type: string, minLength: 1, maxLength: 8000 }
+        dueDate: { type: string, format: date }
+        required: { type: boolean }
+        assigneeIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items: { type: integer }
+        taskIds:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: integer }
+        reviewerRequired: { type: boolean, default: false }
+        reviewerIds:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items: { type: integer }
+        order: { type: integer, minimum: 0 }
+    DeliverableUpdate:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string, maxLength: 8000 }
+        acceptanceCriteria: { type: string, minLength: 1, maxLength: 8000 }
+        dueDate: { type: string, format: date }
+        required: { type: boolean }
+        assigneeIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items: { type: integer }
+        taskIds:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: integer }
+        progressPercent: { type: integer, minimum: 0, maximum: 100 }
+        workStatus: { type: string, enum: [planned, in_progress, blocked] }
+        blockerSummary: { type: string, maxLength: 4000 }
+    Deliverable:
+      type: object
+      required:
+        - id
+        - projectId
+        - milestoneId
+        - title
+        - acceptanceCriteria
+        - dueDate
+        - required
+        - status
+        - progressPercent
+        - assignees
+        - taskIds
+        - version
+        - revisions
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        milestoneId: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        acceptanceCriteria: { type: string }
+        dueDate: { type: string, format: date }
+        required: { type: boolean }
+        status: { $ref: '#/components/schemas/DeliverableStatus' }
+        progressPercent: { type: integer, minimum: 0, maximum: 100 }
+        blockerSummary: { type: string }
+        assignees:
+          type: array
+          items: { $ref: '#/components/schemas/MemberSummary' }
+        taskIds:
+          type: array
+          items: { type: integer }
+        version: { type: integer, minimum: 1 }
+        acceptedRevisionId: { type: integer, nullable: true }
+        revisions:
+          type: array
+          maxItems: 25
+          items: { $ref: '#/components/schemas/DeliverableRevision' }
+        capabilities: { $ref: '#/components/schemas/ExecutionCapabilities' }
+    DeliverablePage:
+      type: object
+      required: [results, page, capabilities]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/Deliverable' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+        capabilities: { $ref: '#/components/schemas/ExecutionCapabilities' }
+    EvidenceWrite:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [project_material, task, report, external_url] }
+        sourceId: { type: integer }
+        url: { type: string, format: uri, maxLength: 2048 }
+        label: { type: string, minLength: 1, maxLength: 255 }
+    Evidence:
+      allOf:
+        - $ref: '#/components/schemas/EvidenceWrite'
+        - type: object
+          required: [id, available]
+          properties:
+            id: { type: integer }
+            available: { type: boolean }
+            sourceTypeSnapshot: { type: string }
+            sourceIdSnapshot: { type: string }
+    DeliverableSubmission:
+      type: object
+      required: [expectedVersion, description, evidence, idempotencyKey]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        description: { type: string, minLength: 1, maxLength: 8000 }
+        evidence:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/EvidenceWrite' }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    DeliverableRevision:
+      type: object
+      required: [id, revisionNumber, state, criteriaSnapshot, submittedBy, submittedAt, evidence]
+      properties:
+        id: { type: integer }
+        revisionNumber: { type: integer, minimum: 1 }
+        state: { type: string, enum: [submitted, recommended_accept, recommended_return, accepted, returned] }
+        criteriaSnapshot: { type: string }
+        descriptionSnapshot: { type: string }
+        submittedBy: { $ref: '#/components/schemas/MemberSummary' }
+        submittedAt: { type: string, format: date-time }
+        evidence:
+          type: array
+          items: { $ref: '#/components/schemas/Evidence' }
+        recommendations:
+          type: array
+          items: { $ref: '#/components/schemas/DeliverableRecommendation' }
+        finalDecision: { $ref: '#/components/schemas/DeliverableFinalDecision' }
+    DeliverableRecommendationWrite:
+      type: object
+      required: [revisionId, recommendation, rationale, idempotencyKey]
+      properties:
+        revisionId: { type: integer }
+        recommendation: { type: string, enum: [accept, return] }
+        rationale: { type: string, minLength: 1, maxLength: 8000 }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    DeliverableRecommendation:
+      allOf:
+        - $ref: '#/components/schemas/DeliverableRecommendationWrite'
+        - type: object
+          required: [id, reviewer, createdAt]
+          properties:
+            id: { type: integer }
+            reviewer: { $ref: '#/components/schemas/MemberSummary' }
+            createdAt: { type: string, format: date-time }
+    DeliverableDecisionWrite:
+      type: object
+      required: [revisionId, decision, expectedVersion, idempotencyKey]
+      properties:
+        revisionId: { type: integer }
+        decision: { type: string, enum: [accepted, returned] }
+        rationale: { type: string, maxLength: 8000 }
+        expectedVersion: { type: integer, minimum: 1 }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    DeliverableFinalDecision:
+      allOf:
+        - $ref: '#/components/schemas/DeliverableDecisionWrite'
+        - type: object
+          required: [id, decidedBy, decidedAt]
+          properties:
+            id: { type: integer }
+            decidedBy: { $ref: '#/components/schemas/MemberSummary' }
+            decidedAt: { type: string, format: date-time }
+
+    ReportFieldType:
+      type: string
+      enum: [long_text, number, percentage, single_choice, multiple_choice, execution_progress, risk_blocker]
+    ReportTemplateField:
+      type: object
+      required: [key, labelEn, labelZh, fieldType, required, order, analyticsEnabled]
+      properties:
+        id: { type: integer }
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{1,49}$' }
+        labelEn: { type: string, minLength: 1, maxLength: 255 }
+        labelZh: { type: string, minLength: 1, maxLength: 255 }
+        helpTextEn: { type: string, maxLength: 1000 }
+        helpTextZh: { type: string, maxLength: 1000 }
+        fieldType: { $ref: '#/components/schemas/ReportFieldType' }
+        required: { type: boolean }
+        order: { type: integer, minimum: 0 }
+        unit: { type: string, maxLength: 40, nullable: true }
+        minValue: { type: number, nullable: true }
+        maxValue: { type: number, nullable: true }
+        analyticsEnabled: { type: boolean }
+        options:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            required: [value, labelEn, labelZh]
+            properties:
+              value: { type: string, minLength: 1, maxLength: 100 }
+              labelEn: { type: string, minLength: 1, maxLength: 255 }
+              labelZh: { type: string, minLength: 1, maxLength: 255 }
+    ReportTemplateVersion:
+      type: object
+      required: [id, templateId, projectId, name, versionNumber, status, version, fields]
+      properties:
+        id: { type: integer }
+        templateId: { type: integer }
+        projectId: { type: integer }
+        name: { type: string }
+        versionNumber: { type: integer, minimum: 1 }
+        status: { type: string, enum: [draft, published, superseded] }
+        version: { type: integer, minimum: 1 }
+        fields:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ReportTemplateField' }
+        publishedAt: { type: string, format: date-time, nullable: true }
+    ReportTemplateDraftWrite:
+      type: object
+      required: [expectedVersion, name, fields]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 255 }
+        fields:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ReportTemplateField' }
+    ReportCapabilities:
+      type: object
+      required: [canEditTemplate, canPublishTemplate, canSubmitReport, canViewAnalytics, canExportAnalytics]
+      properties:
+        canEditTemplate: { type: boolean }
+        canPublishTemplate: { type: boolean }
+        canSubmitReport: { type: boolean }
+        canViewAnalytics: { type: boolean }
+        canExportAnalytics: { type: boolean }
+    ReportingPeriod:
+      type: object
+      required: [id, projectId, startsOn, endsOn, deadlineAt, templateVersionId, state]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+        deadlineAt: { type: string, format: date-time }
+        templateVersionId: { type: integer }
+        state: { type: string, enum: [open, closed] }
+        currentUserReportStatus:
+          type: string
+          enum: [missing, pending_review, reviewed, needs_revision, closed]
+          nullable: true
+    ReportingPeriodPage:
+      type: object
+      required: [results, page]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/ReportingPeriod' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+    ReportResponseWrite:
+      type: object
+      required: [fieldId, value]
+      properties:
+        fieldId: { type: integer }
+        value: {}
+        sourceType:
+          type: string
+          enum: [milestone, deliverable, risk, blocker]
+          nullable: true
+        sourceId: { type: integer, nullable: true }
+    ReportSubmission:
+      type: object
+      required: [reportingPeriodId, responses, idempotencyKey]
+      properties:
+        reportingPeriodId: { type: integer }
+        responses:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ReportResponseWrite' }
+        attachmentReference: { type: string, maxLength: 512 }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    Report:
+      type: object
+      required: [id, projectId, student, reportingPeriod, templateVersionId, revisionNumber, reviewStatus, submittedAt, submittedLate, responses]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        student: { $ref: '#/components/schemas/MemberSummary' }
+        reportingPeriod: { $ref: '#/components/schemas/ReportingPeriod' }
+        templateVersionId: { type: integer }
+        revisionNumber: { type: integer, minimum: 1 }
+        reviewStatus: { type: string, enum: [pending_review, reviewed, needs_revision, closed] }
+        submittedAt: { type: string, format: date-time }
+        submittedLate: { type: boolean }
+        responses:
+          type: array
+          items: { $ref: '#/components/schemas/ReportResponseWrite' }
+    ReportPage:
+      type: object
+      required: [results, page, capabilities]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/Report' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+        capabilities: { $ref: '#/components/schemas/ReportCapabilities' }
+    ReportAnalytics:
+      type: object
+      required: [projectId, from, to, population, generatedAt, submissionCounts, executionCounts, riskCounts, metricSeries]
+      properties:
+        projectId: { type: integer }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        population: { type: integer, minimum: 0 }
+        generatedAt: { type: string, format: date-time }
+        submissionCounts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        executionCounts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        riskCounts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        metricSeries:
+          type: array
+          items:
+            type: object
+            required: [fieldKey, label, unit, points]
+            properties:
+              fieldKey: { type: string }
+              label: { type: string }
+              unit: { type: string, nullable: true }
+              points:
+                type: array
+                items:
+                  type: object
+                  required: [periodStart, sampleCount, missingCount, value, sourceReportIds]
+                  properties:
+                    periodStart: { type: string, format: date }
+                    sampleCount: { type: integer, minimum: 0 }
+                    missingCount: { type: integer, minimum: 0 }
+                    value: { type: number, nullable: true }
+                    sourceReportIds:
+                      type: array
+                      items: { type: integer }
+
+    LinkWrite:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [milestone, deliverable, task, project_material, report, decision, risk] }
+        targetId: { type: integer }
+    Link:
+      allOf:
+        - $ref: '#/components/schemas/LinkWrite'
+        - type: object
+          required: [id, label, available]
+          properties:
+            id: { type: integer }
+            label: { type: string }
+            available: { type: boolean }
+    DecisionWrite:
+      type: object
+      required: [title, context, optionsConsidered, outcome, rationale, ownerId, effectiveDate]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 255 }
+        context: { type: string, minLength: 1, maxLength: 8000 }
+        optionsConsidered:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 1000 }
+        outcome: { type: string, minLength: 1, maxLength: 8000 }
+        rationale: { type: string, minLength: 1, maxLength: 8000 }
+        ownerId: { type: integer }
+        effectiveDate: { type: string, format: date }
+        links:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/LinkWrite' }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    Decision:
+      allOf:
+        - $ref: '#/components/schemas/DecisionWrite'
+        - type: object
+          required: [id, projectId, status, owner, publishedBy, publishedAt, links]
+          properties:
+            id: { type: integer }
+            projectId: { type: integer }
+            status: { type: string, enum: [current, superseded] }
+            supersedesId: { type: integer, nullable: true }
+            supersededById: { type: integer, nullable: true }
+            owner: { $ref: '#/components/schemas/MemberSummary' }
+            publishedBy: { $ref: '#/components/schemas/MemberSummary' }
+            publishedAt: { type: string, format: date-time }
+            links:
+              type: array
+              items: { $ref: '#/components/schemas/Link' }
+    DecisionPage:
+      type: object
+      required: [results, page, canPublish]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/Decision' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+        canPublish: { type: boolean }
+
+    RiskLevel:
+      type: string
+      enum: [low, medium, high]
+    RiskState:
+      type: string
+      enum: [raised, open, mitigating, accepted, resolved]
+    RiskRaise:
+      type: object
+      required: [title, description]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string, minLength: 1, maxLength: 8000 }
+        sourceType: { type: string, enum: [manual, report_blocker, deliverable, decision], default: manual }
+        sourceId: { type: integer, nullable: true }
+        links:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/LinkWrite' }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    RiskTriage:
+      type: object
+      required: [expectedVersion, likelihood, impact, ownerId, treatment, reviewDate]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        likelihood: { $ref: '#/components/schemas/RiskLevel' }
+        impact: { $ref: '#/components/schemas/RiskLevel' }
+        ownerId: { type: integer }
+        treatment: { type: string, minLength: 1, maxLength: 8000 }
+        reviewDate: { type: string, format: date }
+        reason: { type: string, minLength: 1, maxLength: 8000 }
+    RiskTransitionWrite:
+      type: object
+      required: [expectedVersion, action, reason, idempotencyKey]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        action: { type: string, enum: [start_mitigation, accept, resolve, reopen] }
+        reason: { type: string, minLength: 1, maxLength: 8000 }
+        ownerId: { type: integer, nullable: true }
+        reviewDate: { type: string, format: date, nullable: true }
+        evidenceLinks:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/LinkWrite' }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+    RiskRevision:
+      type: object
+      required: [revisionNumber, previousState, newState, likelihood, impact, severity, actor, reason, createdAt]
+      properties:
+        revisionNumber: { type: integer, minimum: 1 }
+        previousState: { $ref: '#/components/schemas/RiskState' }
+        newState: { $ref: '#/components/schemas/RiskState' }
+        likelihood: { $ref: '#/components/schemas/RiskLevel' }
+        impact: { $ref: '#/components/schemas/RiskLevel' }
+        severity: { $ref: '#/components/schemas/RiskLevel' }
+        actor: { $ref: '#/components/schemas/MemberSummary' }
+        reason: { type: string }
+        createdAt: { type: string, format: date-time }
+    Risk:
+      type: object
+      required: [id, projectId, title, description, state, version, raisedBy, createdAt, updatedAt, links, revisions]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        sourceType: { type: string, enum: [manual, report_blocker, deliverable, decision] }
+        likelihood: { $ref: '#/components/schemas/RiskLevel' }
+        impact: { $ref: '#/components/schemas/RiskLevel' }
+        severity: { $ref: '#/components/schemas/RiskLevel' }
+        matrixExplanation: { type: string }
+        owner: { $ref: '#/components/schemas/MemberSummary' }
+        treatment: { type: string }
+        reviewDate: { type: string, format: date, nullable: true }
+        state: { $ref: '#/components/schemas/RiskState' }
+        closureRationale: { type: string }
+        version: { type: integer, minimum: 1 }
+        raisedBy: { $ref: '#/components/schemas/MemberSummary' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        links:
+          type: array
+          items: { $ref: '#/components/schemas/Link' }
+        revisions:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/RiskRevision' }
+    RiskPage:
+      type: object
+      required: [results, page, canRaise, canTriage]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/Risk' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+        canRaise: { type: boolean }
+        canTriage: { type: boolean }
+    MemberSummary:
+      type: object
+      required: [id, displayName]
+      properties:
+        id: { type: integer }
+        displayName: { type: string }
+        role: { type: string }

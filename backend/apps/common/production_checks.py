@@ -145,6 +145,30 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
     )
     if notification_route.get("queue") != notification_queue:
         issues.append("Notification tasks must route to CELERY_NOTIFICATION_QUEUE")
+    threshold_min = getattr(
+        settings_obj, "GRADSYNC_NOTIFICATION_THRESHOLD_MIN_MINUTES", 60
+    )
+    threshold_max = getattr(
+        settings_obj, "GRADSYNC_NOTIFICATION_THRESHOLD_MAX_MINUTES", 10080
+    )
+    if not 1 <= threshold_min < threshold_max:
+        issues.append("Notification threshold minimum must be positive and below maximum")
+    for setting_name in (
+        "GRADSYNC_NOTIFICATION_REMINDER_LEAD_MINUTES",
+        "GRADSYNC_NOTIFICATION_ESCALATION_DELAY_MINUTES",
+        "GRADSYNC_NOTIFICATION_REPEAT_INTERVAL_MINUTES",
+    ):
+        value = getattr(settings_obj, setting_name, 1440)
+        if not threshold_min <= value <= threshold_max:
+            issues.append(f"{setting_name} must be within notification threshold bounds")
+    if not 0 <= getattr(settings_obj, "GRADSYNC_NOTIFICATION_MAX_REMINDERS", 3) <= 20:
+        issues.append("GRADSYNC_NOTIFICATION_MAX_REMINDERS must be between 0 and 20")
+    if not 1 <= getattr(settings_obj, "GRADSYNC_REPORT_ANALYTICS_MAX_PERIODS", 104) <= 104:
+        issues.append("GRADSYNC_REPORT_ANALYTICS_MAX_PERIODS must be between 1 and 104")
+    if not 0 <= getattr(settings_obj, "GRADSYNC_REPORT_ANALYTICS_CACHE_SECONDS", 60) <= 3600:
+        issues.append("GRADSYNC_REPORT_ANALYTICS_CACHE_SECONDS must be between 0 and 3600")
+    if not 1 <= getattr(settings_obj, "GRADSYNC_EXECUTION_JOB_BATCH_SIZE", 200) <= 1000:
+        issues.append("GRADSYNC_EXECUTION_JOB_BATCH_SIZE must be between 1 and 1000")
     if getattr(settings_obj, "SENTRY_DSN", "") and not getattr(
         settings_obj, "ERROR_REPORTING_ENABLED", False
     ):
@@ -257,6 +281,15 @@ def production_ready_settings_stub(**overrides):
         "CELERY_BROKER_URL": "redis://redis:6379/0",
         "CELERY_NOTIFICATION_QUEUE": "notifications",
         "CELERY_TASK_ROUTES": {"apps.notifications.tasks.*": {"queue": "notifications"}},
+        "GRADSYNC_NOTIFICATION_REMINDER_LEAD_MINUTES": 1440,
+        "GRADSYNC_NOTIFICATION_ESCALATION_DELAY_MINUTES": 1440,
+        "GRADSYNC_NOTIFICATION_REPEAT_INTERVAL_MINUTES": 1440,
+        "GRADSYNC_NOTIFICATION_MAX_REMINDERS": 3,
+        "GRADSYNC_NOTIFICATION_THRESHOLD_MIN_MINUTES": 60,
+        "GRADSYNC_NOTIFICATION_THRESHOLD_MAX_MINUTES": 10080,
+        "GRADSYNC_REPORT_ANALYTICS_MAX_PERIODS": 104,
+        "GRADSYNC_REPORT_ANALYTICS_CACHE_SECONDS": 60,
+        "GRADSYNC_EXECUTION_JOB_BATCH_SIZE": 200,
         "PUBLIC_BASE_URL": "https://gradsync.edu",
         "TLS_CERTIFICATE_PATH": "/etc/letsencrypt/live/gradsync.edu/fullchain.pem",
         "TLS_PRIVATE_KEY_PATH": "/etc/letsencrypt/live/gradsync.edu/privkey.pem",

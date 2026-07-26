@@ -66,7 +66,9 @@ The deploy script performs:
 2. Enforce specification acceptance before changing runtime services.
 3. Run Compose with `COMPOSE_PARALLEL_LIMIT=1` and `--env-file .env.production`.
 4. Keep the existing application services running while new images build.
-5. Prune Docker builder cache when `GRADSYNC_PRUNE_BUILDER_CACHE=true`.
+5. Prune only BuildKit cache older than
+   `GRADSYNC_BUILDER_CACHE_MAX_AGE` (default `168h`) when
+   `GRADSYNC_PRUNE_BUILDER_CACHE=true`, preserving recent npm and pip layers.
 6. Build the backend and frontend images serially, pruning builder cache after
    each image build to release build state on 1 GB hosts.
 7. Prune dangling images when `GRADSYNC_PRUNE_DANGLING_IMAGES=true`.
@@ -84,6 +86,25 @@ The deploy script performs:
 The deployment script intentionally does not flush Linux page cache. Avoid
 `sync; echo 3 > /proc/sys/vm/drop_caches` during deploys; it removes useful
 filesystem cache and can increase I/O pressure on a small VPS.
+
+## Research Execution Limits
+
+Notification follow-up and later research-execution jobs use bounded,
+non-secret settings. Keep the minimum threshold below the maximum threshold,
+all reminder intervals within that range, analytics periods at `104` or less,
+and batch size between `1` and `1000`.
+
+```dotenv
+GRADSYNC_NOTIFICATION_REMINDER_LEAD_MINUTES=1440
+GRADSYNC_NOTIFICATION_ESCALATION_DELAY_MINUTES=1440
+GRADSYNC_NOTIFICATION_REPEAT_INTERVAL_MINUTES=1440
+GRADSYNC_NOTIFICATION_MAX_REMINDERS=3
+GRADSYNC_NOTIFICATION_THRESHOLD_MIN_MINUTES=60
+GRADSYNC_NOTIFICATION_THRESHOLD_MAX_MINUTES=10080
+GRADSYNC_REPORT_ANALYTICS_MAX_PERIODS=104
+GRADSYNC_REPORT_ANALYTICS_CACHE_SECONDS=60
+GRADSYNC_EXECUTION_JOB_BATCH_SIZE=200
+```
 
 ## Host Nginx
 

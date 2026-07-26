@@ -8,7 +8,13 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from apps.projects.models import ResearchProject
 from apps.tasks.models import Task
 
-from .models import Notification
+from .models import Notification, NotificationDeliveryAttempt
+from .outcome_services import (
+    expire_notification,
+    mark_notification_unavailable,
+    reconcile_authoritative_action,
+)
+from .policy_services import effective_project_policy
 from .services import (
     mark_notification_attempt_failed,
     mark_notification_status,
@@ -143,7 +149,21 @@ def deliver_due_notifications(limit: int = 100) -> int:
                 reason,
             )
             _sync_schedule_dispatch(notification, "skipped")
+            if notification.active_follow_up:
+                mark_notification_unavailable(notification)
             continue
+        attempt_number = notification.retry_count + 1
+        NotificationDeliveryAttempt.objects.get_or_create(
+            notification=notification,
+            channel=NotificationDeliveryAttempt.Channel.EMAIL,
+            attempt_number=attempt_number,
+            defaults={
+                "eligible_at": notification.eligible_at,
+                "idempotency_key": (
+                    f"notification:{notification.pk}:email:{attempt_number}"
+                ),
+            },
+        )
         mark_notification_status(notification, Notification.Status.QUEUED)
         body = _notification_email_body(notification)
         try:
@@ -159,7 +179,11 @@ def deliver_due_notifications(limit: int = 100) -> int:
         except (
             Exception
         ) as exc:  # pragma: no cover - exercised by integration error paths in real mail setup
-            mark_notification_attempt_failed(notification, exc)
+            mark_notification_attempt_failed(
+                notification,
+                exc,
+                retry_needed=notification.retry_count < 4,
+            )
             _sync_schedule_dispatch(notification, "failed")
             continue
         mark_notification_status(notification, Notification.Status.SENT)
@@ -220,6 +244,83 @@ def create_schedule_reminders_task() -> int:
     return created
 
 
+def process_actionable_notification_followups(limit: int | None = None) -> int:
+    now = timezone.now()
+    limit = max(
+        1,
+        min(
+            limit or settings.GRADSYNC_EXECUTION_JOB_BATCH_SIZE,
+            settings.GRADSYNC_EXECUTION_JOB_BATCH_SIZE,
+        ),
+    )
+    processed = 0
+    notifications = (
+        Notification.objects.filter(
+            active_follow_up=True,
+            outcome_state=Notification.OutcomeState.PENDING,
+        )
+        .select_related("project", "recipient")
+        .order_by("due_at", "id")[:limit]
+    )
+    for notification in notifications:
+        reconciled = reconcile_authoritative_action(
+            notification=notification,
+            event_type="scheduled.reconcile",
+            event_id=notification.target_id,
+        )
+        if reconciled.outcome_state == Notification.OutcomeState.COMPLETED:
+            processed += 1
+            continue
+        if notification.expires_at and notification.expires_at <= now:
+            expire_notification(notification)
+            processed += 1
+            continue
+        if not notification.due_at:
+            continue
+        policy = (
+            effective_project_policy(notification.project)
+            if notification.project_id
+            else {
+                "reminder_lead_minutes": settings.GRADSYNC_NOTIFICATION_REMINDER_LEAD_MINUTES,
+                "escalation_delay_minutes": settings.GRADSYNC_NOTIFICATION_ESCALATION_DELAY_MINUTES,
+                "repeat_interval_minutes": settings.GRADSYNC_NOTIFICATION_REPEAT_INTERVAL_MINUTES,
+                "max_reminders": settings.GRADSYNC_NOTIFICATION_MAX_REMINDERS,
+            }
+        )
+        reminder_due = notification.due_at - timezone.timedelta(
+            minutes=policy["reminder_lead_minutes"]
+        )
+        repeat_due = (
+            notification.last_reminded_at is None
+            or notification.last_reminded_at
+            + timezone.timedelta(minutes=policy["repeat_interval_minutes"])
+            <= now
+        )
+        if (
+            reminder_due <= now
+            and repeat_due
+            and notification.reminder_count < policy["max_reminders"]
+        ):
+            notification.reminder_count += 1
+            notification.last_reminded_at = now
+            notification.save(update_fields=["reminder_count", "last_reminded_at"])
+            processed += 1
+        escalation_due = notification.due_at + timezone.timedelta(
+            minutes=policy["escalation_delay_minutes"]
+        )
+        if escalation_due <= now and notification.escalation_level == 0:
+            notification.escalation_level = 1
+            notification.last_escalated_at = now
+            notification.save(update_fields=["escalation_level", "last_escalated_at"])
+            processed += 1
+    return processed
+
+
+@shared_task(queue="notifications")
+def process_actionable_notification_followups_task(limit: int | None = None) -> int:
+    return process_actionable_notification_followups(limit=limit)
+
+
 @shared_task(
     bind=True,
     queue="notifications",
@@ -248,6 +349,10 @@ def ensure_periodic_notification_tasks() -> int:
         (
             "GradSync schedule reminders",
             "apps.notifications.tasks.create_schedule_reminders_task",
+        ),
+        (
+            "GradSync actionable notification follow-ups",
+            "apps.notifications.tasks.process_actionable_notification_followups_task",
         ),
     ]:
         _, was_created = PeriodicTask.objects.update_or_create(

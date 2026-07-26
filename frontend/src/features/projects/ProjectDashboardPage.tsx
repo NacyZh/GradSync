@@ -19,6 +19,7 @@ import { TaskStatusControl } from '../tasks/TaskStatusControl';
 import { TaskTree, type TaskNode } from '../tasks/TaskTree';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
 import { ProjectCollaboratorsPanel } from './ProjectCollaboratorsPanel';
+import { ProjectNotificationPolicy } from './ProjectNotificationPolicy';
 import { archiveProject, deleteProject, getProject, reopenProject, type Project } from './api';
 import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 
@@ -281,6 +282,10 @@ export function ProjectDashboardPage() {
         canManage={Boolean(capabilities.canManageCollaborators)}
         disabled={archived || project.governanceState === 'hold'}
       />
+
+      {capabilities.canManageProjectNotificationPolicy ? (
+        <ProjectNotificationPolicy projectId={projectId} />
+      ) : null}
 
       {capabilities.canCreateTasks ? (
         <section className="panel" aria-label="Create task">

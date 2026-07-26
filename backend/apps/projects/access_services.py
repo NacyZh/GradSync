@@ -37,6 +37,8 @@ def project_capabilities(user, project: ResearchProject) -> dict[str, bool | str
     student = role == ProjectMembership.Role.STUDENT
     manager = primary or co_advisor
     can_view = bool(membership or administrator)
+    can_write_execution = manager and active and not held
+    can_participate = bool((membership and active and not held) or administrator)
 
     return {
         "role": "administrator" if administrator else role or "",
@@ -56,6 +58,27 @@ def project_capabilities(user, project: ResearchProject) -> dict[str, bool | str
         "canCreateTasks": manager and active and not held,
         "canUpdateTasks": (manager or student) and active and not held,
         "canMutateProjectWork": manager and active and not held,
+        "canViewExecutionSummary": can_view,
+        "canManageMilestones": can_write_execution,
+        "canManageDeliverables": can_write_execution,
+        "canSubmitAssignedDeliverables": student and active and not held,
+        "canRecommendDeliverables": (
+            primary or co_advisor or reviewer
+        ) and active and not held,
+        "canDecideDeliverables": manager and active and not held,
+        "canManageReportTemplates": primary and active and not held,
+        "canViewReportAnalytics": can_view,
+        "canPublishDecisions": manager and active and not held,
+        "canRaiseRisks": bool(
+            membership
+            and role != ProjectMembership.Role.OBSERVER
+            and active
+            and not held
+        ),
+        "canTriageRisks": manager and active and not held,
+        "canManageProjectNotificationPolicy": primary and active and not held,
+        "canViewExecutionOperations": administrator,
+        "canParticipateInExecution": can_participate and not administrator,
         "isReadOnly": bool(can_view and not manager and not student),
         "governanceState": project.governance_state,
         "governanceHoldReason": project.governance_hold_reason,
@@ -65,4 +88,3 @@ def project_capabilities(user, project: ResearchProject) -> dict[str, bool | str
 
 def can_access_project(user, project: ResearchProject) -> bool:
     return bool(project_capabilities(user, project)["canViewProject"])
-

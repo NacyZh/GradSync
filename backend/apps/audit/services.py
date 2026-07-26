@@ -195,3 +195,41 @@ def record_schedule_event(*, actor, schedule_item, action: str, outcome: str, au
         schedule_item,
         target_snapshot=snapshot,
     )
+
+
+def record_execution_event(
+    *,
+    project,
+    actor,
+    action: str,
+    target=None,
+    outcome: str = AuditEvent.Outcome.SUCCEEDED,
+    state: Mapping[str, Any] | None = None,
+    privileged: bool = False,
+) -> AuditEvent:
+    safe_state = redact_snapshot(
+        state,
+        allowed_keys={
+            "status",
+            "version",
+            "requirementType",
+            "outcomeState",
+            "category",
+            "severity",
+            "dueAt",
+        },
+    )
+    return record_event(
+        project,
+        actor,
+        f"execution.{action}",
+        f"Research execution action: {action}",
+        target,
+        target_snapshot=safe_state,
+        category=(
+            AuditEvent.Category.PROJECT_GOVERNANCE
+            if privileged
+            else AuditEvent.Category.OTHER
+        ),
+        outcome=outcome,
+    )
