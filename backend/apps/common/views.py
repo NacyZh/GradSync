@@ -1,6 +1,7 @@
 from django.apps import apps
 from django.conf import settings
 from django.db import connection
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -52,10 +53,11 @@ def metrics(_request):
     AccountSession = apps.get_model("accounts", "AccountSession")
     AuditExport = apps.get_model("audit", "AuditExport")
     Notification = apps.get_model("notifications", "Notification")
-    NotificationDeliveryAttempt = apps.get_model(
-        "notifications", "NotificationDeliveryAttempt"
-    )
+    NotificationDeliveryAttempt = apps.get_model("notifications", "NotificationDeliveryAttempt")
     ResearchProject = apps.get_model("projects", "ResearchProject")
+    RiskRecord = apps.get_model("projects", "RiskRecord")
+    ReportingPeriod = apps.get_model("submissions", "ReportingPeriod")
+    WeeklyProgressReport = apps.get_model("submissions", "WeeklyProgressReport")
     ScheduleNotificationDispatch = apps.get_model("schedules", "ScheduleNotificationDispatch")
     pending_recoveries = AccountRecoveryRequest.objects.filter(status="pending").count()
     revoked_sessions = AccountSession.objects.filter(status="revoked").count()
@@ -69,11 +71,28 @@ def metrics(_request):
         if oldest_export
         else 0
     )
+    actionable_risks = (
+        RiskRecord.objects.filter(state__in=["raised", "open", "mitigating"])
+        .filter(Q(severity="high") | Q(review_date__lt=timezone.localdate()))
+        .count()
+    )
 
     lines = [
         "# HELP gradsync_projects_total Total GradSync projects.",
         "# TYPE gradsync_projects_total gauge",
         f"gradsync_projects_total {ResearchProject.objects.count()}",
+        "# HELP gradsync_reporting_periods_open Open structured reporting periods.",
+        "# TYPE gradsync_reporting_periods_open gauge",
+        (f"gradsync_reporting_periods_open {ReportingPeriod.objects.filter(state='open').count()}"),
+        "# HELP gradsync_structured_reports_unlinked Legacy reports awaiting backfill.",
+        "# TYPE gradsync_structured_reports_unlinked gauge",
+        (
+            "gradsync_structured_reports_unlinked "
+            f"{WeeklyProgressReport.objects.filter(reporting_period__isnull=True).count()}"
+        ),
+        "# HELP gradsync_risks_actionable Open high or overdue risks.",
+        "# TYPE gradsync_risks_actionable gauge",
+        f"gradsync_risks_actionable {actionable_risks}",
         "# HELP gradsync_notifications_pending Pending notification records.",
         "# TYPE gradsync_notifications_pending gauge",
         f"gradsync_notifications_pending {Notification.objects.filter(status='pending').count()}",

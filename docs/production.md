@@ -436,3 +436,24 @@ without reversing the additive columns. Do not drop quantity, policy, version,
 or audit snapshot data. Django migration source files are reviewed source code;
 caches, compiled files, generated schemas, reports, and build outputs remain
 forbidden generated artifacts.
+
+## Research Execution Rollout And Rollback
+
+Use an expand, backfill, activate sequence:
+
+1. Back up PostgreSQL and media together and verify the restore target.
+2. Apply additive execution, reporting, notification, and governance
+   migrations before deploying application code.
+3. Run the report backfill and verify
+   `gradsync_structured_reports_unlinked` reaches zero without changing legacy
+   review outcomes or submission timestamps.
+4. Deploy application containers, then run
+   `python manage.py ensure_notification_schedule`.
+5. Smoke-test deliverable acceptance, report return/resubmission, decision
+   supersession, and risk close/reopen.
+
+Application-first rollback retains all additive tables and columns. Disable
+feature 017 Beat jobs if the previous application cannot import them. Do not
+reverse migrations, delete report responses, rewrite immutable decisions,
+collapse risk revisions, or remove notification outcome evidence. Legacy task,
+weekly-report, and notification routes remain available.

@@ -120,3 +120,50 @@ def reconcile_authoritative_action(
         ]
     )
     return locked
+
+
+def reconcile_notifications_for_event(
+    *,
+    project,
+    target_type: str,
+    target_id: str,
+    event_type: str,
+    event_id: str,
+):
+    notifications = Notification.objects.filter(
+        project=project,
+        target_type=target_type,
+        target_id=str(target_id),
+        outcome_state=Notification.OutcomeState.PENDING,
+        active_follow_up=True,
+    )
+    for notification in notifications.iterator(chunk_size=100):
+        reconcile_authoritative_action(
+            notification=notification,
+            event_type=event_type,
+            event_id=str(event_id),
+        )
+
+
+def register_execution_outcome_resolvers():
+    register_action_resolver(
+        "DeliverableRevision",
+        lambda _notification, event_type, _event_id: event_type
+        in {
+            "execution.deliverable.recommended",
+            "execution.deliverable.decided",
+        },
+    )
+    register_action_resolver(
+        "RiskRecord",
+        lambda _notification, event_type, _event_id: event_type
+        in {"execution.risk.accept", "execution.risk.resolve"},
+    )
+    register_action_resolver(
+        "WeeklyProgressReport",
+        lambda _notification, event_type, _event_id: event_type
+        in {
+            "execution.weekly_report.reviewed",
+            "weekly_report.reviewed",
+        },
+    )

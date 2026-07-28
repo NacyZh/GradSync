@@ -35,6 +35,7 @@ def assign_reviewer(*, actor, project, reviewer_membership, target):
         "weekly_report": None,
         "writing_version": None,
         "draft_version": None,
+        "deliverable_revision": None,
     }
     model_name = target._meta.model_name
     fields[
@@ -42,6 +43,7 @@ def assign_reviewer(*, actor, project, reviewer_membership, target):
             "weeklyprogressreport": "weekly_report",
             "writingversion": "writing_version",
             "draftversion": "draft_version",
+            "deliverablerevision": "deliverable_revision",
         }[model_name]
     ] = target
     assignment, _ = SubmissionReviewAssignment.objects.get_or_create(
@@ -109,6 +111,7 @@ def reviewer_can_access_target(*, user, target) -> bool:
         "weeklyprogressreport": {"weekly_report": target},
         "writingversion": {"writing_version": target},
         "draftversion": {"draft_version": target},
+        "deliverablerevision": {"deliverable_revision": target},
     }[target._meta.model_name]
     return SubmissionReviewAssignment.objects.filter(
         reviewer_membership=membership,

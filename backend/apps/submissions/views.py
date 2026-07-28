@@ -1,7 +1,14 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from django.utils.dateparse import parse_date
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import mixins, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -11,6 +18,7 @@ from rest_framework.response import Response
 from apps.common.downloads import DownloadUnavailable, storage_file_download_response
 from apps.common.openapi import delete_json_request_body
 from apps.common.search import apply_text_search
+from apps.projects.access_services import project_capabilities
 from apps.projects.services import projects_visible_to
 
 from .comment_services import InlineCommentService
@@ -18,19 +26,31 @@ from .feedback_services import TeacherFeedbackService
 from .models import (
     InlineComment,
     ProjectReportSchedule,
+    ReportingPeriod,
+    ReportTemplateVersion,
     TeacherFeedback,
     WeeklyProgressReport,
     WritingProject,
     WritingVersion,
 )
-from .report_services import WeeklyReportService
+from .report_analytics import calculate_report_analytics, export_report_analytics_csv
+from .report_services import WeeklyReportService, submit_structured_report
+from .report_template_services import (
+    create_template_draft,
+    publish_template_version,
+    replace_template_fields,
+)
 from .serializers import (
     InlineCommentSerializer,
     InlineCommentStatusSerializer,
     ProjectReportScheduleDeleteSerializer,
     ProjectReportScheduleSerializer,
     ProjectReportScheduleWriteSerializer,
+    ReportingPeriodSerializer,
+    ReportSubmissionSerializer,
+    ReportTemplateVersionSerializer,
     ReviewStatusSerializer,
+    StructuredReportSerializer,
     TeacherFeedbackCreateSerializer,
     TeacherFeedbackSerializer,
     WeeklyReportSerializer,
@@ -56,19 +76,403 @@ from .writing_services import (
     upload_standalone_writing_version,
 )
 
+_REPORT_ERRORS = {
+    400: OpenApiResponse(description="Validation error"),
+    401: OpenApiResponse(description="Authentication required"),
+    403: OpenApiResponse(description="Forbidden"),
+    404: OpenApiResponse(description="Not found"),
+    409: OpenApiResponse(description="Conflict"),
+}
+_REPORT_READ_ERRORS = {
+    key: value for key, value in _REPORT_ERRORS.items() if key in {401, 403, 404}
+}
 
+
+def _report_capabilities(user, project):
+    capabilities = project_capabilities(user, project)
+    role = capabilities["role"]
+    return {
+        "canEditTemplate": capabilities["canManageReportTemplates"],
+        "canPublishTemplate": capabilities["canManageReportTemplates"],
+        "canSubmitReport": role == "student" and not capabilities["isReadOnly"],
+        "canViewAnalytics": capabilities["canViewReportAnalytics"],
+        "canExportAnalytics": capabilities["canViewReportAnalytics"],
+    }
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses={
+            200: ReportTemplateVersionSerializer(many=True),
+            **_REPORT_READ_ERRORS,
+        }
+    ),
+    post=extend_schema(
+        request={"application/json": {"type": "object"}},
+        responses={201: ReportTemplateVersionSerializer, **_REPORT_ERRORS},
+    ),
+)
+class ReportTemplateListView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_project(self, request, project_id):
+        return get_object_or_404(projects_visible_to(request.user), pk=project_id)
+
+    def get(self, request, project_id):
+        project = self.get_project(request, project_id)
+        versions = ReportTemplateVersion.objects.filter(project=project).prefetch_related("fields")
+        return Response(
+            {
+                "results": ReportTemplateVersionSerializer(versions, many=True).data,
+                "capabilities": _report_capabilities(request.user, project),
+            }
+        )
+
+    def post(self, request, project_id):
+        project = self.get_project(request, project_id)
+        try:
+            version = create_template_draft(
+                actor=request.user, project=project, name=str(request.data.get("name", ""))
+            )
+        except (DjangoPermissionDenied, ValueError) as exc:
+            raise ValidationError(str(exc)) from exc
+        return Response(
+            ReportTemplateVersionSerializer(version).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+@extend_schema_view(
+    get=extend_schema(responses={200: ReportTemplateVersionSerializer, **_REPORT_READ_ERRORS}),
+    patch=extend_schema(
+        request=ReportTemplateVersionSerializer,
+        responses={200: ReportTemplateVersionSerializer, **_REPORT_ERRORS},
+    ),
+)
+class ReportTemplateDetailView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_version(self, request, project_id, template_version_id):
+        project = get_object_or_404(projects_visible_to(request.user), pk=project_id)
+        return get_object_or_404(
+            ReportTemplateVersion.objects.prefetch_related("fields"),
+            project=project,
+            pk=template_version_id,
+        )
+
+    def get(self, request, project_id, template_version_id):
+        return Response(
+            ReportTemplateVersionSerializer(
+                self.get_version(request, project_id, template_version_id)
+            ).data
+        )
+
+    def patch(self, request, project_id, template_version_id):
+        version = self.get_version(request, project_id, template_version_id)
+        fields = []
+        for item in request.data.get("fields", []):
+            fields.append(
+                {
+                    "key": item.get("key"),
+                    "label_en": item.get("labelEn"),
+                    "label_zh": item.get("labelZh"),
+                    "help_text_en": item.get("helpTextEn", ""),
+                    "help_text_zh": item.get("helpTextZh", ""),
+                    "field_type": item.get("fieldType"),
+                    "required": item.get("required", False),
+                    "order": item.get("order"),
+                    "unit": item.get("unit", ""),
+                    "options": item.get("options", []),
+                    "min_value": item.get("minValue"),
+                    "max_value": item.get("maxValue"),
+                    "analytics_enabled": item.get("analyticsEnabled", False),
+                }
+            )
+        try:
+            updated = replace_template_fields(
+                actor=request.user,
+                template_version=version,
+                expected_version=request.data.get("expectedVersion"),
+                fields=fields,
+            )
+            if request.data.get("name"):
+                updated.template.name = request.data["name"].strip()
+                updated.template.save(update_fields=["name", "updated_at"])
+        except (DjangoPermissionDenied, ValueError) as exc:
+            raise ValidationError(str(exc)) from exc
+        return Response(ReportTemplateVersionSerializer(updated).data)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        request={"application/json": {"type": "object"}},
+        responses={200: ReportTemplateVersionSerializer, **_REPORT_ERRORS},
+    )
+)
+class ReportTemplatePublishView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, project_id, template_version_id):
+        project = get_object_or_404(projects_visible_to(request.user), pk=project_id)
+        version = get_object_or_404(ReportTemplateVersion, project=project, pk=template_version_id)
+        try:
+            version = publish_template_version(
+                actor=request.user,
+                template_version=version,
+                expected_version=request.data.get("expectedVersion"),
+            )
+        except (DjangoPermissionDenied, ValueError) as exc:
+            raise ValidationError(str(exc)) from exc
+        return Response(ReportTemplateVersionSerializer(version).data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[
+            OpenApiParameter("cursor", str, OpenApiParameter.QUERY),
+            OpenApiParameter("pageSize", int, OpenApiParameter.QUERY),
+            OpenApiParameter("state", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: ReportingPeriodSerializer(many=True), **_REPORT_READ_ERRORS},
+    )
+)
+class ReportingPeriodListView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        project = get_object_or_404(projects_visible_to(request.user), pk=project_id)
+        periods = ReportingPeriod.objects.filter(project=project)
+        if request.query_params.get("state"):
+            periods = periods.filter(state=request.query_params["state"])
+        page_size = min(max(int(request.query_params.get("pageSize", 50)), 1), 100)
+        rows = list(periods[:page_size])
+        return Response(
+            {
+                "results": ReportingPeriodSerializer(
+                    rows, many=True, context={"user": request.user}
+                ).data,
+                "page": {"nextCursor": None, "hasMore": False},
+            }
+        )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[
+            OpenApiParameter("cursor", str, OpenApiParameter.QUERY),
+            OpenApiParameter("pageSize", int, OpenApiParameter.QUERY),
+            OpenApiParameter("periodId", int, OpenApiParameter.QUERY),
+            OpenApiParameter("studentId", int, OpenApiParameter.QUERY),
+            OpenApiParameter("reviewStatus", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: StructuredReportSerializer(many=True), **_REPORT_READ_ERRORS},
+    ),
+    post=extend_schema(
+        request=ReportSubmissionSerializer,
+        responses={201: StructuredReportSerializer, **_REPORT_ERRORS},
+    ),
+)
+class StructuredReportListView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_project(self, request, project_id):
+        return get_object_or_404(projects_visible_to(request.user), pk=project_id)
+
+    def get(self, request, project_id):
+        project = self.get_project(request, project_id)
+        rows = WeeklyProgressReport.objects.filter(
+            project=project, reporting_period__isnull=False
+        ).select_related("student", "reporting_period", "template_version")
+        role = project_capabilities(request.user, project)["role"]
+        if role == "student":
+            rows = rows.filter(student=request.user)
+        if request.query_params.get("periodId"):
+            rows = rows.filter(reporting_period_id=request.query_params["periodId"])
+        if request.query_params.get("studentId"):
+            rows = rows.filter(student_id=request.query_params["studentId"])
+        if request.query_params.get("reviewStatus"):
+            rows = rows.filter(review_status=request.query_params["reviewStatus"])
+        page_size = min(max(int(request.query_params.get("pageSize", 50)), 1), 100)
+        return Response(
+            {
+                "results": StructuredReportSerializer(rows[:page_size], many=True).data,
+                "page": {"nextCursor": None, "hasMore": False},
+                "capabilities": _report_capabilities(request.user, project),
+            }
+        )
+
+    def post(self, request, project_id):
+        project = self.get_project(request, project_id)
+        serializer = ReportSubmissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        period = get_object_or_404(ReportingPeriod, project=project, pk=data["reportingPeriodId"])
+        response_map = {}
+        fields = {field.id: field for field in period.template_version.fields.all()}
+        for item in data["responses"]:
+            field = fields.get(int(item.get("fieldId", 0)))
+            if field is None:
+                raise ValidationError("Response field does not belong to this period.")
+            value = item.get("value")
+            if item.get("sourceType"):
+                value = {
+                    "sourceType": item["sourceType"],
+                    "sourceId": item.get("sourceId"),
+                    **(value if isinstance(value, dict) else {"value": value}),
+                }
+            response_map[field.key] = value
+        try:
+            report = submit_structured_report(
+                actor=request.user,
+                project=project,
+                period=period,
+                responses=response_map,
+                idempotency_key=data["idempotencyKey"],
+            )
+        except (DjangoPermissionDenied, ValueError) as exc:
+            raise ValidationError(str(exc)) from exc
+        return Response(
+            StructuredReportSerializer(report).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[
+            OpenApiParameter("from", str, OpenApiParameter.QUERY, required=True),
+            OpenApiParameter("to", str, OpenApiParameter.QUERY, required=True),
+            OpenApiParameter("studentId", int, OpenApiParameter.QUERY),
+        ],
+        responses={200: OpenApiResponse(description="Report analytics"), **_REPORT_ERRORS},
+    )
+)
+class ReportAnalyticsView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        project = get_object_or_404(projects_visible_to(request.user), pk=project_id)
+        starts_on = parse_date(request.query_params.get("from", ""))
+        ends_on = parse_date(request.query_params.get("to", ""))
+        if not starts_on or not ends_on:
+            raise ValidationError("from and to must be ISO dates.")
+        kwargs = {
+            "actor": request.user,
+            "project": project,
+            "starts_on": starts_on,
+            "ends_on": ends_on,
+            "student_id": request.query_params.get("studentId") or None,
+        }
+        try:
+            analytics = calculate_report_analytics(**kwargs)
+        except (DjangoPermissionDenied, DjangoValidationError, ValueError) as exc:
+            raise ValidationError(str(exc)) from exc
+        analytics.update(
+            {
+                "projectId": project.id,
+                "from": analytics.pop("range")["from"],
+                "to": ends_on.isoformat(),
+            }
+        )
+        return Response(analytics)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[
+            OpenApiParameter("from", str, OpenApiParameter.QUERY, required=True),
+            OpenApiParameter("to", str, OpenApiParameter.QUERY, required=True),
+            OpenApiParameter("studentId", int, OpenApiParameter.QUERY),
+        ],
+        responses={
+            (200, "text/csv"): OpenApiResponse(description="CSV export"),
+            **_REPORT_ERRORS,
+        },
+    )
+)
+class ReportAnalyticsExportView(ReportAnalyticsView):
+    def get(self, request, project_id):
+        project = get_object_or_404(projects_visible_to(request.user), pk=project_id)
+        starts_on = parse_date(request.query_params.get("from", ""))
+        ends_on = parse_date(request.query_params.get("to", ""))
+        if not starts_on or not ends_on:
+            raise ValidationError("from and to must be ISO dates.")
+        try:
+            content = export_report_analytics_csv(
+                actor=request.user,
+                project=project,
+                starts_on=starts_on,
+                ends_on=ends_on,
+                student_id=request.query_params.get("studentId") or None,
+            )
+        except (DjangoPermissionDenied, DjangoValidationError, ValueError) as exc:
+            raise ValidationError(str(exc)) from exc
+        response = HttpResponse(content, content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = (
+            f'attachment; filename="project-{project.id}-report-analytics.csv"'
+        )
+        return response
+
+
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter("cursor", str, OpenApiParameter.QUERY),
+            OpenApiParameter("pageSize", int, OpenApiParameter.QUERY),
+            OpenApiParameter("periodId", int, OpenApiParameter.QUERY),
+            OpenApiParameter("studentId", int, OpenApiParameter.QUERY),
+            OpenApiParameter("reviewStatus", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: StructuredReportSerializer(many=True), **_REPORT_READ_ERRORS},
+    ),
+    create=extend_schema(
+        request=ReportSubmissionSerializer,
+        responses={201: StructuredReportSerializer, **_REPORT_ERRORS},
+    ),
+)
 class WeeklyReportViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = WeeklyReportSerializer
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        request=WeeklyReportSerializer,
-        responses={
-            201: WeeklyReportSerializer,
-            409: OpenApiResponse(description="Duplicate weekly report"),
-        },
-    )
     def create(self, request, *args, **kwargs):
+        if "reportingPeriodId" in request.data:
+            project = self.get_project()
+            serializer = ReportSubmissionSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+            period = get_object_or_404(
+                ReportingPeriod, project=project, pk=data["reportingPeriodId"]
+            )
+            fields = {field.id: field for field in period.template_version.fields.all()}
+            response_map = {}
+            for item in data["responses"]:
+                field = fields.get(int(item.get("fieldId", 0)))
+                if not field:
+                    raise ValidationError(
+                        "Response field does not belong to this reporting period."
+                    )
+                value = item.get("value")
+                if item.get("sourceType"):
+                    value = {
+                        "sourceType": item["sourceType"],
+                        "sourceId": item.get("sourceId"),
+                        **(value if isinstance(value, dict) else {"value": value}),
+                    }
+                response_map[field.key] = value
+            try:
+                report = submit_structured_report(
+                    actor=request.user,
+                    project=project,
+                    period=period,
+                    responses=response_map,
+                    idempotency_key=data["idempotencyKey"],
+                )
+            except (DjangoPermissionDenied, ValueError) as exc:
+                raise ValidationError(str(exc)) from exc
+            return Response(
+                StructuredReportSerializer(report).data,
+                status=status.HTTP_201_CREATED,
+            )
         return super().create(request, *args, **kwargs)
 
     def get_project(self):

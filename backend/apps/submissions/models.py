@@ -108,10 +108,44 @@ class WeeklyProgressReport(models.Model):
     )
     submitted_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    reporting_period = models.ForeignKey(
+        "ReportingPeriod",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reports",
+    )
+    template_version = models.ForeignKey(
+        "ReportTemplateVersion",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reports",
+    )
+    submitted_late = models.BooleanField(default=False)
+    idempotency_key = models.CharField(max_length=100, blank=True)
+    response_schema_version = models.PositiveIntegerField(default=1)
 
     class Meta:
         unique_together = [("project", "student", "report_week_start", "revision_number")]
         ordering = ["-report_week_start", "-revision_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "student", "idempotency_key"],
+                condition=~models.Q(idempotency_key=""),
+                name="unique_structured_report_retry",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["reporting_period", "student", "-revision_number"],
+                name="sub_report_period_student_idx",
+            ),
+            models.Index(
+                fields=["project", "submitted_late", "review_status", "submitted_at"],
+                name="sub_report_lateness_state_idx",
+            ),
+        ]
 
 
 class InlineComment(models.Model):
@@ -342,6 +376,13 @@ class SubmissionReviewAssignment(models.Model):
         blank=True,
         related_name="review_assignments",
     )
+    deliverable_revision = models.ForeignKey(
+        "projects.DeliverableRevision",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="review_assignments",
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     assigned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -367,16 +408,25 @@ class SubmissionReviewAssignment(models.Model):
                         models.Q(weekly_report__isnull=False)
                         & models.Q(writing_version__isnull=True)
                         & models.Q(draft_version__isnull=True)
+                        & models.Q(deliverable_revision__isnull=True)
                     )
                     | (
                         models.Q(weekly_report__isnull=True)
                         & models.Q(writing_version__isnull=False)
                         & models.Q(draft_version__isnull=True)
+                        & models.Q(deliverable_revision__isnull=True)
                     )
                     | (
                         models.Q(weekly_report__isnull=True)
                         & models.Q(writing_version__isnull=True)
                         & models.Q(draft_version__isnull=False)
+                        & models.Q(deliverable_revision__isnull=True)
+                    )
+                    | (
+                        models.Q(weekly_report__isnull=True)
+                        & models.Q(writing_version__isnull=True)
+                        & models.Q(draft_version__isnull=True)
+                        & models.Q(deliverable_revision__isnull=False)
                     )
                 ),
                 name="review_assignment_exactly_one_target",
@@ -396,6 +446,13 @@ class SubmissionReviewAssignment(models.Model):
                 condition=models.Q(status="active", draft_version__isnull=False),
                 name="unique_active_draft_review_assignment",
             ),
+            models.UniqueConstraint(
+                fields=["reviewer_membership", "deliverable_revision"],
+                condition=models.Q(
+                    status="active", deliverable_revision__isnull=False
+                ),
+                name="unique_active_deliverable_review_assignment",
+            ),
         ]
         indexes = [
             models.Index(
@@ -405,4 +462,242 @@ class SubmissionReviewAssignment(models.Model):
             models.Index(fields=["weekly_report", "status"], name="sub_review_weekly_idx"),
             models.Index(fields=["writing_version", "status"], name="sub_review_writing_idx"),
             models.Index(fields=["draft_version", "status"], name="sub_review_draft_idx"),
+            models.Index(
+                fields=["deliverable_revision", "status"],
+                name="sub_review_deliverable_idx",
+            ),
+        ]
+
+
+class ReportTemplate(models.Model):
+    project = models.OneToOneField(
+        "projects.ResearchProject",
+        on_delete=models.CASCADE,
+        related_name="report_template",
+    )
+    name = models.CharField(max_length=255)
+    active_version = models.ForeignKey(
+        "ReportTemplateVersion",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_report_templates",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class ReportTemplateVersion(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PUBLISHED = "published", "Published"
+        SUPERSEDED = "superseded", "Superseded"
+
+    project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.CASCADE,
+        related_name="report_template_versions",
+    )
+    template = models.ForeignKey(
+        ReportTemplate, on_delete=models.CASCADE, related_name="versions"
+    )
+    version_number = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.DRAFT
+    )
+    version = models.PositiveIntegerField(default=1)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_report_template_versions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="published_report_template_versions",
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-version_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["template", "version_number"],
+                name="unique_report_template_version",
+            ),
+            models.UniqueConstraint(
+                fields=["template"],
+                condition=models.Q(status="draft"),
+                name="unique_draft_report_template",
+            ),
+            models.UniqueConstraint(
+                fields=["template"],
+                condition=models.Q(status="published"),
+                name="unique_published_report_template",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["project", "status", "version_number"],
+                name="sub_template_project_state_idx",
+            ),
+            models.Index(
+                fields=["template", "status"], name="sub_template_version_state_idx"
+            ),
+        ]
+
+
+class ReportTemplateField(models.Model):
+    class FieldType(models.TextChoices):
+        LONG_TEXT = "long_text", "Long text"
+        NUMBER = "number", "Number"
+        PERCENTAGE = "percentage", "Percentage"
+        SINGLE_CHOICE = "single_choice", "Single choice"
+        MULTIPLE_CHOICE = "multiple_choice", "Multiple choice"
+        EXECUTION_PROGRESS = "execution_progress", "Execution progress"
+        RISK_BLOCKER = "risk_blocker", "Risk or blocker"
+
+    template_version = models.ForeignKey(
+        ReportTemplateVersion, on_delete=models.CASCADE, related_name="fields"
+    )
+    key = models.SlugField(max_length=80)
+    label_en = models.CharField(max_length=255)
+    label_zh = models.CharField(max_length=255)
+    help_text_en = models.TextField(blank=True, max_length=1000)
+    help_text_zh = models.TextField(blank=True, max_length=1000)
+    field_type = models.CharField(max_length=32, choices=FieldType.choices)
+    required = models.BooleanField(default=False)
+    order = models.PositiveIntegerField()
+    unit = models.CharField(max_length=40, blank=True)
+    options = models.JSONField(default=list, blank=True)
+    min_value = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True
+    )
+    max_value = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True
+    )
+    analytics_enabled = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["template_version", "key"],
+                name="unique_report_template_field_key",
+            ),
+            models.UniqueConstraint(
+                fields=["template_version", "order"],
+                name="unique_report_template_field_order",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["template_version", "order"],
+                name="sub_template_field_order_idx",
+            ),
+            models.Index(
+                fields=["template_version", "analytics_enabled", "field_type"],
+                name="sub_template_field_metric_idx",
+            ),
+        ]
+
+
+class ReportingPeriod(models.Model):
+    class State(models.TextChoices):
+        OPEN = "open", "Open"
+        CLOSED = "closed", "Closed"
+
+    project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.CASCADE,
+        related_name="reporting_periods",
+    )
+    starts_on = models.DateField()
+    ends_on = models.DateField()
+    deadline_at = models.DateTimeField()
+    template_version = models.ForeignKey(
+        ReportTemplateVersion,
+        on_delete=models.PROTECT,
+        related_name="reporting_periods",
+    )
+    state = models.CharField(max_length=10, choices=State.choices, default=State.OPEN)
+    opened_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    generation_key = models.CharField(max_length=160, unique=True)
+
+    class Meta:
+        ordering = ["-starts_on"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "starts_on"], name="unique_project_reporting_period"
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["project", "starts_on", "state"],
+                name="sub_period_project_state_idx",
+            ),
+            models.Index(
+                fields=["state", "deadline_at"], name="sub_period_deadline_idx"
+            ),
+            models.Index(
+                fields=["template_version", "starts_on"],
+                name="sub_period_template_idx",
+            ),
+        ]
+
+
+class ReportResponse(models.Model):
+    class SourceType(models.TextChoices):
+        MILESTONE = "milestone", "Milestone"
+        DELIVERABLE = "deliverable", "Deliverable"
+        RISK = "risk", "Risk"
+
+    project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.CASCADE,
+        related_name="report_responses",
+    )
+    report = models.ForeignKey(
+        WeeklyProgressReport, on_delete=models.CASCADE, related_name="responses"
+    )
+    template_field = models.ForeignKey(
+        ReportTemplateField, on_delete=models.PROTECT, related_name="responses"
+    )
+    value = models.JSONField()
+    numeric_value = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True
+    )
+    source_type = models.CharField(
+        max_length=20, choices=SourceType.choices, blank=True
+    )
+    source_id = models.CharField(max_length=80, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["report", "template_field"],
+                name="unique_report_field_response",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["project", "template_field", "numeric_value"],
+                name="sub_response_metric_idx",
+            ),
+            models.Index(
+                fields=["report", "template_field"], name="sub_response_report_idx"
+            ),
+            models.Index(
+                fields=["source_type", "source_id"], name="sub_response_source_idx"
+            ),
         ]

@@ -220,6 +220,7 @@ describe('role-aware navigation', () => {
       'projectsLanding',
       'projectCreate',
       'projectDashboard',
+      'projectExecution',
       'projectMaterials',
       'weeklyReport',
       'reviewQueue',

@@ -6,24 +6,24 @@
   "decisions": {
     "product": {
       "assignedReviewer": "NacyeZ <s240101199@stu.cqupt.edu.cn>",
-      "decision": "pending",
-      "decidedRevision": null,
-      "decidedAt": null,
-      "rationale": ""
+      "decision": "accepted",
+      "decidedRevision": "c7e09b005e079ac85190def685e7205f8a1aa84c49e678a75614e3588d7c0b5a",
+      "decidedAt": "2026-07-28T09:44:31Z",
+      "rationale": "Solo maintainer confirms the current revision matches the intended research execution product scope."
     },
     "testing": {
       "assignedReviewer": "NacyeZ <s240101199@stu.cqupt.edu.cn>",
-      "decision": "pending",
-      "decidedRevision": null,
-      "decidedAt": null,
-      "rationale": ""
+      "decision": "accepted",
+      "decidedRevision": "c7e09b005e079ac85190def685e7205f8a1aa84c49e678a75614e3588d7c0b5a",
+      "decidedAt": "2026-07-28T09:44:31Z",
+      "rationale": "Solo maintainer accepts the recorded backend, frontend, contract, PWA, accessibility, responsive, and full-stack validation evidence."
     },
     "development": {
       "assignedReviewer": "NacyeZ <s240101199@stu.cqupt.edu.cn>",
-      "decision": "pending",
-      "decidedRevision": null,
-      "decidedAt": null,
-      "rationale": ""
+      "decision": "accepted",
+      "decidedRevision": "c7e09b005e079ac85190def685e7205f8a1aa84c49e678a75614e3588d7c0b5a",
+      "decidedAt": "2026-07-28T09:44:31Z",
+      "rationale": "Solo maintainer accepts the implementation, additive migrations, architecture, security boundaries, and documented operational constraints."
     }
   },
   "exceptions": []

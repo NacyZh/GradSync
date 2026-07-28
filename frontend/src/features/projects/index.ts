@@ -5,6 +5,17 @@ export {
   type CollaboratorRole,
   type TeacherOption,
 } from './api';
+export {
+  getExecutionSummary,
+  listMilestones,
+  listDeliverables,
+  type Deliverable,
+  type DeliverableRevision,
+  type ExecutionCapabilities,
+  type ExecutionSummary,
+  type Milestone,
+} from './executionApi';
+export { DeliverableDetail } from './DeliverableDetail';
 
 export const projectExecutionQueryKeys = (projectId: number) => [
   ['project-execution', projectId],

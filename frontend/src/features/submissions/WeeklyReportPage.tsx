@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { ClipboardCheck } from 'lucide-react';
 
 import { Button } from '@/shared/ui/primitives/button';
@@ -9,6 +9,8 @@ import { KeyboardHint, useAppFeedback, useSubmitShortcut } from '../../shared/ui
 import { DataState } from '../../shared/ui/DataState';
 import { FieldGroup, FormField, TextareaField } from '../../shared/ui/FormField';
 import { PageShell } from '../../shared/ui/PageShell';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../shared/ui/primitives/tabs';
+import { useI18n } from '../../shared/i18n/I18nProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { WeeklyReportHistory } from './WeeklyReportHistory';
 import {
@@ -17,13 +19,20 @@ import {
   listReports,
   saveProjectReportSchedule,
   submitWeeklyReport,
+  createReportTemplateDraft,
+  listReportingPeriods,
+  listReportTemplates,
 } from './api';
+import { ReportAnalyticsPanel } from './ReportAnalyticsPanel';
+import { ReportTemplateEditor } from './ReportTemplateEditor';
+import { StructuredReportForm } from './StructuredReportForm';
 
 export function WeeklyReportPage() {
   const projectId = Number(useParams().projectId ?? 0);
   const { user } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
   const { notify, confirm } = useAppFeedback();
+  const { t } = useI18n();
   const canSubmitReports = user?.global_role === 'student';
   const canManageSchedule = user?.global_role === 'advisor' || user?.global_role === 'admin';
   const reportsQuery = useQuery({
@@ -61,6 +70,29 @@ export function WeeklyReportPage() {
     },
     onError: (error) => notify(error.message, 'error'),
   });
+  const templatesQuery = useQuery({
+    queryKey: ['reportTemplates', projectId],
+    queryFn: () => listReportTemplates(projectId),
+    enabled: Boolean(projectId),
+  });
+  const periodsQuery = useQuery({
+    queryKey: ['reportingPeriods', projectId],
+    queryFn: () => listReportingPeriods(projectId),
+    enabled: Boolean(projectId),
+  });
+  const activeTemplate = useMemo(
+    () => templatesQuery.data?.results.find((item) => item.status === 'draft')
+      ?? templatesQuery.data?.results.find((item) => item.status === 'published'),
+    [templatesQuery.data?.results],
+  );
+  const activePeriod = periodsQuery.data?.results.find((item) => item.state === 'open');
+  const analyticsRange = useMemo(() => {
+    const rows = periodsQuery.data?.results ?? [];
+    return {
+      from: rows.at(-1)?.startsOn ?? new Date().toISOString().slice(0, 10),
+      to: rows[0]?.endsOn ?? new Date().toISOString().slice(0, 10),
+    };
+  }, [periodsQuery.data?.results]);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,6 +138,41 @@ export function WeeklyReportPage() {
       description="Submit weekly progress updates, track review decisions, and resubmit revisions when a report is returned."
       className="submission-workspace"
     >
+      <Tabs defaultValue="periods" className="mb-4">
+        <TabsList aria-label={t('reportWorkspaceViews')}>
+          <TabsTrigger value="periods">{t('periods')}</TabsTrigger>
+          <TabsTrigger value="history">{t('history')}</TabsTrigger>
+          {templatesQuery.data?.capabilities.canEditTemplate ? <TabsTrigger value="template">{t('template')}</TabsTrigger> : null}
+          {templatesQuery.data?.capabilities.canViewAnalytics ? <TabsTrigger value="analytics">{t('analytics')}</TabsTrigger> : null}
+        </TabsList>
+        <TabsContent value="periods">
+          <Card>
+            <CardHeader><CardTitle>{t('currentReportingPeriod')}</CardTitle><CardDescription>{t('periodTemplateLocked')}</CardDescription></CardHeader>
+            <CardContent>
+              {periodsQuery.isLoading || templatesQuery.isLoading ? <DataState state="loading" message={t('loadingReportingPeriod')} /> : null}
+              {canSubmitReports && activePeriod && activeTemplate ? <StructuredReportForm projectId={projectId} period={activePeriod} template={activeTemplate} onSubmitted={() => { reportsQuery.refetch(); periodsQuery.refetch(); }} /> : null}
+              {!periodsQuery.isLoading && (!activePeriod || !activeTemplate) ? <DataState state="empty" message={t('noOpenReportingPeriod')} /> : null}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="history">
+          <WeeklyReportHistory reports={reportsQuery.data?.results ?? []} />
+        </TabsContent>
+        <TabsContent value="template">
+          <Card>
+            <CardHeader><CardTitle>{t('reportTemplate')}</CardTitle><CardDescription>{t('reportTemplateDescription')}</CardDescription></CardHeader>
+            <CardContent>
+              {activeTemplate ? <ReportTemplateEditor projectId={projectId} template={activeTemplate} onChanged={() => templatesQuery.refetch()} /> : <Button type="button" onClick={async () => { await createReportTemplateDraft(projectId, t('weeklyProgress')); templatesQuery.refetch(); }}>{t('createTemplate')}</Button>}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="analytics">
+          <Card>
+            <CardHeader><CardTitle>{t('reportAnalytics')}</CardTitle><CardDescription>{t('reportAnalyticsDescription')}</CardDescription></CardHeader>
+            <CardContent><ReportAnalyticsPanel projectId={projectId} from={analyticsRange.from} to={analyticsRange.to} /></CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
       <Card className="mb-4" aria-label="Weekly report schedule">
         <CardHeader>
           <CardTitle>Weekly report deadline</CardTitle>

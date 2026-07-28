@@ -33,8 +33,8 @@ class ActionableNotificationFactory(factory.django.DjangoModelFactory):
     outcome_state = Notification.OutcomeState.PENDING
 
 
-def _execution_record(model_name: str, **overrides):
-    model = apps.get_model("projects", model_name)
+def _execution_record(model_name: str, *, app_label="projects", **overrides):
+    model = apps.get_model(app_label, model_name)
     return model.objects.create(**overrides)
 
 
@@ -47,16 +47,16 @@ def deliverable(**overrides):
 
 
 def report_template(**overrides):
-    return _execution_record("ReportTemplate", **overrides)
+    return _execution_record("ReportTemplate", app_label="submissions", **overrides)
 
 
 def reporting_period(**overrides):
-    return _execution_record("ReportingPeriod", **overrides)
+    return _execution_record("ReportingPeriod", app_label="submissions", **overrides)
 
 
 def decision(**overrides):
-    return _execution_record("ProjectDecision", **overrides)
+    return _execution_record("DecisionRecord", **overrides)
 
 
 def risk(**overrides):
-    return _execution_record("ProjectRisk", **overrides)
+    return _execution_record("RiskRecord", **overrides)

@@ -58,6 +58,12 @@ export type ProjectCapabilities = {
   canReviewAssignedTargets?: boolean;
   canViewProject?: boolean;
   canManageProjectNotificationPolicy?: boolean;
+  canViewExecutionSummary?: boolean;
+  canManageMilestones?: boolean;
+  canManageDeliverables?: boolean;
+  canSubmitAssignedDeliverables?: boolean;
+  canRecommendDeliverables?: boolean;
+  canDecideDeliverables?: boolean;
   isReadOnly?: boolean;
   deleteDisabledReason?: string;
 };

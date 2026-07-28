@@ -2,6 +2,7 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.mail import send_mail
+from django.db import models
 from django.utils import timezone
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
@@ -159,9 +160,7 @@ def deliver_due_notifications(limit: int = 100) -> int:
             attempt_number=attempt_number,
             defaults={
                 "eligible_at": notification.eligible_at,
-                "idempotency_key": (
-                    f"notification:{notification.pk}:email:{attempt_number}"
-                ),
+                "idempotency_key": (f"notification:{notification.pk}:email:{attempt_number}"),
             },
         )
         mark_notification_status(notification, Notification.Status.QUEUED)
@@ -321,6 +320,92 @@ def process_actionable_notification_followups_task(limit: int | None = None) -> 
     return process_actionable_notification_followups(limit=limit)
 
 
+@shared_task(queue="notifications")
+def maintain_reporting_periods_task() -> int:
+    from apps.submissions.report_period_services import (
+        close_due_reporting_periods,
+        open_current_reporting_periods,
+    )
+
+    opened = open_current_reporting_periods()
+    closed = close_due_reporting_periods()
+    logger.info("reporting_period_maintenance opened=%s closed=%s", opened, closed)
+    return opened + closed
+
+
+def create_risk_review_reminders(limit: int | None = None) -> int:
+    from apps.projects.models import RiskRecord
+
+    current = timezone.localdate()
+    maximum = max(
+        1,
+        min(
+            limit or settings.GRADSYNC_EXECUTION_JOB_BATCH_SIZE,
+            settings.GRADSYNC_EXECUTION_JOB_BATCH_SIZE,
+        ),
+    )
+    rows = (
+        RiskRecord.objects.filter(
+            project__status="active",
+            state__in=[
+                RiskRecord.State.RAISED,
+                RiskRecord.State.OPEN,
+                RiskRecord.State.MITIGATING,
+            ],
+        )
+        .filter(models.Q(severity=RiskRecord.Level.HIGH) | models.Q(review_date__lte=current))
+        .select_related("project", "owner")[:maximum]
+    )
+    created = 0
+    for risk in rows:
+        recipients = (
+            [risk.owner]
+            if risk.owner_id
+            else [
+                membership.user
+                for membership in risk.project.memberships.filter(
+                    role__in=["advisor", "co_advisor"], status="active"
+                ).select_related("user")
+            ]
+        )
+        for recipient in recipients:
+            if recipient is None:
+                continue
+            _, was_created = Notification.objects.get_or_create(
+                recipient=recipient,
+                dedupe_key=f"risk:{risk.id}:active-review",
+                active_follow_up=True,
+                defaults={
+                    "project": risk.project,
+                    "event_type": Notification.EventType.APPROACHING_DEADLINE,
+                    "target_type": "RiskRecord",
+                    "target_id": str(risk.id),
+                    "subject": f"Risk review required: {risk.title}",
+                    "action_path": f"/projects/{risk.project_id}/execution?tab=risks",
+                    "eligible_at": timezone.now(),
+                    "category": Notification.Category.RISK,
+                    "requirement_type": Notification.RequirementType.ACTION,
+                    "outcome_state": Notification.OutcomeState.PENDING,
+                    "due_at": (
+                        timezone.make_aware(
+                            timezone.datetime.combine(
+                                risk.review_date, timezone.datetime.max.time()
+                            )
+                        )
+                        if risk.review_date
+                        else timezone.now()
+                    ),
+                },
+            )
+            created += int(was_created)
+    return created
+
+
+@shared_task(queue="notifications")
+def create_risk_review_reminders_task() -> int:
+    return create_risk_review_reminders()
+
+
 @shared_task(
     bind=True,
     queue="notifications",
@@ -353,6 +438,14 @@ def ensure_periodic_notification_tasks() -> int:
         (
             "GradSync actionable notification follow-ups",
             "apps.notifications.tasks.process_actionable_notification_followups_task",
+        ),
+        (
+            "GradSync reporting period maintenance",
+            "apps.notifications.tasks.maintain_reporting_periods_task",
+        ),
+        (
+            "GradSync risk review reminders",
+            "apps.notifications.tasks.create_risk_review_reminders_task",
         ),
     ]:
         _, was_created = PeriodicTask.objects.update_or_create(

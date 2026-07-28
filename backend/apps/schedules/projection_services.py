@@ -4,10 +4,14 @@ from zoneinfo import ZoneInfo
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.projects.models import ProjectMembership, ResearchProject
+from apps.projects.models import ProjectMembership, ResearchProject, RiskRecord
 from apps.projects.services import projects_visible_to
 from apps.resources.models import Booking
-from apps.submissions.models import ProjectReportSchedule, WeeklyProgressReport
+from apps.submissions.models import (
+    ProjectReportSchedule,
+    ReportingPeriod,
+    WeeklyProgressReport,
+)
 from apps.tasks.models import Task
 
 from .models import ScheduleItem
@@ -182,6 +186,70 @@ def project_milestone_occurrences(user, starts_at, ends_at):
                         action_path=f"/projects/{project.id}",
                     )
                 )
+        for milestone in project.milestones.filter(
+            target_date__gte=starts_at.date(),
+            target_date__lt=ends_at.date(),
+            archived_at__isnull=True,
+        ):
+            output.append(
+                _occurrence(
+                    occurrence_id=(f"milestone:{milestone.id}:{milestone.target_date.isoformat()}"),
+                    source_type="project",
+                    source_id=milestone.id,
+                    category="milestone",
+                    title=milestone.title,
+                    starts_on=milestone.target_date,
+                    ends_on=milestone.target_date + timedelta(days=1),
+                    status=milestone.current_status,
+                    action_path=(f"/projects/{project.id}/execution?milestone={milestone.id}"),
+                    version=milestone.version,
+                )
+            )
+        for deliverable in project.deliverables.filter(
+            due_date__gte=starts_at.date(),
+            due_date__lt=ends_at.date(),
+            archived_at__isnull=True,
+        ):
+            output.append(
+                _occurrence(
+                    occurrence_id=(
+                        f"deliverable:{deliverable.id}:{deliverable.due_date.isoformat()}"
+                    ),
+                    source_type="project",
+                    source_id=deliverable.id,
+                    category="deadline",
+                    title=deliverable.title,
+                    starts_on=deliverable.due_date,
+                    ends_on=deliverable.due_date + timedelta(days=1),
+                    status=deliverable.current_status,
+                    action_path=(f"/projects/{project.id}/execution?deliverable={deliverable.id}"),
+                    version=deliverable.version,
+                )
+            )
+        for risk in RiskRecord.objects.filter(
+            project=project,
+            review_date__gte=starts_at.date(),
+            review_date__lt=ends_at.date(),
+            state__in=[
+                RiskRecord.State.RAISED,
+                RiskRecord.State.OPEN,
+                RiskRecord.State.MITIGATING,
+            ],
+        ):
+            output.append(
+                _occurrence(
+                    occurrence_id=f"risk_review:{risk.id}:{risk.review_date.isoformat()}",
+                    source_type="project",
+                    source_id=risk.id,
+                    category="risk",
+                    title=f"Risk review: {risk.title}",
+                    starts_on=risk.review_date,
+                    ends_on=risk.review_date + timedelta(days=1),
+                    status=risk.state,
+                    action_path=f"/projects/{project.id}/execution?tab=risks",
+                    version=risk.version,
+                )
+            )
     return output
 
 
@@ -234,6 +302,27 @@ def report_occurrences(user, starts_at, ends_at):
         )
         for report in reports
     ]
+    periods = ReportingPeriod.objects.filter(
+        project__in=visible_projects,
+        deadline_at__gte=starts_at,
+        deadline_at__lt=ends_at,
+    ).select_related("project")
+    period_project_ids = set()
+    for period in periods:
+        period_project_ids.add(period.project_id)
+        output.append(
+            _occurrence(
+                occurrence_id=f"reporting_period:{period.id}:{period.deadline_at.isoformat()}",
+                source_type="report",
+                source_id=period.id,
+                category="report",
+                title=f"{period.project.title}: progress report due",
+                starts_at=period.deadline_at,
+                ends_at=period.deadline_at + timedelta(minutes=30),
+                status=period.state,
+                action_path=f"/projects/{period.project_id}/reports",
+            )
+        )
     active_projects = visible_projects.filter(status=ResearchProject.Status.ACTIVE)
     if getattr(user, "global_role", None) in {"advisor", "admin"}:
         active_project_ids = active_projects.values("id")
@@ -243,9 +332,11 @@ def report_occurrences(user, starts_at, ends_at):
             user=user,
             status=ProjectMembership.Status.ACTIVE,
         ).values("project_id")
-    policies = ProjectReportSchedule.objects.filter(
-        project_id__in=active_project_ids
-    ).select_related("project")
+    policies = (
+        ProjectReportSchedule.objects.filter(project_id__in=active_project_ids)
+        .exclude(project_id__in=period_project_ids)
+        .select_related("project")
+    )
     for policy in policies:
         zone = ZoneInfo(policy.timezone)
         current = starts_at.astimezone(zone).date()

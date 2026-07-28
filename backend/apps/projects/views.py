@@ -30,6 +30,7 @@ from apps.submissions.review_assignment_services import (
 )
 from apps.submissions.serializers import SubmissionReviewAssignmentSerializer
 
+from .access_services import project_capabilities
 from .collaboration_services import (
     assign_collaborator,
     change_collaborator_role,
@@ -44,7 +45,12 @@ from .material_services import (
     project_material_download_response,
     project_material_queryset_for,
 )
-from .models import ProjectMaterial, ProjectMembership, ResearchProject
+from .models import (
+    DeliverableRevision,
+    ProjectMaterial,
+    ProjectMembership,
+    ResearchProject,
+)
 from .serializers import (
     CollaboratorCreateSerializer,
     CollaboratorUpdateSerializer,
@@ -354,6 +360,14 @@ class ProjectViewSet(
         project = self.get_object()
         if request.method == "GET":
             assignments = project.review_assignments.select_related("reviewer_membership__user")
+            capabilities = project_capabilities(request.user, project)
+            if not (
+                capabilities["canAssignReviews"]
+                or capabilities["canViewExecutionOperations"]
+            ):
+                assignments = assignments.filter(
+                    reviewer_membership__user=request.user
+                )
             return Response(
                 {"results": SubmissionReviewAssignmentSerializer(assignments, many=True).data}
             )
@@ -376,6 +390,10 @@ class ProjectViewSet(
             (
                 serializer.validated_data.get("draft_version_id"),
                 DraftVersion,
+            ),
+            (
+                serializer.validated_data.get("deliverable_revision_id"),
+                DeliverableRevision,
             ),
         ]
         selected = [(target_id, model) for target_id, model in targets if target_id]

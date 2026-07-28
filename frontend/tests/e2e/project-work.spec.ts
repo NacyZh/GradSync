@@ -75,7 +75,7 @@ test('advisor can create a project and dashboard shows isolated project work', a
   await expect(page.getByRole('navigation', { name: 'Project workflow' })).toContainText('Materials');
   await expect(page.getByRole('navigation', { name: 'Project workflow' })).toContainText('Reviews');
   await expect(page.getByRole('navigation', { name: 'Project workflow' })).not.toContainText('Drafts');
-  await expect(page.getByRole('region', { name: 'Project summary' })).toContainText('Current tasks');
+  await expect(page.getByRole('region', { name: 'Project summary' })).toContainText('Open milestones');
   await expect(page.getByRole('region', { name: 'Current tasks' })).toContainText('Analyze sample');
   await page.getByRole('region', { name: 'Current tasks' }).getByRole('button', { name: /Analyze sample/ }).click();
   await expect(page.getByRole('region', { name: 'Task details' })).toContainText('Priority: high');

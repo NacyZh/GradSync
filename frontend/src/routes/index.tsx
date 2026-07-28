@@ -17,6 +17,7 @@ export const routeWorkspaceBundles = {
   projectsLanding: () => import('../features/projects/ProjectsLandingPage'),
   projectCreate: () => import('../features/projects/ProjectCreatePage'),
   projectDashboard: () => import('../features/projects/ProjectDashboardPage'),
+  projectExecution: () => import('../features/projects/ProjectExecutionPage'),
   projectMaterials: () => import('../features/projects/ProjectMaterialsPage'),
   weeklyReport: () => import('../features/submissions/WeeklyReportPage'),
   reviewQueue: () => import('../features/submissions/ReviewQueuePage'),
@@ -33,6 +34,7 @@ const ProfilePage = lazy(async () => ({ default: (await routeWorkspaceBundles.pr
 const ProjectsLandingPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectsLanding()).ProjectsLandingPage }));
 const ProjectCreatePage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectCreate()).ProjectCreatePage }));
 const ProjectDashboardPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectDashboard()).ProjectDashboardPage }));
+const ProjectExecutionPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectExecution()).ProjectExecutionPage }));
 const ProjectMaterialsPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectMaterials()).ProjectMaterialsPage }));
 const WeeklyReportPage = lazy(async () => ({ default: (await routeWorkspaceBundles.weeklyReport()).WeeklyReportPage }));
 const ReviewQueuePage = lazy(async () => ({ default: (await routeWorkspaceBundles.reviewQueue()).ReviewQueuePage }));
@@ -120,6 +122,10 @@ export const router = createBrowserRouter([
   {
     path: '/projects/:projectId',
     element: protectedPage(<ProjectDashboardPage />),
+  },
+  {
+    path: '/projects/:projectId/execution',
+    element: protectedPage(<ProjectExecutionPage />),
   },
   {
     path: '/projects/:projectId/materials',

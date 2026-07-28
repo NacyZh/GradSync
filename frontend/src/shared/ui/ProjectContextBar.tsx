@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { ClipboardList, FileStack, Gauge, Inbox, Microscope } from 'lucide-react';
+import { ClipboardList, FileStack, Flag, Gauge, Inbox, Microscope } from 'lucide-react';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { cn } from '@/shared/lib/utils';
+import { translateUiText } from '@/shared/i18n/translate';
+import { useI18n } from '@/shared/i18n/I18nProvider';
 
 type ProjectContextBarProps = {
   projectId: number;
@@ -22,6 +24,7 @@ const workflowLinks: Array<{
   roles: UserRole[];
 }> = [
   { label: 'Dashboard', suffix: '', icon: Gauge, roles: ['admin', 'advisor', 'student'] },
+  { label: 'Execution', suffix: 'execution', icon: Flag, roles: ['admin', 'advisor', 'student'] },
   { label: 'Materials', suffix: 'materials', icon: FileStack, roles: ['admin', 'advisor', 'student'] },
   { label: 'Reports', suffix: 'reports', icon: ClipboardList, roles: ['admin', 'student'] },
   { label: 'Reviews', suffix: 'reviews', icon: Inbox, roles: ['admin', 'advisor'] },
@@ -29,6 +32,7 @@ const workflowLinks: Array<{
 ];
 
 export function ProjectContextBar({ projectId, userRole = 'student', className }: ProjectContextBarProps) {
+  const { locale } = useI18n();
   const links = workflowLinks.filter((link) => link.roles.includes(userRole));
 
   return (
@@ -45,7 +49,7 @@ export function ProjectContextBar({ projectId, userRole = 'student', className }
               className={({ isActive }) => cn('gap-2', isActive && 'bg-accent text-accent-foreground')}
             >
               <Icon className="h-4 w-4" aria-hidden="true" />
-              {label}
+              {translateUiText(label, locale)}
             </NavLink>
           </Button>
         ))}

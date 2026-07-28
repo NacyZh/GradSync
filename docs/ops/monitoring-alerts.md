@@ -26,6 +26,10 @@ collection.
 | Primary advisor conflict | Any project with multiple active primary roles | Security owner | Run migration conflict fixture |
 | Audit export queue age | Oldest queued/processing export over 5 minutes | Operations owner | Pause Celery worker in staging |
 | Audit export failure | Any failed export | Application owner | Force storage write failure in staging |
+| Reporting period generation lag | No open period for an active scheduled project | Application owner | Disable Beat period maintenance in staging |
+| Structured report backfill lag | Any unlinked legacy report after rollout | Application owner | Run migration against a restored fixture |
+| Actionable high/overdue risk | Any unresolved high or overdue record past escalation delay | Project governance owner | Seed a past-due high risk |
+| Report analytics failure | 5 failed bounded requests in 10 minutes | Application owner | Disable Redis and verify source fallback |
 
 ## Required Configuration
 
@@ -70,3 +74,13 @@ collection.
 - Ready CSV files expire according to `GRADSYNC_AUDIT_EXPORT_TTL_SECONDS`.
   Cleanup removes the file while preserving immutable event and export
   evidence.
+
+## Research Execution Signals
+
+- `gradsync_reporting_periods_open` confirms active reporting windows.
+- `gradsync_structured_reports_unlinked` must reach zero after backfill.
+- `gradsync_risks_actionable` counts high or overdue active risks without
+  exposing titles, descriptions, owners, rationale, or linked labels.
+- Beat registers reporting-period maintenance, risk-review reminders, and
+  actionable notification follow-ups idempotently.
+- Redis failure may increase analytics latency but must not block source reads.

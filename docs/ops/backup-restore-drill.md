@@ -86,3 +86,15 @@ An application rollback keeps additive governance schema and evidence in
 place. It must not reactivate sessions or collaborators, clear governance
 holds, broaden reviewer assignments, discard audit history, or change Pending,
 Rejected, or stale acceptance decisions.
+
+## Research Execution Restore Addendum
+
+After restore, compare counts for milestones, deliverables, evidence,
+reporting periods, report responses, decisions, risks, risk revisions, and
+actionable notification outcomes. Historical weekly-report narrative and
+review state must remain unchanged.
+
+For application rollback rehearsal, retain additive schema, disable feature
+017 Beat jobs, verify legacy task/report/notification reads on prior images,
+then restore current images and confirm reconciliation creates no duplicate
+period, reminder, decision successor, or risk transition.

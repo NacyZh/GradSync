@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Archive, BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, BookOpenCheck, CalendarDays, Flag, PackageCheck, RotateCcw, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/primitives/card';
@@ -22,6 +23,7 @@ import { ProjectCollaboratorsPanel } from './ProjectCollaboratorsPanel';
 import { ProjectNotificationPolicy } from './ProjectNotificationPolicy';
 import { archiveProject, deleteProject, getProject, reopenProject, type Project } from './api';
 import { useProjectLiveRefresh } from './useProjectLiveRefresh';
+import { getExecutionSummary } from './executionApi';
 
 export function ProjectDashboardPage() {
   const { locale, t } = useI18n();
@@ -31,6 +33,11 @@ export function ProjectDashboardPage() {
   const { confirm, notify } = useAppFeedback();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const projectQuery = useQuery({ queryKey: ['project', projectId], queryFn: () => getProject(projectId), enabled: Boolean(projectId) });
+  const executionSummaryQuery = useQuery({
+    queryKey: ['project-execution', projectId],
+    queryFn: () => getExecutionSummary(projectId),
+    enabled: Boolean(projectId),
+  });
   const liveRefresh = useProjectLiveRefresh(projectId, projectQuery.data?.latestEventId);
   const archiveMutation = useMutation({
     mutationFn: () => archiveProject(projectId),
@@ -104,7 +111,6 @@ export function ProjectDashboardPage() {
     }
   }
   const completed = flattenedTasks.filter((task) => task.status === 'completed').length;
-  const blocked = flattenedTasks.filter((task) => task.status === 'blocked').length;
   const progress = flattenedTasks.length ? Math.round((completed / flattenedTasks.length) * 100) : 0;
   const archived = project.status === 'archived';
   const capabilities = project.capabilities ?? {
@@ -121,6 +127,14 @@ export function ProjectDashboardPage() {
   const nextDeadline = [...flattenedTasks]
     .filter((task) => task.deadline_at)
     .sort((left, right) => new Date(left.deadline_at ?? '').getTime() - new Date(right.deadline_at ?? '').getTime())[0];
+  const openMilestones = sumExecutionCounts(
+    executionSummaryQuery.data?.milestoneCounts,
+    ['planned', 'in_progress', 'at_risk', 'blocked', 'overdue'],
+  );
+  const pendingDeliverables = sumExecutionCounts(
+    executionSummaryQuery.data?.deliverableCounts,
+    ['submitted', 'under_review', 'changes_requested'],
+  );
 
   return (
     <PageShell
@@ -185,11 +199,22 @@ export function ProjectDashboardPage() {
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Project summary">
-        <MetricCard icon={ClipboardList} label="Current tasks" value={flattenedTasks.length} detail={translateUiText(`${progress}% complete`, locale)} />
-        <MetricCard icon={CheckCircle2} label="Blocked tasks" value={blocked} detail={translateUiText(blocked ? 'needs attention' : 'clear', locale)} />
+        <MetricCard icon={Flag} label={t('openMilestones')} value={openMilestones} detail={t('projectOutcomes')} />
+        <MetricCard icon={PackageCheck} label={t('awaitingAcceptance')} value={pendingDeliverables} detail={t('deliverableRevisions')} />
         <MetricCard icon={BookOpenCheck} label="Pending reviews" value={pendingReviews.length} detail={translateUiText('weekly reports', locale)} />
         <MetricCard icon={CalendarDays} label="Upcoming bookings" value={bookings.length} detail={nextDeadline ? `Next due ${formatDate(nextDeadline.deadline_at)}` : 'reserved resources'} />
       </section>
+
+      {capabilities.canViewExecutionSummary ? (
+        <div className="flex justify-end">
+          <Button asChild variant="outline">
+            <Link to={`/projects/${projectId}/execution`}>
+              <Flag className="h-4 w-4" aria-hidden="true" />
+              {t('openExecutionWorkspace')}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid min-w-0 gap-4 overflow-hidden xl:grid-cols-[minmax(18rem,0.9fr)_minmax(22rem,1fr)_minmax(18rem,0.75fr)]">
         <section className="panel grid min-h-0 grid-rows-[auto_1fr] overflow-hidden xl:h-[min(34rem,calc(100vh-12rem))] xl:min-h-[28rem]" aria-label="Current tasks">
@@ -348,7 +373,7 @@ function formatDate(value?: string) {
   return formatUiDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function MetricCard({ icon: Icon, label, value, detail }: { icon: typeof ClipboardList; label: string; value: number; detail: string }) {
+function MetricCard({ icon: Icon, label, value, detail }: { icon: typeof Flag; label: string; value: number; detail: string }) {
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
@@ -363,4 +388,11 @@ function MetricCard({ icon: Icon, label, value, detail }: { icon: typeof Clipboa
       <CardContent className="text-sm text-muted-foreground">{detail}</CardContent>
     </Card>
   );
+}
+
+function sumExecutionCounts(
+  counts: Record<string, number> | undefined,
+  states: string[],
+) {
+  return states.reduce((total, state) => total + (counts?.[state] ?? 0), 0);
 }

@@ -145,12 +145,8 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
     )
     if notification_route.get("queue") != notification_queue:
         issues.append("Notification tasks must route to CELERY_NOTIFICATION_QUEUE")
-    threshold_min = getattr(
-        settings_obj, "GRADSYNC_NOTIFICATION_THRESHOLD_MIN_MINUTES", 60
-    )
-    threshold_max = getattr(
-        settings_obj, "GRADSYNC_NOTIFICATION_THRESHOLD_MAX_MINUTES", 10080
-    )
+    threshold_min = getattr(settings_obj, "GRADSYNC_NOTIFICATION_THRESHOLD_MIN_MINUTES", 60)
+    threshold_max = getattr(settings_obj, "GRADSYNC_NOTIFICATION_THRESHOLD_MAX_MINUTES", 10080)
     if not 1 <= threshold_min < threshold_max:
         issues.append("Notification threshold minimum must be positive and below maximum")
     for setting_name in (
@@ -257,6 +253,15 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
             ):
                 if required not in deploy_text:
                     issues.append(f"deploy script is missing {required}")
+        notification_tasks = repo_root / "backend/apps/notifications/tasks.py"
+        task_text = notification_tasks.read_text() if notification_tasks.exists() else ""
+        for required_task in (
+            "maintain_reporting_periods_task",
+            "create_risk_review_reminders_task",
+            "process_actionable_notification_followups_task",
+        ):
+            if required_task not in task_text:
+                issues.append(f"execution scheduler registration is missing {required_task}")
     return issues
 
 

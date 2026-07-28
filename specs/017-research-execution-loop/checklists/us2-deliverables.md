@@ -1,0 +1,25 @@
+# US2 Milestones and Deliverables Checkpoint
+
+- [X] Milestone status is service-derived from required deliverable decisions.
+- [X] Milestone owners must be active project members.
+- [X] Deliverable assignees and reviewer designations are project-scoped.
+- [X] Submission rejects empty, cross-project, and unsafe evidence.
+- [X] Submission revisions and evidence snapshots are immutable.
+- [X] Idempotency keys prevent duplicate revision and decision records.
+- [X] Reviewer recommendations never perform final acceptance.
+- [X] Primary and co-advisors retain final decision authority.
+- [X] Return, resubmit, accept, and history behavior is covered.
+- [X] Direct-ID access rejects removed and unrelated users.
+- [X] Lists are cursor-bounded and the 200-record fixture remains bounded.
+- [X] Stale optimistic versions return a safe conflict response.
+- [X] Milestone and deliverable dates are read-only calendar projections.
+- [X] Review assignments support immutable deliverable revision targets.
+- [X] Authoritative review and decision events close linked notification actions.
+- [X] Execution query keys participate in five-second project refresh.
+- [X] The list/detail workspace is fixed-height and keyboard selectable.
+- [X] Student, reviewer, advisor, observer, and administrator controls derive from server capabilities.
+- [X] Member selection uses a searchable multi-select dropdown.
+- [X] Evidence selection, submission, recommendation, decision, and history use global toast feedback.
+- [X] New execution labels are present in English and Chinese catalogs.
+- [X] Backend unit, contract, integration, security, performance, and calendar tests pass.
+- [X] Frontend component, import-boundary, locale, build, and Playwright checks pass.

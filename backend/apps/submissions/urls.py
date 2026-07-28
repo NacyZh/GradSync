@@ -4,7 +4,14 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     InlineCommentViewSet,
     ProjectReportScheduleView,
+    ReportAnalyticsExportView,
+    ReportAnalyticsView,
+    ReportingPeriodListView,
+    ReportTemplateDetailView,
+    ReportTemplateListView,
+    ReportTemplatePublishView,
     StandaloneWritingProjectViewSet,
+    StructuredReportListView,
     TeacherFeedbackDownloadView,
     TeacherFeedbackSubmitView,
     WeeklyReportViewSet,
@@ -23,6 +30,41 @@ router.register("comments", InlineCommentViewSet, basename="project-comments")
 router.register("writing-projects", WritingProjectViewSet, basename="project-writing")
 
 urlpatterns = [
+    path(
+        "projects/<int:project_id>/report-templates/",
+        ReportTemplateListView.as_view(),
+        name="report-template-list",
+    ),
+    path(
+        "projects/<int:project_id>/report-templates/<int:template_version_id>/",
+        ReportTemplateDetailView.as_view(),
+        name="report-template-detail",
+    ),
+    path(
+        "projects/<int:project_id>/report-templates/<int:template_version_id>/publish/",
+        ReportTemplatePublishView.as_view(),
+        name="report-template-publish",
+    ),
+    path(
+        "projects/<int:project_id>/reporting-periods/",
+        ReportingPeriodListView.as_view(),
+        name="reporting-period-list",
+    ),
+    path(
+        "projects/<int:project_id>/structured-reports/",
+        StructuredReportListView.as_view(),
+        name="structured-report-list",
+    ),
+    path(
+        "projects/<int:project_id>/report-analytics/",
+        ReportAnalyticsView.as_view(),
+        name="report-analytics",
+    ),
+    path(
+        "projects/<int:project_id>/report-analytics/export/",
+        ReportAnalyticsExportView.as_view(),
+        name="report-analytics-export",
+    ),
     path(
         "projects/<int:project_id>/report-schedule/",
         ProjectReportScheduleView.as_view(),

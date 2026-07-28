@@ -1,12 +1,110 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
+from .execution_views import (
+    DecisionDetailView,
+    DecisionListView,
+    DecisionSupersedeView,
+    DeliverableArchiveView,
+    DeliverableDecisionView,
+    DeliverableDetailView,
+    DeliverableListView,
+    DeliverableRecommendationView,
+    DeliverableSubmitView,
+    ExecutionSummaryView,
+    MilestoneArchiveView,
+    MilestoneDetailView,
+    MilestoneListView,
+    RiskDetailView,
+    RiskListView,
+    RiskTransitionView,
+)
 from .views import EligibleTeacherSearchView, LegacyBoundaryLinkView, ProjectViewSet
 
 router = DefaultRouter()
 router.register("projects", ProjectViewSet, basename="projects")
 
 urlpatterns = [
+    path(
+        "projects/<int:project_id>/decisions/",
+        DecisionListView.as_view(),
+        name="project-decisions",
+    ),
+    path(
+        "projects/<int:project_id>/decisions/<int:decision_id>/",
+        DecisionDetailView.as_view(),
+        name="project-decision-detail",
+    ),
+    path(
+        "projects/<int:project_id>/decisions/<int:decision_id>/supersede/",
+        DecisionSupersedeView.as_view(),
+        name="project-decision-supersede",
+    ),
+    path(
+        "projects/<int:project_id>/risks/",
+        RiskListView.as_view(),
+        name="project-risks",
+    ),
+    path(
+        "projects/<int:project_id>/risks/<int:risk_id>/",
+        RiskDetailView.as_view(),
+        name="project-risk-detail",
+    ),
+    path(
+        "projects/<int:project_id>/risks/<int:risk_id>/transitions/",
+        RiskTransitionView.as_view(),
+        name="project-risk-transition",
+    ),
+    path(
+        "projects/<int:project_id>/execution-summary/",
+        ExecutionSummaryView.as_view(),
+        name="project-execution-summary",
+    ),
+    path(
+        "projects/<int:project_id>/milestones/",
+        MilestoneListView.as_view(),
+        name="project-milestones",
+    ),
+    path(
+        "projects/<int:project_id>/milestones/<int:milestone_id>/",
+        MilestoneDetailView.as_view(),
+        name="project-milestone-detail",
+    ),
+    path(
+        "projects/<int:project_id>/milestones/<int:milestone_id>/archive/",
+        MilestoneArchiveView.as_view(),
+        name="project-milestone-archive",
+    ),
+    path(
+        "projects/<int:project_id>/deliverables/",
+        DeliverableListView.as_view(),
+        name="project-deliverables",
+    ),
+    path(
+        "projects/<int:project_id>/deliverables/<int:deliverable_id>/",
+        DeliverableDetailView.as_view(),
+        name="project-deliverable-detail",
+    ),
+    path(
+        "projects/<int:project_id>/deliverables/<int:deliverable_id>/submit/",
+        DeliverableSubmitView.as_view(),
+        name="project-deliverable-submit",
+    ),
+    path(
+        "projects/<int:project_id>/deliverables/<int:deliverable_id>/recommendations/",
+        DeliverableRecommendationView.as_view(),
+        name="project-deliverable-recommendations",
+    ),
+    path(
+        "projects/<int:project_id>/deliverables/<int:deliverable_id>/decisions/",
+        DeliverableDecisionView.as_view(),
+        name="project-deliverable-decisions",
+    ),
+    path(
+        "projects/<int:project_id>/deliverables/<int:deliverable_id>/archive/",
+        DeliverableArchiveView.as_view(),
+        name="project-deliverable-archive",
+    ),
     path("boundary/legacy-link/", LegacyBoundaryLinkView.as_view(), name="legacy-boundary-link"),
     path(
         "projects/collaborators/eligible/",

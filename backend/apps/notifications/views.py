@@ -3,7 +3,12 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import generics, mixins, status, views, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -33,13 +38,30 @@ from .serializers import (
 )
 from .services import notifications_visible_to
 
+_NOTIFICATION_ERRORS = {
+    400: OpenApiResponse(description="Validation error"),
+    401: OpenApiResponse(description="Authentication required"),
+    403: OpenApiResponse(description="Forbidden"),
+    404: OpenApiResponse(description="Not found"),
+    409: OpenApiResponse(description="Conflict"),
+}
+
 
 @extend_schema_view(
     get=extend_schema(
+        parameters=[
+            OpenApiParameter("category", str, OpenApiParameter.QUERY),
+            OpenApiParameter("outcome", str, OpenApiParameter.QUERY),
+            OpenApiParameter("projectId", int, OpenApiParameter.QUERY),
+            OpenApiParameter("createdAfter", str, OpenApiParameter.QUERY),
+            OpenApiParameter("unread", bool, OpenApiParameter.QUERY),
+            OpenApiParameter("cursor", str, OpenApiParameter.QUERY),
+            OpenApiParameter("pageSize", int, OpenApiParameter.QUERY),
+        ],
         responses={
             200: NotificationSerializer(many=True),
             401: OpenApiResponse(description="Authentication required"),
-        }
+        },
     )
 )
 class NotificationStatusListView(generics.GenericAPIView):
@@ -69,8 +91,7 @@ class NotificationStatusListView(generics.GenericAPIView):
         elif unread in {"false", "0"}:
             queryset = queryset.filter(viewer_read_at__isnull=False)
         page_size = bounded_page_size(
-            request.query_params.get("pageSize")
-            or request.query_params.get("page_size"),
+            request.query_params.get("pageSize") or request.query_params.get("page_size"),
             maximum=100,
         )
         cursor = request.query_params.get("cursor")
@@ -104,7 +125,11 @@ class NotificationReadView(views.APIView):
 
     @extend_schema(
         request=NotificationReadSerializer,
-        responses={200: OpenApiResponse(description="Visible notifications marked as read")},
+        responses={
+            200: OpenApiResponse(description="Visible notifications marked as read"),
+            400: _NOTIFICATION_ERRORS[400],
+            401: _NOTIFICATION_ERRORS[401],
+        },
     )
     def post(self, request):
         serializer = NotificationReadSerializer(data=request.data)
@@ -114,9 +139,9 @@ class NotificationReadView(views.APIView):
         visible = notifications_visible_to(request.user)
         notification_ids = list(
             visible.filter(
-                pk__in=selected_ids if selected_ids is not None else visible.filter(
-                    pk__lte=through_id
-                ).values("pk")
+                pk__in=selected_ids
+                if selected_ids is not None
+                else visible.filter(pk__lte=through_id).values("pk")
             ).values_list("pk", flat=True)
         )
         NotificationReadReceipt.objects.bulk_create(
@@ -154,18 +179,15 @@ class NotificationAcknowledgeView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = NotificationSerializer
 
-    @extend_schema(request=None, responses=NotificationSerializer)
+    @extend_schema(
+        request={"application/json": {"type": "object", "properties": {}}},
+        responses={200: NotificationSerializer, **_NOTIFICATION_ERRORS},
+    )
     def post(self, request, notification_id):
-        notification = get_object_or_404(
-            notifications_visible_to(request.user), pk=notification_id
-        )
-        acknowledged = acknowledge_notification(
-            notification=notification, actor=request.user
-        )
+        notification = get_object_or_404(notifications_visible_to(request.user), pk=notification_id)
+        acknowledged = acknowledge_notification(notification=notification, actor=request.user)
         acknowledged.viewer_read_at = (
-            NotificationReadReceipt.objects.filter(
-                notification=acknowledged, viewer=request.user
-            )
+            NotificationReadReceipt.objects.filter(notification=acknowledged, viewer=request.user)
             .values_list("viewed_at", flat=True)
             .first()
         )
@@ -176,13 +198,18 @@ class NotificationPreferenceView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = NotificationPreferenceSerializer
 
-    @extend_schema(responses=NotificationPreferenceSerializer)
+    @extend_schema(
+        responses={
+            200: NotificationPreferenceSerializer,
+            401: _NOTIFICATION_ERRORS[401],
+        }
+    )
     def get(self, request):
         return Response(NotificationPreferenceSerializer(preference_profile_for(request.user)).data)
 
     @extend_schema(
         request=NotificationPreferenceWriteSerializer,
-        responses=NotificationPreferenceSerializer,
+        responses={200: NotificationPreferenceSerializer, **_NOTIFICATION_ERRORS},
     )
     def patch(self, request):
         serializer = NotificationPreferenceWriteSerializer(data=request.data)
@@ -213,7 +240,7 @@ class ProjectNotificationPolicyView(generics.GenericAPIView):
     def _project(self, request, project_id):
         return get_object_or_404(projects_visible_to(request.user), pk=project_id)
 
-    @extend_schema(responses=ProjectNotificationPolicySerializer)
+    @extend_schema(responses={200: ProjectNotificationPolicySerializer, **_NOTIFICATION_ERRORS})
     def get(self, request, project_id):
         project = self._project(request, project_id)
         effective = effective_project_policy(project)
@@ -239,7 +266,7 @@ class ProjectNotificationPolicyView(generics.GenericAPIView):
 
     @extend_schema(
         request=ProjectNotificationPolicyWriteSerializer,
-        responses=ProjectNotificationPolicySerializer,
+        responses={200: ProjectNotificationPolicySerializer, **_NOTIFICATION_ERRORS},
     )
     def patch(self, request, project_id):
         project = self._project(request, project_id)
@@ -277,7 +304,16 @@ class NotificationOperationsSummaryView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = NotificationOperationsSummarySerializer
 
-    @extend_schema(responses=NotificationOperationsSummarySerializer)
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("from", str, OpenApiParameter.QUERY, required=True),
+            OpenApiParameter("to", str, OpenApiParameter.QUERY, required=True),
+        ],
+        responses={
+            200: NotificationOperationsSummarySerializer,
+            **_NOTIFICATION_ERRORS,
+        },
+    )
     def get(self, request):
         if not request.user.is_administrator:
             raise PermissionDenied("Administrator access is required.")

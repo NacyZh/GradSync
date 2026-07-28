@@ -3,6 +3,10 @@ from rest_framework import serializers
 from .models import (
     InlineComment,
     ProjectReportSchedule,
+    ReportingPeriod,
+    ReportResponse,
+    ReportTemplateField,
+    ReportTemplateVersion,
     SubmissionReviewAssignment,
     TeacherFeedback,
     WeeklyProgressReport,
@@ -11,10 +15,145 @@ from .models import (
 )
 
 
-class SubmissionReviewAssignmentSerializer(serializers.ModelSerializer):
-    reviewerMembershipId = serializers.IntegerField(
-        source="reviewer_membership_id", required=False
+class ReportTemplateFieldSerializer(serializers.ModelSerializer):
+    labelEn = serializers.CharField(source="label_en")
+    labelZh = serializers.CharField(source="label_zh")
+    helpTextEn = serializers.CharField(source="help_text_en", required=False)
+    helpTextZh = serializers.CharField(source="help_text_zh", required=False)
+    fieldType = serializers.CharField(source="field_type")
+    minValue = serializers.DecimalField(
+        source="min_value", max_digits=14, decimal_places=4, allow_null=True
     )
+    maxValue = serializers.DecimalField(
+        source="max_value", max_digits=14, decimal_places=4, allow_null=True
+    )
+    analyticsEnabled = serializers.BooleanField(source="analytics_enabled")
+
+    class Meta:
+        model = ReportTemplateField
+        fields = [
+            "id",
+            "key",
+            "labelEn",
+            "labelZh",
+            "helpTextEn",
+            "helpTextZh",
+            "fieldType",
+            "required",
+            "order",
+            "unit",
+            "options",
+            "minValue",
+            "maxValue",
+            "analyticsEnabled",
+        ]
+
+
+class ReportTemplateVersionSerializer(serializers.ModelSerializer):
+    templateId = serializers.IntegerField(source="template_id", read_only=True)
+    projectId = serializers.IntegerField(source="project_id", read_only=True)
+    name = serializers.CharField(source="template.name", read_only=True)
+    versionNumber = serializers.IntegerField(source="version_number", read_only=True)
+    publishedAt = serializers.DateTimeField(source="published_at", read_only=True, allow_null=True)
+    fields = ReportTemplateFieldSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ReportTemplateVersion
+        fields = [
+            "id",
+            "templateId",
+            "projectId",
+            "name",
+            "versionNumber",
+            "status",
+            "version",
+            "fields",
+            "publishedAt",
+        ]
+
+
+class ReportingPeriodSerializer(serializers.ModelSerializer):
+    projectId = serializers.IntegerField(source="project_id", read_only=True)
+    startsOn = serializers.DateField(source="starts_on")
+    endsOn = serializers.DateField(source="ends_on")
+    deadlineAt = serializers.DateTimeField(source="deadline_at")
+    templateVersionId = serializers.IntegerField(source="template_version_id", read_only=True)
+    currentUserReportStatus = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReportingPeriod
+        fields = [
+            "id",
+            "projectId",
+            "startsOn",
+            "endsOn",
+            "deadlineAt",
+            "templateVersionId",
+            "state",
+            "currentUserReportStatus",
+        ]
+
+    def get_currentUserReportStatus(self, obj):
+        user = self.context.get("user")
+        if not user:
+            return None
+        report = obj.reports.filter(student=user).order_by("-revision_number").first()
+        return report.review_status if report else "missing"
+
+
+class StructuredReportResponseSerializer(serializers.ModelSerializer):
+    fieldId = serializers.IntegerField(source="template_field_id")
+    sourceType = serializers.CharField(source="source_type")
+    sourceId = serializers.CharField(source="source_id")
+
+    class Meta:
+        model = ReportResponse
+        fields = ["fieldId", "value", "sourceType", "sourceId"]
+
+
+class StructuredReportSerializer(serializers.ModelSerializer):
+    projectId = serializers.IntegerField(source="project_id", read_only=True)
+    student = serializers.SerializerMethodField()
+    reportingPeriod = ReportingPeriodSerializer(source="reporting_period")
+    templateVersionId = serializers.IntegerField(source="template_version_id", read_only=True)
+    revisionNumber = serializers.IntegerField(source="revision_number")
+    reviewStatus = serializers.CharField(source="review_status")
+    submittedAt = serializers.DateTimeField(source="submitted_at")
+    submittedLate = serializers.BooleanField(source="submitted_late")
+    responses = StructuredReportResponseSerializer(many=True)
+
+    class Meta:
+        model = WeeklyProgressReport
+        fields = [
+            "id",
+            "projectId",
+            "student",
+            "reportingPeriod",
+            "templateVersionId",
+            "revisionNumber",
+            "reviewStatus",
+            "submittedAt",
+            "submittedLate",
+            "responses",
+        ]
+
+    def get_student(self, obj):
+        return {
+            "id": obj.student_id,
+            "displayName": obj.student.name,
+            "role": obj.student.global_role,
+        }
+
+
+class ReportSubmissionSerializer(serializers.Serializer):
+    reportingPeriodId = serializers.IntegerField()
+    responses = serializers.ListField(child=serializers.DictField(), min_length=1)
+    attachmentReference = serializers.CharField(required=False, allow_blank=True, max_length=512)
+    idempotencyKey = serializers.CharField(min_length=8, max_length=100)
+
+
+class SubmissionReviewAssignmentSerializer(serializers.ModelSerializer):
+    reviewerMembershipId = serializers.IntegerField(source="reviewer_membership_id", required=False)
     weeklyReportId = serializers.IntegerField(
         source="weekly_report_id", required=False, allow_null=True
     )
@@ -24,9 +163,10 @@ class SubmissionReviewAssignmentSerializer(serializers.ModelSerializer):
     draftVersionId = serializers.IntegerField(
         source="draft_version_id", required=False, allow_null=True
     )
-    reviewerName = serializers.CharField(
-        source="reviewer_membership.user.name", read_only=True
+    deliverableRevisionId = serializers.IntegerField(
+        source="deliverable_revision_id", required=False, allow_null=True
     )
+    reviewerName = serializers.CharField(source="reviewer_membership.user.name", read_only=True)
 
     class Meta:
         model = SubmissionReviewAssignment
@@ -37,6 +177,7 @@ class SubmissionReviewAssignmentSerializer(serializers.ModelSerializer):
             "weeklyReportId",
             "writingVersionId",
             "draftVersionId",
+            "deliverableRevisionId",
             "status",
             "version",
             "assigned_at",

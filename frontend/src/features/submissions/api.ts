@@ -15,6 +15,158 @@ export type WeeklyReport = {
   reviewed_at?: string | null;
 };
 
+export type ReportTemplateField = {
+  id: number;
+  key: string;
+  labelEn: string;
+  labelZh: string;
+  helpTextEn?: string;
+  helpTextZh?: string;
+  fieldType: 'long_text' | 'number' | 'percentage' | 'single_choice' | 'multiple_choice' | 'execution_progress' | 'risk_blocker';
+  required: boolean;
+  order: number;
+  unit?: string;
+  options: Array<{ value: string; labelEn: string; labelZh: string }>;
+  minValue?: string | null;
+  maxValue?: string | null;
+  analyticsEnabled: boolean;
+};
+
+export type ReportTemplateVersion = {
+  id: number;
+  templateId: number;
+  projectId: number;
+  name: string;
+  versionNumber: number;
+  status: 'draft' | 'published' | 'superseded';
+  version: number;
+  fields: ReportTemplateField[];
+  publishedAt?: string | null;
+};
+
+export type ReportingPeriod = {
+  id: number;
+  projectId: number;
+  startsOn: string;
+  endsOn: string;
+  deadlineAt: string;
+  templateVersionId: number;
+  state: 'open' | 'closed';
+  currentUserReportStatus?: 'missing' | WeeklyReport['review_status'] | null;
+};
+
+export type StructuredReport = {
+  id: number;
+  projectId: number;
+  student: { id: number; displayName: string; role: string };
+  reportingPeriod: ReportingPeriod;
+  templateVersionId: number;
+  revisionNumber: number;
+  reviewStatus: string;
+  submittedAt: string;
+  submittedLate: boolean;
+  responses: Array<{ fieldId: number; value: unknown; sourceType?: string; sourceId?: string }>;
+};
+
+export type ReportAnalytics = {
+  projectId: number;
+  from: string;
+  to: string;
+  submissionCounts: Record<string, number>;
+  reviewCounts?: Record<string, number>;
+  metricSeries: Array<{
+    key: string;
+    labelEn: string;
+    labelZh: string;
+    value: number | null;
+    unit: string;
+    population: number;
+    missing: number;
+    sourceReportIds: number[];
+  }>;
+};
+
+export function listReportTemplates(projectId: number) {
+  return apiRequest<{
+    results: ReportTemplateVersion[];
+    capabilities: {
+      canEditTemplate: boolean;
+      canPublishTemplate: boolean;
+      canSubmitReport: boolean;
+      canViewAnalytics: boolean;
+      canExportAnalytics: boolean;
+    };
+  }>(`/api/projects/${projectId}/report-templates/`);
+}
+
+export function createReportTemplateDraft(projectId: number, name: string) {
+  return apiRequest<ReportTemplateVersion>(`/api/projects/${projectId}/report-templates/`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function updateReportTemplate(
+  projectId: number,
+  template: ReportTemplateVersion,
+  fields: ReportTemplateField[],
+) {
+  return apiRequest<ReportTemplateVersion>(
+    `/api/projects/${projectId}/report-templates/${template.id}/`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        expectedVersion: template.version,
+        name: template.name,
+        fields,
+      }),
+    },
+  );
+}
+
+export function publishReportTemplate(projectId: number, template: ReportTemplateVersion) {
+  return apiRequest<ReportTemplateVersion>(
+    `/api/projects/${projectId}/report-templates/${template.id}/publish/`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ expectedVersion: template.version, reason: 'Published for future periods' }),
+    },
+  );
+}
+
+export function listReportingPeriods(projectId: number) {
+  return apiRequest<{ results: ReportingPeriod[]; page: { nextCursor: string | null } }>(
+    `/api/projects/${projectId}/reporting-periods/?pageSize=100`,
+  );
+}
+
+export function submitStructuredReport(
+  projectId: number,
+  payload: {
+    reportingPeriodId: number;
+    responses: Array<{ fieldId: number; value: unknown }>;
+    idempotencyKey: string;
+  },
+) {
+  return apiRequest<StructuredReport>(`/api/projects/${projectId}/reports/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getReportAnalytics(projectId: number, from: string, to: string) {
+  return apiRequest<ReportAnalytics>(
+    `/api/projects/${projectId}/report-analytics/?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  );
+}
+
+export function downloadReportAnalytics(projectId: number, from: string, to: string) {
+  return downloadFile(
+    `/api/projects/${projectId}/report-analytics/export/?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    `project-${projectId}-report-analytics.csv`,
+  );
+}
+
 export type ProjectReportSchedule = {
   id: number;
   projectId: number;
@@ -43,6 +195,7 @@ export type ReviewAssignment = {
   weeklyReportId?: number | null;
   writingVersionId?: number | null;
   draftVersionId?: number | null;
+  deliverableRevisionId?: number | null;
   status: 'active' | 'removed';
   version: number;
 };
