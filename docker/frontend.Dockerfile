@@ -9,6 +9,7 @@ ARG NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=30000
 ARG NPM_CONFIG_FETCH_TIMEOUT=120000
 ARG NPM_CONFIG_MAXSOCKETS=8
 ARG NPM_CI_TIMEOUT_SECONDS=600
+ARG GRADSYNC_BUILD_REVISION=unknown
 
 COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,id=gradsync-frontend-npm,target=/root/.npm \
@@ -19,9 +20,14 @@ RUN --mount=type=cache,id=gradsync-frontend-npm,target=/root/.npm \
 COPY frontend/ ./
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-RUN npm run build
+RUN npm run build \
+    && printf '%s\n' "$GRADSYNC_BUILD_REVISION" > dist/version.txt \
+    && sed -i "s/__GRADSYNC_BUILD_REVISION__/$GRADSYNC_BUILD_REVISION/g" dist/sw.js
 
 FROM nginx:1.27-alpine AS runtime
+
+ARG GRADSYNC_BUILD_REVISION=unknown
+LABEL org.opencontainers.image.revision=$GRADSYNC_BUILD_REVISION
 
 COPY docker/nginx.conf /etc/nginx/nginx.conf.template
 COPY --from=build /app/frontend/dist /usr/share/nginx/html

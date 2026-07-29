@@ -1,5 +1,6 @@
 const CACHE_PREFIX = 'gradsync-shell-';
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const BUILD_REVISION = '__GRADSYNC_BUILD_REVISION__';
+const CACHE_NAME = `${CACHE_PREFIX}${BUILD_REVISION}`;
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/asset-manifest.json'];
 
 async function precacheApplication() {

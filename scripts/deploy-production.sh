@@ -48,6 +48,20 @@ else
   echo "WARNING: GRADSYNC_DEPLOY_REVISION is unset; deploying the branch head." >&2
 fi
 
+DEPLOYED_REVISION="$(git rev-parse HEAD)"
+case "$DEPLOYED_REVISION" in
+  *[!0-9a-f]*)
+    echo "Resolved deployment revision is not a full Git commit SHA: $DEPLOYED_REVISION" >&2
+    exit 2
+    ;;
+esac
+if [ "${#DEPLOYED_REVISION}" -ne 40 ]; then
+  echo "Resolved deployment revision is not a full Git commit SHA: $DEPLOYED_REVISION" >&2
+  exit 2
+fi
+GRADSYNC_BUILD_REVISION="$DEPLOYED_REVISION"
+export GRADSYNC_BUILD_REVISION
+
 echo "Enforcing production specification acceptance"
 python3 scripts/check-spec-acceptance.py --mode enforce --scope production
 
@@ -119,6 +133,17 @@ compose exec -T backend python manage.py check_production_readiness --skip-repo-
 echo "Starting frontend"
 compose up -d --no-deps --remove-orphans frontend
 wait_for_service frontend healthy
+frontend_container_id="$(compose ps -q frontend)"
+frontend_image_revision="$(
+  docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+    "$frontend_container_id"
+)"
+if [ "$frontend_image_revision" != "$DEPLOYED_REVISION" ]; then
+  echo "Frontend container revision mismatch." >&2
+  echo "Expected: $DEPLOYED_REVISION" >&2
+  echo "Running:  $frontend_image_revision" >&2
+  exit 1
+fi
 
 echo "Starting worker"
 compose up -d --no-deps --remove-orphans worker
@@ -133,6 +158,14 @@ if command -v curl >/dev/null 2>&1; then
   curl -fsS "$PUBLIC_URL/healthz/" >/dev/null
   curl -fsS "$PUBLIC_URL/readyz/" >/dev/null
   curl -fsS "$PUBLIC_URL/api/schema/" >/dev/null
+  public_frontend_revision="$(curl -fsS "$PUBLIC_URL/version.txt" | tr -d '\r\n')"
+  if [ "$public_frontend_revision" != "$DEPLOYED_REVISION" ]; then
+    echo "Public frontend revision mismatch." >&2
+    echo "Expected: $DEPLOYED_REVISION" >&2
+    echo "Public:   $public_frontend_revision" >&2
+    echo "The public proxy is still serving an older frontend container or cached response." >&2
+    exit 1
+  fi
 
   upload_limit="$(
     compose exec -T backend python -c \
