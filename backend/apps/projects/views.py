@@ -31,6 +31,16 @@ from apps.submissions.review_assignment_services import (
 from apps.submissions.serializers import SubmissionReviewAssignmentSerializer
 
 from .access_services import project_capabilities
+from .closeout_serializers import (
+    CloseoutDispositionSerializer,
+    ProjectCloseoutPreflightSerializer,
+    ProjectCloseoutResultSerializer,
+)
+from .closeout_services import (
+    build_closeout_preflight,
+    closeout_and_archive,
+    project_export_response,
+)
 from .collaboration_services import (
     assign_collaborator,
     change_collaborator_role,
@@ -474,6 +484,7 @@ class ProjectViewSet(
             200: ProjectMembershipSerializer,
             400: OpenApiResponse(description="Validation failed"),
             403: OpenApiResponse(description="Membership change forbidden"),
+            404: OpenApiResponse(description="Membership not found"),
             409: OpenApiResponse(description="Version conflict"),
         },
     )
@@ -492,6 +503,7 @@ class ProjectViewSet(
             204: OpenApiResponse(description="Membership removed"),
             400: OpenApiResponse(description="Validation failed"),
             403: OpenApiResponse(description="Membership removal forbidden"),
+            404: OpenApiResponse(description="Membership not found"),
             409: OpenApiResponse(description="Version conflict"),
         },
     )
@@ -533,10 +545,70 @@ class ProjectViewSet(
             raise ValidationError({"message": exc.messages[0]}) from exc
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(
+        methods=["GET"],
+        responses={
+            200: ProjectCloseoutPreflightSerializer,
+            403: OpenApiResponse(description="Project access forbidden"),
+        },
+    )
+    @action(detail=True, methods=["get"], url_path="closeout")
+    def closeout(self, request, pk=None):
+        try:
+            payload = build_closeout_preflight(user=request.user, project=self.get_object())
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        return Response(ProjectCloseoutPreflightSerializer(payload).data)
+
+    @extend_schema(
+        methods=["POST"],
+        request=CloseoutDispositionSerializer,
+        responses={
+            200: ProjectCloseoutResultSerializer,
+            400: OpenApiResponse(description="Closeout items remain unresolved"),
+            403: OpenApiResponse(description="Project archival forbidden"),
+        },
+    )
     @action(detail=True, methods=["post"])
     def archive(self, request, pk=None):
-        project = ProjectService(request.user).archive_project(self.get_object())
-        return Response(ProjectSerializer(project, context={"request": request}).data)
+        serializer = CloseoutDispositionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            record = closeout_and_archive(
+                actor=request.user,
+                project=self.get_object(),
+                dispositions=serializer.validated_data,
+            )
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"message": exc.messages}
+            raise ValidationError(detail) from exc
+        return Response(
+            ProjectCloseoutResultSerializer(
+                {
+                    "projectId": record.project_id,
+                    "status": record.project.status,
+                    "archiveVersion": record.archive_version,
+                    "archivedAt": record.archived_at,
+                    "checklist": record.checklist,
+                }
+            ).data
+        )
+
+    @extend_schema(
+        methods=["GET"],
+        responses={
+            (200, "application/zip"): OpenApiResponse(description="Project closeout package"),
+            403: OpenApiResponse(description="Project export forbidden"),
+        },
+    )
+    @action(detail=True, methods=["get"], url_path="export")
+    def export(self, request, pk=None):
+        try:
+            return project_export_response(actor=request.user, project=self.get_object())
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
 
     @action(detail=True, methods=["post"])
     def reopen(self, request, pk=None):

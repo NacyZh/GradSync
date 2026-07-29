@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { BookOpen, BriefcaseBusiness, Code2, FileSearch, FileStack, FileText, LayoutDashboard, LogOut, Moon, Settings, Sun, UserCircle, Users } from 'lucide-react';
+import { Activity, BookOpen, BriefcaseBusiness, Code2, FileSearch, FileStack, FileText, LayoutDashboard, LogOut, Moon, Settings, Sun, UserCircle, Users } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
@@ -40,6 +40,7 @@ export function Layout({ children }: PropsWithChildren) {
         { to: '/library/documents', label: t('documents'), icon: FileStack, roles: ['admin', 'advisor', 'student'] },
         { to: '/writing', label: t('writing'), icon: FileText, roles: ['admin', 'advisor', 'student'] },
         { to: '/admin/accounts', label: t('team'), icon: Users, roles: ['admin'] },
+        { to: '/admin/health', label: translateUiText('Project health', locale), icon: Activity, roles: ['admin'] },
         { to: '/admin/audit', label: t('auditConsole'), icon: FileSearch, roles: ['admin'] },
         { to: '/profile', label: t('profile'), icon: UserCircle, roles: ['admin', 'advisor', 'student'] },
       ].filter((link) => link.roles.includes(user.global_role))

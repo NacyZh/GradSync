@@ -51,12 +51,17 @@ class ResourceType(models.Model):
 
 
 class ResourceItem(models.Model):
+    class Kind(models.TextChoices):
+        EQUIPMENT = "equipment", "Equipment"
+        CONSUMABLE = "consumable", "Consumable"
+
     class Status(models.TextChoices):
         AVAILABLE = "available", "Available"
         UNAVAILABLE = "unavailable", "Unavailable"
         RETIRED = "retired", "Retired"
 
     resource_type = models.ForeignKey(ResourceType, on_delete=models.PROTECT, related_name="items")
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.EQUIPMENT)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     location = models.CharField(max_length=255, blank=True)
@@ -77,6 +82,12 @@ class ResourceItem(models.Model):
         related_name="managed_resources",
     )
     use_instructions = models.TextField(blank=True)
+    stock_on_hand = models.PositiveIntegerField(default=0)
+    reorder_level = models.PositiveIntegerField(default=0)
+    stock_unit = models.CharField(max_length=40, blank=True)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    calibration_interval_days = models.PositiveIntegerField(null=True, blank=True)
+    next_calibration_at = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AVAILABLE)
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -111,6 +122,10 @@ class ResourceItem(models.Model):
         if unsupported:
             unsupported_fields = ", ".join(sorted(unsupported))
             raise ValidationError(f"Unsupported resource field values: {unsupported_fields}")
+        if self.kind == self.Kind.CONSUMABLE and not self.stock_unit.strip():
+            raise ValidationError({"stock_unit": "Consumables require a stock unit"})
+        if self.kind == self.Kind.CONSUMABLE and self.calibration_interval_days:
+            raise ValidationError("Consumables do not support calibration intervals")
 
 
 class ResourceUseSubmission(models.Model):
@@ -223,4 +238,103 @@ class Booking(models.Model):
             ),
             models.Index(fields=["requested_by", "status"], name="booking_requester_idx"),
             models.Index(fields=["status", "created_at"], name="booking_review_queue_idx"),
+        ]
+
+
+class ResourceMaintenanceRecord(models.Model):
+    class Kind(models.TextChoices):
+        PREVENTIVE = "preventive", "Preventive maintenance"
+        CALIBRATION = "calibration", "Calibration"
+        REPAIR = "repair", "Repair"
+        FAULT = "fault", "Fault"
+
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        IN_PROGRESS = "in_progress", "In progress"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    resource_item = models.ForeignKey(
+        ResourceItem,
+        on_delete=models.PROTECT,
+        related_name="maintenance_records",
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
+    title = models.CharField(max_length=255)
+    details = models.TextField(blank=True)
+    provider = models.CharField(max_length=255, blank=True)
+    scheduled_at = models.DateTimeField()
+    due_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    takes_offline = models.BooleanField(default=True)
+    cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_resource_maintenance",
+    )
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="completed_resource_maintenance",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-scheduled_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=["resource_item", "status", "scheduled_at"],
+                name="resource_maint_status_idx",
+            )
+        ]
+
+
+class ConsumableStockTransaction(models.Model):
+    class Kind(models.TextChoices):
+        RECEIPT = "receipt", "Receipt"
+        ISSUE = "issue", "Issue"
+        ADJUSTMENT = "adjustment", "Adjustment"
+
+    resource_item = models.ForeignKey(
+        ResourceItem,
+        on_delete=models.PROTECT,
+        related_name="stock_transactions",
+    )
+    project = models.ForeignKey(
+        "projects.ResearchProject",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consumable_transactions",
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    quantity_delta = models.IntegerField()
+    balance_after = models.PositiveIntegerField()
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    note = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="recorded_consumable_transactions",
+    )
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-recorded_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(quantity_delta=0),
+                name="consumable_quantity_delta_nonzero",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["resource_item", "-recorded_at"],
+                name="consumable_resource_time_idx",
+            )
         ]

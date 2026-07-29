@@ -148,3 +148,75 @@ export function getAuditExport(exportId: string) {
 export function downloadAuditExport(exportId: string) {
   return downloadFile(`/api/audit-exports/${exportId}/download`, 'audit-export.csv');
 }
+
+export type ProjectHealthRow = {
+  projectId: number;
+  title: string;
+  advisorName: string;
+  endsOn?: string | null;
+  overdue: boolean;
+  openTaskCount: number;
+  overdueTaskCount: number;
+  longBlockedTaskCount: number;
+  missingReportCount: number;
+  governanceState: 'normal' | 'hold';
+  governanceHoldReason?: string;
+  resourceConflictCount: number;
+  notificationFailureCount: number;
+  healthScore: number;
+  healthLevel: 'healthy' | 'attention' | 'critical';
+  actionPath: string;
+};
+
+export type ProjectHealthSnapshot = {
+  generatedAt: string;
+  windowDays: number;
+  longBlockedDays: number;
+  summary: {
+    activeProjects: number;
+    overdueProjects: number;
+    overdueProjectRate: number;
+    longBlockedTasks: number;
+    missingReports: number;
+    governanceHolds: number;
+    resourceConflicts: number;
+    notificationFailures: number;
+    notificationFailureRate: number;
+  };
+  projects: ProjectHealthRow[];
+  blockedTasks: Array<{
+    taskId: number;
+    title: string;
+    projectId: number;
+    projectTitle: string;
+    blockedSince: string;
+    blockedDays: number;
+    deadlineAt?: string | null;
+    actionPath: string;
+  }>;
+  missingReports: Array<{
+    projectId: number;
+    projectTitle: string;
+    periodId: number;
+    periodStart: string;
+    deadlineAt: string;
+    missingCount: number;
+    actionPath: string;
+  }>;
+  governanceHolds: Array<{
+    projectId: number;
+    projectTitle: string;
+    reason: string;
+    startedAt?: string | null;
+    actionPath: string;
+  }>;
+  trend: Array<{
+    date: string;
+    resourceConflicts: number;
+    notificationFailures: number;
+  }>;
+};
+
+export function getProjectHealthSnapshot() {
+  return apiRequest<ProjectHealthSnapshot>('/api/admin/project-health/');
+}

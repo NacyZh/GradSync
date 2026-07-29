@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../features/auth/AuthProvider';
+import { ProjectHealthDashboard } from '../features/admin/ProjectHealthDashboard';
 import { listProjects } from '../features/projects/api';
 import { CalendarAgenda } from '../features/schedules/CalendarAgenda';
 import { CalendarGrid } from '../features/schedules/CalendarGrid';
@@ -189,6 +190,8 @@ export function HomePage() {
       </section>
 
       {isLoadingUser ? <AsyncState state="loading" message="Loading account" /> : null}
+
+      {role === 'admin' ? <ProjectHealthDashboard compact /> : null}
 
       {user && (
         <section className="calendar-workspace" aria-label="Dashboard calendar">

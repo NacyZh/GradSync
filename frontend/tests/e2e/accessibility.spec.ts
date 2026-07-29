@@ -22,7 +22,7 @@ test('main application landmarks are present', async ({ page }) => {
   await expect(page.locator('main')).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Workspace navigation' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Primary workspace' })).toBeVisible();
-  await expect(page.getByRole('searchbox').or(page.getByPlaceholder('Search projects, tasks, reviews'))).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Search' })).toBeVisible();
   await page.getByRole('button', { name: 'Switch to dark theme' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.keyboard.press('Tab');

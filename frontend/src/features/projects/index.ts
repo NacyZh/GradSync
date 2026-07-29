@@ -3,6 +3,7 @@ export {
   getProject,
   searchEligibleTeachers,
   type CollaboratorRole,
+  type Project,
   type TeacherOption,
 } from './api';
 export {

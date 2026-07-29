@@ -137,8 +137,63 @@ export function updateProject(projectId: number, payload: Partial<Pick<Project, 
   });
 }
 
-export function archiveProject(projectId: number) {
-  return apiRequest<Project>(`/api/projects/${projectId}/archive/`, { method: 'POST' });
+export type ProjectCloseoutCheck = {
+  key:
+    | 'incompleteTasks'
+    | 'pendingReports'
+    | 'pendingMaterialPermissions'
+    | 'unacceptedRequiredDeliverables'
+    | 'unreturnedResources'
+    | 'openBookings';
+  count: number;
+  severity: 'clear' | 'attention' | 'blocked';
+  sample: Array<Record<string, unknown>>;
+};
+
+export type ProjectCloseoutPreflight = {
+  projectId: number;
+  ready: boolean;
+  checks: ProjectCloseoutCheck[];
+  latestCloseout: {
+    archiveVersion: number;
+    archivedAt: string;
+    archivedBy: string;
+  } | null;
+};
+
+export type ProjectCloseoutDisposition = {
+  cancelOpenTasks: boolean;
+  closePendingReports: boolean;
+  cancelOpenBookings: boolean;
+  materialsReviewed: boolean;
+  finalPackageConfirmed: boolean;
+  notes?: string;
+};
+
+export type ProjectCloseoutResult = {
+  projectId: number;
+  status: 'archived';
+  archiveVersion: number;
+  archivedAt: string;
+  checklist: Record<string, boolean>;
+};
+
+export function getProjectCloseout(projectId: number) {
+  return apiRequest<ProjectCloseoutPreflight>(`/api/projects/${projectId}/closeout/`);
+}
+
+export function completeProjectCloseout(
+  projectId: number,
+  payload: ProjectCloseoutDisposition,
+) {
+  return apiRequest<ProjectCloseoutResult>(`/api/projects/${projectId}/archive/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function downloadProjectExport(projectId: number) {
+  return downloadFile(`/api/projects/${projectId}/export/`, `project-${projectId}.zip`);
 }
 
 export function reopenProject(projectId: number) {

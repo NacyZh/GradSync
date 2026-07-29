@@ -44,6 +44,11 @@ class Notification(models.Model):
         )
         MEMBERSHIP_CHANGED = "membership_changed", "Membership changed"
         RESOURCE_USE_DECISION = "resource_use_decision", "Resource use decision"
+        RESOURCE_LOW_STOCK = "resource_low_stock", "Resource low stock"
+        RESOURCE_MAINTENANCE_DUE = (
+            "resource_maintenance_due",
+            "Resource maintenance due",
+        )
         SCHEDULE_PUBLISHED = "schedule_published", "Schedule published"
         SCHEDULE_CHANGED = "schedule_changed", "Schedule changed"
         SCHEDULE_CANCELLED = "schedule_cancelled", "Schedule cancelled"
@@ -145,9 +150,7 @@ class Notification(models.Model):
                 fields=["recipient", "outcome_state", "-created_at"],
                 name="notif_outcome_cursor_idx",
             ),
-            models.Index(
-                fields=["active_follow_up", "due_at"], name="notif_followup_due_idx"
-            ),
+            models.Index(fields=["active_follow_up", "due_at"], name="notif_followup_due_idx"),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -162,10 +165,7 @@ class Notification(models.Model):
                         outcome_state="not_required",
                         active_follow_up=False,
                     )
-                    | (
-                        ~Q(requirement_type="informational")
-                        & ~Q(outcome_state="not_required")
-                    )
+                    | (~Q(requirement_type="informational") & ~Q(outcome_state="not_required"))
                 ),
                 name="notification_requirement_outcome_valid",
             ),
@@ -244,9 +244,7 @@ class NotificationDeliveryAttempt(models.Model):
                 name="unique_notification_channel_attempt",
             )
         ]
-        indexes = [
-            models.Index(fields=["state", "eligible_at"], name="notif_attempt_due_idx")
-        ]
+        indexes = [models.Index(fields=["state", "eligible_at"], name="notif_attempt_due_idx")]
 
 
 class NotificationPreferenceProfile(models.Model):

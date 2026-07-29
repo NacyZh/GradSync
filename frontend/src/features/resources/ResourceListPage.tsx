@@ -26,6 +26,7 @@ import {
 } from './api';
 import { ResourceInventoryDialog } from './ResourceInventoryDialog';
 import { ResourceLifecycleDialog } from './ResourceLifecycleDialog';
+import { ResourceOperationsPanel } from './ResourceOperationsPanel';
 import { ResourceUseSubmissionPanel } from './ResourceUseSubmissionPanel';
 
 export function ResourceListPage() {
@@ -170,14 +171,25 @@ export function ResourceListPage() {
             ))}
           </ul>
         </section>
-        <BookingCalendar
-          resource={selectedResource}
-          resourceTypes={resourceTypes}
-          onAvailabilityChange={setAvailability}
-        />
+        {selectedResource?.kind === 'consumable'
+          ? <ResourceOperationsPanel resource={selectedResource} canManage={canManage} />
+          : <BookingCalendar
+              resource={selectedResource}
+              resourceTypes={resourceTypes}
+              onAvailabilityChange={setAvailability}
+            />}
       </div>
 
-      <ResourceUseSubmissionPanel resources={filtered} canManage={canManage} />
+      {canManage && selectedResource?.kind !== 'consumable'
+        ? <ResourceOperationsPanel resource={selectedResource} canManage />
+        : null}
+
+      {filtered.some((resource) => resource.kind !== 'consumable')
+        ? <ResourceUseSubmissionPanel
+            resources={filtered.filter((resource) => resource.kind !== 'consumable')}
+            canManage={canManage}
+          />
+        : null}
 
       <ResourceInventoryDialog open={inventoryOpen} resource={editing} pending={createMutation.isPending || updateMutation.isPending} onOpenChange={(open) => { setInventoryOpen(open); if (!open) setEditing(undefined); }} onSubmit={save} />
       <ResourceLifecycleDialog resource={lifecycle} open={Boolean(lifecycle)} pending={deleteMutation.isPending || retireMutation.isPending} canRetire={canRetire} onOpenChange={(open) => { if (!open) { setLifecycle(undefined); setCanRetire(false); } }} onDelete={() => lifecycle && deleteMutation.mutate(lifecycle.id)} onRetire={() => lifecycle && retireMutation.mutate(lifecycle)} />
@@ -186,6 +198,11 @@ export function ResourceListPage() {
 }
 
 function formatAvailabilitySummary(resource: LaboratoryResource, availability?: ResourceItem) {
+  if (resource.kind === 'consumable') {
+    return resource.lowStock
+      ? `${resource.stockOnHand} ${resource.stockUnit} in stock · low stock`
+      : `${resource.stockOnHand} ${resource.stockUnit} in stock`;
+  }
   const totalQuantity = availability?.totalQuantity ?? resource.totalQuantity ?? 0;
   const availableQuantity = availability?.availableQuantity ?? resource.availableQuantity ?? totalQuantity;
   const allocatedQuantity = availability?.allocatedQuantity ?? Math.max(totalQuantity - availableQuantity, 0);
@@ -199,6 +216,7 @@ function getResourceTypeName(resource: LaboratoryResource, resourceTypeById: Map
 function getResourceCardStatus(resource: LaboratoryResource, availability?: ResourceItem) {
   if (resource.status === 'retired') return 'retired';
   if (resource.status === 'unavailable') return 'unavailable';
+  if (resource.kind === 'consumable') return resource.lowStock ? 'low stock' : 'available';
   if (!availability) return resource.status === 'active' ? 'available' : resource.status;
   const availableQuantity = availability.availableQuantity ?? availability.totalQuantity ?? resource.availableQuantity ?? resource.totalQuantity ?? 0;
   return availableQuantity > 0 ? 'available' : 'unavailable';

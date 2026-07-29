@@ -3,8 +3,10 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     BookingViewSet,
+    ConsumableStockTransactionViewSet,
     LaboratoryResourceViewSet,
     ResourceItemViewSet,
+    ResourceMaintenanceViewSet,
     ResourceTypeViewSet,
     ResourceUseSubmissionViewSet,
     StandaloneBookingViewSet,
@@ -15,6 +17,16 @@ resource_router.register("resource-types", ResourceTypeViewSet, basename="resour
 resource_router.register("resource-items", ResourceItemViewSet, basename="resource-items")
 resource_router.register("resources", LaboratoryResourceViewSet, basename="resources")
 resource_router.register("bookings", StandaloneBookingViewSet, basename="bookings")
+resource_router.register(
+    "resource-maintenance",
+    ResourceMaintenanceViewSet,
+    basename="resource-maintenance",
+)
+resource_router.register(
+    "consumable-transactions",
+    ConsumableStockTransactionViewSet,
+    basename="consumable-transactions",
+)
 resource_router.register(
     "resource-use-submissions",
     ResourceUseSubmissionViewSet,

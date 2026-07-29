@@ -77,6 +77,14 @@ export type LaboratoryResource = {
   confirmationPolicyOverride?: ConfirmationPolicy | null;
   effectiveConfirmationPolicy: ConfirmationPolicy;
   version: number;
+  kind: 'equipment' | 'consumable';
+  stockOnHand: number;
+  reorderLevel: number;
+  stockUnit?: string;
+  unitCost: string;
+  calibrationIntervalDays?: number | null;
+  nextCalibrationAt?: string | null;
+  lowStock: boolean;
   currentUsePeriods?: Array<{ bookingId: number; startsAt: string; endsAt: string; quantity: number }>;
 };
 
@@ -89,6 +97,41 @@ export type ResourceWrite = {
   status?: LaboratoryResource['status'];
   useInstructions?: string;
   confirmationPolicyOverride?: ConfirmationPolicy | null;
+  kind?: LaboratoryResource['kind'];
+  stockOnHand?: number;
+  reorderLevel?: number;
+  stockUnit?: string;
+  unitCost?: number;
+  calibrationIntervalDays?: number | null;
+  nextCalibrationAt?: string | null;
+};
+
+export type ResourceMaintenance = {
+  id: number;
+  resourceId: number;
+  kind: 'preventive' | 'calibration' | 'repair' | 'fault';
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  title: string;
+  details?: string;
+  provider?: string;
+  scheduledAt: string;
+  dueAt?: string | null;
+  completedAt?: string | null;
+  takesOffline: boolean;
+  cost: string;
+};
+
+export type ConsumableTransaction = {
+  id: number;
+  resourceId: number;
+  projectId?: number | null;
+  kind: 'receipt' | 'issue' | 'adjustment';
+  quantityDelta: number;
+  balanceAfter: number;
+  unitCost: string;
+  totalCost: string;
+  note?: string;
+  recordedAt: string;
 };
 
 export function listResourceTypes() {
@@ -125,6 +168,59 @@ export function retireLaboratoryResource(resourceId: number, version: number) {
   return apiRequest<LaboratoryResource>(`/api/resources/${resourceId}/retire/`, {
     method: 'POST',
     body: JSON.stringify({ version }),
+  });
+}
+
+export function listResourceMaintenance(resourceId: number) {
+  return apiRequest<{ results: ResourceMaintenance[] }>(
+    `/api/resource-maintenance/?resourceId=${resourceId}`,
+  );
+}
+
+export function createResourceMaintenance(payload: {
+  resourceId: number;
+  kind: ResourceMaintenance['kind'];
+  title: string;
+  scheduledAt: string;
+  dueAt?: string | null;
+  details?: string;
+  provider?: string;
+  takesOffline: boolean;
+  cost: number;
+}) {
+  return apiRequest<ResourceMaintenance>('/api/resource-maintenance/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateResourceMaintenance(
+  recordId: number,
+  payload: { status: ResourceMaintenance['status']; details?: string },
+) {
+  return apiRequest<ResourceMaintenance>(`/api/resource-maintenance/${recordId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listConsumableTransactions(resourceId: number) {
+  return apiRequest<{ results: ConsumableTransaction[] }>(
+    `/api/consumable-transactions/?resourceId=${resourceId}`,
+  );
+}
+
+export function createConsumableTransaction(payload: {
+  resourceId: number;
+  projectId?: number | null;
+  kind: ConsumableTransaction['kind'];
+  quantityDelta: number;
+  unitCost?: number | null;
+  note?: string;
+}) {
+  return apiRequest<ConsumableTransaction>('/api/consumable-transactions/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

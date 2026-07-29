@@ -1,7 +1,14 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import Booking, ResourceItem, ResourceType, ResourceUseSubmission
+from .models import (
+    Booking,
+    ConsumableStockTransaction,
+    ResourceItem,
+    ResourceMaintenanceRecord,
+    ResourceType,
+    ResourceUseSubmission,
+)
 from .services import current_use_periods_by_resource, resource_status_to_contract
 
 
@@ -183,6 +190,17 @@ class LaboratoryResourceSerializer(serializers.ModelSerializer):
         source="effective_confirmation_policy", read_only=True
     )
     status = serializers.SerializerMethodField()
+    stockOnHand = serializers.IntegerField(source="stock_on_hand", read_only=True)
+    reorderLevel = serializers.IntegerField(source="reorder_level", read_only=True)
+    stockUnit = serializers.CharField(source="stock_unit", read_only=True)
+    unitCost = serializers.DecimalField(
+        source="unit_cost", max_digits=12, decimal_places=2, read_only=True
+    )
+    calibrationIntervalDays = serializers.IntegerField(
+        source="calibration_interval_days", read_only=True
+    )
+    nextCalibrationAt = serializers.DateField(source="next_calibration_at", read_only=True)
+    lowStock = serializers.SerializerMethodField()
 
     class Meta:
         model = ResourceItem
@@ -202,6 +220,14 @@ class LaboratoryResourceSerializer(serializers.ModelSerializer):
             "confirmationPolicyOverride",
             "effectiveConfirmationPolicy",
             "version",
+            "kind",
+            "stockOnHand",
+            "reorderLevel",
+            "stockUnit",
+            "unitCost",
+            "calibrationIntervalDays",
+            "nextCalibrationAt",
+            "lowStock",
         ]
 
     @extend_schema_field(serializers.CharField())
@@ -219,6 +245,10 @@ class LaboratoryResourceSerializer(serializers.ModelSerializer):
             return periods
         return current_use_periods_by_resource([obj.pk]).get(obj.pk, [])
 
+    @extend_schema_field(serializers.BooleanField())
+    def get_lowStock(self, obj):
+        return obj.kind == ResourceItem.Kind.CONSUMABLE and obj.stock_on_hand <= obj.reorder_level
+
 
 class ResourceCreateSerializer(serializers.Serializer):
     name = serializers.CharField()
@@ -233,6 +263,13 @@ class ResourceCreateSerializer(serializers.Serializer):
     confirmationPolicyOverride = serializers.ChoiceField(
         choices=ResourceType.ConfirmationPolicy.choices, required=False, allow_null=True
     )
+    kind = serializers.ChoiceField(choices=ResourceItem.Kind.choices, default="equipment")
+    stockOnHand = serializers.IntegerField(min_value=0, default=0)
+    reorderLevel = serializers.IntegerField(min_value=0, default=0)
+    stockUnit = serializers.CharField(required=False, allow_blank=True)
+    unitCost = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+    calibrationIntervalDays = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    nextCalibrationAt = serializers.DateField(required=False, allow_null=True)
 
 
 class ResourceUpdateSerializer(serializers.Serializer):
@@ -250,6 +287,108 @@ class ResourceUpdateSerializer(serializers.Serializer):
     confirmationPolicyOverride = serializers.ChoiceField(
         choices=ResourceType.ConfirmationPolicy.choices, required=False, allow_null=True
     )
+    kind = serializers.ChoiceField(choices=ResourceItem.Kind.choices, required=False)
+    reorderLevel = serializers.IntegerField(min_value=0, required=False)
+    stockUnit = serializers.CharField(required=False, allow_blank=True)
+    unitCost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    calibrationIntervalDays = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    nextCalibrationAt = serializers.DateField(required=False, allow_null=True)
+
+
+class ResourceMaintenanceSerializer(serializers.ModelSerializer):
+    resourceId = serializers.IntegerField(source="resource_item_id", read_only=True)
+    createdById = serializers.IntegerField(source="created_by_id", read_only=True)
+    completedById = serializers.IntegerField(source="completed_by_id", read_only=True)
+    scheduledAt = serializers.DateTimeField(source="scheduled_at", read_only=True)
+    dueAt = serializers.DateTimeField(source="due_at", read_only=True)
+    completedAt = serializers.DateTimeField(source="completed_at", read_only=True)
+    takesOffline = serializers.BooleanField(source="takes_offline", read_only=True)
+
+    class Meta:
+        model = ResourceMaintenanceRecord
+        fields = [
+            "id",
+            "resourceId",
+            "kind",
+            "status",
+            "title",
+            "details",
+            "provider",
+            "scheduledAt",
+            "dueAt",
+            "completedAt",
+            "takesOffline",
+            "cost",
+            "createdById",
+            "completedById",
+        ]
+
+
+class ResourceMaintenanceCreateSerializer(serializers.Serializer):
+    resourceId = serializers.IntegerField(min_value=1)
+    kind = serializers.ChoiceField(choices=ResourceMaintenanceRecord.Kind.choices)
+    title = serializers.CharField(max_length=255)
+    details = serializers.CharField(required=False, allow_blank=True)
+    provider = serializers.CharField(required=False, allow_blank=True)
+    scheduledAt = serializers.DateTimeField()
+    dueAt = serializers.DateTimeField(required=False, allow_null=True)
+    takesOffline = serializers.BooleanField(default=True)
+    cost = serializers.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+
+class ResourceMaintenanceUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=[
+            ResourceMaintenanceRecord.Status.IN_PROGRESS,
+            ResourceMaintenanceRecord.Status.COMPLETED,
+            ResourceMaintenanceRecord.Status.CANCELLED,
+        ]
+    )
+    details = serializers.CharField(required=False, allow_blank=True)
+
+
+class ConsumableStockTransactionSerializer(serializers.ModelSerializer):
+    resourceId = serializers.IntegerField(source="resource_item_id", read_only=True)
+    projectId = serializers.IntegerField(source="project_id", read_only=True)
+    quantityDelta = serializers.IntegerField(source="quantity_delta", read_only=True)
+    balanceAfter = serializers.IntegerField(source="balance_after", read_only=True)
+    unitCost = serializers.DecimalField(
+        source="unit_cost", max_digits=12, decimal_places=2, read_only=True
+    )
+    recordedById = serializers.IntegerField(source="recorded_by_id", read_only=True)
+    recordedAt = serializers.DateTimeField(source="recorded_at", read_only=True)
+    totalCost = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConsumableStockTransaction
+        fields = [
+            "id",
+            "resourceId",
+            "projectId",
+            "kind",
+            "quantityDelta",
+            "balanceAfter",
+            "unitCost",
+            "totalCost",
+            "note",
+            "recordedById",
+            "recordedAt",
+        ]
+
+    @extend_schema_field(serializers.DecimalField(max_digits=14, decimal_places=2))
+    def get_totalCost(self, obj):
+        return abs(obj.quantity_delta) * obj.unit_cost
+
+
+class ConsumableStockTransactionCreateSerializer(serializers.Serializer):
+    resourceId = serializers.IntegerField(min_value=1)
+    projectId = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    kind = serializers.ChoiceField(choices=ConsumableStockTransaction.Kind.choices)
+    quantityDelta = serializers.IntegerField()
+    unitCost = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, allow_null=True
+    )
+    note = serializers.CharField(required=False, allow_blank=True)
 
 
 class ResourceUseSubmissionCreateSerializer(serializers.Serializer):

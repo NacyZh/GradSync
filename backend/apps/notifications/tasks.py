@@ -406,6 +406,15 @@ def create_risk_review_reminders_task() -> int:
     return create_risk_review_reminders()
 
 
+@shared_task(queue="notifications")
+def reconcile_resource_operations_task() -> int:
+    from apps.resources.services import reconcile_resource_operation_alerts
+
+    updated = reconcile_resource_operation_alerts()
+    logger.info("resource_operation_scan alerts_created=%s", updated)
+    return updated
+
+
 @shared_task(
     bind=True,
     queue="notifications",
@@ -446,6 +455,10 @@ def ensure_periodic_notification_tasks() -> int:
         (
             "GradSync risk review reminders",
             "apps.notifications.tasks.create_risk_review_reminders_task",
+        ),
+        (
+            "GradSync resource operation alerts",
+            "apps.notifications.tasks.reconcile_resource_operations_task",
         ),
     ]:
         _, was_created = PeriodicTask.objects.update_or_create(

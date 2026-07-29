@@ -13,6 +13,17 @@ class IsAdministrator(BasePermission):
         )
 
 
+class IsActiveAccount(BasePermission):
+    """Only authenticated accounts in the active lifecycle state may pass."""
+
+    def has_permission(self, request, view) -> bool:
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.status == request.user.Status.ACTIVE
+        )
+
+
 class IsProjectMember(BasePermission):
     def has_permission(self, request, view) -> bool:
         project_id = (

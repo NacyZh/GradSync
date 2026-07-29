@@ -36,6 +36,14 @@ function resource(overrides: Record<string, unknown> = {}) {
     confirmationPolicyOverride: null,
     effectiveConfirmationPolicy: 'immediate',
     version: 1,
+    kind: 'equipment',
+    stockOnHand: 0,
+    reorderLevel: 0,
+    stockUnit: '',
+    unitCost: '0.00',
+    calibrationIntervalDays: null,
+    nextCalibrationAt: null,
+    lowStock: false,
     ...overrides,
   };
 }
@@ -163,5 +171,50 @@ describe('collaboration resources UI', () => {
     expect((await screen.findAllByText('Confocal microscope')).length).toBeGreaterThan(0);
     expect(await screen.findByText('Booking queue row')).toBeInTheDocument();
     expect(screen.queryByText('Use records unavailable')).not.toBeInTheDocument();
+  });
+
+  it('routes consumables through a fixed stock ledger instead of equipment booking', async () => {
+    mockFetch((url) => {
+      if (url.includes('/api/accounts/me/')) return { id: 10, global_role: 'advisor', status: 'active' };
+      if (url.endsWith('/api/resources/')) {
+        return {
+          results: [resource({
+            id: 7,
+            name: 'Nitrile gloves',
+            resourceType: 'Lab supply',
+            kind: 'consumable',
+            stockOnHand: 18,
+            reorderLevel: 20,
+            stockUnit: 'box',
+            unitCost: '42.00',
+            lowStock: true,
+          })],
+        };
+      }
+      if (url.includes('/api/consumable-transactions/')) {
+        return {
+          results: [{
+            id: 4,
+            resourceId: 7,
+            kind: 'issue',
+            quantityDelta: -2,
+            balanceAfter: 18,
+            unitCost: '42.00',
+            totalCost: '84.00',
+            note: 'Cell culture work',
+            recordedAt: '2026-07-29T08:00:00Z',
+          }],
+        };
+      }
+      if (url.includes('/resource-types')) return { results: [] };
+      return { results: [] };
+    });
+
+    renderResources();
+
+    expect(await screen.findByRole('region', { name: 'Consumable inventory' })).toBeInTheDocument();
+    expect(await screen.findByText('Cell culture work')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Booking calendar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Submit resource use' })).not.toBeInTheDocument();
   });
 });

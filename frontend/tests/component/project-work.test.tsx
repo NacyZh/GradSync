@@ -37,6 +37,44 @@ describe('project work UI', () => {
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           );
         }
+        if (String(url).includes('/api/admin/project-health/')) {
+          return new Response(JSON.stringify({
+            generatedAt: '2026-07-29T08:00:00Z',
+            windowDays: 30,
+            longBlockedDays: 7,
+            summary: {
+              activeProjects: 1,
+              overdueProjects: 1,
+              overdueProjectRate: 100,
+              longBlockedTasks: 2,
+              missingReports: 1,
+              governanceHolds: 0,
+              resourceConflicts: 3,
+              notificationFailures: 1,
+              notificationFailureRate: 20,
+            },
+            projects: [{
+              projectId: 7,
+              title: 'Graphene Lab',
+              advisorName: 'Advisor',
+              overdue: true,
+              openTaskCount: 4,
+              overdueTaskCount: 2,
+              longBlockedTaskCount: 2,
+              missingReportCount: 1,
+              governanceState: 'normal',
+              resourceConflictCount: 3,
+              notificationFailureCount: 1,
+              healthScore: 42,
+              healthLevel: 'critical',
+              actionPath: '/projects/7',
+            }],
+            blockedTasks: [],
+            missingReports: [],
+            governanceHolds: [],
+            trend: [],
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         return new Response(
           JSON.stringify({
             results: [{ id: 7, title: 'Graphene Lab', description: 'Materials study', status: 'active' }],
@@ -55,6 +93,8 @@ describe('project work UI', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Operations workspace' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Cross-project health' })).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Operations queue' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Account operations' })).toHaveAttribute('href', '/admin/accounts');
     expect(screen.getByRole('link', { name: 'Teacher access requests' })).toHaveAttribute('href', '/admin/accounts?view=requests');

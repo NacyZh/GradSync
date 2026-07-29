@@ -13,6 +13,7 @@ import { ProtectedRoute, RoleRoute } from './ProtectedRoute';
 export const routeWorkspaceBundles = {
   accountAdmin: () => import('../features/admin/AccountAdminPage'),
   auditConsole: () => import('../features/admin/AuditConsolePage'),
+  projectHealth: () => import('../features/admin/ProjectHealthPage'),
   profile: () => import('../features/auth/ProfilePage'),
   projectsLanding: () => import('../features/projects/ProjectsLandingPage'),
   projectCreate: () => import('../features/projects/ProjectCreatePage'),
@@ -30,6 +31,7 @@ export const routeWorkspaceBundles = {
 
 const AccountAdminPage = lazy(async () => ({ default: (await routeWorkspaceBundles.accountAdmin()).AccountAdminPage }));
 const AuditConsolePage = lazy(async () => ({ default: (await routeWorkspaceBundles.auditConsole()).AuditConsolePage }));
+const ProjectHealthPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectHealth()).ProjectHealthPage }));
 const ProfilePage = lazy(async () => ({ default: (await routeWorkspaceBundles.profile()).ProfilePage }));
 const ProjectsLandingPage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectsLanding()).ProjectsLandingPage }));
 const ProjectCreatePage = lazy(async () => ({ default: (await routeWorkspaceBundles.projectCreate()).ProjectCreatePage }));
@@ -104,6 +106,10 @@ export const router = createBrowserRouter([
   {
     path: '/admin/audit',
     element: rolePage(<AuditConsolePage />, 'admin'),
+  },
+  {
+    path: '/admin/health',
+    element: rolePage(<ProjectHealthPage />, 'admin'),
   },
   {
     path: '/admin/role-activations',

@@ -123,7 +123,7 @@ describe('role-aware navigation', () => {
     expect(document.documentElement.dataset.theme).toBe('dark');
   });
 
-  it('searches visible projects and navigates to the selected workspace', async () => {
+  it('uses the permission-filtered global endpoint and navigates to domain results', async () => {
     const user = userEvent.setup();
     vi.stubGlobal('fetch', vi.fn((url) => {
       if (String(url).includes('/api/accounts/me/')) {
@@ -135,9 +135,28 @@ describe('role-aware navigation', () => {
           status: 'active',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
       }
-      if (String(url).includes('/api/projects/')) {
+      if (String(url).includes('/api/search/')) {
         return Promise.resolve(new Response(JSON.stringify({
-          results: [{ id: 41, title: 'Graphene Research', description: 'Materials project', status: 'active' }],
+          query: 'graphene',
+          results: [
+            {
+              id: 'project:41',
+              type: 'project',
+              title: 'Graphene Research',
+              context: 'Active',
+              path: '/projects/41',
+              projectId: 41,
+            },
+            {
+              id: 'document:9',
+              type: 'document',
+              title: 'Graphene Protocol',
+              context: 'Protocols · Graphene Research',
+              path: '/library/documents',
+              projectId: 41,
+            },
+          ],
+          counts: { project: 1, task: 0, report: 0, paper: 0, document: 1, code: 0, member: 0 },
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
       }
       return Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -154,8 +173,13 @@ describe('role-aware navigation', () => {
 
     await screen.findByText('advisor');
     await user.type(screen.getByRole('combobox', { name: 'Search' }), 'Graphene');
-    await user.click(await screen.findByRole('option', { name: /Graphene Research/ }));
+    expect(await screen.findByRole('option', { name: /Graphene Protocol.*Document/ })).toBeInTheDocument();
+    await user.click(await screen.findByRole('option', { name: /^Graphene Research/ }));
     expect(screen.getByTestId('current-location')).toHaveTextContent('/projects/41');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/search/?q=graphene&limit=5'),
+      expect.anything(),
+    );
   });
 
   it('renders protected route content for authenticated users', async () => {
@@ -216,6 +240,7 @@ describe('role-aware navigation', () => {
     expect(Object.keys(routeWorkspaceBundles)).toEqual([
       'accountAdmin',
       'auditConsole',
+      'projectHealth',
       'profile',
       'projectsLanding',
       'projectCreate',

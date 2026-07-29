@@ -28,7 +28,15 @@ def test_advisor_archives_reopens_and_blocks_archived_writes(api_client):
     ProjectMembership.objects.create(project=project, user=student, role="student")
 
     archive_response = authenticate(api_client, advisor).post(
-        f"/api/projects/{project.id}/archive/"
+        f"/api/projects/{project.id}/archive/",
+        {
+            "cancelOpenTasks": False,
+            "closePendingReports": False,
+            "cancelOpenBookings": False,
+            "materialsReviewed": True,
+            "finalPackageConfirmed": True,
+        },
+        format="json",
     )
     assert archive_response.status_code == 200
 

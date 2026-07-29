@@ -161,6 +161,40 @@ class ProjectOwnershipTransfer(models.Model):
         ]
 
 
+class ProjectCloseoutRecord(models.Model):
+    project = models.ForeignKey(
+        ResearchProject,
+        on_delete=models.PROTECT,
+        related_name="closeout_records",
+    )
+    archive_version = models.PositiveIntegerField()
+    checklist = models.JSONField(default=dict)
+    dispositions = models.JSONField(default=dict)
+    snapshot = models.JSONField(default=dict)
+    notes = models.TextField(blank=True, max_length=4000)
+    archived_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_closeouts",
+    )
+    archived_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-archive_version"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "archive_version"],
+                name="unique_project_closeout_version",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["project", "-archived_at"],
+                name="project_closeout_time_idx",
+            )
+        ]
+
+
 class ProjectMaterial(models.Model):
     class MaterialType(models.TextChoices):
         PAPER = "paper", "Paper"

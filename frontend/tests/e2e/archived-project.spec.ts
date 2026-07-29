@@ -30,7 +30,32 @@ test('archived project validation controls are available on dashboard', async ({
     });
     await page.route('**/api/projects/1/archive/', async (route) => {
       status = 'archived';
-      await route.fulfill({ json: { id: 1, title: 'Archived validation project', status, capabilities: projectCapabilities(status) } });
+      await route.fulfill({
+        json: {
+          projectId: 1,
+          status,
+          archiveVersion: 1,
+          archivedAt: new Date().toISOString(),
+          checklist: {},
+        },
+      });
+    });
+    await page.route('**/api/projects/1/closeout/', async (route) => {
+      await route.fulfill({
+        json: {
+          projectId: 1,
+          ready: true,
+          checks: [
+            'incompleteTasks',
+            'pendingReports',
+            'pendingMaterialPermissions',
+            'unacceptedRequiredDeliverables',
+            'unreturnedResources',
+            'openBookings',
+          ].map((key) => ({ key, count: 0, severity: 'clear', sample: [] })),
+          latestCloseout: null,
+        },
+      });
     });
     await page.route('**/api/projects/1/reopen/', async (route) => {
       status = 'active';
@@ -50,9 +75,20 @@ test('archived project validation controls are available on dashboard', async ({
   await expect(page.getByRole('button', { name: 'Reopen project' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Activity' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Archive project' }).click();
-  await expect(page.getByRole('dialog', { name: 'Archive project?' })).toBeVisible();
-  await page.getByRole('dialog', { name: 'Archive project?' }).getByRole('button', { name: 'Archive project' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Project archived' }).first()).toBeVisible();
+  const closeout = page.getByRole('dialog', { name: 'Archive project?' });
+  await expect(closeout).toBeVisible();
+  for (const label of [
+    'Cancel all remaining tasks',
+    'Close pending reports as unresolved',
+    'Cancel pending and future bookings',
+  ]) {
+    const checkbox = closeout.getByRole('checkbox', { name: label });
+    if (await checkbox.count()) await checkbox.check();
+  }
+  await closeout.getByRole('checkbox', { name: 'I reviewed final material visibility and access' }).check();
+  await closeout.getByRole('checkbox', { name: 'Accepted deliverables and evidence form the final outcomes package' }).check();
+  await closeout.getByRole('button', { name: 'Complete closeout and archive' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Project closeout completed' }).first()).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Project is archived' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add task' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Reopen project' })).toBeVisible();

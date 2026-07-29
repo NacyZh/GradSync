@@ -11,14 +11,27 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.search import apply_text_search
+from apps.projects.models import ResearchProject
 
-from .models import Booking, ResourceItem, ResourceType, ResourceUseSubmission
+from .models import (
+    Booking,
+    ConsumableStockTransaction,
+    ResourceItem,
+    ResourceMaintenanceRecord,
+    ResourceType,
+    ResourceUseSubmission,
+)
 from .serializers import (
     BookingDecisionSerializer,
     BookingSerializer,
+    ConsumableStockTransactionCreateSerializer,
+    ConsumableStockTransactionSerializer,
     LaboratoryResourceSerializer,
     ResourceCreateSerializer,
     ResourceItemSerializer,
+    ResourceMaintenanceCreateSerializer,
+    ResourceMaintenanceSerializer,
+    ResourceMaintenanceUpdateSerializer,
     ResourceTypeSerializer,
     ResourceUpdateSerializer,
     ResourceUseSubmissionCreateSerializer,
@@ -29,8 +42,11 @@ from .services import (
     BookingService,
     ResourceConflict,
     ResourceInventoryService,
+    ResourceOperationsService,
     current_use_periods_by_resource,
     reconcile_completed_bookings,
+    reconcile_resource_operation_alerts,
+    record_booking_conflict,
     resource_status_from_contract,
 )
 
@@ -96,7 +112,7 @@ class ResourceItemViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def availability(self, request):
         starts_at = parse_datetime(request.query_params.get("starts_at", ""))
         ends_at = parse_datetime(request.query_params.get("ends_at", ""))
-        queryset = self.get_queryset()
+        queryset = self.get_queryset().filter(kind=ResourceItem.Kind.EQUIPMENT)
         if not starts_at or not ends_at or ends_at <= starts_at:
             raise ValidationError("Availability requires a valid starts_at and ends_at window")
         queryset = queryset.annotate(
@@ -185,6 +201,11 @@ class StandaloneBookingViewSet(viewsets.ModelViewSet):
                 resource_item=resource_item, **attrs
             )
         except ResourceConflict as exc:
+            record_booking_conflict(
+                actor=request.user,
+                resource=resource_item,
+                payload=exc.payload,
+            )
             return Response(exc.payload, status=status.HTTP_409_CONFLICT)
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc
@@ -201,6 +222,12 @@ class StandaloneBookingViewSet(viewsets.ModelViewSet):
         try:
             booking = BookingService(request.user).update_booking(booking, **attrs)
         except ResourceConflict as exc:
+            record_booking_conflict(
+                actor=request.user,
+                resource=booking.resource_item,
+                project=booking.project,
+                payload=exc.payload,
+            )
             return Response(exc.payload, status=status.HTTP_409_CONFLICT)
         except DjangoValidationError as exc:
             raise ValidationError(exc.messages) from exc
@@ -319,6 +346,7 @@ class LaboratoryResourceViewSet(
     )
     def list(self, request, *args, **kwargs):
         reconcile_completed_bookings()
+        reconcile_resource_operation_alerts()
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         resources = list(page if page is not None else queryset)
@@ -359,15 +387,19 @@ class LaboratoryResourceViewSet(
         )
         if not starts_at or not ends_at or ends_at <= starts_at:
             raise ValidationError("Availability requires a valid time window")
-        queryset = self.get_queryset().annotate(
-            reserved_quantity=Sum(
-                "bookings__quantity",
-                filter=Q(
-                    bookings__status__in=[Booking.Status.CONFIRMED, Booking.Status.RESERVED],
-                    bookings__starts_at__lt=ends_at,
-                    bookings__ends_at__gt=starts_at,
-                ),
-                default=0,
+        queryset = (
+            self.get_queryset()
+            .filter(kind=ResourceItem.Kind.EQUIPMENT)
+            .annotate(
+                reserved_quantity=Sum(
+                    "bookings__quantity",
+                    filter=Q(
+                        bookings__status__in=[Booking.Status.CONFIRMED, Booking.Status.RESERVED],
+                        bookings__starts_at__lt=ends_at,
+                        bookings__ends_at__gt=starts_at,
+                    ),
+                    default=0,
+                )
             )
         )
         resources = list(queryset)
@@ -405,6 +437,13 @@ class LaboratoryResourceViewSet(
                 confirmation_policy_override=serializer.validated_data.get(
                     "confirmationPolicyOverride"
                 ),
+                kind=serializer.validated_data.get("kind", ResourceItem.Kind.EQUIPMENT),
+                stock_on_hand=serializer.validated_data.get("stockOnHand", 0),
+                reorder_level=serializer.validated_data.get("reorderLevel", 0),
+                stock_unit=serializer.validated_data.get("stockUnit", ""),
+                unit_cost=serializer.validated_data.get("unitCost", 0),
+                calibration_interval_days=serializer.validated_data.get("calibrationIntervalDays"),
+                next_calibration_at=serializer.validated_data.get("nextCalibrationAt"),
             )
         except PermissionError as exc:
             raise PermissionDenied(str(exc)) from exc
@@ -423,6 +462,15 @@ class LaboratoryResourceViewSet(
             attrs["total_quantity"] = attrs.pop("totalQuantity")
         if "confirmationPolicyOverride" in attrs:
             attrs["confirmation_policy_override"] = attrs.pop("confirmationPolicyOverride")
+        for contract_name, model_name in {
+            "reorderLevel": "reorder_level",
+            "stockUnit": "stock_unit",
+            "unitCost": "unit_cost",
+            "calibrationIntervalDays": "calibration_interval_days",
+            "nextCalibrationAt": "next_calibration_at",
+        }.items():
+            if contract_name in attrs:
+                attrs[model_name] = attrs.pop(contract_name)
         try:
             resource = ResourceInventoryService(request.user).update_resource(resource, **attrs)
         except PermissionError as exc:
@@ -487,6 +535,144 @@ class LaboratoryResourceViewSet(
             raise ValidationError(exc.messages) from exc
         return Response(
             ResourceUseSubmissionSerializer(submission).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ResourceMaintenanceViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    permission_classes = [IsAuthenticated]
+    queryset = ResourceMaintenanceRecord.objects.select_related(
+        "resource_item",
+        "created_by",
+        "completed_by",
+    )
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return ResourceMaintenanceCreateSerializer
+        if self.action in {"partial_update", "update"}:
+            return ResourceMaintenanceUpdateSerializer
+        return ResourceMaintenanceSerializer
+
+    def get_queryset(self):
+        try:
+            ResourceInventoryService(self.request.user).require_manager()
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        queryset = self.queryset
+        resource_id = self.request.query_params.get("resourceId")
+        if resource_id:
+            queryset = queryset.filter(resource_item_id=resource_id)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        records = self.get_queryset()[:200]
+        return Response({"results": ResourceMaintenanceSerializer(records, many=True).data})
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        try:
+            record = ResourceOperationsService(request.user).create_maintenance(
+                resource=get_object_or_404(ResourceItem, pk=values["resourceId"]),
+                kind=values["kind"],
+                title=values["title"],
+                scheduled_at=values["scheduledAt"],
+                due_at=values.get("dueAt"),
+                details=values.get("details", ""),
+                provider=values.get("provider", ""),
+                takes_offline=values.get("takesOffline", True),
+                cost=values.get("cost", 0),
+            )
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", exc.messages)) from exc
+        return Response(
+            ResourceMaintenanceSerializer(record).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            record = ResourceOperationsService(request.user).transition_maintenance(
+                self.get_object(),
+                status=serializer.validated_data["status"],
+                details=serializer.validated_data.get("details"),
+            )
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", exc.messages)) from exc
+        return Response(ResourceMaintenanceSerializer(record).data)
+
+
+class ConsumableStockTransactionViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
+    permission_classes = [IsAuthenticated]
+    queryset = ConsumableStockTransaction.objects.select_related(
+        "resource_item",
+        "project",
+        "recorded_by",
+    )
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return ConsumableStockTransactionCreateSerializer
+        return ConsumableStockTransactionSerializer
+
+    def get_queryset(self):
+        try:
+            ResourceInventoryService(self.request.user).require_manager()
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        queryset = self.queryset
+        resource_id = self.request.query_params.get("resourceId")
+        if resource_id:
+            queryset = queryset.filter(resource_item_id=resource_id)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        transactions = self.get_queryset()[:200]
+        return Response(
+            {"results": ConsumableStockTransactionSerializer(transactions, many=True).data}
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        project = None
+        if values.get("projectId"):
+            project = get_object_or_404(ResearchProject, pk=values["projectId"])
+        try:
+            transaction_record = ResourceOperationsService(request.user).record_stock_transaction(
+                resource=get_object_or_404(ResourceItem, pk=values["resourceId"]),
+                project=project,
+                kind=values["kind"],
+                quantity_delta=values["quantityDelta"],
+                unit_cost=values.get("unitCost"),
+                note=values.get("note", ""),
+            )
+        except PermissionError as exc:
+            raise PermissionDenied(str(exc)) from exc
+        except ResourceConflict as exc:
+            return Response(exc.payload, status=status.HTTP_409_CONFLICT)
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", exc.messages)) from exc
+        return Response(
+            ConsumableStockTransactionSerializer(transaction_record).data,
             status=status.HTTP_201_CREATED,
         )
 

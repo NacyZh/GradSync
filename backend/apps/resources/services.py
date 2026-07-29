@@ -1,6 +1,10 @@
+from datetime import timedelta
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import transaction
-from django.db.models import Sum
+from django.db import models, transaction
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -8,13 +12,35 @@ from apps.audit.services import record_event
 from apps.notifications.models import Notification
 from apps.notifications.services import enqueue_notification
 
-from .models import Booking, ResourceItem, ResourceType, ResourceUseSubmission
+from .models import (
+    Booking,
+    ConsumableStockTransaction,
+    ResourceItem,
+    ResourceMaintenanceRecord,
+    ResourceType,
+    ResourceUseSubmission,
+)
 
 
 class ResourceConflict(ValidationError):
     def __init__(self, payload):
         self.payload = payload
         super().__init__(payload.get("detail") or payload.get("code") or "Resource conflict")
+
+
+def record_booking_conflict(*, actor, resource, payload, project=None):
+    record_event(
+        project,
+        actor,
+        "booking.resource_conflict",
+        f"Booking conflict for resource {resource.id}",
+        resource,
+        target_snapshot={
+            "resourceId": resource.id,
+            "outcome": "resource_conflict",
+            **payload,
+        },
+    )
 
 
 def _is_resource_manager(user) -> bool:
@@ -110,6 +136,78 @@ def current_use_periods_by_resource(resource_ids, now=None, *, limit_per_resourc
     return grouped
 
 
+def _resource_notification_recipients(resource):
+    if resource.manager_id:
+        return [resource.manager]
+    return list(
+        get_user_model().objects.filter(
+            global_role="admin",
+            status="active",
+        )
+    )
+
+
+def reconcile_resource_operation_alerts(today=None) -> int:
+    today = today or timezone.localdate()
+    now = timezone.now()
+    alerted = 0
+    scheduled_outages = ResourceMaintenanceRecord.objects.filter(
+        resource_item_id=models.OuterRef("pk"),
+        takes_offline=True,
+        status__in=[
+            ResourceMaintenanceRecord.Status.SCHEDULED,
+            ResourceMaintenanceRecord.Status.IN_PROGRESS,
+        ],
+    ).filter(
+        Q(status=ResourceMaintenanceRecord.Status.IN_PROGRESS)
+        | Q(kind=ResourceMaintenanceRecord.Kind.FAULT)
+        | Q(scheduled_at__lte=now)
+    )
+    ResourceItem.objects.filter(
+        kind=ResourceItem.Kind.EQUIPMENT,
+        status=ResourceItem.Status.AVAILABLE,
+    ).filter(models.Exists(scheduled_outages)).update(
+        status=ResourceItem.Status.UNAVAILABLE,
+        version=models.F("version") + 1,
+    )
+    resources = (
+        ResourceItem.objects.select_related("manager")
+        .filter(
+            kind=ResourceItem.Kind.EQUIPMENT,
+            next_calibration_at__lte=today,
+        )
+        .exclude(status=ResourceItem.Status.RETIRED)
+    )
+    for resource in resources:
+        if resource.status == ResourceItem.Status.AVAILABLE:
+            resource.status = ResourceItem.Status.UNAVAILABLE
+            resource.version += 1
+            resource.save(update_fields=["status", "version", "updated_at"])
+        for recipient in _resource_notification_recipients(resource):
+            dedupe_subject = (
+                f"Calibration overdue: {resource.name} ({resource.next_calibration_at})"
+            )
+            if Notification.objects.filter(
+                recipient=recipient,
+                event_type=Notification.EventType.RESOURCE_MAINTENANCE_DUE,
+                target_type="ResourceItem",
+                target_id=str(resource.id),
+                subject=dedupe_subject,
+            ).exists():
+                continue
+            enqueue_notification(
+                recipient=recipient,
+                event_type=Notification.EventType.RESOURCE_MAINTENANCE_DUE,
+                target_type="ResourceItem",
+                target_id=str(resource.id),
+                subject=dedupe_subject,
+                action_path="/resources",
+                category=Notification.Category.ADMINISTRATION,
+            )
+            alerted += 1
+    return alerted
+
+
 class ResourceInventoryService:
     def __init__(self, user):
         self.user = user
@@ -134,6 +232,13 @@ class ResourceInventoryService:
         use_instructions: str = "",
         status: str = "active",
         confirmation_policy_override: str | None = None,
+        kind: str = ResourceItem.Kind.EQUIPMENT,
+        stock_on_hand: int = 0,
+        reorder_level: int = 0,
+        stock_unit: str = "",
+        unit_cost: Decimal = Decimal("0"),
+        calibration_interval_days: int | None = None,
+        next_calibration_at=None,
     ) -> ResourceItem:
         self.require_manager()
         if not name.strip() or not resource_type.strip():
@@ -154,8 +259,43 @@ class ResourceInventoryService:
             status=resource_status_from_contract(status),
             confirmation_policy_override=confirmation_policy_override,
             manager=self.user,
+            kind=kind,
+            stock_on_hand=stock_on_hand,
+            reorder_level=reorder_level,
+            stock_unit=stock_unit.strip(),
+            unit_cost=unit_cost,
+            calibration_interval_days=calibration_interval_days,
+            next_calibration_at=next_calibration_at,
         )
         resource.full_clean()
+        if resource.kind == ResourceItem.Kind.CONSUMABLE and resource.stock_on_hand:
+            ConsumableStockTransaction.objects.create(
+                resource_item=resource,
+                kind=ConsumableStockTransaction.Kind.ADJUSTMENT,
+                quantity_delta=resource.stock_on_hand,
+                balance_after=resource.stock_on_hand,
+                unit_cost=resource.unit_cost,
+                note="Opening balance",
+                recorded_by=self.user,
+            )
+        if (
+            resource.kind == ResourceItem.Kind.CONSUMABLE
+            and resource.stock_on_hand <= resource.reorder_level
+        ):
+            for recipient in _resource_notification_recipients(resource):
+                enqueue_notification(
+                    recipient=recipient,
+                    sender=self.user,
+                    event_type=Notification.EventType.RESOURCE_LOW_STOCK,
+                    target_type="ResourceItem",
+                    target_id=str(resource.id),
+                    subject=(
+                        f"Low stock: {resource.name} "
+                        f"({resource.stock_on_hand} {resource.stock_unit})"
+                    ),
+                    action_path="/resources",
+                    category=Notification.Category.ADMINISTRATION,
+                )
         record_event(
             None, self.user, "resource.created", f"Created resource {resource.id}", resource
         )
@@ -214,6 +354,33 @@ class ResourceInventoryService:
             if override not in {None, *ResourceType.ConfirmationPolicy.values}:
                 raise ValidationError({"confirmationPolicyOverride": "Unsupported policy"})
             resource.confirmation_policy_override = override
+        requested_kind = attrs.get("kind")
+        if requested_kind and requested_kind != resource.kind:
+            has_history = (
+                resource.bookings.exists()
+                or resource.use_submissions.exists()
+                or resource.maintenance_records.exists()
+                or resource.stock_transactions.exists()
+            )
+            if has_history:
+                raise ResourceConflict(
+                    {
+                        "code": "resource_kind_has_history",
+                        "detail": "Resource class cannot change after operational history exists",
+                    }
+                )
+        for field in (
+            "kind",
+            "reorder_level",
+            "unit_cost",
+        ):
+            if field in attrs and attrs[field] is not None:
+                setattr(resource, field, attrs[field])
+        for field in ("calibration_interval_days", "next_calibration_at"):
+            if field in attrs:
+                setattr(resource, field, attrs[field])
+        if "stock_unit" in attrs and attrs["stock_unit"] is not None:
+            resource.stock_unit = attrs["stock_unit"].strip()
         resource.manager = resource.manager or self.user
         resource.version += 1
         resource.full_clean()
@@ -261,6 +428,8 @@ class ResourceInventoryService:
         dependency_counts = {
             "bookings": resource.bookings.count(),
             "useSubmissions": resource.use_submissions.count(),
+            "maintenanceRecords": resource.maintenance_records.count(),
+            "stockTransactions": resource.stock_transactions.count(),
         }
         snapshot = {
             "resourceId": resource.pk,
@@ -304,6 +473,8 @@ class ResourceInventoryService:
         details: str,
     ) -> ResourceUseSubmission:
         self.require_student()
+        if resource.kind == ResourceItem.Kind.CONSUMABLE:
+            raise ValidationError("Consumables must be issued from stock")
         if resource.status == ResourceItem.Status.RETIRED:
             raise ValidationError("Retired resources cannot receive new use submissions")
         if submission_type not in ResourceUseSubmission.SubmissionType.values:
@@ -362,6 +533,235 @@ class ResourceInventoryService:
         return submission
 
 
+class ResourceOperationsService:
+    def __init__(self, user):
+        self.user = user
+
+    def _require_manager(self):
+        if not _is_resource_manager(self.user):
+            raise PermissionError("Only teachers and administrators can manage resource operations")
+
+    @transaction.atomic
+    def create_maintenance(
+        self,
+        *,
+        resource,
+        kind,
+        title,
+        scheduled_at,
+        due_at=None,
+        details="",
+        provider="",
+        takes_offline=True,
+        cost=Decimal("0"),
+    ):
+        self._require_manager()
+        resource = ResourceItem.objects.select_for_update().get(pk=resource.pk)
+        if resource.kind != ResourceItem.Kind.EQUIPMENT:
+            raise ValidationError("Maintenance records apply only to equipment")
+        if not title.strip():
+            raise ValidationError({"title": "Maintenance title is required"})
+        if due_at and due_at < scheduled_at:
+            raise ValidationError({"dueAt": "Maintenance due time cannot precede its start"})
+        record = ResourceMaintenanceRecord.objects.create(
+            resource_item=resource,
+            kind=kind,
+            title=title.strip(),
+            scheduled_at=scheduled_at,
+            due_at=due_at,
+            details=details.strip(),
+            provider=provider.strip(),
+            takes_offline=takes_offline,
+            cost=cost,
+            created_by=self.user,
+        )
+        if takes_offline and (
+            kind == ResourceMaintenanceRecord.Kind.FAULT or scheduled_at <= timezone.now()
+        ):
+            ResourceItem.objects.filter(
+                pk=resource.pk,
+            ).exclude(status=ResourceItem.Status.RETIRED).update(
+                status=ResourceItem.Status.UNAVAILABLE,
+                version=models.F("version") + 1,
+            )
+        record_event(
+            None,
+            self.user,
+            "resource.maintenance_created",
+            f"Created maintenance record {record.id}",
+            record,
+        )
+        return record
+
+    @transaction.atomic
+    def transition_maintenance(self, record, *, status, details=None):
+        self._require_manager()
+        record = (
+            ResourceMaintenanceRecord.objects.select_for_update()
+            .select_related("resource_item")
+            .get(pk=record.pk)
+        )
+        if record.status in {
+            ResourceMaintenanceRecord.Status.COMPLETED,
+            ResourceMaintenanceRecord.Status.CANCELLED,
+        }:
+            raise ValidationError("Closed maintenance records are immutable")
+        if status not in {
+            ResourceMaintenanceRecord.Status.IN_PROGRESS,
+            ResourceMaintenanceRecord.Status.COMPLETED,
+            ResourceMaintenanceRecord.Status.CANCELLED,
+        }:
+            raise ValidationError("Unsupported maintenance transition")
+        record.status = status
+        if details is not None:
+            record.details = details.strip()
+        if status == ResourceMaintenanceRecord.Status.COMPLETED:
+            record.completed_at = timezone.now()
+            record.completed_by = self.user
+            resource = record.resource_item
+            if (
+                record.kind == ResourceMaintenanceRecord.Kind.CALIBRATION
+                and resource.calibration_interval_days
+            ):
+                resource.next_calibration_at = timezone.localdate() + timedelta(
+                    days=resource.calibration_interval_days
+                )
+            other_outages = (
+                resource.maintenance_records.filter(
+                    takes_offline=True,
+                    status__in=[
+                        ResourceMaintenanceRecord.Status.SCHEDULED,
+                        ResourceMaintenanceRecord.Status.IN_PROGRESS,
+                    ],
+                )
+                .exclude(pk=record.pk)
+                .filter(
+                    Q(status=ResourceMaintenanceRecord.Status.IN_PROGRESS)
+                    | Q(kind=ResourceMaintenanceRecord.Kind.FAULT)
+                    | Q(scheduled_at__lte=timezone.now())
+                )
+            )
+            if not other_outages.exists() and resource.status != ResourceItem.Status.RETIRED:
+                resource.status = ResourceItem.Status.AVAILABLE
+            resource.version += 1
+            resource.save()
+        elif status == ResourceMaintenanceRecord.Status.IN_PROGRESS and record.takes_offline:
+            ResourceItem.objects.filter(pk=record.resource_item_id).exclude(
+                status=ResourceItem.Status.RETIRED
+            ).update(
+                status=ResourceItem.Status.UNAVAILABLE,
+                version=models.F("version") + 1,
+            )
+        elif status == ResourceMaintenanceRecord.Status.CANCELLED and record.takes_offline:
+            resource = ResourceItem.objects.select_for_update().get(pk=record.resource_item_id)
+            other_outages = (
+                resource.maintenance_records.filter(
+                    takes_offline=True,
+                    status__in=[
+                        ResourceMaintenanceRecord.Status.SCHEDULED,
+                        ResourceMaintenanceRecord.Status.IN_PROGRESS,
+                    ],
+                )
+                .exclude(pk=record.pk)
+                .filter(
+                    Q(status=ResourceMaintenanceRecord.Status.IN_PROGRESS)
+                    | Q(kind=ResourceMaintenanceRecord.Kind.FAULT)
+                    | Q(scheduled_at__lte=timezone.now())
+                )
+            )
+            if not other_outages.exists() and resource.status != ResourceItem.Status.RETIRED:
+                resource.status = ResourceItem.Status.AVAILABLE
+                resource.version += 1
+                resource.save(update_fields=["status", "version", "updated_at"])
+        record.save()
+        record_event(
+            None,
+            self.user,
+            f"resource.maintenance_{status}",
+            f"Maintenance record {record.id} changed to {status}",
+            record,
+        )
+        return record
+
+    @transaction.atomic
+    def record_stock_transaction(
+        self,
+        *,
+        resource,
+        kind,
+        quantity_delta,
+        project=None,
+        unit_cost=None,
+        note="",
+    ):
+        self._require_manager()
+        if (
+            project is not None
+            and getattr(self.user, "global_role", "") != "admin"
+            and not project.memberships.filter(user=self.user, status="active").exists()
+        ):
+            raise PermissionError("Stock costs can only be assigned to a managed project")
+        resource = (
+            ResourceItem.objects.select_for_update().select_related("manager").get(pk=resource.pk)
+        )
+        if resource.kind != ResourceItem.Kind.CONSUMABLE:
+            raise ValidationError("Stock transactions apply only to consumables")
+        if quantity_delta == 0:
+            raise ValidationError({"quantityDelta": "Quantity change cannot be zero"})
+        if kind == ConsumableStockTransaction.Kind.RECEIPT and quantity_delta < 0:
+            raise ValidationError("Receipts must increase stock")
+        if kind == ConsumableStockTransaction.Kind.ISSUE and quantity_delta > 0:
+            raise ValidationError("Issues must decrease stock")
+        new_balance = resource.stock_on_hand + quantity_delta
+        if new_balance < 0:
+            raise ResourceConflict(
+                {
+                    "code": "insufficient_consumable_stock",
+                    "availableQuantity": resource.stock_on_hand,
+                    "requestedQuantity": abs(quantity_delta),
+                }
+            )
+        prior_balance = resource.stock_on_hand
+        resource.stock_on_hand = new_balance
+        resource.version += 1
+        resource.save(update_fields=["stock_on_hand", "version", "updated_at"])
+        transaction_record = ConsumableStockTransaction.objects.create(
+            resource_item=resource,
+            project=project,
+            kind=kind,
+            quantity_delta=quantity_delta,
+            balance_after=new_balance,
+            unit_cost=resource.unit_cost if unit_cost is None else unit_cost,
+            note=note.strip(),
+            recorded_by=self.user,
+        )
+        record_event(
+            project,
+            self.user,
+            "resource.stock_recorded",
+            f"Recorded stock transaction {transaction_record.id}",
+            transaction_record,
+            target_snapshot={
+                "resourceId": resource.id,
+                "quantityDelta": quantity_delta,
+                "balanceAfter": new_balance,
+            },
+        )
+        if prior_balance > resource.reorder_level and new_balance <= resource.reorder_level:
+            for recipient in _resource_notification_recipients(resource):
+                enqueue_notification(
+                    recipient=recipient,
+                    sender=self.user,
+                    event_type=Notification.EventType.RESOURCE_LOW_STOCK,
+                    target_type="ResourceItem",
+                    target_id=str(resource.id),
+                    subject=f"Low stock: {resource.name} ({new_balance} {resource.stock_unit})",
+                    action_path="/resources",
+                    category=Notification.Category.ADMINISTRATION,
+                )
+        return transaction_record
+
+
 class BookingService:
     def __init__(self, user, project=None):
         self.user = user
@@ -408,11 +808,43 @@ class BookingService:
 
     def _assert_capacity(self, resource_item, starts_at, ends_at, quantity, exclude=None):
         resource_item = ResourceItem.objects.select_for_update().get(pk=resource_item.pk)
+        if resource_item.kind == ResourceItem.Kind.CONSUMABLE:
+            raise ResourceConflict(
+                {
+                    "code": "consumable_not_bookable",
+                    "detail": "Consumables are issued from stock and cannot be booked",
+                }
+            )
         if resource_item.status != ResourceItem.Status.AVAILABLE:
             raise ResourceConflict(
                 {
                     "code": "resource_unusable",
                     "detail": "Resource is not available for new use",
+                }
+            )
+        if (
+            resource_item.next_calibration_at
+            and resource_item.next_calibration_at <= starts_at.date()
+        ):
+            raise ResourceConflict(
+                {
+                    "code": "calibration_due",
+                    "detail": "Resource calibration is due before this booking",
+                }
+            )
+        maintenance_conflict = resource_item.maintenance_records.filter(
+            takes_offline=True,
+            status__in=[
+                ResourceMaintenanceRecord.Status.SCHEDULED,
+                ResourceMaintenanceRecord.Status.IN_PROGRESS,
+            ],
+            scheduled_at__lt=ends_at,
+        ).filter(Q(due_at__isnull=True) | Q(due_at__gt=starts_at))
+        if maintenance_conflict.exists():
+            raise ResourceConflict(
+                {
+                    "code": "resource_maintenance_conflict",
+                    "detail": "Resource is unavailable during scheduled maintenance",
                 }
             )
         if quantity > resource_item.total_quantity:
@@ -464,8 +896,10 @@ class BookingService:
             if is_student and policy == ResourceType.ConfirmationPolicy.APPROVAL_REQUIRED
             else Booking.Status.CONFIRMED
         )
-        origin = Booking.Origin.STUDENT_REQUEST if is_student else (
-            Booking.Origin.STAFF_DIRECT if is_manager else Booking.Origin.LEGACY_BOOKING
+        origin = (
+            Booking.Origin.STUDENT_REQUEST
+            if is_student
+            else (Booking.Origin.STAFF_DIRECT if is_manager else Booking.Origin.LEGACY_BOOKING)
         )
         self._assert_capacity(resource_item, starts_at, ends_at, quantity)
         booking = Booking.objects.create(
@@ -655,7 +1089,7 @@ class BookingService:
                 else "duplicate_decision"
             )
             record_event(
-                None,
+                fresh_booking.project,
                 self.user,
                 event_type,
                 f"Decision conflict for booking {fresh_booking.id}",

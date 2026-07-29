@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Archive, BookOpenCheck, CalendarDays, Flag, PackageCheck, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, BookOpenCheck, CalendarDays, Download, Flag, PackageCheck, RotateCcw, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Button } from '@/shared/ui/primitives/button';
@@ -20,8 +20,9 @@ import { TaskStatusControl } from '../tasks/TaskStatusControl';
 import { TaskTree, type TaskNode } from '../tasks/TaskTree';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
 import { ProjectCollaboratorsPanel } from './ProjectCollaboratorsPanel';
+import { ProjectCloseoutDialog } from './ProjectCloseoutDialog';
 import { ProjectNotificationPolicy } from './ProjectNotificationPolicy';
-import { archiveProject, deleteProject, getProject, reopenProject, type Project } from './api';
+import { deleteProject, downloadProjectExport, getProject, reopenProject, type Project } from './api';
 import { useProjectLiveRefresh } from './useProjectLiveRefresh';
 import { getExecutionSummary } from './executionApi';
 
@@ -32,6 +33,7 @@ export function ProjectDashboardPage() {
   const queryClient = useQueryClient();
   const { confirm, notify } = useAppFeedback();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [closeoutOpen, setCloseoutOpen] = useState(false);
   const projectQuery = useQuery({ queryKey: ['project', projectId], queryFn: () => getProject(projectId), enabled: Boolean(projectId) });
   const executionSummaryQuery = useQuery({
     queryKey: ['project-execution', projectId],
@@ -39,12 +41,9 @@ export function ProjectDashboardPage() {
     enabled: Boolean(projectId),
   });
   const liveRefresh = useProjectLiveRefresh(projectId, projectQuery.data?.latestEventId);
-  const archiveMutation = useMutation({
-    mutationFn: () => archiveProject(projectId),
-    onSuccess: () => {
-      notify('Project archived', 'success');
-      projectQuery.refetch();
-    },
+  const exportMutation = useMutation({
+    mutationFn: () => downloadProjectExport(projectId),
+    onSuccess: () => notify(translateUiText('Project export downloaded', locale), 'success'),
     onError: (error) => notify(error.message, 'error'),
   });
   const reopenMutation = useMutation({
@@ -63,15 +62,6 @@ export function ProjectDashboardPage() {
     },
     onError: (error) => notify(error.message, 'error'),
   });
-  async function onArchive() {
-    const ok = await confirm({
-      title: 'Archive project?',
-      message: 'Archiving makes tasks, submissions, comments, bookings, and reminders read-only until reopened.',
-      actionLabel: 'Archive project',
-    });
-    if (ok) archiveMutation.mutate();
-  }
-
   async function onDelete() {
     const ok = await confirm({
       title: 'Delete project?',
@@ -147,9 +137,15 @@ export function ProjectDashboardPage() {
           </div>
           <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end" aria-label="Project actions">
             {capabilities.canArchiveProject ? (
-              <Button variant="destructive" type="button" onClick={onArchive} disabled={archiveMutation.isPending}>
+              <Button variant="destructive" type="button" onClick={() => setCloseoutOpen(true)}>
                 <Archive className="h-4 w-4" aria-hidden="true" />
                 Archive project
+              </Button>
+            ) : null}
+            {capabilities.canManageProject || capabilities.canSuperviseGovernance ? (
+              <Button variant="outline" type="button" onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending}>
+                <Download className="h-4 w-4" aria-hidden="true" />
+                {translateUiText('Export project', locale)}
               </Button>
             ) : null}
             {capabilities.canReopenProject ? (
@@ -183,6 +179,14 @@ export function ProjectDashboardPage() {
       {liveRefresh.state === 'stale' ? (
         <DataState state="warning" title="Project data may be stale" message="Last successful project data is still visible while live refresh retries." />
       ) : null}
+      <ProjectCloseoutDialog
+        projectId={projectId}
+        open={closeoutOpen}
+        onOpenChange={setCloseoutOpen}
+        onArchived={async () => {
+          await projectQuery.refetch();
+        }}
+      />
       {archived ? (
         <DataState
           state="warning"

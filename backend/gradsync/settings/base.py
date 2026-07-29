@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "apps.library",
     "apps.repositories",
     "apps.operations",
+    "apps.search",
     "apps.notifications",
     "apps.audit",
     "apps.schedules",
