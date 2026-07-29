@@ -71,7 +71,6 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/admin/project-health/', async (route) => {
     await route.fulfill({ json: healthSnapshot });
   });
-  await loginAs(page, adminUser.email);
 });
 
 for (const viewport of [

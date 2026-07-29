@@ -24,11 +24,41 @@ test.beforeEach(async ({ page }) => {
         id: 7,
         name: 'Confocal microscope',
         resourceType: 'Microscope',
+        kind: 'equipment',
+        totalQuantity: 1,
+        availableQuantity: 1,
         description: 'Shared imaging station',
         status: 'active',
         useInstructions: 'Submit request first.',
+        effectiveConfirmationPolicy: 'approval_required',
+        version: 1,
       }],
     });
+  });
+  await page.route('**/api/resource-types/', async (route) => {
+    await fulfillJson(route, {
+      results: [{
+        id: 1,
+        name: 'Microscope',
+        confirmationPolicy: 'approval_required',
+        fieldSchema: [],
+      }],
+    });
+  });
+  await page.route('**/api/resources/availability/**', async (route) => {
+    await fulfillJson(route, {
+      results: [{
+        id: 7,
+        name: 'Confocal microscope',
+        totalQuantity: 1,
+        availableQuantity: 1,
+        allocatedQuantity: 0,
+        status: 'available',
+      }],
+    });
+  });
+  await page.route('**/api/resource-maintenance/**', async (route) => {
+    await fulfillJson(route, { results: [] });
   });
   await page.route('**/api/bookings**', async (route) => {
     const url = new URL(route.request().url());
@@ -96,11 +126,12 @@ test('resource inventory and use submissions are role separated', async ({ page 
   await expect(page.getByRole('region', { name: 'Resource use submissions' })).toContainText('Image samples');
 
   await page.getByRole('button', { name: 'Create resource' }).click();
-  await expect(page.getByRole('dialog', { name: 'Create resource' })).toBeVisible();
-  await page.getByLabel('Resource name').fill('New microscope');
-  await page.getByRole('textbox', { name: 'Resource type' }).fill('Microscope');
-  await page.getByRole('button', { name: 'Create resource' }).click();
-  await expect(page.getByRole('dialog', { name: 'Create resource' })).toHaveCount(0);
+  const createDialog = page.getByRole('dialog', { name: 'Create resource' });
+  await expect(createDialog).toBeVisible();
+  await createDialog.getByLabel('Resource name').fill('New microscope');
+  await createDialog.getByRole('textbox', { name: 'Resource type' }).fill('Microscope');
+  await createDialog.getByRole('button', { name: 'Create resource' }).click();
+  await expect(createDialog).toHaveCount(0);
 
   await useForm.getByLabel('Start').fill('2099-01-02T09:00');
   await useForm.getByLabel('End').fill('2099-01-02T10:00');

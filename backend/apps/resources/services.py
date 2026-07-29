@@ -701,9 +701,7 @@ class ResourceOperationsService:
             and not project.memberships.filter(user=self.user, status="active").exists()
         ):
             raise PermissionError("Stock costs can only be assigned to a managed project")
-        resource = (
-            ResourceItem.objects.select_for_update().select_related("manager").get(pk=resource.pk)
-        )
+        resource = ResourceItem.objects.select_for_update().get(pk=resource.pk)
         if resource.kind != ResourceItem.Kind.CONSUMABLE:
             raise ValidationError("Stock transactions apply only to consumables")
         if quantity_delta == 0:
