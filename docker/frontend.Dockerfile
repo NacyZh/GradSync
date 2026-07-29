@@ -2,9 +2,19 @@ FROM node:22-slim AS build
 
 WORKDIR /app/frontend
 
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
+ARG NPM_CONFIG_FETCH_RETRIES=2
+ARG NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=5000
+ARG NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=30000
+ARG NPM_CONFIG_FETCH_TIMEOUT=120000
+ARG NPM_CONFIG_MAXSOCKETS=8
+ARG NPM_CI_TIMEOUT_SECONDS=600
+
 COPY frontend/package.json frontend/package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit --no-fund
+RUN --mount=type=cache,id=gradsync-frontend-npm,target=/root/.npm \
+    echo "Using npm registry: $(npm config get registry)" && \
+    timeout "${NPM_CI_TIMEOUT_SECONDS}s" \
+    npm ci --prefer-offline --no-audit --no-fund --loglevel=http
 
 COPY frontend/ ./
 ARG VITE_API_BASE_URL=""

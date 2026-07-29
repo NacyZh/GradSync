@@ -76,6 +76,14 @@ services:
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: ${GRADSYNC_NPM_REGISTRY:-https://registry.npmjs.org}
+        NPM_CONFIG_FETCH_RETRIES: ${GRADSYNC_NPM_FETCH_RETRIES:-2}
+        NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: ${GRADSYNC_NPM_FETCH_RETRY_MINTIMEOUT_MS:-5000}
+        NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: ${GRADSYNC_NPM_FETCH_RETRY_MAXTIMEOUT_MS:-30000}
+        NPM_CONFIG_FETCH_TIMEOUT: ${GRADSYNC_NPM_FETCH_TIMEOUT_MS:-120000}
+        NPM_CONFIG_MAXSOCKETS: ${GRADSYNC_NPM_MAXSOCKETS:-8}
+        NPM_CI_TIMEOUT_SECONDS: ${GRADSYNC_NPM_CI_TIMEOUT_SECONDS:-600}
     env_file:
       - path: .env.production.example
       - path: .env.production

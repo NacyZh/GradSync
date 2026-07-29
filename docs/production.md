@@ -70,7 +70,8 @@ The deploy script performs:
    `GRADSYNC_BUILDER_CACHE_MAX_AGE` (default `168h`) when
    `GRADSYNC_PRUNE_BUILDER_CACHE=true`, preserving recent npm and pip layers.
 6. Build the backend and frontend images serially, pruning builder cache after
-   each image build to release build state on 1 GB hosts.
+   each image build to release build state on 1 GB hosts. The frontend npm
+   cache uses a stable BuildKit cache ID across release revisions.
 7. Prune dangling images when `GRADSYNC_PRUNE_DANGLING_IMAGES=true`.
 8. Start PostgreSQL and Redis one at a time and wait for health checks.
 9. Run migrations.
@@ -86,6 +87,32 @@ The deploy script performs:
 The deployment script intentionally does not flush Linux page cache. Avoid
 `sync; echo 3 > /proc/sys/vm/drop_caches` during deploys; it removes useful
 filesystem cache and can increase I/O pressure on a small VPS.
+
+### Frontend dependency downloads
+
+The production frontend image bounds npm registry retries, request timeouts,
+socket concurrency, and the complete `npm ci` step. Defaults are:
+
+```dotenv
+GRADSYNC_NPM_REGISTRY=https://registry.npmjs.org
+GRADSYNC_NPM_FETCH_RETRIES=2
+GRADSYNC_NPM_FETCH_RETRY_MINTIMEOUT_MS=5000
+GRADSYNC_NPM_FETCH_RETRY_MAXTIMEOUT_MS=30000
+GRADSYNC_NPM_FETCH_TIMEOUT_MS=120000
+GRADSYNC_NPM_MAXSOCKETS=8
+GRADSYNC_NPM_CI_TIMEOUT_SECONDS=600
+```
+
+If the production host cannot reliably reach the official npm registry, set
+`GRADSYNC_NPM_REGISTRY` in the protected `PRODUCTION_ENV_FILE` to an
+organization-approved registry proxy or regional mirror. Do not disable TLS or
+package-lock integrity checks. A timed-out install now exits the image build
+instead of consuming the complete deployment-job timeout. HTTP fetch lines in
+the Docker build output identify the package or registry that stalled.
+
+After changing these values, rerun the deployment. The package-lock layer and
+the persistent `gradsync-frontend-npm` BuildKit cache allow subsequent builds
+to reuse downloaded archives.
 
 ## Research Execution Limits
 
