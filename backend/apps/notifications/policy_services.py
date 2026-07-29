@@ -95,9 +95,8 @@ def email_enabled_for(user, category: str) -> bool:
     return preference.email_enabled if preference else True
 
 
-def quiet_hours_eligible_at(user, candidate=None):
+def quiet_hours_eligible_at_for_profile(profile, candidate=None):
     candidate = candidate or timezone.now()
-    profile = preference_profile_for(user)
     if not profile.quiet_hours_enabled:
         return candidate
     zone = ZoneInfo(profile.timezone_name)
@@ -119,6 +118,10 @@ def quiet_hours_eligible_at(user, candidate=None):
         end_date += timedelta(days=1)
     local_end = datetime.combine(end_date, end, tzinfo=zone)
     return local_end.astimezone(UTC)
+
+
+def quiet_hours_eligible_at(user, candidate=None):
+    return quiet_hours_eligible_at_for_profile(preference_profile_for(user), candidate)
 
 
 def _default_policy_values():

@@ -172,13 +172,13 @@ def reresolve_audience(item, *, resolved_at=None):
         project_id__in=project_ids,
         status=ProjectMembership.Status.ACTIVE,
         user__status="active",
-    )
-    for membership in memberships:
-        if membership.user_id == item.owner_id:
+    ).values_list("user_id", "project_id")
+    for user_id, project_id in memberships:
+        if user_id == item.owner_id:
             continue
-        entry = evidence.setdefault(membership.user_id, {"types": set(), "projects": set()})
+        entry = evidence.setdefault(user_id, {"types": set(), "projects": set()})
         entry["types"].add("project")
-        entry["projects"].add(membership.project_id)
+        entry["projects"].add(project_id)
     for account_id in account_ids:
         if account_id == item.owner_id:
             continue
@@ -187,32 +187,46 @@ def reresolve_audience(item, *, resolved_at=None):
 
     open_grants = {
         grant.recipient_id: grant
-        for grant in item.recipient_grants.select_for_update().filter(valid_until__isnull=True)
+        for grant in item.recipient_grants.select_for_update()
+        .select_related("recipient")
+        .filter(valid_until__isnull=True)
     }
     removed = []
+    changed = []
     for recipient_id, grant in open_grants.items():
         if recipient_id not in evidence:
             grant.valid_until = max(now, grant.valid_from + timezone.timedelta(microseconds=1))
-            grant.save(update_fields=["valid_until", "resolved_at"])
+            grant.resolved_at = now
+            changed.append(grant)
             removed.append(grant.recipient)
-    added = 0
+    additions = []
     for recipient_id, entry in evidence.items():
         grant = open_grants.get(recipient_id)
         if grant is None:
-            ScheduleRecipientGrant.objects.create(
-                schedule_item=item,
-                recipient_id=recipient_id,
-                valid_from=now,
-                source_types=sorted(entry["types"]),
-                source_project_ids=sorted(entry["projects"]),
+            additions.append(
+                ScheduleRecipientGrant(
+                    schedule_item=item,
+                    recipient_id=recipient_id,
+                    valid_from=now,
+                    source_types=sorted(entry["types"]),
+                    source_project_ids=sorted(entry["projects"]),
+                    resolved_at=now,
+                )
             )
-            added += 1
         else:
             grant.source_types = sorted(entry["types"])
             grant.source_project_ids = sorted(entry["projects"])
-            grant.save(update_fields=["source_types", "source_project_ids", "resolved_at"])
+            grant.resolved_at = now
+            changed.append(grant)
+    if changed:
+        ScheduleRecipientGrant.objects.bulk_update(
+            changed,
+            ["valid_until", "source_types", "source_project_ids", "resolved_at"],
+        )
+    if additions:
+        ScheduleRecipientGrant.objects.bulk_create(additions)
     if removed:
         from .reminder_services import dispatch_group_event
 
         dispatch_group_event(item, actor=item.owner, event_type="removed", recipients=removed)
-    return {"added": added, "removed": len(removed), "active": len(evidence)}
+    return {"added": len(additions), "removed": len(removed), "active": len(evidence)}

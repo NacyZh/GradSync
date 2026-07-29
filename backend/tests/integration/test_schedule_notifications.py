@@ -2,6 +2,8 @@ import pytest
 from django.core import mail
 from django.utils import timezone
 
+from apps.notifications.models import Notification, NotificationDeliveryAttempt
+from apps.notifications.policy_services import preference_profile_for
 from apps.notifications.tasks import deliver_due_notifications
 from apps.projects.models import ProjectMembership
 from apps.schedules.models import ScheduleReminder
@@ -73,3 +75,33 @@ def test_failed_schedule_email_is_retried_without_duplicate_notification(monkeyp
     assert deliver_due_notifications() == 1
     assert item.notification_dispatches.filter(channel="in_app", event_type="reminder").count() == 1
     assert item.notification_dispatches.get(channel="email").status == "created"
+
+
+def test_schedule_reminder_batch_honors_disabled_email_preference():
+    item, _, student, now = make_due_group_reminder()
+    profile = preference_profile_for(student)
+    schedule_preference = profile.category_preferences.get(
+        category=Notification.Category.SCHEDULE
+    )
+    schedule_preference.email_enabled = False
+    schedule_preference.save(update_fields=["email_enabled"])
+
+    assert create_due_schedule_reminders(now=now) == 1
+
+    notification = item.notification_dispatches.get(
+        channel="email",
+        event_type="reminder",
+    ).notification
+    assert notification.status == Notification.Status.IN_APP_ONLY
+    assert set(
+        notification.delivery_attempts.values_list("channel", "state")
+    ) == {
+        (
+            NotificationDeliveryAttempt.Channel.IN_APP,
+            NotificationDeliveryAttempt.State.SENT,
+        ),
+        (
+            NotificationDeliveryAttempt.Channel.EMAIL,
+            NotificationDeliveryAttempt.State.SKIPPED,
+        ),
+    }
