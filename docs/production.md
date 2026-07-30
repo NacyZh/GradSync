@@ -94,6 +94,13 @@ Git fetch, image pull, fallback image build, migration, cache prune, and public
 HTTP probes have independent time limits. A stalled stage therefore fails with
 its own command context instead of consuming the complete deployment timeout.
 
+Project governance holds are reported by production readiness as operational
+warnings, not deployment blockers. A hold is an intentional fail-closed
+business state: the affected project remains read-only until an administrator
+uses the project health console to transfer ownership to an eligible teacher.
+Unapplied migrations, conflicting primary advisors, and stale audit exports
+remain deployment-blocking database failures.
+
 The deployment script intentionally does not flush Linux page cache. Avoid
 `sync; echo 3 > /proc/sys/vm/drop_caches` during deploys; it removes useful
 filesystem cache and can increase I/O pressure on a small VPS.

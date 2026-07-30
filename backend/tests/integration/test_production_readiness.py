@@ -1,12 +1,16 @@
 from pathlib import Path
 
+import pytest
 from django.core import mail
 from django.core.management import call_command
 
+from apps.common.management.commands import check_production_readiness as readiness_command
 from apps.common.production_checks import (
     collect_production_readiness_issues,
     production_ready_settings_stub,
 )
+from tests.factories.accounts import VerifiedUserFactory
+from tests.factories.collaboration import ResearchProjectFactory
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -451,3 +455,34 @@ def test_production_readiness_smtp_probe_uses_delivery_path(settings, tmp_path):
 
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == ["ops@gradsync.edu"]
+
+
+@pytest.mark.django_db
+def test_project_governance_holds_warn_without_blocking_deployment(
+    settings,
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    advisor = VerifiedUserFactory(global_role="advisor", active_role="teacher")
+    project = ResearchProjectFactory(
+        advisor=advisor,
+        governance_state="hold",
+        governance_hold_reason="owner_ineligible",
+    )
+    static_root = tmp_path / "staticfiles"
+    static_root.mkdir()
+    settings.STATIC_ROOT = str(static_root)
+    settings.PRODUCTION_SMTP_PROBE_TO = ""
+    monkeypatch.setattr(
+        readiness_command,
+        "collect_production_readiness_issues",
+        lambda _settings, _repo_root: [],
+    )
+
+    call_command("check_production_readiness", skip_repo_files=True)
+
+    output = capsys.readouterr()
+    assert "Production readiness checks passed" in output.out
+    assert "1 project governance holds need operational attention" in output.err
+    assert f"{project.id}:owner_ineligible" in output.err

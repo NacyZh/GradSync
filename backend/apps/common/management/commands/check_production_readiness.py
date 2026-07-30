@@ -28,6 +28,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         repo_root = None if options["skip_repo_files"] else Path(options["repo_root"])
         issues = collect_production_readiness_issues(settings, repo_root)
+        warnings = []
         if not options["skip_database"]:
             ResearchProject = apps.get_model("projects", "ResearchProject")
             ProjectMembership = apps.get_model("projects", "ProjectMembership")
@@ -36,16 +37,24 @@ class Command(BaseCommand):
             unapplied = executor.migration_plan(executor.loader.graph.leaf_nodes())
             if unapplied:
                 issues.append(f"{len(unapplied)} database migrations are not applied")
+            held_project_query = ResearchProject.objects.filter(
+                governance_state="hold"
+            ).order_by("id")
+            held_project_count = held_project_query.count()
             held_projects = list(
-                ResearchProject.objects.filter(governance_state="hold").values_list(
-                    "id", "governance_hold_reason"
-                )[:25]
+                held_project_query.values_list("id", "governance_hold_reason")[:25]
             )
             if held_projects:
                 summary = ", ".join(
                     f"{project_id}:{reason}" for project_id, reason in held_projects
                 )
-                issues.append(f"project governance holds require resolution: {summary}")
+                omitted = held_project_count - len(held_projects)
+                if omitted:
+                    summary += f", and {omitted} more"
+                warnings.append(
+                    f"{held_project_count} project governance holds need operational "
+                    f"attention: {summary}"
+                )
             conflicting_projects = (
                 ProjectMembership.objects.filter(status="active", role="advisor")
                 .values("project_id")
@@ -87,6 +96,9 @@ class Command(BaseCommand):
                     issues.append("SMTP delivery probe did not accept exactly one message")
             except Exception as exc:
                 issues.append(f"SMTP delivery probe failed: {exc}")
+
+        for warning in warnings:
+            self.stderr.write(self.style.WARNING(f"Production readiness warning: {warning}"))
 
         if issues:
             raise CommandError("Production readiness failed:\n- " + "\n- ".join(issues))
