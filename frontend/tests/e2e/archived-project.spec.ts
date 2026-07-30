@@ -4,8 +4,16 @@ import { fullStackE2E, loginAs, mockAuthenticatedApi } from './api-mocks';
 
 test('archived project validation controls are available on dashboard', async ({ page }) => {
   await mockAuthenticatedApi(page);
+  let projectPath = '/projects/1';
+  let projectTitle = 'Archived validation project';
   if (fullStackE2E) {
     await loginAs(page);
+    projectTitle = 'Archive lifecycle project';
+    await page.goto('/projects/new');
+    await page.getByLabel('Project title').fill(projectTitle);
+    await page.getByRole('button', { name: 'Create' }).click();
+    await expect(page).toHaveURL(/\/projects\/\d+$/);
+    projectPath = new URL(page.url()).pathname;
   } else {
     let status = 'active';
     await page.route('**/api/projects/1/', async (route) => {
@@ -66,9 +74,9 @@ test('archived project validation controls are available on dashboard', async ({
     });
   }
 
-  await page.goto('/projects/1');
+  await page.goto(projectPath);
   await expect(page.getByRole('banner')).toBeVisible();
-  await expect(page.getByRole('heading', { name: fullStackE2E ? 'Graphene Lab' : 'Archived validation project' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Project workflow' })).toContainText('Materials');
   await expect(page.getByRole('navigation', { name: 'Project workflow' })).toContainText('Reviews');
   await expect(page.getByRole('button', { name: 'Archive project' })).toBeVisible();
