@@ -33,7 +33,9 @@
 
 Pushes to `master` run the GitHub Actions CI/CD workflow. After backend and
 frontend checks pass, the `deploy-production` job connects to the production
-host over SSH and runs `scripts/deploy-production.sh`.
+host over SSH, uploads `scripts/deploy-production.sh` as a revision-specific
+temporary file, and executes it without sharing the SSH input stream with
+Docker Compose.
 
 The production host must already have:
 

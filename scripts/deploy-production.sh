@@ -161,15 +161,15 @@ compose up -d redis
 wait_for_service redis healthy
 
 echo "Running database migrations"
-compose_timed "$MIGRATION_TIMEOUT_SECONDS" run --rm migrate
+compose_timed "$MIGRATION_TIMEOUT_SECONDS" run --rm -T migrate </dev/null
 
 echo "Starting backend"
 compose up -d --no-deps --remove-orphans backend
 wait_for_service backend healthy
 
 echo "Running production readiness checks"
-compose exec -T backend python manage.py check --deploy
-compose exec -T backend python manage.py check_production_readiness --skip-repo-files
+compose exec -T backend python manage.py check --deploy </dev/null
+compose exec -T backend python manage.py check_production_readiness --skip-repo-files </dev/null
 
 echo "Starting frontend"
 compose up -d --no-deps --remove-orphans frontend
@@ -214,7 +214,8 @@ if command -v curl >/dev/null 2>&1; then
 
   upload_limit="$(
     compose exec -T backend python -c \
-      'from django.conf import settings; print(settings.GRADSYNC_UPLOAD_MAX_BYTES)'
+      'from django.conf import settings; print(settings.GRADSYNC_UPLOAD_MAX_BYTES)' \
+      </dev/null
   )"
   upload_probe_size=$((3 * 1024 * 1024))
   if [ "$upload_limit" -gt "$upload_probe_size" ]; then

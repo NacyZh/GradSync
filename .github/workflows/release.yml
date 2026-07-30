@@ -434,6 +434,15 @@ jobs:
       - name: Deploy on production host
         timeout-minutes: 55
         run: |
+          remote_script="/tmp/gradsync-deploy-${DEPLOY_REVISION}.sh"
+          scp \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            -o StrictHostKeyChecking=yes \
+            -i ~/.ssh/gradsync_github_deploy \
+            -P "${DEPLOY_PORT}" \
+            scripts/deploy-production.sh \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${remote_script}"
           ssh \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
@@ -443,8 +452,7 @@ jobs:
             -i ~/.ssh/gradsync_github_deploy \
             -p "${DEPLOY_PORT}" \
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_DEPLOY_REVISION='${DEPLOY_REVISION}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' GRADSYNC_STRICT_UPLOAD_PROXY_CHECK='${STRICT_UPLOAD_PROXY_CHECK}' GRADSYNC_USE_PREBUILT_IMAGES='true' GRADSYNC_IMAGE_SOURCE='${IMAGE_SOURCE}' BACKEND_IMAGE='${BACKEND_IMAGE}' FRONTEND_IMAGE='${FRONTEND_IMAGE}' sh -s" \
-            < scripts/deploy-production.sh
+            "chmod 700 '${remote_script}'; trap 'rm -f \"${remote_script}\"' 0; GRADSYNC_DEPLOY_PATH='${DEPLOY_PATH}' GRADSYNC_DEPLOY_BRANCH='${DEPLOY_BRANCH}' GRADSYNC_DEPLOY_REVISION='${DEPLOY_REVISION}' GRADSYNC_PUBLIC_URL='${PUBLIC_URL}' GRADSYNC_STRICT_UPLOAD_PROXY_CHECK='${STRICT_UPLOAD_PROXY_CHECK}' GRADSYNC_USE_PREBUILT_IMAGES='true' GRADSYNC_IMAGE_SOURCE='${IMAGE_SOURCE}' BACKEND_IMAGE='${BACKEND_IMAGE}' FRONTEND_IMAGE='${FRONTEND_IMAGE}' sh '${remote_script}'"
       - name: Remove production registry credentials
         if: always() && steps.registry_login.outcome == 'success'
         timeout-minutes: 2

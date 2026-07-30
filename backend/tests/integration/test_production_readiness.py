@@ -212,6 +212,9 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "ServerAliveInterval=30" in workflow
     assert "ServerAliveCountMax=6" in workflow
     assert "scripts/deploy-production.sh" in workflow
+    assert "scp \\" in workflow
+    assert 'remote_script="/tmp/gradsync-deploy-${DEPLOY_REVISION}.sh"' in workflow
+    assert "sh -s" not in workflow
 
 
 def test_full_stack_e2e_config_uses_current_seed_command_names():
@@ -242,12 +245,16 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     assert script.count('prune_builder_cache "after image builds"') == 1
     assert "verify_image_revision" in script
     assert "build --pull backend frontend" not in script
-    assert 'compose_timed "$MIGRATION_TIMEOUT_SECONDS" run --rm migrate' in script
+    assert (
+        'compose_timed "$MIGRATION_TIMEOUT_SECONDS" run --rm -T migrate </dev/null'
+        in script
+    )
     assert "--connect-timeout 10 --max-time" in script
     assert "compose up -d --no-deps --remove-orphans backend" in script
-    assert "compose exec -T backend python manage.py check --deploy" in script
+    assert "compose exec -T backend python manage.py check --deploy </dev/null" in script
     assert (
-        "compose exec -T backend python manage.py check_production_readiness --skip-repo-files"
+        "compose exec -T backend python manage.py "
+        "check_production_readiness --skip-repo-files </dev/null"
         in script
     )
     assert "--repo-root /app" not in script
