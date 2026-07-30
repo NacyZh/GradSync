@@ -23,7 +23,6 @@ class Command(BaseCommand):
             action="store_true",
             help="Skip repository file checks when running inside a minimal runtime image.",
         )
-        parser.add_argument("--smtp-probe-to", default="")
 
     def handle(self, *args, **options):
         repo_root = None if options["skip_repo_files"] else Path(options["repo_root"])
@@ -82,8 +81,17 @@ class Command(BaseCommand):
         if not static_root.exists():
             issues.append(f"STATIC_ROOT does not exist: {static_root}")
 
-        probe_to = options["smtp_probe_to"] or getattr(settings, "PRODUCTION_SMTP_PROBE_TO", "")
-        if probe_to:
+        probe_to = getattr(settings, "PRODUCTION_SMTP_PROBE_TO", "")
+        probe_matches_user = False
+        if probe_to and not options["skip_database"]:
+            User = apps.get_model("accounts", "User")
+            probe_matches_user = User.objects.filter(email__iexact=probe_to).exists()
+            if probe_matches_user:
+                issues.append(
+                    "PRODUCTION_SMTP_PROBE_TO must be a dedicated test mailbox, "
+                    "not an existing GradSync user email"
+                )
+        if probe_to and not probe_matches_user and not issues:
             try:
                 delivered_count = send_mail(
                     "GradSync production SMTP probe",

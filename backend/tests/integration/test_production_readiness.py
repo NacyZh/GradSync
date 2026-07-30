@@ -58,6 +58,24 @@ def test_production_readiness_rejects_invalid_smtp_settings():
     assert "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be configured together" in issues
 
 
+def test_production_readiness_requires_dedicated_smtp_probe_mailbox():
+    missing = collect_production_readiness_issues(
+        production_ready_settings_stub(PRODUCTION_SMTP_PROBE_TO="")
+    )
+    invalid = collect_production_readiness_issues(
+        production_ready_settings_stub(PRODUCTION_SMTP_PROBE_TO="not-an-email")
+    )
+    sender = collect_production_readiness_issues(
+        production_ready_settings_stub(
+            PRODUCTION_SMTP_PROBE_TO="NO-REPLY@GRADSYNC.EDU"
+        )
+    )
+
+    assert "PRODUCTION_SMTP_PROBE_TO must configure a dedicated test mailbox" in missing
+    assert "PRODUCTION_SMTP_PROBE_TO must be a valid email address" in invalid
+    assert "PRODUCTION_SMTP_PROBE_TO must differ from DEFAULT_FROM_EMAIL" in sender
+
+
 def test_production_readiness_rejects_unbounded_research_execution_settings():
     settings = production_ready_settings_stub(
         GRADSYNC_NOTIFICATION_THRESHOLD_MIN_MINUTES=120,
@@ -462,6 +480,33 @@ def test_production_readiness_smtp_probe_uses_delivery_path(settings, tmp_path):
 
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == ["ops@gradsync.edu"]
+
+
+@pytest.mark.django_db
+def test_production_readiness_rejects_registered_user_as_smtp_probe(
+    settings,
+    tmp_path,
+    monkeypatch,
+):
+    user = VerifiedUserFactory(email="smtp-probe@gradsync.edu")
+    static_root = tmp_path / "staticfiles"
+    static_root.mkdir()
+    settings.STATIC_ROOT = str(static_root)
+    settings.PRODUCTION_SMTP_PROBE_TO = user.email
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    monkeypatch.setattr(
+        readiness_command,
+        "collect_production_readiness_issues",
+        lambda _settings, _repo_root: [],
+    )
+
+    with pytest.raises(
+        readiness_command.CommandError,
+        match="must be a dedicated test mailbox",
+    ):
+        call_command("check_production_readiness", skip_repo_files=True)
+
+    assert mail.outbox == []
 
 
 @pytest.mark.django_db

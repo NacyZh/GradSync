@@ -106,7 +106,9 @@ def deliver_password_recovery(
         if return_to.startswith("/") and not return_to.startswith("//")
         else "/reset-password"
     )
-    url = f"{settings.APPROVED_FRONTEND_ORIGIN}{path}?{query}"
+    public_base_url = str(getattr(settings, "PUBLIC_BASE_URL", "")).strip().rstrip("/")
+    frontend_origin = public_base_url or settings.APPROVED_FRONTEND_ORIGIN
+    url = f"{frontend_origin}{path}?{query}"
     prefix = str(getattr(settings, "EMAIL_SUBJECT_PREFIX", "")).strip()
     notification = enqueue_notification(
         recipient=recovery.user,

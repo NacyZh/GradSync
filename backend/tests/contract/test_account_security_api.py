@@ -15,6 +15,7 @@ NEW_PASSWORD = "An0ther-Secure-Pw!"
 @pytest.mark.parametrize("kind", ["eligible", "unknown", "suspended", "archived"])
 def test_password_recovery_request_is_non_enumerating(api_client, kind, settings):
     settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    settings.PUBLIC_BASE_URL = "https://public.gradsync.example"
     email = f"{kind}@example.com"
     if kind != "unknown":
         user = UserFactory(
@@ -36,6 +37,11 @@ def test_password_recovery_request_is_non_enumerating(api_client, kind, settings
         "message": "If the account is eligible, recovery instructions will be sent."
     }
     assert AccountRecoveryRequest.objects.count() == (1 if kind == "eligible" else 0)
+    if kind == "eligible":
+        assert (
+            "https://public.gradsync.example/reset-password?"
+            in mail.outbox[-1].body
+        )
 
 
 @pytest.mark.django_db
@@ -67,6 +73,46 @@ def test_password_recovery_confirmation_changes_password_and_is_single_use(api_c
     )
     user.refresh_from_db()
     assert user.check_password(NEW_PASSWORD)
+
+
+@pytest.mark.django_db
+def test_password_recovery_confirmation_signs_out_current_browser(api_client, settings):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    signed_in_user = UserFactory(email_verified_at=timezone.now())
+    signed_in_user.set_password(PASSWORD)
+    signed_in_user.save()
+    recovered_user = UserFactory(email_verified_at=timezone.now())
+    recovered_user.set_password(PASSWORD)
+    recovered_user.save()
+
+    login_response = api_client.post(
+        "/api/accounts/login/",
+        {"email": signed_in_user.email, "password": PASSWORD},
+        format="json",
+    )
+    assert login_response.status_code == 200
+    api_client.post(
+        "/api/accounts/password-recovery/",
+        {"email": recovered_user.email},
+        format="json",
+    )
+    recovery = AccountRecoveryRequest.objects.get(user=recovered_user)
+    token = re.search(r"token=([^&\s]+)", mail.outbox[-1].body).group(1)
+
+    response = api_client.post(
+        "/api/accounts/password-recovery/confirm/",
+        {
+            "requestId": str(recovery.id),
+            "token": token,
+            "newPassword": NEW_PASSWORD,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 204
+    assert response["Cache-Control"] == "no-store"
+    assert response.cookies[settings.JWT_REFRESH_COOKIE_NAME]["max-age"] == 0
+    assert api_client.get("/api/accounts/me/").status_code == 401
 
 
 @pytest.mark.django_db

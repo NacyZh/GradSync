@@ -21,6 +21,22 @@ test('password recovery remains public and non-enumerating', async ({ page }) =>
   ).toBeVisible();
 });
 
+test('password reset signs out the current browser before returning to login', async ({ page }) => {
+  test.skip(fullStackE2E, 'The full-stack recovery token is delivered out of band.');
+  await mockAuthenticatedApi(page);
+  await mockAccountSecurity(page);
+
+  await page.goto(
+    '/reset-password?requestId=11111111-1111-4111-8111-111111111111&token=recovery-token',
+  );
+  await page.getByLabel('New password', { exact: true }).fill('An0ther-Secure-Pw!');
+  await page.getByLabel('Confirm new password').fill('An0ther-Secure-Pw!');
+  await page.getByRole('button', { name: 'Reset password' }).click();
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+});
+
 test('profile exposes email change and account session controls', async ({ page }) => {
   await mockAuthenticatedApi(page);
   await mockAccountSecurity(page);

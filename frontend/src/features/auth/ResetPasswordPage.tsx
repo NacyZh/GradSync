@@ -9,11 +9,13 @@ import { Input } from '@/shared/ui/primitives/input';
 import { Label } from '@/shared/ui/primitives/label';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 import { useI18n } from '../i18n/I18nProvider';
+import { useAuth } from './AuthProvider';
 import { confirmPasswordRecovery } from './api';
 
 export function ResetPasswordPage() {
   const { t } = useI18n();
   const { notify } = useAppFeedback();
+  const { clearAuthentication } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const requestId = params.get('requestId') ?? '';
@@ -23,6 +25,7 @@ export function ResetPasswordPage() {
   const mutation = useMutation({
     mutationFn: confirmPasswordRecovery,
     onSuccess: () => {
+      clearAuthentication();
       notify(t('passwordRecoveryCompleted'), 'success');
       navigate('/login', { replace: true });
     },
@@ -100,4 +103,3 @@ export function ResetPasswordPage() {
     </main>
   );
 }
-

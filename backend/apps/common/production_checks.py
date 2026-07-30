@@ -3,6 +3,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlparse
 
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+
 REQUIRED_OPERATIONAL_DOCS = (
     "docs/ops/credential-inventory.md",
     "docs/ops/infrastructure.md",
@@ -114,6 +117,16 @@ def collect_production_readiness_issues(settings_obj, repo_root: Path | None = N
         email_password and _has_placeholder(email_password)
     ):
         issues.append("SMTP credentials must not contain placeholder values")
+    smtp_probe_to = str(getattr(settings_obj, "PRODUCTION_SMTP_PROBE_TO", "")).strip()
+    if not smtp_probe_to:
+        issues.append("PRODUCTION_SMTP_PROBE_TO must configure a dedicated test mailbox")
+    else:
+        try:
+            validate_email(smtp_probe_to)
+        except ValidationError:
+            issues.append("PRODUCTION_SMTP_PROBE_TO must be a valid email address")
+        if smtp_probe_to.casefold() == default_from_email.strip().casefold():
+            issues.append("PRODUCTION_SMTP_PROBE_TO must differ from DEFAULT_FROM_EMAIL")
     if not getattr(settings_obj, "CELERY_BROKER_URL", ""):
         issues.append("CELERY_BROKER_URL must be configured")
     approved_origin = str(getattr(settings_obj, "APPROVED_FRONTEND_ORIGIN", "https://localhost"))

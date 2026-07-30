@@ -190,6 +190,7 @@ class PasswordRecoveryConfirmView(APIView):
     def post(self, request):
         serializer = PasswordRecoveryConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        browser_session_id = current_session_id(request)
         try:
             consume_password_recovery(
                 request_id=serializer.validated_data["requestId"],
@@ -206,7 +207,19 @@ class PasswordRecoveryConfirmView(APIView):
                 {"message": str(exc), "code": "recovery_invalid"},
                 status=status.HTTP_409_CONFLICT,
             )
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        if browser_session_id:
+            browser_session = AccountSession.objects.filter(pk=browser_session_id).first()
+            if browser_session:
+                revoke_session(
+                    session=browser_session,
+                    actor=None,
+                    reason="password_recovery_browser_reset",
+                )
+        logout(request)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        clear_refresh_cookie(response)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class EmailChangeView(APIView):

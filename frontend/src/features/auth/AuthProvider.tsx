@@ -21,6 +21,7 @@ type AuthContextValue = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<CurrentUser>;
   logout: () => Promise<void>;
+  clearAuthentication: () => void;
   isLoggingIn: boolean;
   isLoggingOut: boolean;
   loginError: string | null;
@@ -33,6 +34,7 @@ const AuthContext = createContext<AuthContextValue>({
     throw new Error('AuthProvider not mounted');
   },
   logout: async () => {},
+  clearAuthentication: () => {},
   isLoggingIn: false,
   isLoggingOut: false,
   loginError: null,
@@ -40,6 +42,14 @@ const AuthContext = createContext<AuthContextValue>({
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
+
+  const clearAuthentication = useCallback(() => {
+    clearAccessToken();
+    queryClient.removeQueries({
+      predicate: (query) => query.queryKey[0] !== 'current-user',
+    });
+    queryClient.setQueryData(['current-user'], null);
+  }, [queryClient]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['current-user'],
@@ -60,10 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: logoutApi,
-    onSuccess: () => {
-      queryClient.setQueryData(['current-user'], null);
-      queryClient.clear();
-    },
+    onSettled: clearAuthentication,
   });
 
   const login = useCallback(
@@ -96,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
+        clearAuthentication,
         isLoggingIn: loginMutation.isPending,
         isLoggingOut: logoutMutation.isPending,
         loginError: loginMutation.error?.message ?? null,
