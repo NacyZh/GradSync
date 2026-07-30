@@ -13,6 +13,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     && pip install --upgrade pip \
     && pip install .
 
+ARG GRADSYNC_BUILD_REVISION=unknown
+ARG GRADSYNC_IMAGE_SOURCE=""
+LABEL org.opencontainers.image.revision=$GRADSYNC_BUILD_REVISION \
+      org.opencontainers.image.source=$GRADSYNC_IMAGE_SOURCE
+
 COPY docker/backend-entrypoint.sh /entrypoint.sh
 
 RUN mkdir -p /app/backend/staticfiles /app/backend/media \

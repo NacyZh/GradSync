@@ -40,8 +40,8 @@ The production host must already have:
 - The repository cloned at `GRADSYNC_DEPLOY_PATH` (default
   `/home/GradSync/GradSync`).
 - A clean working tree that can accept `git pull --ff-only`.
-- Debian 13 with `git`, `curl`, Docker Engine, and the Docker Compose plugin
-  installed.
+- Debian 13 with `git`, `curl`, GNU `timeout`, Docker Engine, and the Docker
+  Compose plugin installed.
 - A valid `.env.production` file, either maintained on the host or synced from
   the `PRODUCTION_ENV_FILE` GitHub secret.
 - Git credentials or a deploy key that allow the host to fetch the GitHub
@@ -65,14 +65,11 @@ The deploy script performs:
    the current workflow.
 2. Enforce specification acceptance before changing runtime services.
 3. Run Compose with `COMPOSE_PARALLEL_LIMIT=1` and `--env-file .env.production`.
-4. Keep the existing application services running while new images build.
-5. Prune only BuildKit cache older than
-   `GRADSYNC_BUILDER_CACHE_MAX_AGE` (default `168h`) when
-   `GRADSYNC_PRUNE_BUILDER_CACHE=true`, preserving recent npm and pip layers.
-6. Build the backend and frontend images serially, pruning builder cache after
-   each image build to release build state on 1 GB hosts. The frontend npm
-   cache uses a stable BuildKit cache ID across release revisions.
-7. Prune dangling images when `GRADSYNC_PRUNE_DANGLING_IMAGES=true`.
+4. Pull the backend and frontend images published by the `production-image`
+   job under immutable `github.sha` tags.
+5. Verify both image revision labels match the checked-out commit before
+   changing runtime services.
+6. Prune dangling images when `GRADSYNC_PRUNE_DANGLING_IMAGES=true`.
 8. Start PostgreSQL and Redis one at a time and wait for health checks.
 9. Run migrations.
 10. Recreate the backend, wait for health, and run `python manage.py check --deploy`
@@ -81,8 +78,21 @@ The deploy script performs:
    container.
 11. Recreate frontend, worker, and scheduler one at a time.
 12. Probe `/`, `/healthz/`, `/readyz/`, and `/api/schema/`.
-13. Watch backend logs, worker logs, queue depth, notification failures, and
+13. Remove the production host's short-lived GHCR credentials.
+14. Watch backend logs, worker logs, queue depth, notification failures, and
    request latency for at least one reminder cycle.
+
+The `production-image` job uses GitHub Actions BuildKit caches scoped separately
+to the backend and frontend. The deployment job authenticates the host with its
+short-lived `GITHUB_TOKEN`; no long-lived registry token is stored. A direct
+host build remains available only by invoking the script with
+`GRADSYNC_USE_PREBUILT_IMAGES=false`. That fallback builds serially, keeps
+BuildKit entries for 720 hours by default, and runs one cache prune after both
+images have built.
+
+Git fetch, image pull, fallback image build, migration, cache prune, and public
+HTTP probes have independent time limits. A stalled stage therefore fails with
+its own command context instead of consuming the complete deployment timeout.
 
 The deployment script intentionally does not flush Linux page cache. Avoid
 `sync; echo 3 > /proc/sys/vm/drop_caches` during deploys; it removes useful
@@ -103,12 +113,12 @@ GRADSYNC_NPM_MAXSOCKETS=8
 GRADSYNC_NPM_CI_TIMEOUT_SECONDS=600
 ```
 
-If the production host cannot reliably reach the official npm registry, set
-`GRADSYNC_NPM_REGISTRY` in the protected `PRODUCTION_ENV_FILE` to an
-organization-approved registry proxy or regional mirror. Do not disable TLS or
-package-lock integrity checks. A timed-out install now exits the image build
-instead of consuming the complete deployment-job timeout. HTTP fetch lines in
-the Docker build output identify the package or registry that stalled.
+Normal production deployment installs frontend dependencies in the
+`production-image` GitHub Actions job, not on the production host. The
+dependency layer is reused whenever `package.json` and `package-lock.json`
+remain unchanged; the per-commit revision argument is intentionally declared
+after that layer. Direct host-build fallback still honors the settings above.
+Do not disable TLS or package-lock integrity checks.
 
 After changing these values, rerun the deployment. The package-lock layer and
 the persistent `gradsync-frontend-npm` BuildKit cache allow subsequent builds

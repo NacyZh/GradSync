@@ -4,6 +4,9 @@ services:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
+      args:
+        GRADSYNC_BUILD_REVISION: ${GRADSYNC_BUILD_REVISION:-unknown}
+        GRADSYNC_IMAGE_SOURCE: ${GRADSYNC_IMAGE_SOURCE:-}
     env_file:
       - path: .env.production.example
       - path: .env.production
@@ -85,6 +88,7 @@ services:
         NPM_CONFIG_MAXSOCKETS: ${GRADSYNC_NPM_MAXSOCKETS:-8}
         NPM_CI_TIMEOUT_SECONDS: ${GRADSYNC_NPM_CI_TIMEOUT_SECONDS:-600}
         GRADSYNC_BUILD_REVISION: ${GRADSYNC_BUILD_REVISION:-unknown}
+        GRADSYNC_IMAGE_SOURCE: ${GRADSYNC_IMAGE_SOURCE:-}
     env_file:
       - path: .env.production.example
       - path: .env.production

@@ -172,8 +172,15 @@ def test_release_workflow_deploys_by_ssh_with_protected_environment():
     assert "production-image:" in workflow
     assert "frontend-e2e:" in workflow
     assert "docker compose -f docker-compose.prod.yml config --quiet" in workflow
-    assert "docker build -f docker/backend.Dockerfile" in workflow
-    assert "docker build -f docker/frontend.Dockerfile" in workflow
+    assert "docker/setup-buildx-action@v3" in workflow
+    assert "docker/login-action@v4" in workflow
+    assert workflow.count("docker/build-push-action@v7") == 2
+    assert "cache-from: type=gha,scope=production-backend" in workflow
+    assert "cache-from: type=gha,scope=production-frontend" in workflow
+    assert "packages: write" in workflow
+    assert "packages: read" in workflow
+    assert "GRADSYNC_USE_PREBUILT_IMAGES='true'" in workflow
+    assert "docker logout ghcr.io" in workflow
     assert "needs: [backend, frontend, frontend-e2e]" in workflow
     assert (
         "needs: [backend, frontend, frontend-e2e, acceptance-enforce, "
@@ -218,16 +225,21 @@ def test_deploy_script_fetches_code_and_restarts_stack():
     assert 'test "$(git rev-parse HEAD)" = "$REVISION"' in script
     assert 'docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE"' in script
     assert 'COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"' in script
-    assert 'BUILDER_CACHE_MAX_AGE="${GRADSYNC_BUILDER_CACHE_MAX_AGE:-168h}"' in script
+    assert 'BUILDER_CACHE_MAX_AGE="${GRADSYNC_BUILDER_CACHE_MAX_AGE:-720h}"' in script
     assert "compose stop backend frontend worker scheduler" not in script
     assert "compose rm -f backend frontend worker scheduler" not in script
     assert "docker builder prune -af" in script
     assert '--filter "until=$BUILDER_CACHE_MAX_AGE"' in script
     assert "docker image prune -f" in script
-    assert "compose build --pull backend" in script
-    assert "compose build --pull frontend" in script
+    assert 'USE_PREBUILT_IMAGES="${GRADSYNC_USE_PREBUILT_IMAGES:-false}"' in script
+    assert 'compose_timed "$IMAGE_PULL_TIMEOUT_SECONDS" pull backend frontend' in script
+    assert 'compose_timed "$IMAGE_BUILD_TIMEOUT_SECONDS" build --pull backend' in script
+    assert 'compose_timed "$IMAGE_BUILD_TIMEOUT_SECONDS" build --pull frontend' in script
+    assert script.count('prune_builder_cache "after image builds"') == 1
+    assert "verify_image_revision" in script
     assert "build --pull backend frontend" not in script
-    assert "compose run --rm migrate" in script
+    assert 'compose_timed "$MIGRATION_TIMEOUT_SECONDS" run --rm migrate' in script
+    assert "--connect-timeout 10 --max-time" in script
     assert "compose up -d --no-deps --remove-orphans backend" in script
     assert "compose exec -T backend python manage.py check --deploy" in script
     assert (

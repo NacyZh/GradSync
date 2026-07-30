@@ -14,6 +14,9 @@ def test_frontend_dependency_install_is_bounded_and_configurable():
     assert "id=gradsync-frontend-npm" in dockerfile
     assert 'timeout "${NPM_CI_TIMEOUT_SECONDS}s"' in dockerfile
     assert "--loglevel=http" in dockerfile
+    assert dockerfile.index("npm ci --prefer-offline") < dockerfile.index(
+        "ARG GRADSYNC_BUILD_REVISION=unknown"
+    )
 
     assert "GRADSYNC_NPM_REGISTRY" in compose
     assert "GRADSYNC_NPM_FETCH_TIMEOUT_MS" in compose
@@ -33,5 +36,7 @@ def test_frontend_image_and_public_asset_are_revision_bound():
     assert "GRADSYNC_BUILD_REVISION" in compose
     assert "location = /version.txt" in nginx
     assert "__GRADSYNC_BUILD_REVISION__" in service_worker
-    assert 'public_frontend_revision="$(curl -fsS "$PUBLIC_URL/version.txt"' in deploy
+    assert 'public_frontend_revision="$(' in deploy
+    assert '"$PUBLIC_URL/version.txt"' in deploy
     assert "Public frontend revision mismatch." in deploy
+    assert "verify_image_revision" in deploy

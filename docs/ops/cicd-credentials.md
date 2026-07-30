@@ -24,7 +24,11 @@ environment.
 ## Gate Rules
 
 - Pull requests run tests and builds but do not deploy.
-- Pushes to `master` deploy by SSH after backend and frontend checks pass.
+- Pushes to `master` publish commit-SHA backend and frontend images to GHCR,
+  then deploy those exact images over SSH after all checks pass.
+- `production-image` receives `packages: write`; `deploy-production` receives
+  only `packages: read`. The production host uses the job-scoped
+  `GITHUB_TOKEN` and logs out after deployment, so no registry PAT is required.
 - The `deploy-production` job requires GitHub environment approval before
   deployment credentials are usable.
 - Deploy credentials must be least privilege and rotated after staff changes or
