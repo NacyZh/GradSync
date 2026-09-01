@@ -11,6 +11,10 @@ htmlcov/
 venv/
 dist/
 *.egg-info/
+.specify
+.agents
+.claude
+.codex
 
 # Node / frontend
 node_modules/
@@ -58,7 +62,6 @@ specs/*
 specs/003-research-collab-platform/*
 !specs/003-research-collab-platform/contracts/
 specs/003-research-collab-platform/contracts/*
-!specs/003-research-collab-platform/contracts/openapi.yaml
 !specs/015-dashboard-calendar/
 !specs/015-dashboard-calendar/**
 !specs/016-access-governance/
